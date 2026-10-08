@@ -469,6 +469,32 @@ typedef struct ItofinParticleSwarmOptions {
   bool has_velocity_clamp;
 } ItofinParticleSwarmOptions;
 
+/**
+ * Single-chain annealing controls. Presence flags preserve explicit values;
+ * a zero-initialized record selects deterministic seed zero and solver defaults.
+ */
+typedef struct ItofinHybridSimulatedAnnealingOptions {
+  uint64_t seed;
+  size_t maxiter;
+  size_t maxfev;
+  double xatol;
+  double fatol;
+  double initial_temperature;
+  double cooling_rate;
+  double step_size;
+  size_t local_search_interval;
+  size_t local_search_steps;
+  size_t reanneal_interval;
+  bool has_xatol;
+  bool has_fatol;
+  bool has_initial_temperature;
+  bool has_cooling_rate;
+  bool has_step_size;
+  bool has_local_search_interval;
+  bool has_local_search_steps;
+  bool has_reanneal_interval;
+} ItofinHybridSimulatedAnnealingOptions;
+
 typedef struct ItofinSwapHelperConfig {
   uint64_t quote;
   int32_t tenor_length;
@@ -1017,32 +1043,6 @@ typedef struct ItofinSlsqpOptions {
   size_t maxiter;
   size_t maxfev;
 } ItofinSlsqpOptions;
-
-/**
- * Single-chain annealing controls. Presence flags preserve explicit values;
- * a zero-initialized record selects deterministic seed zero and solver defaults.
- */
-typedef struct ItofinHybridSimulatedAnnealingOptions {
-  uint64_t seed;
-  size_t maxiter;
-  size_t maxfev;
-  double xatol;
-  double fatol;
-  double initial_temperature;
-  double cooling_rate;
-  double step_size;
-  size_t local_search_interval;
-  size_t local_search_steps;
-  size_t reanneal_interval;
-  bool has_xatol;
-  bool has_fatol;
-  bool has_initial_temperature;
-  bool has_cooling_rate;
-  bool has_step_size;
-  bool has_local_search_interval;
-  bool has_local_search_steps;
-  bool has_reanneal_interval;
-} ItofinHybridSimulatedAnnealingOptions;
 
 typedef struct ItofinOvernightFutureConfig {
   uint64_t index;
@@ -3135,6 +3135,33 @@ int32_t itofin_particle_swarm_result(struct ItofinContext *ctx,
                                      size_t n,
                                      struct ItofinOptimizeResult *out,
                                      struct ItofinError *error);
+
+/**
+ * Construct a retained hybrid-annealing calibration method in free-parameter order.
+ * A null or zeroed options record selects defaults. Model calibration uses root-RSS;
+ * every candidate must satisfy the model constraint before pricing.
+ * # Safety
+ * Pointers must satisfy the crate-level C caller contract.
+ */
+int32_t itofin_hybrid_simulated_annealing_new(struct ItofinContext *ctx,
+                                              const double *lower,
+                                              size_t lower_len,
+                                              const double *upper,
+                                              size_t upper_len,
+                                              const struct ItofinHybridSimulatedAnnealingOptions *options,
+                                              uint64_t *out,
+                                              struct ItofinError *error);
+
+/**
+ * Copy the preserved hybrid-annealing outcome without repricing.
+ * # Safety
+ * `out` and other pointers follow `itofin_differential_evolution_result`.
+ */
+int32_t itofin_hybrid_simulated_annealing_result(struct ItofinContext *ctx,
+                                                 uint64_t method,
+                                                 size_t n,
+                                                 struct ItofinOptimizeResult *out,
+                                                 struct ItofinError *error);
 
 /**
  * # Safety
