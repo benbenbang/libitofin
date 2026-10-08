@@ -7,9 +7,9 @@ use crate::math::optimization::method::OptimizationMethod;
 use crate::math::optimization::problem::Problem;
 use crate::require;
 use itofin_optimize::{
-    Bounds, Common, Converged, DifferentialEvolutionOptions, HybridSimulatedAnnealingOptions,
-    Method, Minimize, MinimizeError, ParticleSwarmOptions, Problem as ScalarProblem, Termination,
-    minimize,
+    Bounds, Common, Converged, DifferentialEvolutionOptions, FireflyOptions,
+    HybridSimulatedAnnealingOptions, Method, Minimize, MinimizeError, ParticleSwarmOptions,
+    Problem as ScalarProblem, Termination, minimize,
 };
 
 #[derive(Debug, Clone)]
@@ -54,6 +54,7 @@ fn budgets(method: &Method, common: &Common) -> QlResult<Common> {
     let result = match method {
         Method::DifferentialEvolution(options) => options.budgets(common),
         Method::ParticleSwarm(options) => options.budgets(common),
+        Method::Firefly(options) => options.budgets(common),
         Method::HybridSimulatedAnnealing(options) => options.budgets(common),
         _ => return Err(ql_error("calibration adapter requires a global solver")),
     };
@@ -63,6 +64,7 @@ fn budgets(method: &Method, common: &Common) -> QlResult<Common> {
 fn solver_name(method: &Method) -> &'static str {
     match method {
         Method::ParticleSwarm(_) => "particle swarm",
+        Method::Firefly(_) => "firefly",
         Method::HybridSimulatedAnnealing(_) => "hybrid simulated annealing",
         _ => "differential evolution",
     }
@@ -349,6 +351,58 @@ impl OptimizationMethod for HybridSimulatedAnnealing {
         self.last_result()
     }
 }
+
+/// Bounded firefly search accepted by model calibration.
+///
+/// Bounds and explicit populations use the projected, free-parameter order.
+/// The supplied box must be wholly feasible for the model constraint. Every
+/// candidate is checked before pricing; rejected candidates abort the run
+/// instead of evaluating invalid parameters or inventing a penalty.
+/// General coupled constraints are not supported by this box-based search.
+#[derive(Debug, Clone)]
+pub struct Firefly {
+    adapter: CalibrationAdapter,
+}
+
+impl Firefly {
+    /// Constructs a solver with explicit finite bounds and a deterministic seed.
+    ///
+    /// # Errors
+    /// Rejects invalid bounds, population, coefficients or budgets. Evaluation
+    /// budgets are capped at ten million to keep legacy integer counts safe.
+    pub fn new(bounds: Bounds, options: FireflyOptions, common: Common) -> QlResult<Self> {
+        Ok(Self {
+            adapter: CalibrationAdapter::new(bounds, Method::Firefly(options), common)?,
+        })
+    }
+
+    /// The exact optimizer outcome of the last completed solver invocation.
+    ///
+    /// Exhaustion is retained without claiming convergence. Invalid input and
+    /// objective failures during invocation clear previous results; earlier
+    /// model preflight failures retain them. Nonfinite termination retains
+    /// diagnostics while returning a calibration error.
+    pub fn last_result(&self) -> Option<&Minimize> {
+        self.adapter.last_result()
+    }
+}
+
+impl OptimizationMethod for Firefly {
+    fn minimize(
+        &mut self,
+        problem: &mut Problem<'_>,
+        end_criteria: &EndCriteria,
+    ) -> QlResult<EndCriteriaType> {
+        self.adapter.minimize(problem, end_criteria)
+    }
+
+    fn global_result(&self) -> Option<&Minimize> {
+        self.last_result()
+    }
+}
+
+#[cfg(test)]
+mod firefly_tests;
 
 #[cfg(test)]
 mod hybrid_simulated_annealing_tests;
