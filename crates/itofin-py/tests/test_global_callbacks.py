@@ -6,7 +6,10 @@ import pytest
 from itofin.optimize import Status, minimize
 
 
-METHOD = "Differential-Evolution"
+@pytest.fixture(params=["Differential-Evolution", "Particle-Swarm"])
+def method(request: pytest.FixtureRequest) -> str:
+    """Exercise the same callback and validation contracts for both global solvers."""
+    return str(request.param)
 BOUNDS = [(-1.0, 1.0)]
 POPULATION = [[-1.0], [-0.5], [0.25], [1.0]]
 
@@ -16,7 +19,7 @@ def quadratic(x: np.ndarray) -> float:
     return float((x[0] - 0.1) ** 2)
 
 
-def test_callback_stop_iteration_cancels_after_one_generation() -> None:
+def test_callback_stop_iteration_cancels_after_one_generation(method: str) -> None:
     """Cancellation retains the best point and counts completed work."""
     seen = []
 
@@ -27,7 +30,7 @@ def test_callback_stop_iteration_cancels_after_one_generation() -> None:
     result = minimize(
         quadratic,
         [0.0],
-        method=METHOD,
+        method=method,
         bounds=BOUNDS,
         options={"initial_population": POPULATION},
         callback=stop,
@@ -39,7 +42,7 @@ def test_callback_stop_iteration_cancels_after_one_generation() -> None:
 
 
 @pytest.mark.parametrize("callback_failure", [False, True])
-def test_objective_and_callback_exception_identity(callback_failure: bool) -> None:
+def test_objective_and_callback_exception_identity(method: str, callback_failure: bool) -> None:
     """The exact Python exception object crosses the Rust boundary unchanged."""
     sentinel = RuntimeError("global callback failure" if callback_failure else "global objective failure")
 
@@ -50,7 +53,7 @@ def test_objective_and_callback_exception_identity(callback_failure: bool) -> No
         minimize(
             quadratic if callback_failure else fail,
             [0.0],
-            method=METHOD,
+            method=method,
             bounds=BOUNDS,
             options={"initial_population": POPULATION},
             callback=fail if callback_failure else None,
@@ -58,7 +61,7 @@ def test_objective_and_callback_exception_identity(callback_failure: bool) -> No
     assert caught.value is sentinel
 
 
-def test_objective_stop_iteration_remains_an_exception_not_cancellation() -> None:
+def test_objective_stop_iteration_remains_an_exception_not_cancellation(method: str) -> None:
     """Only callback StopIteration has cancellation semantics."""
     sentinel = StopIteration("objective exhausted")
 
@@ -66,11 +69,11 @@ def test_objective_stop_iteration_remains_an_exception_not_cancellation() -> Non
         raise sentinel
 
     with pytest.raises(StopIteration) as caught:
-        minimize(fail, [0.0], method=METHOD, bounds=BOUNDS)
+        minimize(fail, [0.0], method=method, bounds=BOUNDS)
     assert caught.value is sentinel
 
 
-def test_reentry_from_callback_and_mutation_do_not_change_outer_state() -> None:
+def test_reentry_from_callback_and_mutation_do_not_change_outer_state(method: str) -> None:
     """Independent nested runs and writable arrays cannot corrupt the outer run."""
     nested = []
 
@@ -83,7 +86,7 @@ def test_reentry_from_callback_and_mutation_do_not_change_outer_state() -> None:
     result = minimize(
         quadratic,
         [0.0],
-        method=METHOD,
+        method=method,
         bounds=BOUNDS,
         options={"initial_population": POPULATION},
         callback=callback,
@@ -94,7 +97,7 @@ def test_reentry_from_callback_and_mutation_do_not_change_outer_state() -> None:
     assert result.fun == quadratic(result.x)
 
 
-def test_objective_array_mutation_is_isolated_from_core_population() -> None:
+def test_objective_array_mutation_is_isolated_from_core_population(method: str) -> None:
     """The facade passes owned arrays, not aliases of candidate storage."""
     captured = []
 
@@ -107,7 +110,7 @@ def test_objective_array_mutation_is_isolated_from_core_population() -> None:
     result = minimize(
         objective,
         [0.0],
-        method=METHOD,
+        method=method,
         bounds=BOUNDS,
         options={"initial_population": POPULATION, "maxiter": 1},
     )
@@ -116,15 +119,15 @@ def test_objective_array_mutation_is_isolated_from_core_population() -> None:
     assert all(point[0] == 500.0 for point in captured)
 
 
-def test_nan_and_infinity_results_stop_without_panicking() -> None:
+def test_nan_and_infinity_results_stop_without_panicking(method: str) -> None:
     """Nonfinite objective results return the established Nonfinite status."""
     for value in [float("nan"), float("inf"), -float("inf")]:
-        result = minimize(lambda _: value, [0.0], method=METHOD, bounds=BOUNDS)
+        result = minimize(lambda _: value, [0.0], method=method, bounds=BOUNDS)
         assert result.status == Status.Nonfinite and not result.success
         assert result.nfev == 1
 
 
-def test_objective_can_reenter_optimizer_without_global_state() -> None:
+def test_objective_can_reenter_optimizer_without_global_state(method: str) -> None:
     """Nested objective runs retain independent solver and callback state."""
     count = 0
 
@@ -138,7 +141,7 @@ def test_objective_can_reenter_optimizer_without_global_state() -> None:
     result = minimize(
         objective,
         [0.0],
-        method=METHOD,
+        method=method,
         bounds=BOUNDS,
         options={"initial_population": POPULATION, "maxfev": 4},
     )
