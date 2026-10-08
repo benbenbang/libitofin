@@ -46,6 +46,7 @@ mod counters;
 mod differential_evolution;
 mod error;
 mod finite_difference;
+mod firefly;
 mod global;
 mod lbfgsb;
 mod line_search;
@@ -136,6 +137,7 @@ pub fn minimize<O: Objective>(
         Method::HybridSimulatedAnnealing(options) => {
             simulated_annealing::minimize(objective, problem, options, common)
         }
+        Method::Firefly(options) => firefly::minimize(objective, problem, options, common),
         Method::DifferentialEvolution(options) => {
             differential_evolution::minimize(objective, problem, options, common)
         }
