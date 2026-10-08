@@ -170,3 +170,5 @@ fn hybrid_annealing_cancel_fixed_and_budget_counts() {
     assert_eq!(x, [0.5]);
     assert_eq!(calls.releases, 1);
 }
+
+mod boundary_tests;
