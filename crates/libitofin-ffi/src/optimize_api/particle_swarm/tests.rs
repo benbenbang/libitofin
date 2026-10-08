@@ -244,3 +244,5 @@ fn particle_swarm_partial_generation_counts_and_zero_coefficients() {
     assert_eq!(calls.values[0], calls.values[4]);
     assert_eq!(calls.releases, 1);
 }
+
+mod boundary_tests;
