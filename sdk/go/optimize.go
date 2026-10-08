@@ -145,10 +145,12 @@ func Minimize(ctx context.Context, fn func(x []float64) (float64, error), x0 []f
 	var lbfgsb LBFGSB
 	var slsqp SLSQP
 	var de DifferentialEvolution
+	var pso ParticleSwarm
 	isBFGS := false
 	isLBFGSB := false
 	isSLSQP := false
 	isDE := false
+	isPSO := false
 	switch selected := method.(type) {
 	case NelderMeadOptions:
 		nm = selected
@@ -193,6 +195,13 @@ func Minimize(ctx context.Context, fn func(x []float64) (float64, error), x0 []f
 		}
 		isDE = true
 		de = *selected
+	case ParticleSwarm:
+		isPSO, pso = true, selected
+	case *ParticleSwarm:
+		if selected == nil {
+			return OptimizeResult{}, fmt.Errorf("%w: nil method", ErrInvalidArgument)
+		}
+		isPSO, pso = true, *selected
 	default:
 		return OptimizeResult{}, fmt.Errorf("%w: unknown method", ErrInvalidArgument)
 	}
@@ -200,7 +209,11 @@ func Minimize(ctx context.Context, fn func(x []float64) (float64, error), x0 []f
 		return OptimizeResult{}, err
 	}
 	var dimensions []int
-	if isDE {
+	if isPSO {
+		if err := validateParticleSwarm(pso, x0); err != nil {
+			return OptimizeResult{}, err
+		}
+	} else if isDE {
 		if err := validateDifferentialEvolution(de, x0); err != nil {
 			return OptimizeResult{}, err
 		}
@@ -256,7 +269,9 @@ func Minimize(ctx context.Context, fn func(x []float64) (float64, error), x0 []f
 	out.x = (*C.double)(unsafe.Pointer(unsafe.SliceData(x)))
 	var e C.ItofinError
 	var status C.int32_t
-	if isDE {
+	if isPSO {
+		status = runParticleSwarm(&objective, x0, pso, &out, &e)
+	} else if isDE {
 		status = runDifferentialEvolution(&objective, x0, de, &out, &e)
 	} else if isBFGS {
 		fd := C.int32_t(0)
