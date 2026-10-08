@@ -1,10 +1,12 @@
+"""Global model calibration shares ownership, rollback and result contracts."""
+
 import gc
 
 import pytest
 
 from itofin import ItofinError
 from itofin.models import HullWhite
-from itofin.optimization import BoundaryConstraint, DifferentialEvolution, EndCriteria
+from itofin.optimization import BoundaryConstraint, DifferentialEvolution, EndCriteria, ParticleSwarm
 from itofin.optimize import Status
 from itofin.indexes import Euribor
 
@@ -21,15 +23,22 @@ def _market():
     return model, helpers, criteria
 
 
-def _method(**options):
-    return DifferentialEvolution(
+@pytest.fixture(params=[DifferentialEvolution, ParticleSwarm])
+def factory(request):
+    """Both global adapters share rollback and diagnostic semantics."""
+    return request.param
+
+
+def _method(factory, **options):
+    return factory(
         [(0.001, 0.03)], seed=42, population_size=8,
         xatol=1e-7, fatol=1e-12, **options,
     )
 
 
-def test_global_calibration_fixed_parameter_repeat_and_result_copy():
-    method = _method()
+def test_global_calibration_fixed_parameter_repeat_and_result_copy(factory):
+    """Repeated seeded runs retain fixed parameters and independently owned results."""
+    method = _method(factory)
     assert method.last_result() is None
     results = []
     for _ in range(2):
@@ -54,9 +63,10 @@ def test_global_calibration_fixed_parameter_repeat_and_result_copy():
     assert results[0] == results[1]
 
 
-def test_global_calibration_exhaustion_is_not_convergence():
+def test_global_calibration_exhaustion_is_not_convergence(factory):
+    """An exhausted budget returns diagnostics without reporting success."""
     model, helpers, criteria = _market()
-    method = _method(maxfev=1)
+    method = _method(factory, maxfev=1)
     model.calibrate(helpers, method, criteria, True)
     result = method.last_result()
     assert result is not None
@@ -65,9 +75,10 @@ def test_global_calibration_exhaustion_is_not_convergence():
     assert model.a() == 0.05
 
 
-def test_global_calibration_dimension_failure_clears_old_result_and_rolls_back():
+def test_global_calibration_dimension_failure_clears_old_result_and_rolls_back(factory):
+    """Invalid free-parameter dimension clears stale diagnostics and restores the model."""
     model, helpers, criteria = _market()
-    method = _method()
+    method = _method(factory)
     model.calibrate(helpers, method, criteria, True)
     before = (model.a(), model.sigma())
     with pytest.raises(ItofinError, match="free parameter count"):
@@ -76,9 +87,10 @@ def test_global_calibration_dimension_failure_clears_old_result_and_rolls_back()
     assert (model.a(), model.sigma()) == before
 
 
-def test_global_calibration_constraint_intersection_and_invalid_population():
+def test_global_calibration_constraint_intersection_and_invalid_population(factory):
+    """Explicit populations must fit the intersected effective box."""
     model, helpers, criteria = _market()
-    method = DifferentialEvolution(
+    method = factory(
         [(0.001, 0.03)], initial_population=[[0.003], [0.006], [0.02], [0.025]],
     )
     before = (model.a(), model.sigma())
@@ -95,5 +107,18 @@ def test_global_calibration_constraint_intersection_and_invalid_population():
     {"mutation": 0}, {"recombination": 1.01}, {"xatol": float("nan")},
 ])
 def test_global_calibration_rejects_invalid_controls(options):
+    """Reject invalid differential-evolution controls before calibration."""
     with pytest.raises((ItofinError, TypeError, ValueError, OverflowError)):
         DifferentialEvolution([(0.001, 0.03)], **options)
+
+
+@pytest.mark.parametrize("options", [
+    {"seed": True}, {"population_size": False}, {"maxiter": True}, {"maxfev": True},
+    {"seed": -1}, {"maxfev": 10_000_001}, {"population_size": 3},
+    {"inertia": -0.1}, {"inertia": 1.1}, {"cognitive": 4.1}, {"social": -0.1},
+    {"velocity_clamp": 0.0}, {"velocity_clamp": 1.1}, {"xatol": float("nan")},
+])
+def test_particle_swarm_calibration_rejects_invalid_controls(options):
+    """Invalid PSO options fail before constructing or mutating a model."""
+    with pytest.raises((ItofinError, TypeError, ValueError, OverflowError)):
+        ParticleSwarm([(0.001, 0.03)], **options)
