@@ -85,6 +85,50 @@
         "TestParticleSwarmCalibrationFixedParametersAndResultOwnership",
         "TestParticleSwarmCalibrationBudgetAndCrossSession"
       ]
+    },
+    {
+      "c": "itofin_optimize_hybrid_simulated_annealing",
+      "go": "Minimize",
+      "python": "itofin.optimize.minimize",
+      "status": "implemented",
+      "tests": [
+        "TestHybridSimulatedAnnealingNegativeSeededObjective",
+        "TestHybridSimulatedAnnealingErrorPanicCancellationAndReentry",
+        "TestHybridSimulatedAnnealingNonfiniteIsNotCallbackError",
+        "TestHybridSimulatedAnnealingBudgetsFixedAndCopies",
+        "TestHybridSimulatedAnnealingInvalidOptionsNeverEvaluate",
+        "TestHybridSimulatedAnnealingIndependentPolicyFixtures"
+      ]
+    },
+    {
+      "c": "itofin_hybrid_simulated_annealing_new",
+      "go": "HybridSimulatedAnnealingMethod",
+      "python": "itofin.optimization.HybridSimulatedAnnealing",
+      "status": "implemented",
+      "tests": [
+        "TestHybridSimulatedAnnealingCalibrationConstructorValidation",
+        "TestHybridSimulatedAnnealingCalibrationNilAndClosedSession"
+      ]
+    },
+    {
+      "c": "itofin_hybrid_simulated_annealing_new",
+      "go": "Session.NewHybridSimulatedAnnealing",
+      "python": "itofin.optimization.HybridSimulatedAnnealing.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestHybridSimulatedAnnealingCalibrationFixedParametersAndResultOwnership",
+        "TestHybridSimulatedAnnealingCalibrationBudgetAndCrossSession"
+      ]
+    },
+    {
+      "c": "itofin_hybrid_simulated_annealing_result",
+      "go": "HybridSimulatedAnnealingMethod.LastResult",
+      "python": "itofin.optimization.HybridSimulatedAnnealing.last_result",
+      "status": "implemented",
+      "tests": [
+        "TestHybridSimulatedAnnealingCalibrationFixedParametersAndResultOwnership",
+        "TestHybridSimulatedAnnealingCalibrationBudgetAndCrossSession"
+      ]
     }
   ]
 }

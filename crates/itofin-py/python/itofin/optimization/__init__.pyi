@@ -10,6 +10,7 @@ __all__ = [
     "ConjugateGradient",
     "DifferentialEvolution",
     "EndCriteria",
+    "HybridSimulatedAnnealing",
     "LevenbergMarquardt",
     "NoConstraint",
     "ParticleSwarm",
@@ -94,6 +95,24 @@ class EndCriteria:
         Raises:
             ItofinError: Unless 1 < max_stationary_state_iterations <
                 max_iterations, or if any epsilon is negative or non-finite.
+        """
+
+@typing.final
+class HybridSimulatedAnnealing:
+    r"""
+    Bounded hybrid annealing calibration in projected free-parameter order.
+    The complete search box must satisfy the model's constraint.
+    """
+    def __init__(self, bounds: typing.Sequence[tuple[builtins.float, builtins.float]], *, seed: builtins.int = 0, initial_temperature: builtins.float = 1.0, cooling_rate: builtins.float = 0.95, step_size: builtins.float = 0.25, local_search_interval: builtins.int = 10, local_search_steps: builtins.int = 4, reanneal_interval: builtins.int = 100, xatol: typing.Optional[builtins.float] = None, fatol: typing.Optional[builtins.float] = None, maxiter: typing.Optional[builtins.int] = None, maxfev: typing.Optional[builtins.int] = None) -> None:
+        r"""
+        Construct a seeded single-chain annealing method with coordinate local searches.
+        Bounds use the free parameter order; no population is constructed.
+        Invalid candidates abort before pricing rather than receiving a penalty.
+        """
+    def last_result(self) -> typing.Optional[optimize.OptimizeResult]:
+        r"""
+        Copy the exact last result, or None before a completed run.
+        Exhausted runs retain their actual counters without being labelled successful.
         """
 
 @typing.final

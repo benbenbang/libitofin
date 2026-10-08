@@ -65,7 +65,7 @@ def minimize(fun: typing.Callable[[numpy.typing.NDArray[numpy.float64]], float],
         fun (Callable): Called as fun(x) with a float64 array; returns a float.
         x0 (Sequence[float]): The starting point.
         method (str): "Nelder-Mead", "BFGS", "L-BFGS-B", "SLSQP", or
-            "Differential-Evolution" or "Particle-Swarm" (any case).
+            "Differential-Evolution", "Particle-Swarm" or "Hybrid-Simulated-Annealing" (any case).
         options (dict | None): Nelder-Mead accepts maxiter, maxfev, xatol,
             fatol and adaptive. BFGS accepts maxiter, gtol and eps. L-BFGS-B
             accepts maxiter, maxfev, maxcor, ftol, gtol and eps. SLSQP accepts
@@ -77,6 +77,11 @@ def minimize(fun: typing.Callable[[numpy.typing.NDArray[numpy.float64]], float],
             Particle-Swarm accepts the same shared controls plus inertia, cognitive,
             social and velocity_clamp, instead of mutation and recombination.
             Its convergence additionally requires small normalized velocity.
+            Hybrid-Simulated-Annealing accepts maxiter, maxfev, seed, xatol,
+            fatol, initial_temperature, cooling_rate, step_size, local_search_interval,
+            local_search_steps and reanneal_interval. It uses a reflected uniform
+            proposal, Metropolis acceptance and bounded coordinate local searches.
+            It does not accept population controls.
         callback (Callable | None): Called as callback(xk) after every
             iteration. Raising StopIteration stops the run with
             Status.Cancelled.
