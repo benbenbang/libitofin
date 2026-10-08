@@ -4,6 +4,8 @@ use std::io;
 
 #[path = "firefly_numeric_tests.rs"]
 mod numeric;
+#[path = "firefly_validation_tests.rs"]
+mod validation;
 
 fn problem() -> Problem {
     Problem {
