@@ -293,3 +293,6 @@ impl OptimizationMethod for ParticleSwarm {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod particle_swarm_tests;
