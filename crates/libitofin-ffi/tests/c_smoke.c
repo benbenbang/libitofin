@@ -117,6 +117,33 @@ static void smoke_optimize(void) {
     assert(releases == 9 && constraint_releases == 3);
 }
 
+static void smoke_particle_swarm(void) {
+    ItofinObjective objective;
+    ItofinParticleSwarmOptions options;
+    ItofinOptimizeResult result;
+    memset(&objective, 0, sizeof(objective));
+    memset(&options, 0, sizeof(options));
+    memset(&result, 0, sizeof(result));
+    ItofinError error;
+    double x0 = 0.0, lower = -4.0, upper = 4.0, x = 99.0;
+    int before = releases;
+    objective.value = shifted_square;
+    objective.release = count_release;
+    result.x = &x;
+    assert(itofin_optimize_particle_swarm(&objective, &x0, 1, &lower, 1, &upper, 1,
+        NULL, 0, 0, &options, &result, &error) == 0);
+    assert(result.success && fabs(x - 3.0) < 1e-5 && result.njev == 0);
+    assert(releases == before + 1);
+    ItofinContext *ctx = NULL;
+    uint64_t method = 0;
+    assert(itofin_context_new(&ctx, &error) == 0);
+    assert(itofin_particle_swarm_new(ctx, &lower, 1, &upper, 1, &options,
+        NULL, 0, 0, &method, &error) == 0);
+    assert(itofin_particle_swarm_result(ctx, method, 1, &result, &error) == ITOFIN_INVALID_ARGUMENT);
+    assert(itofin_handle_release(ctx, method, &error) == 0);
+    assert(itofin_context_free(ctx, &error) == 0);
+}
+
 int main(void) {
     ItofinContext *ctx = NULL;
     ItofinError error;
@@ -136,5 +163,6 @@ int main(void) {
     assert(itofin_handle_release(ctx, settings, &error) == ITOFIN_INVALID_HANDLE);
     assert(itofin_context_free(ctx, &error) == 0);
     smoke_optimize();
+    smoke_particle_swarm();
     return 0;
 }
