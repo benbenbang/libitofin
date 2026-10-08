@@ -16,3 +16,6 @@ optimization-method-oracle = []
 [dependencies]
 itofin-optimize = { path = "../itofin-optimize" }
 libitofin = { path = "../libitofin" }
+
+[dev-dependencies]
+serde_json = "1.0"

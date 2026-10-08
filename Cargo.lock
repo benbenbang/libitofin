@@ -288,6 +288,7 @@ version = "0.37.0"
 dependencies = [
  "itofin-optimize",
  "libitofin",
+ "serde_json",
 ]
 
 [[package]]

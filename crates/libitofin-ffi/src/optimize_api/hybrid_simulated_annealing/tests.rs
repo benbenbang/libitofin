@@ -172,3 +172,5 @@ fn hybrid_annealing_cancel_fixed_and_budget_counts() {
 }
 
 mod boundary_tests;
+
+mod fixtures;
