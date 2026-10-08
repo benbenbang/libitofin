@@ -223,3 +223,67 @@ pub unsafe extern "C" fn itofin_particle_swarm_result(
 
 #[cfg(test)]
 mod particle_swarm_tests;
+
+/// Construct a retained hybrid-annealing calibration method in free-parameter order.
+/// A null or zeroed options record selects defaults. Model calibration uses root-RSS;
+/// every candidate must satisfy the model constraint before pricing.
+/// # Safety
+/// Pointers must satisfy the crate-level C caller contract.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn itofin_hybrid_simulated_annealing_new(
+    ctx: *mut Context,
+    lower: *const f64,
+    lower_len: usize,
+    upper: *const f64,
+    upper_len: usize,
+    options: *const crate::optimize_api::ItofinHybridSimulatedAnnealingOptions,
+    out: *mut u64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |context| {
+            check_ptr(out)?;
+            if lower_len == 0 || lower_len > 256 || lower_len != upper_len {
+                return Err(BindingError::invalid(
+                    "nonempty equally sized bounds in 1..=256 are required",
+                ));
+            }
+            let options = if options.is_null() {
+                crate::optimize_api::ItofinHybridSimulatedAnnealingOptions::default()
+            } else {
+                check_ptr(options)?;
+                *options
+            };
+            let (options, common) =
+                crate::optimize_api::hybrid_simulated_annealing::decode_hybrid_simulated_annealing(
+                    options,
+                )?;
+            let bounds = Bounds {
+                lower: input_slice(lower, lower_len)?.to_vec(),
+                upper: input_slice(upper, upper_len)?.to_vec(),
+            };
+            let method = libitofin::math::optimization::global::HybridSimulatedAnnealing::new(
+                bounds, options, common,
+            )?;
+            let method = shared_mut(method) as SharedMut<dyn OptimizationMethod>;
+            output(out, context.insert(method)?)
+        })
+    }
+}
+
+/// Copy the preserved hybrid-annealing outcome without repricing.
+/// # Safety
+/// `out` and other pointers follow `itofin_differential_evolution_result`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn itofin_hybrid_simulated_annealing_result(
+    ctx: *mut Context,
+    method: u64,
+    n: usize,
+    out: *mut ItofinOptimizeResult,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe { itofin_differential_evolution_result(ctx, method, n, out, error) }
+}
+
+#[cfg(test)]
+mod hybrid_simulated_annealing_tests;
