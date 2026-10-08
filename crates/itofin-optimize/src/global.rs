@@ -172,6 +172,87 @@ impl DifferentialEvolutionOptions {
     }
 }
 
+/// Serial synchronous global-best particle swarm with finite box bounds.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ParticleSwarmOptions {
+    /// Shared finite-box population controls.
+    pub global: GlobalOptions,
+    /// Previous-velocity weight in `[0, 1]`, default `0.7`.
+    pub inertia: f64,
+    /// Personal-best attraction in `[0, 4]`, default `1.4`.
+    pub cognitive: f64,
+    /// Global-best attraction in `[0, 4]`, default `1.4`.
+    pub social: f64,
+    /// Absolute normalized velocity limit in `(0, 1]`, default `0.2`.
+    pub velocity_clamp: f64,
+}
+
+impl Default for ParticleSwarmOptions {
+    fn default() -> Self {
+        Self {
+            global: GlobalOptions::default(),
+            inertia: 0.7,
+            cognitive: 1.4,
+            social: 1.4,
+            velocity_clamp: 0.2,
+        }
+    }
+}
+
+impl ParticleSwarmOptions {
+    /// Validates the finite-box population and particle-swarm coefficients.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`InvalidInput`] for an invalid shape, bound, point or option.
+    pub fn validate(&self, problem: &Problem) -> Result<(), InvalidInput> {
+        self.global.validate(problem)?;
+        for (option, value, valid, interval) in [
+            (
+                "inertia",
+                self.inertia,
+                (0.0..=1.0).contains(&self.inertia),
+                "[0, 1]",
+            ),
+            (
+                "cognitive",
+                self.cognitive,
+                (0.0..=4.0).contains(&self.cognitive),
+                "[0, 4]",
+            ),
+            (
+                "social",
+                self.social,
+                (0.0..=4.0).contains(&self.social),
+                "[0, 4]",
+            ),
+            (
+                "velocity_clamp",
+                self.velocity_clamp,
+                self.velocity_clamp > 0.0 && self.velocity_clamp <= 1.0,
+                "(0, 1]",
+            ),
+        ] {
+            if !value.is_finite() || !valid {
+                return Err(InvalidInput::ParticleSwarmCoefficient {
+                    option,
+                    range: interval,
+                });
+            }
+        }
+        Ok(())
+    }
+
+    /// Validates shared budgets and supplies the global-solver defaults.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`InvalidInput`] for invalid shared options or work caps.
+    pub fn budgets(&self, common: &Common) -> Result<Common, InvalidInput> {
+        DifferentialEvolutionOptions::default().budgets(common)
+    }
+}
+
 fn range(option: &'static str, found: usize, min: usize, max: usize) -> Result<(), InvalidInput> {
     if found < min || found > max {
         return Err(InvalidInput::GlobalRange {

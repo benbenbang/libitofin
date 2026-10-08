@@ -1,6 +1,6 @@
 use crate::error::InvalidInput;
 use crate::finite_difference::FiniteDifference;
-use crate::global::DifferentialEvolutionOptions;
+use crate::global::{DifferentialEvolutionOptions, ParticleSwarmOptions};
 
 /// Box bounds, one entry per coordinate.
 ///
@@ -265,6 +265,8 @@ pub enum Method {
     Slsqp(SlsqpOptions),
     /// Serial, deferred-generation DE/rand/1/bin with finite box bounds.
     DifferentialEvolution(DifferentialEvolutionOptions),
+    /// Serial synchronous global-best particle swarm with finite box bounds.
+    ParticleSwarm(ParticleSwarmOptions),
 }
 
 impl Method {
@@ -276,6 +278,7 @@ impl Method {
             Method::Lbfgsb(_) => "L-BFGS-B",
             Method::Slsqp(_) => "SLSQP",
             Method::DifferentialEvolution(_) => "Differential-Evolution",
+            Method::ParticleSwarm(_) => "Particle-Swarm",
         }
     }
 
@@ -283,7 +286,10 @@ impl Method {
     pub fn supports_bounds(&self) -> bool {
         match self {
             Method::NelderMead(_) | Method::Bfgs(_) => false,
-            Method::Lbfgsb(_) | Method::Slsqp(_) | Method::DifferentialEvolution(_) => true,
+            Method::Lbfgsb(_)
+            | Method::Slsqp(_)
+            | Method::DifferentialEvolution(_)
+            | Method::ParticleSwarm(_) => true,
         }
     }
 
@@ -305,6 +311,7 @@ impl Method {
             Method::Lbfgsb(options) => options.validate(),
             Method::Slsqp(options) => options.validate(),
             Method::DifferentialEvolution(options) => options.validate(problem),
+            Method::ParticleSwarm(options) => options.validate(problem),
         }
     }
 }
