@@ -1,18 +1,21 @@
 # Global optimization
 
-Differential evolution is a seeded, box-bounded population search, available in
-Rust, C, Go and Python. The solver lives in finance-independent `itofin-optimize`;
-existing binding artifacts include it without another optimizer installation.
-Node is not implemented. This is the first shared contract for the remaining
-global-solver requests, not an implementation of particle swarm, simulated
-annealing or firefly search.
+Particle swarm is not included in v0.37.0 artifacts; build from this source
+checkout until the next coordinated release.
 
-## Two entry points, one solver
+Differential evolution (DE) and particle swarm (PSO) are seeded, box-bounded
+population searches, available in Rust, C, Go and Python. Both solvers live in
+finance-independent `itofin-optimize`;
+existing binding artifacts include it without another optimizer installation.
+Node, simulated annealing and firefly search are not implemented. Both solvers
+share bounds, budgets and result types, but retain separate update rules and controls.
+
+## Two entry points, two solvers
 
 | Need | API | Objective |
 | --- | --- | --- |
 | Standalone minimization | Rust `minimize`, Python `itofin.optimize.minimize`, Go `Minimize`, context-free C optimizer | Signed scalar `f(x)`, including negative values |
-| Existing model calibration | Rust `OptimizationMethod`, Python `itofin.optimization.DifferentialEvolution`, Go `Session.NewDifferentialEvolution` | Existing cost function's scalar value |
+| Existing model calibration | Rust `OptimizationMethod`, Python `itofin.optimization.{DifferentialEvolution, ParticleSwarm}`, Go `Session.NewDifferentialEvolution` / `Session.NewParticleSwarm` | Existing cost function's scalar value |
 
 The standalone API rejects an out-of-box `x0`. The calibration adapter instead
 clamps initially valid model parameters into the effective search box before
@@ -34,16 +37,22 @@ adapter calls that existing scalar operation directly, preserving its semantics.
 | `initial_population` | Optional full population; its row count supplies an omitted size; conflicting size is rejected |
 | `xatol` | Maximum coordinate spread divided by that coordinate's bound width; default `1e-6` |
 | `fatol` | Maximum absolute objective spread; default `1e-8` |
-| `mutation` | Differential weight `F`, finite in `(0, 2]`; default `0.8` |
-| `recombination` | Binomial crossover probability, finite in `[0, 1]`; default `0.9` |
 | `maxiter` / `maxfev` | Completed generations / actual objective evaluations; defaults `1000` / `1,000,000` |
 
 Explicit tolerances override Rust `Common.tol`, which otherwise overrides the
 listed defaults. Coordinate spread uses actual physical population extrema,
 divided by the finite bound width. With `xatol=0`, each physical coordinate must
 have exactly zero spread; rounded normalization alone cannot imply convergence.
-Both coordinate and objective spreads must satisfy their tolerances.
-Neither convergence nor a seeded run proves a global optimum.
+Both coordinate and objective spreads must satisfy their tolerances. PSO also
+requires every free-coordinate absolute normalized velocity to be at most
+`xatol`. These are heuristic stopping tests, not a global-optimum guarantee.
+
+### Differential evolution
+
+| Control | Meaning / default |
+| --- | --- |
+| `mutation` | Differential weight `F`, finite in `(0, 2]`; default `0.8` |
+| `recombination` | Binomial crossover probability, finite in `[0, 1]`; default `0.9` |
 
 - Strategy: serial **DE/rand/1/bin**, with three distinct donors excluding the
   target. At least one free coordinate crosses over, even with probability zero.
@@ -51,10 +60,38 @@ Neither convergence nor a seeded run proves a global optimum.
   accept the trial, an explicit implementation tie rule.
 - Out-of-box donor coordinates are uniformly resampled inside their bounds.
   There is no implicit polishing, parallel execution or general-constraint solver.
+
+### Particle swarm
+
+| Control | Meaning / default |
+| --- | --- |
+| `inertia` | Previous-velocity coefficient, finite in `[0, 1]`; default `0.7` |
+| `cognitive` | Personal-best attraction, finite in `[0, 4]`; default `1.4` |
+| `social` | Global-best attraction, finite in `[0, 4]`; default `1.4` |
+| `velocity_clamp` | Maximum absolute box-normalized velocity, finite in `(0, 1]`; default `0.2` |
+
+- Serial, synchronous **global-best** topology: each generation reads frozen
+  positions, personal bests and the swarm's best. All initial velocities are zero.
+- Each free coordinate draws independent uniform `r1`, then `r2`, and computes
+  `v = inertia*v + cognitive*r1*(pbest-x)/width + social*r2*(gbest-x)/width`.
+  Velocity is clipped to `[-velocity_clamp, velocity_clamp]`; position moves
+  in normalized box coordinates. These defaults and policies are ours, not a
+  promise to reproduce another PSO library or the papers' experiments.
+- Crossing positions are clipped to the exact bound, with outward velocity
+  zeroed there (absorbing bounds). Zero velocity preserves the physical coordinate.
+- Personal/global bests update only on strict improvement. Equal values retain
+  the earliest evaluated best. There is no neighborhood topology, inertia
+  schedule, constriction-factor mode, polishing or parallel execution.
+- Explicit zero inertia, cognitive or social coefficients are supported.
+  DE controls are rejected for PSO, and PSO controls are rejected for DE.
+
+### Shared initialization and limits
+
 - Random initialization includes `x0` as member zero. An explicit population is
   validated completely and preserved without inserting `x0`.
 - Fixed coordinates retain their exact bound. An all-fixed problem evaluates
-  `x0` once, with zero generations, after validating any explicit population.
+  `x0` once, with zero generations, after validating all options and any explicit
+  population.
 - Local SplitMix64 sampling needs no third-party optimizer or runtime dependency.
   Repeated seeds reproduce this implementation, not another library's trajectory.
 
@@ -86,13 +123,18 @@ zero gradient calls (`njev`). Exhaustion is not success.
 
 ## C options and ownership
 
-`itofin_optimize_differential_evolution` accepts separate bounds arrays and an
-optional flattened row-major population. `ItofinDifferentialEvolutionOptions`
-contains `ItofinGlobalOptions`. Zero population/budget fields select defaults;
+The context-free `itofin_optimize_differential_evolution` and
+`itofin_optimize_particle_swarm` accept separate bounds arrays and an optional
+flattened row-major population. `ItofinDifferentialEvolutionOptions` and
+`ItofinParticleSwarmOptions` contain `ItofinGlobalOptions`. Zero population/budget
+fields select defaults;
 `has_xatol`, `has_fatol`, `has_mutation` and `has_recombination` distinguish omitted
 values from explicit zero. In particular, zero crossover and zero tolerances are
-expressible. Objective release runs exactly once, including rejected inputs and
-callback errors; an error return leaves the caller's result buffer untouched.
+expressible. PSO has corresponding `has_inertia`, `has_cognitive`, `has_social`
+and `has_velocity_clamp` flags; zero attraction coefficients are expressible.
+Calibration uses `itofin_differential_evolution_new/result` or
+`itofin_particle_swarm_new/result` on a Session. Objective release runs exactly
+once, including rejected inputs and callback errors; an error return leaves the caller's result buffer untouched.
 
 ## Calibration limits and diagnostics
 
@@ -120,7 +162,9 @@ carefully chosen box; simple finite bounds alone do not guarantee feasibility.
 See the [calibration API](api/optimization.md) for method dispatch and existing
 weights, fixed-parameter masks and constraint arguments.
 
-## Paired executable example
+## Paired executable examples
+
+### Differential evolution
 
 The signed quadratic has analytic optimum `(1.25, -0.75)` and value `-3`.
 Each example checks coordinates within `1e-5` and objective value within `1e-8`.
@@ -146,13 +190,46 @@ checks the calibration cost below `1e-6`, rather than inventing a reference sigm
     --8<-- "sdk/go/examples/differential_evolution/main.go"
     ```
 
-## Algorithm reference
+### Particle swarm
+
+The PSO examples check the same signed quadratic and report actual generations
+and objective calls. Python uses `method="particle-swarm"`; its calibration
+example uses `optimization.ParticleSwarm` with the same Hull-White setup above.
+The existing residual/RSS calibration cost is unchanged.
+
+=== "Python"
+
+    ```python
+    --8<-- "example/python/particle_swarm.py"
+    ```
+
+=== "Rust"
+
+    ```rust
+    --8<-- "crates/libitofin/examples/particle_swarm.rs"
+    ```
+
+=== "Go"
+
+    ```go
+    --8<-- "sdk/go/examples/particle_swarm/main.go"
+    ```
+
+## Algorithm references
 
 Implemented independently from Storn and Price (1997),
 [Differential Evolution: A Simple and Efficient Heuristic for Global Optimization
 over Continuous Spaces](https://doi.org/10.1023/A:1008202821328).
 The local generator follows Steele, Lea and Flood (2014),
 [Fast Splittable Pseudorandom Number Generators](https://doi.org/10.1145/2660193.2660195).
+
+PSO is implemented independently from Kennedy and Eberhart (1995),
+[Particle Swarm Optimization](https://doi.org/10.1109/ICNN.1995.488968), with
+[the authors' paper hosted by the University of Washington](https://staff.washington.edu/paymana/swarm/kennedy95-ijcnn.pdf),
+and the inertia formulation in Shi and Eberhart (1998),
+[A Modified Particle Swarm Optimizer](https://doi.org/10.1109/ICEC.1998.699146).
+Our synchronous update, zero initial velocity, absorbing bounds and convergence
+policies are explicit implementation choices, not unchanged paper defaults.
 
 No upstream optimizer implementation is copied or imported. This is not a claim
 of clean-room provenance or QuantLib/SciPy trajectory equivalence.

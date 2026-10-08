@@ -93,3 +93,8 @@ print(f"{svol.volatility(Period(3, 'Years'), Period(3, 'Years'), 0.03):.4f}")  #
 - [Python bindings source](../crates/itofin-py/): implementation and tests.
 
 - [Coupled yield curves](../docs/docs/joint-curves.md): jointly fit Ibor basis markets with retained curve ownership.
+
+## Global optimization examples
+
+- [Particle swarm](../example/python/particle_swarm.py): seeded signed-scalar minimization, with checked analytic value `-3`.
+- [Shared global-search contract](https://benbenbang.github.io/libitofin/global-optimization/): DE/PSO controls, feasible calibration boxes, budgets and numerical limits.

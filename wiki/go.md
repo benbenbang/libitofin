@@ -62,3 +62,8 @@ result, err := itofin.Minimize(ctx, func(x []float64) (float64, error) {
 - [C ABI contract](../docs/go-binding-contract.md) and [header](../crates/libitofin-ffi/include/itofin.h).
 
 - [Coupled yield curves](../docs/docs/joint-curves.md): jointly fit Ibor basis markets with retained curve ownership.
+
+## Global optimization examples
+
+- [Particle swarm](../sdk/go/examples/particle_swarm/main.go): seeded signed-scalar minimization, with checked analytic value `-3`.
+- [Shared global-search contract](https://benbenbang.github.io/libitofin/global-optimization/): DE/PSO controls, feasible calibration boxes, budgets and numerical limits.
