@@ -35,3 +35,13 @@ The complete QuantLib license and contributor notices are included above.
 The original DAX calibration data retain QuantLib's attribution to A. Sepp.
 Source pins, binary provenance and fixture reproduction are recorded in
 `sdk/go/testdata/gjrgarch-model-oracle.md`.
+
+## Independent global optimizers
+
+The bundled `itofin-optimize` DE and PSO solvers and their calibration adapters
+are independently written, not adapted from QuantLib or another optimizer.
+PSO follows Kennedy and Eberhart (1995), DOI
+<https://doi.org/10.1109/ICNN.1995.488968>, and Shi and Eberhart (1998), DOI
+<https://doi.org/10.1109/ICEC.1998.699146>. DE follows Storn and Price (1997),
+DOI <https://doi.org/10.1023/A:1008202821328>. The crate's own notices document
+our policies and prior design comparisons; no clean-room claim is made.
