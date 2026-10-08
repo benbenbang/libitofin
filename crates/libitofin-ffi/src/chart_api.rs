@@ -3,7 +3,9 @@
 use crate::boundary::{
     BindingError, BindingResult, ItofinError, check_ptr, input_slice, without_context,
 };
-use libitofin::math::chart::{ChartSeries, bollinger_bands, ema, kd, macd, rsi, sma, volume_bars};
+use libitofin::math::chart::{
+    ChartSeries, bollinger_bands, ema, kd, macd, obv, rsi, sma, volume_bars, vwap,
+};
 use libitofin::types::Real;
 
 /// # Safety
@@ -30,6 +32,80 @@ unsafe fn average(
     }
     unsafe { first_valid.write(values.first_valid) };
     Ok(())
+}
+
+/// # Safety
+/// Inputs and outputs follow the crate-level pointer and non-overlap contract.
+unsafe fn volume_line(
+    price: *const Real,
+    volume: *const Real,
+    len: usize,
+    out: *mut Real,
+    capacity: usize,
+    first_valid: *mut usize,
+    compute: fn(&[Real], &[Real]) -> libitofin::errors::QlResult<ChartSeries>,
+) -> BindingResult<()> {
+    if capacity < len {
+        return Err(BindingError::invalid("output capacity too small"));
+    }
+    check_ptr(first_valid)?;
+    if len > 0 {
+        check_ptr(out)?;
+    }
+    let result = compute(unsafe { input_slice(price, len)? }, unsafe {
+        input_slice(volume, len)?
+    })?;
+    if len > 0 {
+        unsafe { std::ptr::copy_nonoverlapping(result.values.as_ptr(), out, len) };
+    }
+    unsafe { first_valid.write(result.first_valid) };
+    Ok(())
+}
+
+/// Compute cumulative VWAP of supplied prices, starting a session per call.
+/// Zero cumulative volume is missing; later zero volume carries the last VWAP.
+/// # Safety
+/// Inputs each hold `len` doubles. Follow the crate-level pointer/non-overlap
+/// contract. `out` holds `capacity` doubles and `first_valid` holds one size_t.
+#[unsafe(no_mangle)]
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn itofin_chart_vwap(
+    price: *const Real,
+    volume: *const Real,
+    len: usize,
+    out: *mut Real,
+    capacity: usize,
+    first_valid: *mut usize,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        without_context(error, || {
+            volume_line(price, volume, len, out, capacity, first_valid, vwap)
+        })
+    }
+}
+
+/// Compute zero-seeded OBV; equal closes leave signed volume unchanged.
+/// The initial volume is validated but does not contribute to the seed.
+/// # Safety
+/// Inputs each hold `len` doubles. Follow the crate-level pointer/non-overlap
+/// contract. `out` holds `capacity` doubles and `first_valid` holds one size_t.
+#[unsafe(no_mangle)]
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn itofin_chart_obv(
+    close: *const Real,
+    volume: *const Real,
+    len: usize,
+    out: *mut Real,
+    capacity: usize,
+    first_valid: *mut usize,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        without_context(error, || {
+            volume_line(close, volume, len, out, capacity, first_valid, obv)
+        })
+    }
 }
 
 /// Compute an input-aligned simple moving average. Prefix values before
