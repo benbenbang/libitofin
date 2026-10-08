@@ -270,3 +270,8 @@ fn fixed_box_prices_once_and_records_convergence() {
     assert_eq!(result.fun, -5.0);
     assert_eq!(cost.0.get(), 1);
 }
+
+#[path = "firefly_model_tests.rs"]
+mod model;
+#[path = "firefly_validation_tests.rs"]
+mod validation;
