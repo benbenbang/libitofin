@@ -311,3 +311,7 @@ pub(crate) fn minimize<O: Objective>(
 #[cfg(test)]
 #[path = "firefly_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "firefly_policy_fixtures_tests.rs"]
+mod policy_fixtures;
