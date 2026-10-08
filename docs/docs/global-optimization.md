@@ -1,21 +1,22 @@
 # Global optimization
 
-Particle swarm is not included in v0.37.0 artifacts; build from this source
-checkout until the next coordinated release.
+Particle swarm and hybrid simulated annealing are not included in v0.37.0
+artifacts; build from this source checkout until the next coordinated release.
 
 Differential evolution (DE) and particle swarm (PSO) are seeded, box-bounded
 population searches, available in Rust, C, Go and Python. Both solvers live in
 finance-independent `itofin-optimize`;
 existing binding artifacts include it without another optimizer installation.
-Node, simulated annealing and firefly search are not implemented. Both solvers
-share bounds, budgets and result types, but retain separate update rules and controls.
+Hybrid simulated annealing adds a single-chain search with local coordinate
+polling. All three share bounds, budgets and result types, while retaining
+separate update rules and controls. Node and firefly search are not implemented.
 
-## Two entry points, two solvers
+## Two entry points
 
 | Need | API | Objective |
 | --- | --- | --- |
 | Standalone minimization | Rust `minimize`, Python `itofin.optimize.minimize`, Go `Minimize`, context-free C optimizer | Signed scalar `f(x)`, including negative values |
-| Existing model calibration | Rust `OptimizationMethod`, Python `itofin.optimization.{DifferentialEvolution, ParticleSwarm}`, Go `Session.NewDifferentialEvolution` / `Session.NewParticleSwarm` | Existing cost function's scalar value |
+| Existing model calibration | Rust `OptimizationMethod`, Python `itofin.optimization.{DifferentialEvolution, ParticleSwarm, HybridSimulatedAnnealing}`, Go `Session.NewDifferentialEvolution` / `Session.NewParticleSwarm` / `Session.NewHybridSimulatedAnnealing` | Existing cost function's scalar value |
 
 The standalone API rejects an out-of-box `x0`. The calibration adapter instead
 clamps initially valid model parameters into the effective search box before
@@ -25,8 +26,11 @@ The standalone API does **not** turn a scalar into a residual or minimize its
 absolute value. The default QuantLib-style cost function uses residual RMS;
 model calibration overrides it with `sqrt(sum(weight[i] * error[i]²))`. The
 adapter calls that existing scalar operation directly, preserving its semantics.
+This is **root-RSS**, not the unrooted sum of squared residuals.
 
 ## Search contract
+
+### DE/PSO population settings
 
 | Setting | Meaning / default |
 | --- | --- |
@@ -85,12 +89,51 @@ requires every free-coordinate absolute normalized velocity to be at most
 - Explicit zero inertia, cognitive or social coefficients are supported.
   DE controls are rejected for PSO, and PSO controls are rejected for DE.
 
-### Shared initialization and limits
+### Hybrid simulated annealing
+
+| Control | Meaning / default |
+| --- | --- |
+| `initial_temperature` | Finite positive temperature in **objective units**; default `1.0` |
+| `cooling_rate` | Geometric factor, finite in `(0, 1)`; default `0.95` |
+| `step_size` | Uniform proposal half-width divided by box width, finite in `(0, 1]`; default `0.25` |
+| `local_search_interval` | Cycles between local polls, `1..=1,000,000`; default `10` |
+| `local_search_steps` | Maximum coordinate sweeps per local poll, `1..=256`; default `4` |
+| `reanneal_interval` | Cycles between temperature resets, `1..=1,000,000`; default `100` |
+| `xatol` / `fatol` | Normalized unsuccessful poll radius / absolute poll-cost spread; defaults `1e-6` / `1e-8` |
+
+- One chain starts at `x0`; there is no population. Each free coordinate draws a
+  uniform displacement in `[-step_size, step_size]` in normalized box space.
+  Boundary-crossing proposals reflect into the box; fixed coordinates stay exact.
+- Downhill and equal-cost proposals are accepted without another random draw.
+  An uphill proposal is accepted with probability `exp(-(trial-current)/T)`.
+  Rescaling an objective therefore changes the meaning of the temperature.
+- Every local-search interval, poll the best evaluated point in coordinate order,
+  positive then negative. Polls clip to the box, skip unchanged points, and retain
+  strict improvements immediately. This is exploratory coordinate search, **not
+  the full Hooke-Jeeves pattern-move algorithm**.
+- An unsuccessful complete sweep halves the local radius. The radius starts at
+  `step_size`, persists across polls and is not reset by reannealing. Local search
+  returns the chain to its best point; reannealing also resets temperature and
+  returns to the best, without discarding that result.
+- A completed cycle contains the proposal and any scheduled local poll. Its
+  callback receives the best evaluated point. Cooling follows that callback;
+  periodic reannealing then resets temperature to `initial_temperature`.
+  Cooling is floored at the smallest positive `f64`, not zero.
+- Success requires a complete unsuccessful poll with radius `<= xatol` and finite
+  observed absolute cost spread `<= fatol`. This reports **local search
+  resolution**, not a global optimum or a classical asymptotic annealing guarantee.
+  Explicit tolerances override `Common.tol`, then the listed defaults apply.
+  Multimodal problems can successfully converge to a non-global local minimum;
+  compare independently known objective values and more than one seed.
+- DE/PSO population controls are rejected. The same finite box, dimension and
+  budget caps apply; population-size caps do not apply to this single-chain method.
+
+### Population initialization and shared limits
 
 - Random initialization includes `x0` as member zero. An explicit population is
   validated completely and preserved without inserting `x0`.
 - Fixed coordinates retain their exact bound. An all-fixed problem evaluates
-  `x0` once, with zero generations, after validating all options and any explicit
+  `x0` once, with zero iterations, after validating all options and any explicit
   population.
 - Local SplitMix64 sampling needs no third-party optimizer or runtime dependency.
   Repeated seeds reproduce this implementation, not another library's trajectory.
@@ -98,20 +141,21 @@ requires every free-coordinate absolute normalized velocity to be at most
 Resource limits: at most **256 coordinates**, **4096 population members** and
 **1,000,000 population coordinates**. Population size is at least four. Iteration
 and evaluation budgets are capped at **1,000,000** and **10,000,000** respectively.
-Invalid shapes, general constraints, nonfinite inputs and nonfinite interval
-widths are rejected before the objective runs. Python `jac` is unsupported; the
+All three solvers require a finite box and reject general constraints.
+Invalid shapes, nonfinite inputs and nonfinite interval widths are rejected before the objective runs. Python `jac` is unsupported; the
 Rust solver never calls `Objective::gradient`.
 
 ## Results, callbacks and errors
 
 The existing `OptimizeResult` reports the best evaluated point, its matching
-scalar value, status, success, generations (`nit`), objective calls (`nfev`) and
-zero gradient calls (`njev`). Exhaustion is not success.
+scalar value, status, success, completed generations/cycles (`nit`), objective
+calls (`nfev`) and zero gradient calls (`njev`). Exhaustion is not success.
 
-- Initialization consumes objective evaluations, not generations.
-- Partial initialization or a partial generation can exhaust the evaluation
-  budget; neither increments `nit` nor invokes an iteration callback.
-- Callbacks run only after a completed generation. Cancellation therefore waits
+- Initialization consumes objective evaluations, not generations/cycles.
+- Partial initialization or a partial generation/cycle can exhaust the evaluation
+  budget; neither increments `nit` nor invokes an iteration callback. Annealing
+  proposal and local-poll evaluations share that same budget.
+- Callbacks run only after a completed generation/cycle. Cancellation waits
   for that boundary; it wins over iteration exhaustion at the same boundary.
 - Every nonfinite objective return terminates with the nonfinite status. No
   infinity barrier or penalty value replaces an exception or callback error.
@@ -136,6 +180,14 @@ Calibration uses `itofin_differential_evolution_new/result` or
 `itofin_particle_swarm_new/result` on a Session. Objective release runs exactly
 once, including rejected inputs and callback errors; an error return leaves the caller's result buffer untouched.
 
+Hybrid annealing uses context-free `itofin_optimize_hybrid_simulated_annealing`
+and Session `itofin_hybrid_simulated_annealing_new/result`. Bounds are passed
+as separate arrays; `ItofinHybridSimulatedAnnealingOptions` carries schedule
+controls, not `ItofinGlobalOptions` or a population. Presence flags distinguish
+omitted schedule controls and tolerances from explicit values. An all-zero
+record selects defaults. Explicit zero schedule controls are invalid; explicit
+zero tolerances are valid. Zero `maxiter`/`maxfev` fields select default budgets.
+
 ## Calibration limits and diagnostics
 
 Construct the calibration method with bounds in **free/projected parameter
@@ -148,8 +200,8 @@ rollback, rather than performing rejection sampling or inventing a penalty.
 Coupled domains such as GJR stationarity or the Heston Feller condition need a
 carefully chosen box; simple finite bounds alone do not guarantee feasibility.
 
-- `EndCriteria.max_iterations` also limits generations. The global method's own
-  spread tolerances apply; the other `EndCriteria` tolerances are not substituted.
+- `EndCriteria.max_iterations` also limits generations/cycles. Each solver's own
+  convergence tolerances apply; the other `EndCriteria` tolerances are not substituted.
 - Rust `last_result()`, Python `last_result()` and Go `LastResult()` expose exact
   diagnostics from the last solver invocation. Entering the adapter clears its
   previous result. Model/binding preflight failures before the adapter runs leave
@@ -195,7 +247,7 @@ checks the calibration cost below `1e-6`, rather than inventing a reference sigm
 The PSO examples check the same signed quadratic and report actual generations
 and objective calls. Python uses `method="particle-swarm"`; its calibration
 example uses `optimization.ParticleSwarm` with the same Hull-White setup above.
-The existing residual/RSS calibration cost is unchanged.
+The existing root-RSS calibration cost is unchanged.
 
 === "Python"
 
@@ -215,6 +267,33 @@ The existing residual/RSS calibration cost is unchanged.
     --8<-- "sdk/go/examples/particle_swarm/main.go"
     ```
 
+### Hybrid simulated annealing
+
+The three examples check the same signed quadratic, coordinates within `1e-5`,
+value within `1e-8`, and actual objective-call accounting. Python uses
+`method="hybrid-simulated-annealing"` and also fits the same one-parameter
+Hull-White model with `optimization.HybridSimulatedAnnealing`. The temperature
+acts on the model's existing root-RSS cost, not on an unrooted sum of squares
+or a transformed scalar.
+
+=== "Python"
+
+    ```python
+    --8<-- "example/python/hybrid_simulated_annealing.py"
+    ```
+
+=== "Rust"
+
+    ```rust
+    --8<-- "crates/libitofin/examples/hybrid_simulated_annealing.rs"
+    ```
+
+=== "Go"
+
+    ```go
+    --8<-- "sdk/go/examples/hybrid_simulated_annealing/main.go"
+    ```
+
 ## Algorithm references
 
 Implemented independently from Storn and Price (1997),
@@ -230,6 +309,14 @@ and the inertia formulation in Shi and Eberhart (1998),
 [A Modified Particle Swarm Optimizer](https://doi.org/10.1109/ICEC.1998.699146).
 Our synchronous update, zero initial velocity, absorbing bounds and convergence
 policies are explicit implementation choices, not unchanged paper defaults.
+
+Hybrid annealing uses the Metropolis acceptance rule described by Kirkpatrick,
+Gelatt and Vecchi (1983),
+[Optimization by Simulated Annealing](https://doi.org/10.1126/science.220.4598.671),
+and exploratory coordinate polling inspired by Hooke and Jeeves (1961),
+[Direct Search Solution of Numerical and Statistical Problems](https://doi.org/10.1145/321062.321069).
+Reflected uniform proposals, geometric cooling, periodic best-point reannealing,
+local polling and finite-budget stopping are explicit implementation policies.
 
 No upstream optimizer implementation is copied or imported. This is not a claim
 of clean-room provenance or QuantLib/SciPy trajectory equivalence.
