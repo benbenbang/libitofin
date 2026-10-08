@@ -220,3 +220,6 @@ pub unsafe extern "C" fn itofin_particle_swarm_result(
 ) -> i32 {
     unsafe { itofin_differential_evolution_result(ctx, method, n, out, error) }
 }
+
+#[cfg(test)]
+mod particle_swarm_tests;
