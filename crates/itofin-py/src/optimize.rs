@@ -9,7 +9,7 @@ use crate::ItofinError;
 use itofin_optimize::{
     BfgsOptions, Bounds, Common, ConstraintKind, Converged, DifferentialEvolutionOptions, Flow,
     IterationState, LbfgsbOptions, Method, Minimize, MinimizeError, NelderMeadOptions, Objective,
-    Problem, SlsqpOptions, Termination, minimize as run,
+    ParticleSwarmOptions, Problem, SlsqpOptions, Termination, minimize as run,
 };
 use numpy::PyArray1;
 use pyo3::exceptions::{PyStopIteration, PyValueError};
@@ -420,13 +420,48 @@ fn differential_evolution(
     Ok((method, common))
 }
 
+fn particle_swarm(options: Option<&Bound<'_, PyDict>>) -> PyResult<(ParticleSwarmOptions, Common)> {
+    let mut method = ParticleSwarmOptions::default();
+    let mut common = Common::default();
+    for (key, value) in options.into_iter().flat_map(|options| options.iter()) {
+        let key = key.extract::<String>()?;
+        match key.as_str() {
+            "maxiter" => common.maxiter = Some(strict_global_usize(&value, "maxiter")?),
+            "maxfev" => common.maxfev = Some(strict_global_usize(&value, "maxfev")?),
+            "seed" => method.global.seed = strict_global_seed(&value)?,
+            "population_size" => {
+                method.global.population_size =
+                    Some(strict_global_usize(&value, "population_size")?)
+            }
+            "initial_population" => method.global.initial_population = Some(value.extract()?),
+            "xatol" => method.global.xatol = Some(value.extract()?),
+            "fatol" => method.global.fatol = Some(value.extract()?),
+            "inertia" => method.inertia = value.extract()?,
+            "cognitive" => method.cognitive = value.extract()?,
+            "social" => method.social = value.extract()?,
+            "velocity_clamp" => method.velocity_clamp = value.extract()?,
+            other => {
+                return Err(PyValueError::new_err(format!(
+                    "method Particle-Swarm does not support option {other}"
+                )));
+            }
+        }
+    }
+    if common.maxiter == Some(0) || common.maxfev == Some(0) {
+        return Err(PyValueError::new_err(
+            "Particle-Swarm maxiter and maxfev must be positive",
+        ));
+    }
+    Ok((method, common))
+}
+
 /// Minimize a scalar function of one or more variables.
 ///
 /// Args:
 ///     fun (Callable): Called as fun(x) with a float64 array; returns a float.
 ///     x0 (Sequence[float]): The starting point.
 ///     method (str): "Nelder-Mead", "BFGS", "L-BFGS-B", "SLSQP", or
-///         "Differential-Evolution" (any case).
+///         "Differential-Evolution" or "Particle-Swarm" (any case).
 ///     options (dict | None): Nelder-Mead accepts maxiter, maxfev, xatol,
 ///         fatol and adaptive. BFGS accepts maxiter, gtol and eps. L-BFGS-B
 ///         accepts maxiter, maxfev, maxcor, ftol, gtol and eps. SLSQP accepts
@@ -435,13 +470,16 @@ fn differential_evolution(
 ///         mutation and recombination. Seed zero is deterministic; population
 ///         rows are used unchanged, without inserting x0. Global convergence
 ///         tolerances are normalized coordinate spread and absolute fun spread.
+///         Particle-Swarm accepts the same shared controls plus inertia, cognitive,
+///         social and velocity_clamp, instead of mutation and recombination.
+///         Its convergence additionally requires small normalized velocity.
 ///     callback (Callable | None): Called as callback(xk) after every
 ///         iteration. Raising StopIteration stops the run with
 ///         Status.Cancelled.
 ///     jac (Callable | None): Analytic objective gradient for BFGS, L-BFGS-B
 ///         or SLSQP, called as jac(x).
 ///     bounds: L-BFGS-B or SLSQP pairs of (lower, upper), with None for an
-///         open side. Differential-Evolution requires finite bounds and x0
+///         open side. Global methods require finite bounds and x0
 ///         inside them; equal lower and upper bounds fix a coordinate. Other
 ///         methods reject bounds.
 ///     constraints (Sequence[dict] | None): SLSQP constraints with type "eq"
@@ -475,7 +513,9 @@ pub(crate) fn minimize(
 ) -> PyResult<PyOptimizeResult> {
     let is_lbfgsb = method.eq_ignore_ascii_case("l-bfgs-b");
     let is_slsqp = method.eq_ignore_ascii_case("slsqp");
-    let is_global = method.eq_ignore_ascii_case("differential-evolution");
+    let is_de = method.eq_ignore_ascii_case("differential-evolution");
+    let is_pso = method.eq_ignore_ascii_case("particle-swarm");
+    let is_global = is_de || is_pso;
     if bounds.is_some() && !is_lbfgsb && !is_slsqp && !is_global {
         return Err(PyValueError::new_err(format!(
             "method {method} does not support bounds"
@@ -503,7 +543,7 @@ pub(crate) fn minimize(
     } else if is_slsqp {
         let (options, common) = slsqp(options.as_ref())?;
         (Method::Slsqp(options), common)
-    } else if is_global {
+    } else if is_de {
         if jac.is_some() {
             return Err(PyValueError::new_err(
                 "method Differential-Evolution does not support jac",
@@ -511,6 +551,14 @@ pub(crate) fn minimize(
         }
         let (options, common) = differential_evolution(options.as_ref())?;
         (Method::DifferentialEvolution(options), common)
+    } else if is_pso {
+        if jac.is_some() {
+            return Err(PyValueError::new_err(
+                "method Particle-Swarm does not support jac",
+            ));
+        }
+        let (options, common) = particle_swarm(options.as_ref())?;
+        (Method::ParticleSwarm(options), common)
     } else {
         return Err(ItofinError::new_err(format!("unknown method {method}")));
     };

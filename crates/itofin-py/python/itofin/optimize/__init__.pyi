@@ -65,7 +65,7 @@ def minimize(fun: typing.Callable[[numpy.typing.NDArray[numpy.float64]], float],
         fun (Callable): Called as fun(x) with a float64 array; returns a float.
         x0 (Sequence[float]): The starting point.
         method (str): "Nelder-Mead", "BFGS", "L-BFGS-B", "SLSQP", or
-            "Differential-Evolution" (any case).
+            "Differential-Evolution" or "Particle-Swarm" (any case).
         options (dict | None): Nelder-Mead accepts maxiter, maxfev, xatol,
             fatol and adaptive. BFGS accepts maxiter, gtol and eps. L-BFGS-B
             accepts maxiter, maxfev, maxcor, ftol, gtol and eps. SLSQP accepts
@@ -74,13 +74,16 @@ def minimize(fun: typing.Callable[[numpy.typing.NDArray[numpy.float64]], float],
             mutation and recombination. Seed zero is deterministic; population
             rows are used unchanged, without inserting x0. Global convergence
             tolerances are normalized coordinate spread and absolute fun spread.
+            Particle-Swarm accepts the same shared controls plus inertia, cognitive,
+            social and velocity_clamp, instead of mutation and recombination.
+            Its convergence additionally requires small normalized velocity.
         callback (Callable | None): Called as callback(xk) after every
             iteration. Raising StopIteration stops the run with
             Status.Cancelled.
         jac (Callable | None): Analytic objective gradient for BFGS, L-BFGS-B
             or SLSQP, called as jac(x).
         bounds: L-BFGS-B or SLSQP pairs of (lower, upper), with None for an
-            open side. Differential-Evolution requires finite bounds and x0
+            open side. Global methods require finite bounds and x0
             inside them; equal lower and upper bounds fix a coordinate. Other
             methods reject bounds.
         constraints (Sequence[dict] | None): SLSQP constraints with type "eq"
