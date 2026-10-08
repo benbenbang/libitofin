@@ -495,6 +495,22 @@ typedef struct ItofinHybridSimulatedAnnealingOptions {
   bool has_reanneal_interval;
 } ItofinHybridSimulatedAnnealingOptions;
 
+/**
+ * Firefly controls with presence flags preserving explicit zero alpha/gamma.
+ * Zero-initialized options select alpha .25, beta0 1, gamma 1 and decay .97.
+ */
+typedef struct ItofinFireflyOptions {
+  struct ItofinGlobalOptions global;
+  double alpha;
+  double beta0;
+  double gamma;
+  double alpha_decay;
+  bool has_alpha;
+  bool has_beta0;
+  bool has_gamma;
+  bool has_alpha_decay;
+} ItofinFireflyOptions;
+
 typedef struct ItofinSwapHelperConfig {
   uint64_t quote;
   int32_t tenor_length;
@@ -1043,22 +1059,6 @@ typedef struct ItofinSlsqpOptions {
   size_t maxiter;
   size_t maxfev;
 } ItofinSlsqpOptions;
-
-/**
- * Firefly controls with presence flags preserving explicit zero alpha/gamma.
- * Zero-initialized options select alpha .25, beta0 1, gamma 1 and decay .97.
- */
-typedef struct ItofinFireflyOptions {
-  struct ItofinGlobalOptions global;
-  double alpha;
-  double beta0;
-  double gamma;
-  double alpha_decay;
-  bool has_alpha;
-  bool has_beta0;
-  bool has_gamma;
-  bool has_alpha_decay;
-} ItofinFireflyOptions;
 
 typedef struct ItofinOvernightFutureConfig {
   uint64_t index;
@@ -3178,6 +3178,37 @@ int32_t itofin_hybrid_simulated_annealing_result(struct ItofinContext *ctx,
                                                  size_t n,
                                                  struct ItofinOptimizeResult *out,
                                                  struct ItofinError *error);
+
+/**
+ * Construct a calibration method in projected free-parameter order.
+ * A zeroed options record selects defaults, including deterministic seed zero.
+ * Population is optional row-major `rows * n`, with exact length required.
+ * Every candidate must satisfy the model constraint before its cost is called.
+ * # Safety
+ * Pointers must satisfy the crate-level C caller contract.
+ */
+int32_t itofin_firefly_new(struct ItofinContext *ctx,
+                           const double *lower,
+                           size_t lower_len,
+                           const double *upper,
+                           size_t upper_len,
+                           const struct ItofinFireflyOptions *options,
+                           const double *population,
+                           size_t population_rows,
+                           size_t population_len,
+                           uint64_t *out,
+                           struct ItofinError *error);
+
+/**
+ * Copy the preserved firefly outcome without repricing.
+ * # Safety
+ * `out` and all other pointers follow `itofin_differential_evolution_result`.
+ */
+int32_t itofin_firefly_result(struct ItofinContext *ctx,
+                              uint64_t method,
+                              size_t n,
+                              struct ItofinOptimizeResult *out,
+                              struct ItofinError *error);
 
 /**
  * # Safety
