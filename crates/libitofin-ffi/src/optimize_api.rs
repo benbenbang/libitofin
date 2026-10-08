@@ -1244,3 +1244,6 @@ pub(crate) fn decode_differential_evolution(
 #[cfg(test)]
 #[path = "optimize_api/global_tests.rs"]
 mod global_tests;
+
+pub(crate) mod particle_swarm;
+pub use particle_swarm::{ItofinParticleSwarmOptions, itofin_optimize_particle_swarm};

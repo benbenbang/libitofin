@@ -1002,6 +1002,22 @@ typedef struct ItofinSlsqpOptions {
   size_t maxfev;
 } ItofinSlsqpOptions;
 
+/**
+ * Particle-swarm controls. Presence flags preserve explicit zero coefficients.
+ * Zero-initialized options select inertia .7, cognitive/social 1.4 and clamp .2.
+ */
+typedef struct ItofinParticleSwarmOptions {
+  struct ItofinGlobalOptions global;
+  double inertia;
+  double cognitive;
+  double social;
+  double velocity_clamp;
+  bool has_inertia;
+  bool has_cognitive;
+  bool has_social;
+  bool has_velocity_clamp;
+} ItofinParticleSwarmOptions;
+
 typedef struct ItofinOvernightFutureConfig {
   uint64_t index;
   int32_t value_date;
@@ -5199,6 +5215,30 @@ int32_t itofin_optimize_differential_evolution(const struct ItofinObjective *obj
                                                const struct ItofinDifferentialEvolutionOptions *options,
                                                struct ItofinOptimizeResult *out_result,
                                                struct ItofinError *error);
+
+/**
+ * Minimize with seeded bounded particle swarm. Bounds must be finite,
+ * contain x0 and have finite widths. Optional initial rows are preserved exactly;
+ * zero rows and zero length mean automatic initialization. Row-major storage must
+ * contain `initial_rows * n` values. A supplied gradient is not used.
+ * # Safety
+ * Objective/options/output follow the `itofin_optimize_lbfgsb` contract.
+ * Each input pointer must be readable for its declared length. Output fields
+ * and its x buffer remain untouched when the call returns an error.
+ */
+int32_t itofin_optimize_particle_swarm(const struct ItofinObjective *objective,
+                                       const double *x0,
+                                       size_t n,
+                                       const double *lower,
+                                       size_t lower_len,
+                                       const double *upper,
+                                       size_t upper_len,
+                                       const double *initial_population,
+                                       size_t initial_rows,
+                                       size_t initial_len,
+                                       const struct ItofinParticleSwarmOptions *options,
+                                       struct ItofinOptimizeResult *out_result,
+                                       struct ItofinError *error);
 
 /**
  * `american`: 0 European, 1 American; earliest ignored for European exercise.
