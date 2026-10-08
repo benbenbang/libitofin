@@ -179,3 +179,6 @@ pub(crate) fn decode_particle_swarm(
         common,
     ))
 }
+
+#[cfg(test)]
+mod tests;
