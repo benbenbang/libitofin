@@ -307,3 +307,6 @@ fn fixed_box_calls_scalar_once_and_maps_success() {
     assert_eq!(result.fun, -5.0);
     assert_eq!(problem.function_evaluation(), 1);
 }
+
+#[path = "particle_swarm_model_tests.rs"]
+mod model;
