@@ -53,6 +53,7 @@ mod objective;
 mod outcome;
 mod particle_swarm;
 mod problem;
+mod simulated_annealing;
 mod slsqp;
 
 #[cfg(test)]
@@ -129,6 +130,9 @@ pub fn minimize<O: Objective>(
         Method::Slsqp(options) => slsqp::minimize(objective, problem, options, common),
         Method::ParticleSwarm(options) => {
             particle_swarm::minimize(objective, problem, options, common)
+        }
+        Method::HybridSimulatedAnnealing(options) => {
+            simulated_annealing::minimize(objective, problem, options, common)
         }
         Method::DifferentialEvolution(options) => {
             differential_evolution::minimize(objective, problem, options, common)

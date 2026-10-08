@@ -1,6 +1,8 @@
 use crate::error::InvalidInput;
 use crate::finite_difference::FiniteDifference;
-use crate::global::{DifferentialEvolutionOptions, ParticleSwarmOptions};
+use crate::global::{
+    DifferentialEvolutionOptions, HybridSimulatedAnnealingOptions, ParticleSwarmOptions,
+};
 
 /// Box bounds, one entry per coordinate.
 ///
@@ -267,10 +269,12 @@ pub enum Method {
     DifferentialEvolution(DifferentialEvolutionOptions),
     /// Serial synchronous global-best particle swarm with finite box bounds.
     ParticleSwarm(ParticleSwarmOptions),
+    /// Reflecting simulated annealing interleaved with bounded coordinate polls.
+    HybridSimulatedAnnealing(HybridSimulatedAnnealingOptions),
 }
 
 impl Method {
-    /// The SciPy name of the method.
+    /// The stable public name of the method.
     pub fn name(&self) -> &'static str {
         match self {
             Method::NelderMead(_) => "Nelder-Mead",
@@ -279,6 +283,7 @@ impl Method {
             Method::Slsqp(_) => "SLSQP",
             Method::DifferentialEvolution(_) => "Differential-Evolution",
             Method::ParticleSwarm(_) => "Particle-Swarm",
+            Method::HybridSimulatedAnnealing(_) => "Hybrid-Simulated-Annealing",
         }
     }
 
@@ -289,7 +294,8 @@ impl Method {
             Method::Lbfgsb(_)
             | Method::Slsqp(_)
             | Method::DifferentialEvolution(_)
-            | Method::ParticleSwarm(_) => true,
+            | Method::ParticleSwarm(_)
+            | Method::HybridSimulatedAnnealing(_) => true,
         }
     }
 
@@ -312,6 +318,7 @@ impl Method {
             Method::Slsqp(options) => options.validate(),
             Method::DifferentialEvolution(options) => options.validate(problem),
             Method::ParticleSwarm(options) => options.validate(problem),
+            Method::HybridSimulatedAnnealing(options) => options.validate(problem),
         }
     }
 }
