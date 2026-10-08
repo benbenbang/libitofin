@@ -427,6 +427,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     optimization.add_class::<PySimplex>()?;
     optimization.add_class::<global_calibration::PyDifferentialEvolution>()?;
     optimization.add_class::<global_calibration::PyParticleSwarm>()?;
+    optimization.add_class::<global_calibration::PyFirefly>()?;
     optimization.add_class::<global_calibration::PyHybridSimulatedAnnealing>()?;
     optimization.add_class::<PyConjugateGradient>()?;
     optimization.add_class::<PySteepestDescent>()?;

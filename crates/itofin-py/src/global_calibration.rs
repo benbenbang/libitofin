@@ -3,11 +3,11 @@
 use crate::ItofinError;
 use crate::optimize::PyOptimizeResult;
 use itofin_optimize::{
-    Bounds, Common, DifferentialEvolutionOptions, GlobalOptions, HybridSimulatedAnnealingOptions,
-    ParticleSwarmOptions,
+    Bounds, Common, DifferentialEvolutionOptions, FireflyOptions, GlobalOptions,
+    HybridSimulatedAnnealingOptions, ParticleSwarmOptions,
 };
 use libitofin::math::optimization::global::{
-    DifferentialEvolution, HybridSimulatedAnnealing, ParticleSwarm,
+    DifferentialEvolution, Firefly, HybridSimulatedAnnealing, ParticleSwarm,
 };
 use pyo3::prelude::*;
 use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
@@ -244,6 +244,84 @@ impl PyHybridSimulatedAnnealing {
 
 impl PyHybridSimulatedAnnealing {
     pub(crate) fn inner_mut(&mut self) -> &mut HybridSimulatedAnnealing {
+        &mut self.inner
+    }
+}
+
+/// Bounded global calibration in projected free-parameter order.
+/// The complete search box must satisfy the model's constraint.
+#[gen_stub_pyclass]
+#[pyclass(name = "Firefly", unsendable, module = "itofin.optimization")]
+pub struct PyFirefly {
+    inner: Firefly,
+}
+
+#[gen_stub_pymethods]
+#[pymethods]
+impl PyFirefly {
+    /// Construct a bounded, deterministic synchronous normalized firefly calibration method.
+    /// Bounds and population coordinates use the free parameter order.
+    /// Invalid candidates abort before pricing rather than receiving a penalty.
+    #[new]
+    #[pyo3(signature = (bounds, *, seed=0, population_size=None, initial_population=None, xatol=None, fatol=None, alpha=0.25, beta0=1.0, gamma=1.0, alpha_decay=0.97, maxiter=None, maxfev=None))]
+    #[allow(clippy::too_many_arguments)]
+    fn new(
+        bounds: Vec<(f64, f64)>,
+        #[pyo3(from_py_with = crate::optimize::strict_global_seed)] seed: u64,
+        #[pyo3(from_py_with = extract_population_size)] population_size: Option<usize>,
+        initial_population: Option<Vec<Vec<f64>>>,
+        xatol: Option<f64>,
+        fatol: Option<f64>,
+        alpha: f64,
+        beta0: f64,
+        gamma: f64,
+        alpha_decay: f64,
+        #[pyo3(from_py_with = extract_maxiter)] maxiter: Option<usize>,
+        #[pyo3(from_py_with = extract_maxfev)] maxfev: Option<usize>,
+    ) -> PyResult<Self> {
+        let bounds = Bounds {
+            lower: bounds.iter().map(|pair| pair.0).collect(),
+            upper: bounds.iter().map(|pair| pair.1).collect(),
+        };
+        let options = FireflyOptions {
+            global: GlobalOptions {
+                seed,
+                population_size,
+                initial_population,
+                xatol,
+                fatol,
+            },
+            alpha,
+            beta0,
+            gamma,
+            alpha_decay,
+        };
+        let inner = Firefly::new(
+            bounds,
+            options,
+            Common {
+                maxiter,
+                maxfev,
+                tol: None,
+            },
+        )
+        .map_err(|error| ItofinError::new_err(error.to_string()))?;
+        Ok(Self { inner })
+    }
+
+    /// Copy the exact last global result, or None before a completed run.
+    /// Exhausted runs are retained without being labelled successful.
+    fn last_result(&self) -> PyResult<Option<PyOptimizeResult>> {
+        self.inner
+            .last_result()
+            .cloned()
+            .map(PyOptimizeResult::from_core)
+            .transpose()
+    }
+}
+
+impl PyFirefly {
+    pub(crate) fn inner_mut(&mut self) -> &mut Firefly {
         &mut self.inner
     }
 }

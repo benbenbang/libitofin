@@ -139,7 +139,7 @@ impl PyHullWhite {
     fn calibrate(
         &mut self,
         helpers: Vec<PyRef<PySwaptionHelper>>,
-        #[gen_stub(override_type(type_repr = "optimization.LevenbergMarquardt | optimization.Simplex | optimization.ConjugateGradient | optimization.SteepestDescent | optimization.DifferentialEvolution | optimization.ParticleSwarm | optimization.HybridSimulatedAnnealing", imports = ("itofin.optimization")))]
+        #[gen_stub(override_type(type_repr = "optimization.LevenbergMarquardt | optimization.Simplex | optimization.ConjugateGradient | optimization.SteepestDescent | optimization.DifferentialEvolution | optimization.ParticleSwarm | optimization.HybridSimulatedAnnealing | optimization.Firefly", imports = ("itofin.optimization")))]
         method: &Bound<'_, PyAny>,
         end_criteria: &PyEndCriteria,
         fix_reversion: bool,
@@ -182,7 +182,7 @@ impl PyHullWhite {
     fn calibrate_caps(
         &self,
         helpers: Vec<PyRef<crate::caphelper::PyCapHelper>>,
-        #[gen_stub(override_type(type_repr = "optimization.LevenbergMarquardt | optimization.Simplex | optimization.ConjugateGradient | optimization.SteepestDescent | optimization.DifferentialEvolution | optimization.ParticleSwarm | optimization.HybridSimulatedAnnealing", imports = ("itofin.optimization")))]
+        #[gen_stub(override_type(type_repr = "optimization.LevenbergMarquardt | optimization.Simplex | optimization.ConjugateGradient | optimization.SteepestDescent | optimization.DifferentialEvolution | optimization.ParticleSwarm | optimization.HybridSimulatedAnnealing | optimization.Firefly", imports = ("itofin.optimization")))]
         method: &Bound<'_, PyAny>,
         end_criteria: &PyEndCriteria,
         fix_reversion: bool,

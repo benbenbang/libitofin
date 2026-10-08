@@ -65,7 +65,7 @@ def minimize(fun: typing.Callable[[numpy.typing.NDArray[numpy.float64]], float],
         fun (Callable): Called as fun(x) with a float64 array; returns a float.
         x0 (Sequence[float]): The starting point.
         method (str): "Nelder-Mead", "BFGS", "L-BFGS-B", "SLSQP", or
-            "Differential-Evolution", "Particle-Swarm" or "Hybrid-Simulated-Annealing" (any case).
+            "Differential-Evolution", "Particle-Swarm", "Hybrid-Simulated-Annealing" or "Firefly" (any case).
         options (dict | None): Nelder-Mead accepts maxiter, maxfev, xatol,
             fatol and adaptive. BFGS accepts maxiter, gtol and eps. L-BFGS-B
             accepts maxiter, maxfev, maxcor, ftol, gtol and eps. SLSQP accepts
@@ -82,6 +82,9 @@ def minimize(fun: typing.Callable[[numpy.typing.NDArray[numpy.float64]], float],
             local_search_steps and reanneal_interval. It uses a reflected uniform
             proposal, Metropolis acceptance and bounded coordinate local searches.
             It does not accept population controls.
+            Firefly accepts the shared population controls plus alpha, beta0,
+            gamma and alpha_decay. Distances and random displacements are
+            normalized by the finite box; attraction uses a frozen generation.
         callback (Callable | None): Called as callback(xk) after every
             iteration. Raising StopIteration stops the run with
             Status.Cancelled.
