@@ -2,6 +2,9 @@ use super::*;
 use crate::{Flow, GlobalOptions, IterationState, Method};
 use std::io;
 
+#[path = "firefly_numeric_tests.rs"]
+mod numeric;
+
 fn problem() -> Problem {
     Problem {
         x0: vec![0.0],
