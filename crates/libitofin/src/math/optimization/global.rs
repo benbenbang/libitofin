@@ -351,6 +351,9 @@ impl OptimizationMethod for HybridSimulatedAnnealing {
 }
 
 #[cfg(test)]
+mod hybrid_simulated_annealing_tests;
+
+#[cfg(test)]
 mod tests;
 
 #[cfg(test)]
