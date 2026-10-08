@@ -608,3 +608,7 @@ mod tests {
         assert_eq!(validity, [2, 3, 3]);
     }
 }
+
+#[cfg(test)]
+#[path = "chart_vwap_obv_tests.rs"]
+mod vwap_obv_tests;
