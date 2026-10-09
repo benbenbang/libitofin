@@ -79,3 +79,5 @@ links to the language guides and project documentation.
 - [Implied volatility term structure](implied-vol-term-structure.md): fixed-reference forward variance, live source handles and explicit extrapolation.
 
 - [Black-Scholes theta](black-scholes-theta.md): current-market theta from supplied Greeks with checked source-order arithmetic.
+
+- [FX forwards](fx-forwards.md): explicit settlement-normalized currency-tagged valuation and snapshot spot inputs.

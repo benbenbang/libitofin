@@ -114,6 +114,7 @@ nav:
   - Bond forwards: bond-forward.md
   - Implied volatility term structure: implied-vol-term-structure.md
   - Black-Scholes theta: black-scholes-theta.md
+  - FX forwards: fx-forwards.md
   - Rust API: rust.md
   - Project:
       - Repository index: https://github.com/benbenbang/libitofin#readme
