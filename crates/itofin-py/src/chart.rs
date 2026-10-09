@@ -1,7 +1,9 @@
 //! Python chart indicators backed by the shared Rust calculations.
 
 use crate::PyQlError;
-use libitofin::math::chart::{self, BollingerBands, ChartSeries, Kd, Macd, VolumeBars};
+use libitofin::math::chart::{
+    self, BollingerBands, ChartSeries, Kd, KeltnerChannels, Macd, VolumeBars,
+};
 use libitofin::math::volatility;
 use numpy::PyArray1;
 use pyo3::prelude::*;
@@ -120,6 +122,47 @@ impl PyBollingerBands {
     }
 
     /// Middle minus population standard deviation times the multiplier.
+    #[getter]
+    fn lower(&self) -> PyChartSeries {
+        self.lower.clone()
+    }
+}
+
+/// Modern EMA-close center and Wilder-ATR envelopes, with shared warmup.
+#[gen_stub_pyclass]
+#[pyclass(name = "KeltnerChannels", frozen, module = "itofin.chart")]
+pub(crate) struct PyKeltnerChannels {
+    center: PyChartSeries,
+    upper: PyChartSeries,
+    lower: PyChartSeries,
+}
+
+impl From<KeltnerChannels> for PyKeltnerChannels {
+    fn from(bands: KeltnerChannels) -> Self {
+        Self {
+            center: PyChartSeries::from_core(bands.center),
+            upper: PyChartSeries::from_core(bands.upper),
+            lower: PyChartSeries::from_core(bands.lower),
+        }
+    }
+}
+
+#[gen_stub_pymethods]
+#[pymethods]
+impl PyKeltnerChannels {
+    /// EMA of closes, preserving the existing arithmetic seed.
+    #[getter]
+    fn center(&self) -> PyChartSeries {
+        self.center.clone()
+    }
+
+    /// Center plus the multiplier times Wilder ATR.
+    #[getter]
+    fn upper(&self) -> PyChartSeries {
+        self.upper.clone()
+    }
+
+    /// Center minus the multiplier times Wilder ATR.
     #[getter]
     fn lower(&self) -> PyChartSeries {
         self.lower.clone()
@@ -310,6 +353,26 @@ pub(crate) fn bollinger_bands(
 ) -> PyResult<PyBollingerBands> {
     chart::bollinger_bands(&close, period, multiplier)
         .map(PyBollingerBands::from)
+        .map_err(PyQlError::from)
+        .map_err(Into::into)
+}
+
+/// Modern Keltner channels with EMA(close) center and Wilder ATR envelopes.
+/// All three series share the later warmup index. Defaults are EMA 20,
+/// ATR 10 and multiplier 2; this differs from standalone ATR's default 14.
+#[gen_stub_pyfunction(module = "itofin.chart")]
+#[pyfunction]
+#[pyo3(signature = (high, low, close, center_period = 20, atr_period = 10, multiplier = 2.0))]
+pub(crate) fn keltner_channels(
+    high: Vec<f64>,
+    low: Vec<f64>,
+    close: Vec<f64>,
+    center_period: usize,
+    atr_period: usize,
+    multiplier: f64,
+) -> PyResult<PyKeltnerChannels> {
+    chart::keltner_channels(&high, &low, &close, center_period, atr_period, multiplier)
+        .map(PyKeltnerChannels::from)
         .map_err(PyQlError::from)
         .map_err(Into::into)
 }

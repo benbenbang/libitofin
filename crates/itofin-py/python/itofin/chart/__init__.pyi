@@ -13,6 +13,7 @@ __all__ = [
     "Garch11FitResult",
     "Garch11Result",
     "Kd",
+    "KeltnerChannels",
     "Macd",
     "OhlcOvernightEstimates",
     "OhlcPointEstimates",
@@ -26,6 +27,7 @@ __all__ = [
     "garch11_forecast",
     "interval_prices",
     "kd",
+    "keltner_channels",
     "macd",
     "obv",
     "ohlc_overnight_volatility",
@@ -182,6 +184,27 @@ class Kd:
         """
 
 @typing.final
+class KeltnerChannels:
+    r"""
+    Modern EMA-close center and Wilder-ATR envelopes, with shared warmup.
+    """
+    @property
+    def center(self) -> ChartSeries:
+        r"""
+        EMA of closes, preserving the existing arithmetic seed.
+        """
+    @property
+    def upper(self) -> ChartSeries:
+        r"""
+        Center plus the multiplier times Wilder ATR.
+        """
+    @property
+    def lower(self) -> ChartSeries:
+        r"""
+        Center minus the multiplier times Wilder ATR.
+        """
+
+@typing.final
 class Macd:
     r"""
     MACD line, signal, and histogram aligned with input closes.
@@ -310,6 +333,13 @@ def interval_prices(dates: typing.Sequence[time.Date], open: typing.Sequence[bui
 def kd(high: typing.Sequence[builtins.float], low: typing.Sequence[builtins.float], close: typing.Sequence[builtins.float], period: builtins.int = 9, k_smooth: builtins.int = 3, d_smooth: builtins.int = 3) -> Kd:
     r"""
     Taiwan KD with RSV and recursive K/D smoothing seeded at 50.
+    """
+
+def keltner_channels(high: typing.Sequence[builtins.float], low: typing.Sequence[builtins.float], close: typing.Sequence[builtins.float], center_period: builtins.int = 20, atr_period: builtins.int = 10, multiplier: builtins.float = 2.0) -> KeltnerChannels:
+    r"""
+    Modern Keltner channels with EMA(close) center and Wilder ATR envelopes.
+    All three series share the later warmup index. Defaults are EMA 20,
+    ATR 10 and multiplier 2; this differs from standalone ATR's default 14.
     """
 
 def macd(close: typing.Sequence[builtins.float], fast_period: builtins.int = 12, slow_period: builtins.int = 26, signal_period: builtins.int = 9) -> Macd:
