@@ -1,5 +1,6 @@
 //! Numerical building blocks ported from `ql/math/`.
 
+pub mod abcdmathfunction;
 pub mod array;
 pub mod beta;
 pub mod chart;
