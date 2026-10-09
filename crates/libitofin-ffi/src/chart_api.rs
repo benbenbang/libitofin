@@ -690,3 +690,7 @@ mod tests {
 #[cfg(test)]
 #[path = "chart_vwap_obv_tests.rs"]
 mod vwap_obv_tests;
+
+#[cfg(test)]
+#[path = "chart_atr_tests.rs"]
+mod atr_tests;
