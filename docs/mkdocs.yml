@@ -110,6 +110,7 @@ nav:
   - Reviewed Rust priority additions: priority-adoption.md
   - Small LOW Rust additions: low-small-additions.md
   - Bond Z-spread analytics: bond-zspread.md
+  - Exchange-rate chaining: exchange-rate-chaining.md
   - Rust API: rust.md
   - Project:
       - Repository index: https://github.com/benbenbang/libitofin#readme
