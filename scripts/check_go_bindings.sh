@@ -95,3 +95,4 @@ go run ./examples/drawdown
 go run ./examples/benchmark_beta
 
 go run ./examples/performance_ratios
+go run ./examples/chart_adx
