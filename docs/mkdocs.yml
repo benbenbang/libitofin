@@ -87,6 +87,7 @@ nav:
   - GBM simulation: simulation.md
   - Standalone Euler GBM: geometric-brownian.md
   - Statistics and risk: statistics.md
+  - Maximum drawdown: drawdown.md
   - Mean convergence: convergence.md
   - QMC discrepancy: discrepancy.md
   - Global optimization: global-optimization.md

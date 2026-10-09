@@ -248,3 +248,9 @@ Rust also provides `SequenceStatistics::new(dimension)` and `add_weighted` for
 an owned accumulator; the binding APIs expose only these batch operations.
 Independent native and exact-centered fixtures are in
 [`sdk/go/testdata/sequence-statistics`](https://github.com/benbenbang/libitofin/tree/main/sdk/go/testdata/sequence-statistics).
+
+## Ordered portfolio drawdown
+
+[Maximum drawdown](drawdown.md) accepts ordered positive equity/NAV values,
+not unordered return samples. It returns a nonnegative fractional running-peak
+loss and deterministic zero-based peak/trough indices in Rust, C, Go and Python.
