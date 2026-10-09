@@ -23,6 +23,7 @@ use crate::time::calendars::unitedstates::{Market as UsMarket, UnitedStates};
 use crate::time::date::Date;
 use crate::time::daycounters::actual360::Actual360;
 use crate::time::period::Period;
+use crate::time::timeunit::TimeUnit;
 
 /// The USD Libor index (`ql/indexes/ibor/usdlibor.hpp`, C++ `USDLibor`).
 ///
@@ -30,6 +31,17 @@ use crate::time::period::Period;
 pub struct UsdLibor;
 
 impl UsdLibor {
+    /// Builds the standard six-month USD Libor index using [`Self::new`].
+    ///
+    /// The forwarding handle and settings retain their shared live state.
+    pub fn six_months(
+        forwarding: Handle<dyn YieldTermStructure>,
+        settings: Shared<Settings<Date>>,
+    ) -> IborIndex {
+        Self::new(Period::new(6, TimeUnit::Months), forwarding, settings)
+            .expect("a six-month USD Libor tenor is valid")
+    }
+
     /// Builds a USD Libor index of the given `tenor` over the `forwarding`
     /// curve.
     ///
@@ -66,17 +78,19 @@ mod tests {
     //! The last-relevant-date regression is covered by `tests/custom_pillars.rs`.
 
     use super::*;
+    use crate::handle::RelinkableHandle;
     use crate::indexes::index::Index;
     use crate::indexes::interestrateindex::InterestRateIndex;
+    use crate::interestrate::Compounding;
     use crate::shared::shared;
     use crate::termstructures::bootstraphelper::RateHelper;
+    use crate::termstructures::yields::FlatForward;
     use crate::termstructures::yields::SwapRateHelper;
     use crate::time::businessdayconvention::BusinessDayConvention;
     use crate::time::calendars::unitedkingdom::{Market as UkMarket, UnitedKingdom};
     use crate::time::date::Month;
     use crate::time::daycounters::thirty360::{Convention, Thirty360};
     use crate::time::frequency::Frequency;
-    use crate::time::timeunit::TimeUnit;
 
     fn usd_libor_3m(settings: Shared<Settings<Date>>) -> IborIndex {
         UsdLibor::new(Period::new(3, TimeUnit::Months), Handle::empty(), settings)
@@ -202,5 +216,88 @@ mod tests {
             index.fixing_date(Date::new(13, Month::November, 2020)),
             Date::new(11, Month::November, 2020)
         );
+    }
+
+    #[test]
+    fn six_months_matches_generic_dates_configuration_and_forecasts() {
+        let today = Date::new(1, Month::May, 2020);
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(today);
+        let forwarding = Handle::new(shared(FlatForward::with_rate(
+            today,
+            0.05,
+            Actual360::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        )) as Shared<dyn YieldTermStructure>);
+        let index = UsdLibor::six_months(forwarding.clone(), settings.clone());
+        let generic =
+            UsdLibor::new(Period::new(6, TimeUnit::Months), forwarding, settings).unwrap();
+        assert_eq!(index.name(), "USDLibor6M Actual/360");
+        assert_eq!(index.name(), generic.name());
+        assert_eq!(index.tenor(), generic.tenor());
+        assert_eq!(index.currency(), generic.currency());
+        assert_eq!(index.fixing_days(), generic.fixing_days());
+        assert_eq!(index.day_counter(), generic.day_counter());
+        assert_eq!(
+            index.business_day_convention(),
+            generic.business_day_convention()
+        );
+        assert_eq!(index.end_of_month(), generic.end_of_month());
+        let fixing = Date::new(7, Month::May, 2020);
+        let value = index.value_date(fixing).unwrap();
+        let maturity = index.maturity_date(value).unwrap();
+        assert_eq!(value, Date::new(12, Month::May, 2020));
+        assert_eq!(maturity, Date::new(12, Month::November, 2020));
+        assert_eq!(value, generic.value_date(fixing).unwrap());
+        assert_eq!(maturity, generic.maturity_date(value).unwrap());
+        assert_eq!(index.fixing_date(value), generic.fixing_date(value));
+        assert_eq!(index.fixing_date(value), Date::new(7, Month::May, 2020));
+        let accrual = Actual360::new().year_fraction(value, maturity);
+        let expected = ((0.05 * accrual).exp() - 1.0) / accrual;
+        assert!((index.forecast_fixing(fixing).unwrap() - expected).abs() < 1e-12);
+        assert_eq!(
+            index.fixing(fixing, false).unwrap(),
+            generic.fixing(fixing, false).unwrap()
+        );
+    }
+
+    #[test]
+    fn six_months_keeps_live_forwarding_and_settings() {
+        let today = Date::new(15, Month::June, 2026);
+        let fixing = Date::new(15, Month::July, 2026);
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(today);
+        let forwarding = RelinkableHandle::<dyn YieldTermStructure>::empty();
+        let index = UsdLibor::six_months(forwarding.handle(), settings.clone());
+        assert!(index.forecast_fixing(fixing).is_err());
+        let curve = |rate| {
+            shared(FlatForward::with_rate(
+                today,
+                rate,
+                Actual360::new(),
+                Compounding::Continuous,
+                Frequency::Annual,
+            )) as Shared<dyn YieldTermStructure>
+        };
+        forwarding.link_to(curve(0.02));
+        let before = index.fixing(fixing, false).unwrap();
+        forwarding.link_to(curve(0.07));
+        let after = index.fixing(fixing, false).unwrap();
+        assert!(after > before);
+        let start = index.value_date(fixing).unwrap();
+        let end = index.maturity_date(start).unwrap();
+        let accrual = index.day_counter().year_fraction(start, end);
+        assert!((after - ((0.07 * accrual).exp() - 1.0) / accrual).abs() < 1e-12);
+        settings.set_evaluation_date(fixing);
+        settings.set_enforces_todays_historic_fixings(true);
+        assert!(index.fixing(fixing, false).is_err());
+        assert_eq!(index.fixing(fixing, true).unwrap(), after);
+        settings.set_enforces_todays_historic_fixings(false);
+        assert_eq!(index.fixing(fixing, false).unwrap(), after);
+        settings.set_evaluation_date(Date::new(16, Month::July, 2026));
+        assert!(index.fixing(fixing, false).is_err());
+        settings.set_evaluation_date(today);
+        assert_eq!(index.fixing(fixing, false).unwrap(), after);
     }
 }

@@ -159,6 +159,13 @@ impl BatesProcess {
     pub fn delta(&self) -> Real {
         self.delta
     }
+    /// Mean proportional jump size, `exp(nu + delta^2 / 2) - 1`.
+    ///
+    /// Reads the same representable compensation validated at construction,
+    /// using `exp_m1` to retain accuracy for small logarithmic jump means.
+    pub fn m(&self) -> Real {
+        (self.nu + 0.5 * self.delta * self.delta).exp_m1()
+    }
     /// Live risk-free curve handle.
     pub fn risk_free_rate(&self) -> Handle<dyn YieldTermStructure> {
         self.heston.risk_free_rate()

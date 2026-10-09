@@ -254,9 +254,17 @@ impl CapFloor {
 
     /// The last floating coupon (`lastFloatingRateCoupon`), the coupon the
     /// optionlet stripper reads its fixing date, payment date and accrual period
-    /// off. `None` only for an empty leg, which the constructors never produce.
+    /// off. Returns `None` for an empty Ibor store, including overnight legs.
+    /// See [`Self::last_overnight_coupon`] for overnight instruments.
     pub fn last_floating_rate_coupon(&self) -> Option<&Shared<IborCoupon>> {
         self.coupons.last()
+    }
+
+    /// The last retained overnight coupon, or `None` on Ibor or empty legs.
+    ///
+    /// This borrows the same shared coupon held in [`Self::overnight_coupons`].
+    pub fn last_overnight_coupon(&self) -> Option<&Shared<OvernightIndexedCoupon>> {
+        self.overnight_coupons.last()
     }
 
     /// The leg's earliest accrual start (`startDate`).
@@ -402,9 +410,9 @@ impl Instrument for CapFloor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cashflows::IborLeg;
+    use crate::cashflows::{IborLeg, OvernightLeg};
     use crate::handle::Handle;
-    use crate::indexes::ibor::Euribor;
+    use crate::indexes::ibor::{Euribor, Sofr};
     use crate::shared::shared;
     use crate::termstructures::yieldtermstructure::YieldTermStructure;
     use crate::time::businessdayconvention::BusinessDayConvention;
@@ -526,5 +534,60 @@ mod tests {
 
         settings.set_evaluation_date(Date::new(15, Month::August, 2027));
         assert!(cap.is_expired().unwrap());
+    }
+
+    #[test]
+    fn last_overnight_coupon_retains_the_trailing_coupon_identity() {
+        let settings = settings_on(Date::new(2, Month::January, 2026));
+        let index = shared(Sofr::new(Handle::empty(), settings.clone()));
+        let schedule = MakeSchedule::new()
+            .from(Date::new(15, Month::January, 2026))
+            .to(Date::new(15, Month::October, 2026))
+            .with_frequency(Frequency::Quarterly)
+            .with_calendar(Target::new())
+            .with_convention(BusinessDayConvention::ModifiedFollowing)
+            .build();
+        let coupons = OvernightLeg::new(schedule, index)
+            .with_notional(100.0)
+            .coupons()
+            .unwrap();
+        assert_eq!(coupons.len(), 3);
+        let cap = CapFloor::from_overnight(
+            CapFloorType::Cap,
+            coupons.clone(),
+            vec![0.03],
+            Vec::new(),
+            settings,
+        )
+        .unwrap();
+        let last = cap.last_overnight_coupon().unwrap();
+        assert!(Shared::ptr_eq(last, &coupons[2]));
+        assert!(std::ptr::eq(last, &cap.overnight_coupons()[2]));
+        assert!(!Shared::ptr_eq(last, &coupons[0]));
+        assert!(cap.last_floating_rate_coupon().is_none());
+        assert_eq!(last.accrual_end_date(), Date::new(15, Month::October, 2026));
+    }
+
+    #[test]
+    fn last_overnight_coupon_is_none_on_ibor_and_empty_legs() {
+        let settings = settings_on(Date::new(2, Month::January, 2026));
+        let coupons = leg(settings.clone());
+        let last = coupons.last().unwrap().clone();
+        let cap = CapFloor::cap(coupons, vec![0.03], settings.clone()).unwrap();
+        assert!(cap.last_overnight_coupon().is_none());
+        assert!(Shared::ptr_eq(
+            cap.last_floating_rate_coupon().unwrap(),
+            &last
+        ));
+        let empty = CapFloor::from_overnight(
+            CapFloorType::Cap,
+            Vec::new(),
+            vec![0.03],
+            Vec::new(),
+            settings,
+        )
+        .unwrap();
+        assert!(empty.last_overnight_coupon().is_none());
+        assert!(empty.last_floating_rate_coupon().is_none());
     }
 }

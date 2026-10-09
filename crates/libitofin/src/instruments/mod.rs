@@ -57,7 +57,9 @@ pub use oneassetoption::{
     OneAssetOptionResults, OptionArguments, VanillaOption,
 };
 pub use overnightindexedswap::OvernightIndexedSwap;
-pub use payoffs::{CashOrNothingPayoff, PlainVanillaPayoff, StrikedTypePayoff, TypePayoff};
+pub use payoffs::{
+    CashOrNothingPayoff, NullPayoff, PlainVanillaPayoff, StrikedTypePayoff, TypePayoff,
+};
 pub use protection::ProtectionSide;
 pub use swap::{Swap, SwapArguments, SwapEngine, SwapResults, SwapType};
 pub use swaption::{
