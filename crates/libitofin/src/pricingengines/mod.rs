@@ -22,7 +22,7 @@ pub use blackdeltacalculator::BlackDeltaCalculator;
 pub use bond::{BondFunctions, DiscountingBondEngine};
 pub use capfloor::{AnalyticCapFloorEngine, BachelierCapFloorEngine, BlackCapFloorEngine};
 pub use credit::{IntegralCdsEngine, MidPointCdsEngine};
-pub use greeks::default_theta_per_day;
+pub use greeks::{black_scholes_theta, default_theta_per_day};
 pub use inflation::{YoYInflationCapFloorEngine, yoy_optionlet_price};
 pub use mclongstaffschwartzengine::McLongstaffSchwartzEngineBase;
 pub use swap::DiscountingSwapEngine;
