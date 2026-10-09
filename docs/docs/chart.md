@@ -540,3 +540,65 @@ Both bindings also accept explicit periods through Python keyword arguments
 or Go's `ChartKD` and `ChartMACD` functions.
 
 ::: itofin.chart
+
+## Williams percent R
+
+`williams_r` / `WilliamsR` uses an **inclusive trailing window**, including the
+current HLC bar. The default is **14 bars**. For the window's highest high H and
+lowest low L, the value is `-100 * ((H-close)/(H-L))`, in **[-100, 0]**.
+A close at H gives 0; a close at L gives -100. A flat window gives **-50**,
+consistent with Taiwan KD's neutral RSV 50, without smoothing K or D.
+
+First-valid is `min(period-1, len)`. Earlier dense values are zero placeholders,
+not real oscillator values; use `to_list()` / `NullableValues()` for missing
+warmup. Empty inputs return an empty result; short inputs remain entirely missing.
+Inputs must be equal-length, finite and satisfy `low <= close <= high`.
+Negative prices are valid. A positive period is required. Overflowing high-low
+or high-close differences are rejected, including partial windows during warmup.
+Returns and intermediates are not silently rescaled or clipped.
+
+=== "Python"
+
+    ```python
+    from itofin import chart
+
+    result = chart.williams_r(
+        [12, 16, 11], [10, 14, 9], [11, 15, 10], period=3
+    )
+    assert result.first_valid == 2
+    assert result.to_list()[:2] == [None, None]
+    assert abs(result.values[2] + 600 / 7) < 1e-12
+    ```
+
+=== "Go"
+
+    ```go
+    package main
+
+    import (
+        "fmt"
+        "math"
+        itofin "github.com/benbenbang/libitofin/sdk/go"
+    )
+
+    func main() {
+        result, err := itofin.WilliamsR(
+            []float64{12, 16, 11}, []float64{10, 14, 9},
+            []float64{11, 15, 10}, 3)
+        if err != nil { panic(err) }
+        if result.FirstValid != 2 || math.Abs(result.Values[2]+600.0/7) > 1e-12 {
+            panic("unexpected Williams percent R")
+        }
+        fmt.Println(result.NullableValues())
+    }
+    ```
+
+Rust exposes `math::chart::{williams_r, williams_r_default}` and returns the
+existing owned `ChartSeries`. C's `itofin_chart_williams_r` takes an explicit
+period and writes caller-owned values and first-valid only on success. No
+context or result handle needs closing. Go's `DefaultWilliamsR` and Python's
+omitted period use 14. Python value properties return independent NumPy copies.
+
+[Independent fixture](https://github.com/benbenbang/libitofin/blob/main/crates/libitofin/tests/data/chart/williams_r.md):
+exact standard-library Fraction calculations, shared across Rust, Go and Python;
+standalone C and C++ clients separately pin the same rational values.
