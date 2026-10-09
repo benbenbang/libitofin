@@ -87,3 +87,5 @@ go run ./examples/portfolio
 
 go run ./examples/drawdown
 go run ./examples/benchmark_beta
+
+go run ./examples/performance_ratios
