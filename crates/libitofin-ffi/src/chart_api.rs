@@ -141,6 +141,43 @@ pub unsafe extern "C" fn itofin_chart_atr(
     }
 }
 
+/// Compute inclusive rolling Williams percent R in [-100, 0], flat windows -50.
+/// Period must be positive; conventional default is 14. Finite rolling
+/// differences are required even during incomplete warmup. Failure is atomic.
+/// Warmup slots are zero; first-valid is `period - 1`, capped at `len`.
+/// # Safety
+/// Inputs each hold `len` doubles. Follow the crate-level pointer/non-overlap
+/// contract. `out` holds `capacity` doubles and `first_valid` holds one size_t.
+#[unsafe(no_mangle)]
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn itofin_chart_williams_r(
+    high: *const Real,
+    low: *const Real,
+    close: *const Real,
+    len: usize,
+    period: usize,
+    out: *mut Real,
+    capacity: usize,
+    first_valid: *mut usize,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        without_context(error, || {
+            if !error.is_null() {
+                check_ptr(error)?;
+            }
+            chart_series_output(len, out, capacity, first_valid, || {
+                Ok(libitofin::math::chart::williams_r(
+                    input_slice(high, len)?,
+                    input_slice(low, len)?,
+                    input_slice(close, len)?,
+                    period,
+                )?)
+            })
+        })
+    }
+}
+
 /// Compute modern EMA-close/Wilder-ATR Keltner channels. Output is channel
 /// major: center, upper, then lower, with `len` values per channel. All share
 /// the later first-valid index after both warmups.
@@ -752,3 +789,7 @@ mod atr_tests;
 #[cfg(test)]
 #[path = "chart_keltner_tests.rs"]
 mod keltner_tests;
+
+#[cfg(test)]
+#[path = "chart_williams_tests.rs"]
+mod williams_tests;
