@@ -4,7 +4,8 @@ use crate::boundary::{
     BindingError, BindingResult, ItofinError, check_ptr, input_slice, without_context,
 };
 use libitofin::math::chart::{
-    ChartSeries, atr, bollinger_bands, ema, kd, macd, obv, rsi, sma, true_range, volume_bars, vwap,
+    ChartSeries, atr, bollinger_bands, ema, kd, keltner_channels, macd, obv, rsi, sma, true_range,
+    volume_bars, vwap,
 };
 use libitofin::types::Real;
 
@@ -136,6 +137,59 @@ pub unsafe extern "C" fn itofin_chart_atr(
                     period,
                 )?)
             })
+        })
+    }
+}
+
+/// Compute modern EMA-close/Wilder-ATR Keltner channels. Output is channel
+/// major: center, upper, then lower, with `len` values per channel. All share
+/// the later first-valid index after both warmups.
+/// # Safety
+/// Inputs each hold `len` doubles. Follow the crate-level pointer/non-overlap
+/// contract. `out` holds `capacity` doubles and `first_valid` holds one size_t.
+#[unsafe(no_mangle)]
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn itofin_chart_keltner_channels(
+    high: *const Real,
+    low: *const Real,
+    close: *const Real,
+    len: usize,
+    center_period: usize,
+    atr_period: usize,
+    multiplier: Real,
+    out: *mut Real,
+    capacity: usize,
+    first_valid: *mut usize,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        without_context(error, || {
+            let count = len
+                .checked_mul(3)
+                .filter(|count| *count <= isize::MAX as usize / size_of::<Real>())
+                .ok_or_else(|| BindingError::invalid("chart output size overflow"))?;
+            if capacity < count {
+                return Err(BindingError::invalid("output capacity too small"));
+            }
+            check_ptr(first_valid)?;
+            if count > 0 {
+                check_ptr(out)?;
+            }
+            let bands = keltner_channels(
+                input_slice(high, len)?,
+                input_slice(low, len)?,
+                input_slice(close, len)?,
+                center_period,
+                atr_period,
+                multiplier,
+            )?;
+            if len > 0 {
+                std::ptr::copy_nonoverlapping(bands.center.values.as_ptr(), out, len);
+                std::ptr::copy_nonoverlapping(bands.upper.values.as_ptr(), out.add(len), len);
+                std::ptr::copy_nonoverlapping(bands.lower.values.as_ptr(), out.add(len * 2), len);
+            }
+            first_valid.write(bands.center.first_valid);
+            Ok(())
         })
     }
 }
