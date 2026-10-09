@@ -77,3 +77,5 @@ links to the language guides and project documentation.
 - [Bond forwards](bond-forward.md): retained live bonds, explicit income/financing curves and checked delivery quotes.
 
 - [Implied volatility term structure](implied-vol-term-structure.md): fixed-reference forward variance, live source handles and explicit extrapolation.
+
+- [Black-Scholes theta](black-scholes-theta.md): current-market theta from supplied Greeks with checked source-order arithmetic.
