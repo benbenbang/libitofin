@@ -11,6 +11,7 @@ pub mod errors;
 pub mod event;
 pub mod exchangerate;
 pub mod exercise;
+pub mod fxforward;
 pub mod handle;
 pub mod indexes;
 pub mod instrument;
