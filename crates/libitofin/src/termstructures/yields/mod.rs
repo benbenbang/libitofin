@@ -15,6 +15,7 @@ mod impliedtermstructure;
 mod jointyieldcurves;
 mod overnightbasisswapratehelper;
 mod piecewiseyieldcurve;
+mod quantotermstructure;
 mod ratehelpers;
 mod simplezerocurve;
 mod zerocurve;
@@ -32,6 +33,7 @@ pub use impliedtermstructure::ImpliedTermStructure;
 pub use jointyieldcurves::{BasisSwapHelperConfig, JointYieldCurves};
 pub use overnightbasisswapratehelper::OvernightIborBasisSwapRateHelper;
 pub use piecewiseyieldcurve::PiecewiseYieldCurve;
+pub use quantotermstructure::QuantoTermStructure;
 pub use ratehelpers::{
     DepositRateHelper, FraRateHelper, FuturesRateHelper, OISRateHelper, Pillar, SwapRateHelper,
 };
