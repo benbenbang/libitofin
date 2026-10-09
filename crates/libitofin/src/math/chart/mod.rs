@@ -4,6 +4,7 @@ use crate::errors::{QlError, QlResult};
 use crate::require;
 use crate::types::Real;
 
+mod adx;
 mod bands_rsi;
 mod kd_macd;
 mod keltner;
@@ -12,6 +13,7 @@ mod true_range_atr;
 mod vwap_obv;
 mod williams;
 
+pub use adx::{Adx, adx, adx_default};
 pub use bands_rsi::{BollingerBands, bollinger_bands, rsi};
 pub use kd_macd::{Kd, Macd, kd, kd_default, macd, macd_default};
 pub use keltner::{KeltnerChannels, keltner_channels, keltner_channels_default};
