@@ -4,8 +4,10 @@
 //! are immutable and preserve input row order; no mutable calibration arguments
 //! or stochastic-process integration are provided.
 
+pub mod lfmcovarproxy;
 pub mod lmexpcorrmodel;
 pub mod lmlinexpvolmodel;
 
+pub use lfmcovarproxy::LfmCovarianceProxy;
 pub use lmexpcorrmodel::LmExponentialCorrelationModel;
 pub use lmlinexpvolmodel::LmLinearExponentialVolatilityModel;
