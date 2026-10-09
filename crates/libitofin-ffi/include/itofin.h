@@ -5748,6 +5748,52 @@ int32_t itofin_overnight_add_fixing(struct ItofinContext *ctx,
                                     struct ItofinError *error);
 
 /**
+ * All-observation RMS shortfall below a per-period target, without annualization.
+ * On failure `out` is unchanged. An all-above-target sample returns zero.
+ *
+ * # Safety
+ * `returns` holds `len` readable doubles and `out` one writable double.
+ * All pointers follow the crate-level alignment and non-overlap contract.
+ */
+int32_t itofin_target_downside_deviation(const double *returns,
+                                         size_t len,
+                                         double target,
+                                         double *out,
+                                         struct ItofinError *error);
+
+/**
+ * Arithmetic Sharpe ratio using scalar per-period risk-free return, sample
+ * deviation (`N-1`) and mandatory `sqrt(periods_per_year)` scaling.
+ * Requires two finite observations and nonzero dispersion. Failure preserves `out`.
+ *
+ * # Safety
+ * `returns` holds `len` readable doubles and `out` one writable double.
+ * All pointers follow the crate-level alignment and non-overlap contract.
+ */
+int32_t itofin_sharpe_ratio(const double *returns,
+                            size_t len,
+                            double risk_free_return,
+                            double periods_per_year,
+                            double *out,
+                            struct ItofinError *error);
+
+/**
+ * Arithmetic Sortino ratio using scalar per-period MAR, all-observation
+ * downside (`N`) and mandatory `sqrt(periods_per_year)` scaling.
+ * Requires two finite observations and nonzero downside. Failure preserves `out`.
+ *
+ * # Safety
+ * `returns` holds `len` readable doubles and `out` one writable double.
+ * All pointers follow the crate-level alignment and non-overlap contract.
+ */
+int32_t itofin_sortino_ratio(const double *returns,
+                             size_t len,
+                             double minimum_acceptable_return,
+                             double periods_per_year,
+                             double *out,
+                             struct ItofinError *error);
+
+/**
  * Construct a Poisson sequence. Dimension one also supplies scalar draws.
  * # Safety
  * Follow the crate-level C caller contract.
