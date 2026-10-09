@@ -16,6 +16,7 @@ pub mod indexes;
 pub mod instrument;
 pub mod instruments;
 pub mod interestrate;
+pub mod legacy;
 pub mod math;
 pub mod methods;
 pub mod models;
