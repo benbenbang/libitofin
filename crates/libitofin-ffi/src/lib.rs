@@ -21,6 +21,7 @@ pub mod merton_paths_api;
 pub mod ou_paths_api;
 pub mod simulation_api;
 pub use boundary::{Context, ItofinError};
+pub mod benchmark_beta_api;
 pub mod calendar_api;
 pub mod cap_calibration_api;
 pub mod cashflows_api;
