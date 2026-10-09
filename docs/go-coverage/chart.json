@@ -247,6 +247,55 @@
       "python": "itofin.chart.williams_r",
       "status": "implemented",
       "tests": "TestChartWilliamsRDefaultWarmupBoundsAndFlat"
+    },
+    {
+      "c": "itofin_chart_adx",
+      "go": "ADX",
+      "python": "itofin.chart.adx",
+      "status": "implemented",
+      "tests": "TestChartADXIndependentFixtureAndOwnership"
+    },
+    {
+      "c": "itofin_chart_adx",
+      "go": "DefaultADX",
+      "python": "itofin.chart.adx",
+      "status": "implemented",
+      "tests": "TestChartADXDefaultShortPeriodOneFlatAndDirections"
+    },
+    {
+      "c": "itofin_chart_adx",
+      "go": "ADXResult",
+      "python": "itofin.chart.Adx",
+      "status": "implemented",
+      "tests": "TestChartADXIndependentFixtureAndOwnership"
+    },
+    {
+      "c": "itofin_chart_adx",
+      "go": "ADXResult.PlusDI",
+      "python": "itofin.chart.Adx.plus_di",
+      "status": "implemented",
+      "tests": "TestChartADXIndependentFixtureAndOwnership"
+    },
+    {
+      "c": "itofin_chart_adx",
+      "go": "ADXResult.MinusDI",
+      "python": "itofin.chart.Adx.minus_di",
+      "status": "implemented",
+      "tests": "TestChartADXIndependentFixtureAndOwnership"
+    },
+    {
+      "c": "itofin_chart_adx",
+      "go": "ADXResult.DX",
+      "python": "itofin.chart.Adx.dx",
+      "status": "implemented",
+      "tests": "TestChartADXIndependentFixtureAndOwnership"
+    },
+    {
+      "c": "itofin_chart_adx",
+      "go": "ADXResult.ADX",
+      "python": "itofin.chart.Adx.adx",
+      "status": "implemented",
+      "tests": "TestChartADXIndependentFixtureAndOwnership"
     }
   ]
 }
