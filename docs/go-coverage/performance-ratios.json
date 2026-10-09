@@ -1,0 +1,26 @@
+{
+  "domain": "performance-ratios",
+  "entries": [
+    {
+      "c": "itofin_target_downside_deviation",
+      "go": "TargetDownsideDeviation",
+      "python": "itofin.statistics.target_downside_deviation",
+      "status": "implemented",
+      "tests": "TestPerformanceRatiosDecimalOracle"
+    },
+    {
+      "c": "itofin_sharpe_ratio",
+      "go": "SharpeRatio",
+      "python": "itofin.statistics.sharpe_ratio",
+      "status": "implemented",
+      "tests": "TestPerformanceRatiosDecimalOracle"
+    },
+    {
+      "c": "itofin_sortino_ratio",
+      "go": "SortinoRatio",
+      "python": "itofin.statistics.sortino_ratio",
+      "status": "implemented",
+      "tests": "TestPerformanceRatiosDecimalOracle"
+    }
+  ]
+}

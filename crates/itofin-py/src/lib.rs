@@ -58,6 +58,7 @@ mod option;
 mod optionletvol;
 mod ou_simulation;
 mod overnightfuture;
+mod performance_ratios;
 mod poissonrng;
 mod randomnumbers;
 mod results;
@@ -478,6 +479,18 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     )?)?;
     statistics.add_class::<general_statistics::PyGeneralStatistics>()?;
     statistics.add_class::<incremental_statistics::PyIncrementalStatistics>()?;
+    statistics.add_function(wrap_pyfunction!(
+        performance_ratios::target_downside_deviation,
+        &statistics
+    )?)?;
+    statistics.add_function(wrap_pyfunction!(
+        performance_ratios::sharpe_ratio,
+        &statistics
+    )?)?;
+    statistics.add_function(wrap_pyfunction!(
+        performance_ratios::sortino_ratio,
+        &statistics
+    )?)?;
     statistics.add_function(wrap_pyfunction!(statistics::mean, &statistics)?)?;
     statistics.add_function(wrap_pyfunction!(statistics::variance, &statistics)?)?;
     statistics.add_function(wrap_pyfunction!(
