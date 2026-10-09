@@ -30,8 +30,11 @@ __all__ = [
     "sequence_minimum",
     "sequence_standard_deviation",
     "sequence_variance",
+    "sharpe_ratio",
     "shortfall",
+    "sortino_ratio",
     "standard_deviation",
+    "target_downside_deviation",
     "top_percentile",
     "value_at_risk",
     "variance",
@@ -353,14 +356,31 @@ def sequence_variance(samples: typing.Sequence[typing.Sequence[builtins.float]],
     Component variances with row-count correction n/(n-1), including zero-weight rows.
     """
 
+def sharpe_ratio(returns: typing.Sequence[builtins.float], risk_free_return: builtins.float, *, periods_per_year: builtins.float) -> builtins.float:
+    r"""
+    Arithmetic excess mean/sample std (N-1), scaled by sqrt(periods_per_year).
+    Risk-free return is per period. Frequency is required; zero dispersion is an error.
+    """
+
 def shortfall(observations: typing.Sequence[builtins.float], target: builtins.float, *, weights: typing.Optional[typing.Sequence[builtins.float]] = None) -> builtins.float:
     r"""
     Weighted probability of observations strictly below a finite target.
     """
 
+def sortino_ratio(returns: typing.Sequence[builtins.float], minimum_acceptable_return: builtins.float, *, periods_per_year: builtins.float) -> builtins.float:
+    r"""
+    Arithmetic mean minus per-period MAR/all-N downside, scaled by sqrt(periods_per_year).
+    Frequency is required; no downside is an error, not infinity.
+    """
+
 def standard_deviation(observations: typing.Sequence[builtins.float], *, weights: typing.Optional[typing.Sequence[builtins.float]] = None) -> builtins.float:
     r"""
     Square root of weighted sample variance.
+    """
+
+def target_downside_deviation(returns: typing.Sequence[builtins.float], target: builtins.float) -> builtins.float:
+    r"""
+    All-observation RMS shortfall below the scalar per-period target, without annualization.
     """
 
 def top_percentile(observations: typing.Sequence[builtins.float], probability: builtins.float, *, weights: typing.Optional[typing.Sequence[builtins.float]] = None) -> builtins.float:
