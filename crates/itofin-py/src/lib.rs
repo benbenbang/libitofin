@@ -28,6 +28,7 @@ mod credithelpers;
 mod currency;
 mod curve;
 mod discrepancy_statistics;
+mod drawdown;
 mod fdengine;
 mod fra;
 mod general_statistics;
@@ -459,6 +460,8 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     results.add_class::<Results>()?;
 
     let statistics = PyModule::new(py, "statistics")?;
+    statistics.add_class::<drawdown::PyDrawdownResult>()?;
+    statistics.add_function(wrap_pyfunction!(drawdown::maximum_drawdown, &statistics)?)?;
     statistics.add_class::<convergence_statistics::PyConvergenceStatistics>()?;
     statistics.add_function(wrap_pyfunction!(
         convergence_statistics::convergence_table,

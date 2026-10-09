@@ -5,6 +5,7 @@ import builtins
 import typing
 __all__ = [
     "ConvergenceStatistics",
+    "DrawdownResult",
     "GeneralStatistics",
     "IncrementalStatistics",
     "average_shortfall",
@@ -15,6 +16,7 @@ __all__ = [
     "downside_deviation",
     "downside_variance",
     "expected_shortfall",
+    "maximum_drawdown",
     "mean",
     "percentile",
     "potential_upside",
@@ -70,6 +72,27 @@ class ConvergenceStatistics:
     def convergence_table(self) -> builtins.list[tuple[builtins.int, builtins.float]]:
         r"""
         Return a fresh list of immutable sample-count and cumulative-mean tuples.
+        """
+
+@typing.final
+class DrawdownResult:
+    r"""
+    Immutable fractional maximum loss and zero-based ordered NAV indices.
+    """
+    @property
+    def drawdown(self) -> builtins.float:
+        r"""
+        Nonnegative fractional loss, not a signed return or percentage.
+        """
+    @property
+    def peak_index(self) -> builtins.int:
+        r"""
+        Earliest equal running peak before the winning trough.
+        """
+    @property
+    def trough_index(self) -> builtins.int:
+        r"""
+        First trough attaining the greatest computed fractional loss.
         """
 
 @typing.final
@@ -245,6 +268,16 @@ def downside_variance(observations: typing.Sequence[builtins.float], *, weights:
 def expected_shortfall(observations: typing.Sequence[builtins.float], confidence: builtins.float, *, weights: typing.Optional[typing.Sequence[builtins.float]] = None) -> builtins.float:
     r"""
     Weighted mean loss strictly below the VaR threshold, as a positive magnitude.
+    """
+
+def maximum_drawdown(values: typing.Sequence[builtins.float]) -> DrawdownResult:
+    r"""
+    Maximum drawdown of ordered finite strictly positive equity/NAV values.
+
+    Empty input errors. One NAV or no decline returns zero with indices (0, 0).
+    Equal peaks retain their earliest index; equal computed losses retain the
+    first trough. Extreme positive ratios may round the fractional loss to one.
+    This is not meaningful for unordered return samples. Results own no handles.
     """
 
 def mean(observations: typing.Sequence[builtins.float], *, weights: typing.Optional[typing.Sequence[builtins.float]] = None) -> builtins.float:
