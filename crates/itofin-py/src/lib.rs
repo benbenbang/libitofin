@@ -16,6 +16,7 @@ mod capfloortermvol;
 mod caphelper;
 mod cashflows;
 mod chart;
+mod chart_adx;
 mod chart_garch;
 mod chart_ohlc_overnight;
 mod chart_ohlc_volatility;
@@ -556,6 +557,8 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     let chart = PyModule::new(py, "chart")?;
     chart.add_class::<chart::PyChartSeries>()?;
+    chart.add_class::<chart_adx::PyAdx>()?;
+    chart.add_function(wrap_pyfunction!(chart_adx::adx, &chart)?)?;
     chart.add_class::<chart_garch::PyGarch11Result>()?;
     chart.add_class::<chart_garch::PyGarch11FitResult>()?;
     chart.add_class::<chart::PyVolumeBars>()?;
