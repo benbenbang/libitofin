@@ -1,0 +1,2625 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Python, Rust, and Go documentation for itofin, the Rust QuantLib port (libitofin).">
+      
+      
+      
+        <link rel="canonical" href="https://benbenbang.github.io/libitofin/gjrgarch-pricing/">
+      
+      
+        <link rel="prev" href="../gjrgarch/">
+      
+      
+        <link rel="next" href="../joint-curves/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>GJR-GARCH models and pricing - itofin</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#gjr-garch-model-and-european-pricing" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="itofin" class="md-header__button md-logo" aria-label="itofin" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            itofin
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              GJR-GARCH models and pricing
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/benbenbang/libitofin" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    benbenbang/libitofin
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="itofin" class="md-nav__button md-logo" aria-label="itofin" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    itofin
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/benbenbang/libitofin" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    benbenbang/libitofin
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../go/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Go SDK
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../finite-difference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Finite-difference options
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../exotic-options/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exotic option scope
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../variance-swaps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Variance swaps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mc-variance-swaps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Monte Carlo variance swaps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../jump-diffusion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Merton jump diffusion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../bates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bates stochastic volatility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../gjrgarch/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GJR-GARCH process and paths
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GJR-GARCH models and pricing
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GJR-GARCH models and pricing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#model-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model contract
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#example-approximation-sampled-price-and-live-quote" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example: approximation, sampled price and live quote
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#analytic-approximation-source-parity-not-an-exact-oracle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Analytic approximation: source parity, not an exact oracle
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#monte-carlo-configuration-and-uncertainty" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Monte Carlo configuration and uncertainty
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Monte Carlo configuration and uncertainty">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#keep-approximation-bias-separate-from-sampling-error" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Keep approximation bias separate from sampling error
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#calibration-and-rollback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Calibration and rollback
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#api-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API reference
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../joint-curves/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Joint yield curves
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../bma/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Municipal BMA swaps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../random-policies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Random policies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../simulation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GBM simulation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../geometric-brownian/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Standalone Euler GBM
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../statistics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Statistics and risk
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../drawdown/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Maximum drawdown
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../convergence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mean convergence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../discrepancy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    QMC discrepancy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../global-optimization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Global optimization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../chart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Chart indicators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cap-engines/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cap/floor engines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_24" >
+        
+          
+          <label class="md-nav__link" for="__nav_24" id="__nav_24_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_24_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_24">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Python API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/time/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Time
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/quotes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quotes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/termstructures/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Term structures
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/processes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Processes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/indexes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indexes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/instruments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Instruments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/cashflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cashflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/pricingengines/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pricing engines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/optimization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Optimization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/optimize/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Optimize
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/randomnumbers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Random numbers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/results/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../priority-adoption/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reviewed Rust priority additions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../low-small-additions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Small LOW Rust additions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../bond-zspread/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bond Z-spread analytics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../exchange-rate-chaining/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exchange-rate chaining
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../bond-forward/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bond forwards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../implied-vol-term-structure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Implied volatility term structure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../black-scholes-theta/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Black-Scholes theta
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../fx-forwards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FX forwards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hullwhite-forward-process/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hull-White forward process
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quanto-term-structure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quanto term structure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../abcd/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ABCD math and volatility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../householder/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Householder utilities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rust/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_38" >
+        
+          
+          <label class="md-nav__link" for="__nav_38" id="__nav_38_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_38_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_38">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Project
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/benbenbang/libitofin#readme" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Repository index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/benbenbang/libitofin/blob/main/wiki/status.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Status and scope
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/benbenbang/libitofin/blob/main/wiki/development.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/benbenbang/libitofin/blob/main/wiki/design.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/benbenbang/libitofin/blob/main/wiki/compatibility.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    QuantLib compatibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#model-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model contract
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#example-approximation-sampled-price-and-live-quote" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example: approximation, sampled price and live quote
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#analytic-approximation-source-parity-not-an-exact-oracle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Analytic approximation: source parity, not an exact oracle
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#monte-carlo-configuration-and-uncertainty" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Monte Carlo configuration and uncertainty
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Monte Carlo configuration and uncertainty">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#keep-approximation-bias-separate-from-sampling-error" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Keep approximation bias separate from sampling error
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#calibration-and-rollback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Calibration and rollback
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#api-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API reference
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="gjr-garch-model-and-european-pricing">GJR-GARCH model and European pricing<a class="headerlink" href="#gjr-garch-model-and-european-pricing" title="Permanent link">&para;</a></h1>
+<p>The shared Rust core provides a six-parameter calibrated model, a European
+Edgeworth approximation and a European Monte Carlo diffusion engine through
+Rust, C, Go and Python. See <a href="../gjrgarch/">process and paths</a> for daily/annual
+units and the three variance schemes. Neither engine is a historical estimator
+or an exact discrete daily GJR-GARCH recursion.</p>
+<h2 id="model-contract">Model contract<a class="headerlink" href="#model-contract" title="Permanent link">&para;</a></h2>
+<p>Parameters, calibration masks and returned arrays use this order:</p>
+<table>
+<thead>
+<tr>
+<th>Position</th>
+<th>Rust / Go</th>
+<th>Python</th>
+<th>Unit and checked model domain</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td><code>omega</code> / <code>Omega</code></td>
+<td><code>omega</code></td>
+<td>Daily intercept, strictly positive</td>
+</tr>
+<tr>
+<td>1</td>
+<td><code>alpha</code> / <code>Alpha</code></td>
+<td><code>alpha</code></td>
+<td>Daily coefficient in <code>[0, 1]</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>beta</code> / <code>Beta</code></td>
+<td><code>beta</code></td>
+<td>Daily coefficient in <code>[0, 1]</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>gamma</code> / <code>Gamma</code></td>
+<td><code>gamma</code></td>
+<td>Daily coefficient in <code>[-1, 1]</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>lambda</code> / <code>Lambda</code></td>
+<td><code>lambda_</code></td>
+<td>Finite innovation displacement</td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>v0</code> / <code>DailyVariance</code></td>
+<td><code>daily_variance</code></td>
+<td>Initial daily variance, strictly positive</td>
+</tr>
+</tbody>
+</table>
+<p>All inputs must be finite. Coupled checks require <code>beta + gamma &gt;= 0</code> and the
+supported process domain, including <code>alpha + gamma &gt;= 0</code>, representable annual
+coefficients and nonnegative residual diffusion variance. These are checked
+for construction, parameter updates and calibration trials. No stationarity
+restriction is imposed. The process alone supports zero omega and variance;
+the calibrated model does not.</p>
+<ul>
+<li>Construction and accepted updates rebuild the model process using
+  <code>FullTruncation</code>, even if the supplied process uses another scheme.</li>
+<li>The analytic engine retains the live model. Parameter changes and live
+  spot/curve notifications invalidate attached option prices.</li>
+<li><code>model.process()</code> returns the current process snapshot. Existing MC engines
+  retain their supplied process and scheme: they do not retarget when model
+  parameters change. Their retained market handles still remain live.</li>
+<li>Rebuild an MC engine from the current model process to sample newly fitted
+  parameters. Model-derived processes use <code>FullTruncation</code>.</li>
+</ul>
+<h2 id="example-approximation-sampled-price-and-live-quote">Example: approximation, sampled price and live quote<a class="headerlink" href="#example-approximation-sampled-price-and-live-quote" title="Permanent link">&para;</a></h2>
+<p>These examples use the same market, one-year call, daily parameters and seed.
+The analytic and MC numbers need not agree within the MC standard error.
+After attaching MC, the last <code>npv</code> call reprices that MC engine.</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:3"><input checked="checked" id="python" name="__tabbed_1" type="radio" /><input id="go" name="__tabbed_1" type="radio" /><input id="rust" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="python">Python</label><label for="go">Go</label><label for="rust">Rust</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">itofin</span><span class="w"> </span><span class="kn">import</span> <span class="n">Settings</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">itofin.instruments</span><span class="w"> </span><span class="kn">import</span> <span class="n">OptionType</span><span class="p">,</span> <span class="n">VanillaOption</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">itofin.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">GJRGARCHModel</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">itofin.pricingengines</span><span class="w"> </span><span class="kn">import</span> <span class="n">AnalyticGJRGARCHEngine</span><span class="p">,</span> <span class="n">MCEuropeanGJRGARCHEngine</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="kn">from</span><span class="w"> </span><span class="nn">itofin.processes</span><span class="w"> </span><span class="kn">import</span> <span class="n">GJRGARCHProcess</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="kn">from</span><span class="w"> </span><span class="nn">itofin.quotes</span><span class="w"> </span><span class="kn">import</span> <span class="n">SimpleQuote</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="kn">from</span><span class="w"> </span><span class="nn">itofin.termstructures</span><span class="w"> </span><span class="kn">import</span> <span class="n">FlatForward</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="kn">from</span><span class="w"> </span><span class="nn">itofin.time</span><span class="w"> </span><span class="kn">import</span> <span class="n">Date</span><span class="p">,</span> <span class="n">DayCounter</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="n">today</span> <span class="o">=</span> <span class="n">Date</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">2026</span><span class="p">)</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="n">settings</span> <span class="o">=</span> <span class="n">Settings</span><span class="p">()</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="n">settings</span><span class="o">.</span><span class="n">set_evaluation_date</span><span class="p">(</span><span class="n">today</span><span class="p">)</span>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="n">dc</span> <span class="o">=</span> <span class="n">DayCounter</span><span class="o">.</span><span class="n">actual365_fixed</span><span class="p">()</span>
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="n">spot</span> <span class="o">=</span> <span class="n">SimpleQuote</span><span class="p">(</span><span class="mf">100.0</span><span class="p">)</span>
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="n">risk</span> <span class="o">=</span> <span class="n">FlatForward</span><span class="p">(</span><span class="n">today</span><span class="p">,</span> <span class="mf">0.05</span><span class="p">,</span> <span class="n">dc</span><span class="p">)</span>
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="n">dividend</span> <span class="o">=</span> <span class="n">FlatForward</span><span class="p">(</span><span class="n">today</span><span class="p">,</span> <span class="mf">0.02</span><span class="p">,</span> <span class="n">dc</span><span class="p">)</span>
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="n">process</span> <span class="o">=</span> <span class="n">GJRGARCHProcess</span><span class="p">(</span>
+<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>    <span class="n">spot</span><span class="p">,</span> <span class="n">risk</span><span class="p">,</span> <span class="n">dividend</span><span class="p">,</span> <span class="mf">0.00016</span><span class="p">,</span> <span class="mf">0.000002</span><span class="p">,</span> <span class="mf">0.04</span><span class="p">,</span> <span class="mf">0.9</span><span class="p">,</span> <span class="mf">0.06</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">,</span>
+<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>    <span class="n">days_per_year</span><span class="o">=</span><span class="mf">252.0</span><span class="p">,</span> <span class="n">scheme</span><span class="o">=</span><span class="s2">"FullTruncation"</span><span class="p">,</span>
+<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="p">)</span>
+<a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a><span class="n">model</span> <span class="o">=</span> <span class="n">GJRGARCHModel</span><span class="p">(</span><span class="n">process</span><span class="p">)</span>
+<a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a><span class="n">option</span> <span class="o">=</span> <span class="n">VanillaOption</span><span class="p">(</span><span class="n">OptionType</span><span class="o">.</span><span class="n">Call</span><span class="p">,</span> <span class="mf">100.0</span><span class="p">,</span> <span class="n">today</span> <span class="o">+</span> <span class="mi">365</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
+<a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a><span class="n">analytic</span> <span class="o">=</span> <span class="n">AnalyticGJRGARCHEngine</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+<a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a><span class="nb">print</span><span class="p">(</span><span class="s2">"Analytic GJR NPV:"</span><span class="p">,</span> <span class="n">option</span><span class="o">.</span><span class="n">price_gjr</span><span class="p">(</span><span class="n">analytic</span><span class="p">))</span>
+<a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a><span class="n">mc</span> <span class="o">=</span> <span class="n">MCEuropeanGJRGARCHEngine</span><span class="p">(</span>
+<a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>    <span class="n">process</span><span class="p">,</span> <span class="n">steps_per_year</span><span class="o">=</span><span class="mi">252</span><span class="p">,</span> <span class="n">samples</span><span class="o">=</span><span class="mi">4096</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">42</span><span class="p">,</span> <span class="n">antithetic</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a><span class="p">)</span>
+<a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a><span class="nb">print</span><span class="p">(</span><span class="s2">"Monte Carlo GJR NPV:"</span><span class="p">,</span> <span class="n">option</span><span class="o">.</span><span class="n">price_mc_gjr</span><span class="p">(</span><span class="n">mc</span><span class="p">))</span>
+<a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a><span class="nb">print</span><span class="p">(</span><span class="s2">"Monte Carlo standard error:"</span><span class="p">,</span> <span class="n">option</span><span class="o">.</span><span class="n">error_estimate</span><span class="p">())</span>
+<a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a><span class="nb">print</span><span class="p">(</span><span class="s2">"Daily omega,alpha,beta,gamma,lambda,v0:"</span><span class="p">,</span> <span class="n">model</span><span class="o">.</span><span class="n">params</span><span class="p">())</span>
+<a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a><span class="n">spot</span><span class="o">.</span><span class="n">set_value</span><span class="p">(</span><span class="mf">105.0</span><span class="p">)</span>
+<a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a><span class="nb">print</span><span class="p">(</span><span class="s2">"After live spot update:"</span><span class="p">,</span> <span class="n">option</span><span class="o">.</span><span class="n">npv</span><span class="p">())</span>
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">package</span><span class="w"> </span><span class="nx">main</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="kn">import</span><span class="w"> </span><span class="p">(</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span><span class="s">"errors"</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">    </span><span class="s">"fmt"</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">    </span><span class="s">"log"</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">    </span><span class="nx">itofin</span><span class="w"> </span><span class="s">"github.com/benbenbang/libitofin/sdk/go"</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="p">)</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="kd">func</span><span class="w"> </span><span class="nx">must</span><span class="p">[</span><span class="nx">T</span><span class="w"> </span><span class="kt">any</span><span class="p">](</span><span class="nx">value</span><span class="w"> </span><span class="nx">T</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="kt">error</span><span class="p">)</span><span class="w"> </span><span class="nx">T</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="w">        </span><span class="nb">panic</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span>
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nx">value</span>
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="p">}</span>
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>
+<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="kd">func</span><span class="w"> </span><span class="nx">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">run</span><span class="p">();</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a><span class="w">        </span><span class="nx">log</span><span class="p">.</span><span class="nx">Fatal</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span>
+<a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a><span class="p">}</span>
+<a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>
+<a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a><span class="kd">func</span><span class="w"> </span><span class="nx">run</span><span class="p">()</span><span class="w"> </span><span class="p">(</span><span class="nx">err</span><span class="w"> </span><span class="kt">error</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a><span class="w">    </span><span class="nx">s</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">itofin</span><span class="p">.</span><span class="nx">NewSession</span><span class="p">()</span>
+<a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a><span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="nx">err</span>
+<a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a><span class="w">    </span><span class="k">defer</span><span class="w"> </span><span class="kd">func</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">errors</span><span class="p">.</span><span class="nx">Join</span><span class="p">(</span><span class="nx">err</span><span class="p">,</span><span class="w"> </span><span class="nx">s</span><span class="p">.</span><span class="nx">Close</span><span class="p">())</span><span class="w"> </span><span class="p">}()</span>
+<a id="__codelineno-1-30" name="__codelineno-1-30" href="#__codelineno-1-30"></a><span class="w">    </span><span class="nx">today</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">must</span><span class="p">(</span><span class="nx">itofin</span><span class="p">.</span><span class="nx">NewDate</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="mi">2026</span><span class="p">))</span>
+<a id="__codelineno-1-31" name="__codelineno-1-31" href="#__codelineno-1-31"></a><span class="w">    </span><span class="nx">expiry</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">must</span><span class="p">(</span><span class="nx">today</span><span class="p">.</span><span class="nx">AddDays</span><span class="p">(</span><span class="mi">365</span><span class="p">))</span>
+<a id="__codelineno-1-32" name="__codelineno-1-32" href="#__codelineno-1-32"></a><span class="w">    </span><span class="nx">settings</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">must</span><span class="p">(</span><span class="nx">s</span><span class="p">.</span><span class="nx">NewSettings</span><span class="p">())</span>
+<a id="__codelineno-1-33" name="__codelineno-1-33" href="#__codelineno-1-33"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">settings</span><span class="p">.</span><span class="nx">SetEvaluationDate</span><span class="p">(</span><span class="nx">today</span><span class="p">);</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-1-34" name="__codelineno-1-34" href="#__codelineno-1-34"></a><span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="nx">err</span>
+<a id="__codelineno-1-35" name="__codelineno-1-35" href="#__codelineno-1-35"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-1-36" name="__codelineno-1-36" href="#__codelineno-1-36"></a><span class="w">    </span><span class="nx">dc</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">must</span><span class="p">(</span><span class="nx">s</span><span class="p">.</span><span class="nx">Actual365Fixed</span><span class="p">())</span>
+<a id="__codelineno-1-37" name="__codelineno-1-37" href="#__codelineno-1-37"></a><span class="w">    </span><span class="nx">spot</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">must</span><span class="p">(</span><span class="nx">s</span><span class="p">.</span><span class="nx">NewSimpleQuote</span><span class="p">(</span><span class="mi">100</span><span class="p">))</span>
+<a id="__codelineno-1-38" name="__codelineno-1-38" href="#__codelineno-1-38"></a><span class="w">    </span><span class="nx">risk</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">must</span><span class="p">(</span><span class="nx">s</span><span class="p">.</span><span class="nx">NewFlatForward</span><span class="p">(</span><span class="nx">today</span><span class="p">,</span><span class="w"> </span><span class="mf">.05</span><span class="p">,</span><span class="w"> </span><span class="nx">dc</span><span class="p">))</span>
+<a id="__codelineno-1-39" name="__codelineno-1-39" href="#__codelineno-1-39"></a><span class="w">    </span><span class="nx">dividend</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">must</span><span class="p">(</span><span class="nx">s</span><span class="p">.</span><span class="nx">NewFlatForward</span><span class="p">(</span><span class="nx">today</span><span class="p">,</span><span class="w"> </span><span class="mf">.02</span><span class="p">,</span><span class="w"> </span><span class="nx">dc</span><span class="p">))</span>
+<a id="__codelineno-1-40" name="__codelineno-1-40" href="#__codelineno-1-40"></a><span class="w">    </span><span class="nx">params</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">itofin</span><span class="p">.</span><span class="nx">GJRParameters</span><span class="p">{</span><span class="nx">DailyVariance</span><span class="p">:</span><span class="w"> </span><span class="mf">.00016</span><span class="p">,</span><span class="w"> </span><span class="nx">Omega</span><span class="p">:</span><span class="w"> </span><span class="mf">.000002</span><span class="p">,</span><span class="w"> </span><span class="nx">Alpha</span><span class="p">:</span><span class="w"> </span><span class="mf">.04</span><span class="p">,</span><span class="w"> </span><span class="nx">Beta</span><span class="p">:</span><span class="w"> </span><span class="mf">.9</span><span class="p">,</span><span class="w"> </span><span class="nx">Gamma</span><span class="p">:</span><span class="w"> </span><span class="mf">.06</span><span class="p">,</span><span class="w"> </span><span class="nx">Lambda</span><span class="p">:</span><span class="w"> </span><span class="mf">.1</span><span class="p">,</span><span class="w"> </span><span class="nx">DaysPerYear</span><span class="p">:</span><span class="w"> </span><span class="mi">252</span><span class="p">}</span>
+<a id="__codelineno-1-41" name="__codelineno-1-41" href="#__codelineno-1-41"></a><span class="w">    </span><span class="nx">process</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">must</span><span class="p">(</span><span class="nx">s</span><span class="p">.</span><span class="nx">NewGJRProcess</span><span class="p">(</span><span class="nx">spot</span><span class="p">,</span><span class="w"> </span><span class="nx">risk</span><span class="p">,</span><span class="w"> </span><span class="nx">dividend</span><span class="p">,</span><span class="w"> </span><span class="nx">params</span><span class="p">,</span><span class="w"> </span><span class="nx">itofin</span><span class="p">.</span><span class="nx">GJRFullTruncation</span><span class="p">))</span>
+<a id="__codelineno-1-42" name="__codelineno-1-42" href="#__codelineno-1-42"></a><span class="w">    </span><span class="nx">model</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">must</span><span class="p">(</span><span class="nx">s</span><span class="p">.</span><span class="nx">NewGJRModel</span><span class="p">(</span><span class="nx">process</span><span class="p">))</span>
+<a id="__codelineno-1-43" name="__codelineno-1-43" href="#__codelineno-1-43"></a><span class="w">    </span><span class="nx">analytic</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">must</span><span class="p">(</span><span class="nx">s</span><span class="p">.</span><span class="nx">NewAnalyticGJREngine</span><span class="p">(</span><span class="nx">model</span><span class="p">))</span>
+<a id="__codelineno-1-44" name="__codelineno-1-44" href="#__codelineno-1-44"></a><span class="w">    </span><span class="nx">option</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">must</span><span class="p">(</span><span class="nx">s</span><span class="p">.</span><span class="nx">NewVanillaOption</span><span class="p">(</span><span class="nx">itofin</span><span class="p">.</span><span class="nx">Call</span><span class="p">,</span><span class="w"> </span><span class="mi">100</span><span class="p">,</span><span class="w"> </span><span class="nx">expiry</span><span class="p">,</span><span class="w"> </span><span class="nx">settings</span><span class="p">))</span>
+<a id="__codelineno-1-45" name="__codelineno-1-45" href="#__codelineno-1-45"></a><span class="w">    </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="s">"Analytic GJR NPV:"</span><span class="p">,</span><span class="w"> </span><span class="nx">must</span><span class="p">(</span><span class="nx">option</span><span class="p">.</span><span class="nx">PriceAnalyticGJR</span><span class="p">(</span><span class="nx">analytic</span><span class="p">)))</span>
+<a id="__codelineno-1-46" name="__codelineno-1-46" href="#__codelineno-1-46"></a><span class="w">    </span><span class="nx">mc</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">must</span><span class="p">(</span><span class="nx">s</span><span class="p">.</span><span class="nx">NewMCGJREngine</span><span class="p">(</span><span class="nx">process</span><span class="p">,</span><span class="w"> </span><span class="nx">itofin</span><span class="p">.</span><span class="nx">GJRMCConfig</span><span class="p">{</span><span class="nx">StepsPerYear</span><span class="p">:</span><span class="w"> </span><span class="mi">252</span><span class="p">,</span><span class="w"> </span><span class="nx">Samples</span><span class="p">:</span><span class="w"> </span><span class="mi">4096</span><span class="p">,</span><span class="w"> </span><span class="nx">Seed</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span><span class="p">,</span><span class="w"> </span><span class="nx">Antithetic</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">}))</span>
+<a id="__codelineno-1-47" name="__codelineno-1-47" href="#__codelineno-1-47"></a><span class="w">    </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="s">"Monte Carlo GJR NPV:"</span><span class="p">,</span><span class="w"> </span><span class="nx">must</span><span class="p">(</span><span class="nx">option</span><span class="p">.</span><span class="nx">PriceMCGJR</span><span class="p">(</span><span class="nx">mc</span><span class="p">)))</span>
+<a id="__codelineno-1-48" name="__codelineno-1-48" href="#__codelineno-1-48"></a><span class="w">    </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="s">"Monte Carlo standard error:"</span><span class="p">,</span><span class="w"> </span><span class="nx">must</span><span class="p">(</span><span class="nx">option</span><span class="p">.</span><span class="nx">ErrorEstimate</span><span class="p">()))</span>
+<a id="__codelineno-1-49" name="__codelineno-1-49" href="#__codelineno-1-49"></a><span class="w">    </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="s">"Daily omega,alpha,beta,gamma,lambda,v0:"</span><span class="p">,</span><span class="w"> </span><span class="nx">must</span><span class="p">(</span><span class="nx">model</span><span class="p">.</span><span class="nx">Params</span><span class="p">()))</span>
+<a id="__codelineno-1-50" name="__codelineno-1-50" href="#__codelineno-1-50"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">spot</span><span class="p">.</span><span class="nx">SetValue</span><span class="p">(</span><span class="mi">105</span><span class="p">);</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-1-51" name="__codelineno-1-51" href="#__codelineno-1-51"></a><span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="nx">err</span>
+<a id="__codelineno-1-52" name="__codelineno-1-52" href="#__codelineno-1-52"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-1-53" name="__codelineno-1-53" href="#__codelineno-1-53"></a><span class="w">    </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="s">"After live spot update:"</span><span class="p">,</span><span class="w"> </span><span class="nx">must</span><span class="p">(</span><span class="nx">option</span><span class="p">.</span><span class="nx">NPV</span><span class="p">()))</span>
+<a id="__codelineno-1-54" name="__codelineno-1-54" href="#__codelineno-1-54"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="kc">nil</span>
+<a id="__codelineno-1-55" name="__codelineno-1-55" href="#__codelineno-1-55"></a><span class="p">}</span>
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="sd">//! Price a European GJR-GARCH option and observe a live spot update.</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="k">use</span><span class="w"> </span><span class="n">libitofin</span><span class="p">::</span><span class="n">errors</span><span class="p">::</span><span class="n">QlResult</span><span class="p">;</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="k">use</span><span class="w"> </span><span class="n">libitofin</span><span class="p">::</span><span class="n">exercise</span><span class="p">::</span><span class="n">EuropeanExercise</span><span class="p">;</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="k">use</span><span class="w"> </span><span class="n">libitofin</span><span class="p">::</span><span class="n">handle</span><span class="p">::</span><span class="n">Handle</span><span class="p">;</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="k">use</span><span class="w"> </span><span class="n">libitofin</span><span class="p">::</span><span class="n">instrument</span><span class="p">::</span><span class="n">Instrument</span><span class="p">;</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="k">use</span><span class="w"> </span><span class="n">libitofin</span><span class="p">::</span><span class="n">instruments</span><span class="p">::{</span><span class="n">PlainVanillaPayoff</span><span class="p">,</span><span class="w"> </span><span class="n">VanillaOption</span><span class="p">};</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="k">use</span><span class="w"> </span><span class="n">libitofin</span><span class="p">::</span><span class="n">interestrate</span><span class="p">::</span><span class="n">Compounding</span><span class="p">;</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="k">use</span><span class="w"> </span><span class="n">libitofin</span><span class="p">::</span><span class="n">math</span><span class="p">::</span><span class="n">randomnumbers</span><span class="p">::</span><span class="n">rngtraits</span><span class="p">::</span><span class="n">PseudoRandom</span><span class="p">;</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="k">use</span><span class="w"> </span><span class="n">libitofin</span><span class="p">::</span><span class="n">models</span><span class="p">::{</span><span class="n">CalibratedModelHolder</span><span class="p">,</span><span class="w"> </span><span class="n">GjrGarchModel</span><span class="p">};</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="k">use</span><span class="w"> </span><span class="n">libitofin</span><span class="p">::</span><span class="n">option</span><span class="p">::</span><span class="n">OptionType</span><span class="p">;</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="k">use</span><span class="w"> </span><span class="n">libitofin</span><span class="p">::</span><span class="n">pricingengines</span><span class="p">::</span><span class="n">vanilla</span><span class="p">::{</span><span class="n">AnalyticGjrGarchEngine</span><span class="p">,</span><span class="w"> </span><span class="n">MakeMcEuropeanGjrGarchEngine</span><span class="p">};</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="k">use</span><span class="w"> </span><span class="n">libitofin</span><span class="p">::</span><span class="n">processes</span><span class="p">::{</span><span class="n">GjrGarchDiscretization</span><span class="p">,</span><span class="w"> </span><span class="n">GjrGarchParameters</span><span class="p">,</span><span class="w"> </span><span class="n">GjrGarchProcess</span><span class="p">};</span>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="k">use</span><span class="w"> </span><span class="n">libitofin</span><span class="p">::</span><span class="n">quotes</span><span class="p">::{</span><span class="n">Quote</span><span class="p">,</span><span class="w"> </span><span class="n">SimpleQuote</span><span class="p">};</span>
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="k">use</span><span class="w"> </span><span class="n">libitofin</span><span class="p">::</span><span class="n">settings</span><span class="p">::</span><span class="n">Settings</span><span class="p">;</span>
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="k">use</span><span class="w"> </span><span class="n">libitofin</span><span class="p">::</span><span class="n">shared</span><span class="p">::{</span><span class="n">Shared</span><span class="p">,</span><span class="w"> </span><span class="n">SharedMut</span><span class="p">,</span><span class="w"> </span><span class="n">shared</span><span class="p">,</span><span class="w"> </span><span class="n">shared_mut</span><span class="p">};</span>
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="k">use</span><span class="w"> </span><span class="n">libitofin</span><span class="p">::</span><span class="n">termstructures</span><span class="p">::</span><span class="n">yields</span><span class="p">::</span><span class="n">FlatForward</span><span class="p">;</span>
+<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a><span class="k">use</span><span class="w"> </span><span class="n">libitofin</span><span class="p">::</span><span class="n">termstructures</span><span class="p">::</span><span class="n">yieldtermstructure</span><span class="p">::</span><span class="n">YieldTermStructure</span><span class="p">;</span>
+<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a><span class="k">use</span><span class="w"> </span><span class="n">libitofin</span><span class="p">::</span><span class="n">time</span><span class="p">::</span><span class="n">date</span><span class="p">::{</span><span class="n">Date</span><span class="p">,</span><span class="w"> </span><span class="n">Month</span><span class="p">};</span>
+<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a><span class="k">use</span><span class="w"> </span><span class="n">libitofin</span><span class="p">::</span><span class="n">time</span><span class="p">::</span><span class="n">daycounters</span><span class="p">::</span><span class="n">actual365fixed</span><span class="p">::</span><span class="n">Actual365Fixed</span><span class="p">;</span>
+<a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a><span class="k">use</span><span class="w"> </span><span class="n">libitofin</span><span class="p">::</span><span class="n">time</span><span class="p">::</span><span class="n">frequency</span><span class="p">::</span><span class="n">Frequency</span><span class="p">;</span>
+<a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a>
+<a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a><span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">QlResult</span><span class="o">&lt;</span><span class="p">()</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a><span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">today</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Date</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="n">Month</span><span class="p">::</span><span class="n">October</span><span class="p">,</span><span class="w"> </span><span class="mi">2026</span><span class="p">);</span>
+<a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a><span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">settings</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">shared</span><span class="p">(</span><span class="n">Settings</span><span class="p">::</span><span class="o">&lt;</span><span class="n">Date</span><span class="o">&gt;</span><span class="p">::</span><span class="n">new</span><span class="p">());</span>
+<a id="__codelineno-2-26" name="__codelineno-2-26" href="#__codelineno-2-26"></a><span class="w">    </span><span class="n">settings</span><span class="p">.</span><span class="n">set_evaluation_date</span><span class="p">(</span><span class="n">today</span><span class="p">);</span>
+<a id="__codelineno-2-27" name="__codelineno-2-27" href="#__codelineno-2-27"></a><span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">spot</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">shared</span><span class="p">(</span><span class="n">SimpleQuote</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="mf">100.0</span><span class="p">));</span>
+<a id="__codelineno-2-28" name="__codelineno-2-28" href="#__codelineno-2-28"></a><span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">curve</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">|</span><span class="n">rate</span><span class="o">|</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-2-29" name="__codelineno-2-29" href="#__codelineno-2-29"></a><span class="w">        </span><span class="n">Handle</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="n">shared</span><span class="p">(</span><span class="n">FlatForward</span><span class="p">::</span><span class="n">with_rate</span><span class="p">(</span>
+<a id="__codelineno-2-30" name="__codelineno-2-30" href="#__codelineno-2-30"></a><span class="w">            </span><span class="n">today</span><span class="p">,</span>
+<a id="__codelineno-2-31" name="__codelineno-2-31" href="#__codelineno-2-31"></a><span class="w">            </span><span class="n">rate</span><span class="p">,</span>
+<a id="__codelineno-2-32" name="__codelineno-2-32" href="#__codelineno-2-32"></a><span class="w">            </span><span class="n">Actual365Fixed</span><span class="p">::</span><span class="n">new</span><span class="p">(),</span>
+<a id="__codelineno-2-33" name="__codelineno-2-33" href="#__codelineno-2-33"></a><span class="w">            </span><span class="n">Compounding</span><span class="p">::</span><span class="n">Continuous</span><span class="p">,</span>
+<a id="__codelineno-2-34" name="__codelineno-2-34" href="#__codelineno-2-34"></a><span class="w">            </span><span class="n">Frequency</span><span class="p">::</span><span class="n">Annual</span><span class="p">,</span>
+<a id="__codelineno-2-35" name="__codelineno-2-35" href="#__codelineno-2-35"></a><span class="w">        </span><span class="p">))</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="n">Shared</span><span class="o">&lt;</span><span class="k">dyn</span><span class="w"> </span><span class="n">YieldTermStructure</span><span class="o">&gt;</span><span class="p">)</span>
+<a id="__codelineno-2-36" name="__codelineno-2-36" href="#__codelineno-2-36"></a><span class="w">    </span><span class="p">};</span>
+<a id="__codelineno-2-37" name="__codelineno-2-37" href="#__codelineno-2-37"></a><span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">process</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">shared</span><span class="p">(</span><span class="n">GjrGarchProcess</span><span class="p">::</span><span class="n">new</span><span class="p">(</span>
+<a id="__codelineno-2-38" name="__codelineno-2-38" href="#__codelineno-2-38"></a><span class="w">        </span><span class="n">curve</span><span class="p">(</span><span class="mf">0.05</span><span class="p">),</span>
+<a id="__codelineno-2-39" name="__codelineno-2-39" href="#__codelineno-2-39"></a><span class="w">        </span><span class="n">curve</span><span class="p">(</span><span class="mf">0.02</span><span class="p">),</span>
+<a id="__codelineno-2-40" name="__codelineno-2-40" href="#__codelineno-2-40"></a><span class="w">        </span><span class="n">Handle</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="n">Shared</span><span class="p">::</span><span class="n">clone</span><span class="p">(</span><span class="o">&amp;</span><span class="n">spot</span><span class="p">)</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="n">Shared</span><span class="o">&lt;</span><span class="k">dyn</span><span class="w"> </span><span class="n">Quote</span><span class="o">&gt;</span><span class="p">),</span>
+<a id="__codelineno-2-41" name="__codelineno-2-41" href="#__codelineno-2-41"></a><span class="w">        </span><span class="n">GjrGarchParameters</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-2-42" name="__codelineno-2-42" href="#__codelineno-2-42"></a><span class="w">            </span><span class="n">v0</span><span class="p">:</span><span class="w"> </span><span class="mf">0.00016</span><span class="p">,</span>
+<a id="__codelineno-2-43" name="__codelineno-2-43" href="#__codelineno-2-43"></a><span class="w">            </span><span class="n">omega</span><span class="p">:</span><span class="w"> </span><span class="mf">0.000002</span><span class="p">,</span>
+<a id="__codelineno-2-44" name="__codelineno-2-44" href="#__codelineno-2-44"></a><span class="w">            </span><span class="n">alpha</span><span class="p">:</span><span class="w"> </span><span class="mf">0.04</span><span class="p">,</span>
+<a id="__codelineno-2-45" name="__codelineno-2-45" href="#__codelineno-2-45"></a><span class="w">            </span><span class="n">beta</span><span class="p">:</span><span class="w"> </span><span class="mf">0.9</span><span class="p">,</span>
+<a id="__codelineno-2-46" name="__codelineno-2-46" href="#__codelineno-2-46"></a><span class="w">            </span><span class="n">gamma</span><span class="p">:</span><span class="w"> </span><span class="mf">0.06</span><span class="p">,</span>
+<a id="__codelineno-2-47" name="__codelineno-2-47" href="#__codelineno-2-47"></a><span class="w">            </span><span class="n">lambda</span><span class="p">:</span><span class="w"> </span><span class="mf">0.1</span><span class="p">,</span>
+<a id="__codelineno-2-48" name="__codelineno-2-48" href="#__codelineno-2-48"></a><span class="w">            </span><span class="n">days_per_year</span><span class="p">:</span><span class="w"> </span><span class="mf">252.0</span><span class="p">,</span>
+<a id="__codelineno-2-49" name="__codelineno-2-49" href="#__codelineno-2-49"></a><span class="w">        </span><span class="p">},</span>
+<a id="__codelineno-2-50" name="__codelineno-2-50" href="#__codelineno-2-50"></a><span class="w">        </span><span class="n">GjrGarchDiscretization</span><span class="p">::</span><span class="n">FullTruncation</span><span class="p">,</span>
+<a id="__codelineno-2-51" name="__codelineno-2-51" href="#__codelineno-2-51"></a><span class="w">    </span><span class="p">)</span><span class="o">?</span><span class="p">);</span>
+<a id="__codelineno-2-52" name="__codelineno-2-52" href="#__codelineno-2-52"></a><span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">model</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">GjrGarchModel</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="n">Shared</span><span class="p">::</span><span class="n">clone</span><span class="p">(</span><span class="o">&amp;</span><span class="n">process</span><span class="p">))</span><span class="o">?</span><span class="p">;</span>
+<a id="__codelineno-2-53" name="__codelineno-2-53" href="#__codelineno-2-53"></a><span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">option</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">VanillaOption</span><span class="p">::</span><span class="n">new</span><span class="p">(</span>
+<a id="__codelineno-2-54" name="__codelineno-2-54" href="#__codelineno-2-54"></a><span class="w">        </span><span class="n">shared</span><span class="p">(</span><span class="n">PlainVanillaPayoff</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="n">OptionType</span><span class="p">::</span><span class="n">Call</span><span class="p">,</span><span class="w"> </span><span class="mf">100.0</span><span class="p">)),</span>
+<a id="__codelineno-2-55" name="__codelineno-2-55" href="#__codelineno-2-55"></a><span class="w">        </span><span class="n">shared</span><span class="p">(</span><span class="n">EuropeanExercise</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="n">today</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">365</span><span class="p">)),</span>
+<a id="__codelineno-2-56" name="__codelineno-2-56" href="#__codelineno-2-56"></a><span class="w">        </span><span class="n">settings</span><span class="p">,</span>
+<a id="__codelineno-2-57" name="__codelineno-2-57" href="#__codelineno-2-57"></a><span class="w">    </span><span class="p">);</span>
+<a id="__codelineno-2-58" name="__codelineno-2-58" href="#__codelineno-2-58"></a><span class="w">    </span><span class="n">option</span>
+<a id="__codelineno-2-59" name="__codelineno-2-59" href="#__codelineno-2-59"></a><span class="w">        </span><span class="p">.</span><span class="n">base_mut</span><span class="p">()</span>
+<a id="__codelineno-2-60" name="__codelineno-2-60" href="#__codelineno-2-60"></a><span class="w">        </span><span class="p">.</span><span class="n">set_pricing_engine</span><span class="p">(</span><span class="n">shared_mut</span><span class="p">(</span><span class="n">AnalyticGjrGarchEngine</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="n">SharedMut</span><span class="p">::</span><span class="n">clone</span><span class="p">(</span>
+<a id="__codelineno-2-61" name="__codelineno-2-61" href="#__codelineno-2-61"></a><span class="w">            </span><span class="o">&amp;</span><span class="n">model</span><span class="p">,</span>
+<a id="__codelineno-2-62" name="__codelineno-2-62" href="#__codelineno-2-62"></a><span class="w">        </span><span class="p">))));</span>
+<a id="__codelineno-2-63" name="__codelineno-2-63" href="#__codelineno-2-63"></a><span class="w">    </span><span class="fm">println!</span><span class="p">(</span><span class="s">"Analytic GJR NPV: {}"</span><span class="p">,</span><span class="w"> </span><span class="n">option</span><span class="p">.</span><span class="n">npv</span><span class="p">()</span><span class="o">?</span><span class="p">);</span>
+<a id="__codelineno-2-64" name="__codelineno-2-64" href="#__codelineno-2-64"></a><span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">mc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">MakeMcEuropeanGjrGarchEngine</span><span class="p">::</span><span class="o">&lt;</span><span class="n">PseudoRandom</span><span class="o">&gt;</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="n">process</span><span class="p">)</span>
+<a id="__codelineno-2-65" name="__codelineno-2-65" href="#__codelineno-2-65"></a><span class="w">        </span><span class="p">.</span><span class="n">with_steps_per_year</span><span class="p">(</span><span class="mi">252</span><span class="p">)</span>
+<a id="__codelineno-2-66" name="__codelineno-2-66" href="#__codelineno-2-66"></a><span class="w">        </span><span class="p">.</span><span class="n">with_samples</span><span class="p">(</span><span class="mi">4096</span><span class="p">)</span>
+<a id="__codelineno-2-67" name="__codelineno-2-67" href="#__codelineno-2-67"></a><span class="w">        </span><span class="p">.</span><span class="n">with_seed</span><span class="p">(</span><span class="mi">42</span><span class="p">)</span>
+<a id="__codelineno-2-68" name="__codelineno-2-68" href="#__codelineno-2-68"></a><span class="w">        </span><span class="p">.</span><span class="n">with_antithetic_variate</span><span class="p">(</span><span class="kc">true</span><span class="p">)</span>
+<a id="__codelineno-2-69" name="__codelineno-2-69" href="#__codelineno-2-69"></a><span class="w">        </span><span class="p">.</span><span class="n">build</span><span class="p">()</span><span class="o">?</span><span class="p">;</span>
+<a id="__codelineno-2-70" name="__codelineno-2-70" href="#__codelineno-2-70"></a><span class="w">    </span><span class="n">option</span><span class="p">.</span><span class="n">base_mut</span><span class="p">().</span><span class="n">set_pricing_engine</span><span class="p">(</span><span class="n">shared_mut</span><span class="p">(</span><span class="n">mc</span><span class="p">));</span>
+<a id="__codelineno-2-71" name="__codelineno-2-71" href="#__codelineno-2-71"></a><span class="w">    </span><span class="fm">println!</span><span class="p">(</span><span class="s">"Monte Carlo GJR NPV: {}"</span><span class="p">,</span><span class="w"> </span><span class="n">option</span><span class="p">.</span><span class="n">npv</span><span class="p">()</span><span class="o">?</span><span class="p">);</span>
+<a id="__codelineno-2-72" name="__codelineno-2-72" href="#__codelineno-2-72"></a><span class="w">    </span><span class="fm">println!</span><span class="p">(</span><span class="s">"Monte Carlo standard error: {}"</span><span class="p">,</span><span class="w"> </span><span class="n">option</span><span class="p">.</span><span class="n">error_estimate</span><span class="p">()</span><span class="o">?</span><span class="p">);</span>
+<a id="__codelineno-2-73" name="__codelineno-2-73" href="#__codelineno-2-73"></a><span class="w">    </span><span class="fm">println!</span><span class="p">(</span>
+<a id="__codelineno-2-74" name="__codelineno-2-74" href="#__codelineno-2-74"></a><span class="w">        </span><span class="s">"Daily omega,alpha,beta,gamma,lambda,v0: {:?}"</span><span class="p">,</span>
+<a id="__codelineno-2-75" name="__codelineno-2-75" href="#__codelineno-2-75"></a><span class="w">        </span><span class="n">model</span><span class="p">.</span><span class="n">borrow</span><span class="p">().</span><span class="n">calibrated_model</span><span class="p">().</span><span class="n">params</span><span class="p">()</span>
+<a id="__codelineno-2-76" name="__codelineno-2-76" href="#__codelineno-2-76"></a><span class="w">    </span><span class="p">);</span>
+<a id="__codelineno-2-77" name="__codelineno-2-77" href="#__codelineno-2-77"></a><span class="w">    </span><span class="n">spot</span><span class="p">.</span><span class="n">set_value</span><span class="p">(</span><span class="mf">105.0</span><span class="p">);</span>
+<a id="__codelineno-2-78" name="__codelineno-2-78" href="#__codelineno-2-78"></a><span class="w">    </span><span class="fm">println!</span><span class="p">(</span><span class="s">"After live spot update: {}"</span><span class="p">,</span><span class="w"> </span><span class="n">option</span><span class="p">.</span><span class="n">npv</span><span class="p">()</span><span class="o">?</span><span class="p">);</span>
+<a id="__codelineno-2-79" name="__codelineno-2-79" href="#__codelineno-2-79"></a><span class="w">    </span><span class="nb">Ok</span><span class="p">(())</span>
+<a id="__codelineno-2-80" name="__codelineno-2-80" href="#__codelineno-2-80"></a><span class="p">}</span>
+</code></pre></div>
+</div>
+</div>
+</div>
+<h2 id="analytic-approximation-source-parity-not-an-exact-oracle">Analytic approximation: source parity, not an exact oracle<a class="headerlink" href="#analytic-approximation-source-parity-not-an-exact-oracle" title="Permanent link">&para;</a></h2>
+<p>The engine ports the <a href="https://github.com/lballabio/QuantLib/blob/9863b578af0caa4cecabf697196533e84a8308b6/ql/pricingengines/vanilla/analyticgjrgarchengine.cpp">pinned QuantLib Edgeworth moment expansion</a>.
+It supports European plain-vanilla NPV only. Unsupported exercise/payoff types
+and requests for missing Greeks fail explicitly.</p>
+<p><strong>Preserved nonstandard dividend convention:</strong> with maturity discounts <code>Dr</code>
+(risk-free) and <code>Dq</code> (dividend), the source uses</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>call - put = spot - strike * Dr / Dq
+</code></pre></div>
+<p>The call is not multiplied by <code>Dq</code>. This is not conventional discounted
+put-call parity. Finite negative approximation values or arbitrage-bound
+violations are not clamped or silently replaced by another pricer.</p>
+<table>
+<thead>
+<tr>
+<th>Analytic guard</th>
+<th>Behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Spot, strike, discounts</td>
+<td>Finite and strictly positive</td>
+</tr>
+<tr>
+<td>Maturity</td>
+<td>Finite positive process time</td>
+</tr>
+<tr>
+<td>Daily horizon <code>T</code></td>
+<td><code>round(days_per_year * time)</code> in <code>1..=1000</code></td>
+</tr>
+<tr>
+<td>Moment poles</td>
+<td>Reject coefficient differences within <code>64 * f64::EPSILON * max(1, abs(a), abs(b))</code></td>
+</tr>
+<tr>
+<td>Moments/output</td>
+<td>Reject zero expected variance, nonpositive computed variance or nonfinite results</td>
+</tr>
+<tr>
+<td>Work/storage</td>
+<td>Direct cubic moment summation, linear temporary storage</td>
+</tr>
+</tbody>
+</table>
+<p>The moment cache includes all six parameters, rounded horizon and daily carry
+rate. Spot and discounts are read live. This fixes the pinned source's stale
+carry-rate cache behavior: rate/dividend bumps match fresh-engine calculations,
+not its stale cached result.</p>
+<h2 id="monte-carlo-configuration-and-uncertainty">Monte Carlo configuration and uncertainty<a class="headerlink" href="#monte-carlo-configuration-and-uncertainty" title="Permanent link">&para;</a></h2>
+<p>MC discounts the terminal plain-vanilla payoff under the supplied diffusion
+process. It preserves <code>PartialTruncation</code>, <code>FullTruncation</code> or <code>Reflection</code>.
+European calls/puts are supported, including zero strike. Greeks are unavailable.</p>
+<table>
+<thead>
+<tr>
+<th>Configuration</th>
+<th>Contract</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Grid</td>
+<td>Exactly one of fixed <code>steps</code> or <code>steps_per_year</code></td>
+</tr>
+<tr>
+<td>Sampling</td>
+<td>Exactly one of fixed <code>samples</code> or positive finite absolute tolerance</td>
+</tr>
+<tr>
+<td>Fixed pseudo-random samples</td>
+<td>At least two observations</td>
+</tr>
+<tr>
+<td>Pseudo-random seed</td>
+<td>Nonzero uint32 seed is reproducible; zero means randomized seed</td>
+</tr>
+<tr>
+<td>Antithetic</td>
+<td>One observation averages a path and its negated-draw partner</td>
+</tr>
+<tr>
+<td>Standard error</td>
+<td>Sampling error of observations/pair averages, not model or discretization error</td>
+</tr>
+<tr>
+<td>Tolerance cap</td>
+<td>Defaults to 50,000 observations; exhaustion returns an error</td>
+</tr>
+<tr>
+<td>Limits</td>
+<td>100,000 steps, 1,000,000 observations, 100,000,000 factor-step evaluations</td>
+</tr>
+</tbody>
+</table>
+<p>Work is <code>steps * 2 factors * observations</code>, doubled for antithetic partners.
+The requested maximum sample budget is included in the work check. Raising
+<code>max_samples</code> cannot bypass the step, observation or work ceilings. Tolerance
+mode requires a cap at least as large as its initial batch of 1,023 observations.
+These errors do not return a successful partial price.</p>
+<p>Rust also supports the low-discrepancy RNG policy with fixed samples only,
+without a standard-error estimate. Python/Go expose pseudo-random MC.
+Brownian bridge and control variates are not exposed by these GJR engines.
+Pseudo-random MC seed zero follows the existing randomized-seed convention; the separate
+<a href="../gjrgarch/#seeded-paths">stateless batch-path API</a> rejects seed zero instead.</p>
+<h3 id="keep-approximation-bias-separate-from-sampling-error">Keep approximation bias separate from sampling error<a class="headerlink" href="#keep-approximation-bias-separate-from-sampling-error" title="Permanent link">&para;</a></h3>
+<p>For the native matrix case <code>lambda=0.2</code>, 180-day maturity and strike 50:</p>
+<table>
+<thead>
+<tr>
+<th>Quantity</th>
+<th>Native value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Analytic approximation</td>
+<td><code>4.54912735976</code></td>
+</tr>
+<tr>
+<td>Diffusion MC estimate</td>
+<td><code>5.60851935058</code></td>
+</tr>
+<tr>
+<td>Difference / MC standard error</td>
+<td>About <code>53.13</code></td>
+</tr>
+</tbody>
+</table>
+<p>This is approximation bias, not evidence of agreement within sampling error.
+The original 36-case cached-value tests retain their separate absolute <code>0.15</code>
+acceptance bands unchanged. Independent native price/error fixtures are checked
+separately. The constant-variance diffusion limit is independently checked
+against Black pricing within four MC standard errors; that limit does not
+make the general analytic approximation exact.</p>
+<h2 id="calibration-and-rollback">Calibration and rollback<a class="headerlink" href="#calibration-and-rollback" title="Permanent link">&para;</a></h2>
+<p>Calibration reuses <code>HestonModelHelper</code> Black-volatility quotes with the analytic
+GJR engine, the existing optimizers, optional nonnegative weights and a
+six-position fixed-parameter mask. Optional constraints are intersected with
+the checked model constraint, not substituted for it. A <code>true</code> mask position
+holds that parameter fixed.</p>
+<ul>
+<li>Failed optimization or final helper evaluation restores the exact previous
+  six parameters and retained process snapshot, plus the previous end-criteria
+  status, residual vector and function-evaluation count.</li>
+<li>Rollback does not reconstruct the saved process from current market inputs.
+  It therefore works even if a quote/curve becomes invalid during fitting.</li>
+<li>Market values are not rolled back. Pricing still reports the invalid market
+  until it is repaired, and observers are notified after model restoration.</li>
+</ul>
+<p>The original 21-helper DAX calibration retains its nonflat risk-free curve and
+percent-volatility SSE acceptance criterion <code>&lt;= 15</code>. The checked Rust fit
+reproduces native SSE about <code>7.8522</code> with 604 function evaluations. These are
+fixture results, not a guarantee for another calibration dataset.</p>
+<p>Python/Go <code>HestonModelHelper</code> constructors currently accept flat-rate inputs,
+not arbitrary curve handles. The Python DAX acceptance test uses a maturity-specific
+effective-rate adapter, <code>rate = -log(discount_at_maturity) / time</code>, to reproduce
+the nonflat curve's discount for each helper. The GJR process/engine itself
+retains the actual nonflat curve. Go checks independent flat-helper fits, not
+the full nonflat DAX case. This adapter is not a general curve-helper API.</p>
+<h2 id="api-reference">API reference<a class="headerlink" href="#api-reference" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="../api/models/#itofin.models.GJRGARCHModel">GJR model</a></li>
+<li><a href="../api/pricingengines/#itofin.pricingengines.AnalyticGJRGARCHEngine">Analytic engine</a></li>
+<li><a href="../api/pricingengines/#itofin.pricingengines.MCEuropeanGJRGARCHEngine">Monte Carlo engine</a></li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.top", "navigation.tracking", "content.code.copy", "content.tabs.link", "toc.follow", "search.suggest"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
