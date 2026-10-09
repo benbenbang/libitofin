@@ -233,6 +233,20 @@
       "python": "itofin.chart.KeltnerChannels.lower",
       "status": "implemented",
       "tests": "TestChartKeltnerIndependentFixtureAndOwnership"
+    },
+    {
+      "c": "itofin_chart_williams_r",
+      "go": "WilliamsR",
+      "python": "itofin.chart.williams_r",
+      "status": "implemented",
+      "tests": "TestChartWilliamsRIndependentFixtureAndOwnership"
+    },
+    {
+      "c": "itofin_chart_williams_r",
+      "go": "DefaultWilliamsR",
+      "python": "itofin.chart.williams_r",
+      "status": "implemented",
+      "tests": "TestChartWilliamsRDefaultWarmupBoundsAndFlat"
     }
   ]
 }

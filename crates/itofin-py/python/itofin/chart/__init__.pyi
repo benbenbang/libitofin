@@ -41,6 +41,7 @@ __all__ = [
     "true_range",
     "volume_bars",
     "vwap",
+    "williams_r",
 ]
 
 @typing.final
@@ -408,4 +409,11 @@ def vwap(price: typing.Sequence[builtins.float], volume: typing.Sequence[builtin
     r"""
     Cumulative VWAP of supplied prices; a separate call starts a new session.
     Zero-volume prefixes are missing; later zero volume carries the last value.
+    """
+
+def williams_r(high: typing.Sequence[builtins.float], low: typing.Sequence[builtins.float], close: typing.Sequence[builtins.float], period: builtins.int = 14) -> ChartSeries:
+    r"""
+    Inclusive trailing Williams percent R in [-100, 0]; flat windows return -50.
+    Default period is 14. First-valid is period-1 capped at length, with zero
+    warmup placeholders. Finite differences are required even during warmup.
     """
