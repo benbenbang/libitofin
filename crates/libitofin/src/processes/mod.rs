@@ -15,6 +15,7 @@ pub mod forwardmeasureprocess;
 mod geometricbrownianprocess;
 mod gjrgarchprocess;
 mod hestonprocess;
+mod hullwhiteprocess;
 mod merton76process;
 mod ornsteinuhlenbeckprocess;
 mod stochasticprocessarray;
@@ -31,6 +32,7 @@ pub use gjrgarchprocess::{
     GjrGarchCoefficients, GjrGarchDiscretization, GjrGarchParameters, GjrGarchProcess,
 };
 pub use hestonprocess::{Discretization as HestonDiscretization, HestonProcess};
+pub use hullwhiteprocess::HullWhiteForwardProcess;
 pub use merton76process::Merton76Process;
 pub use ornsteinuhlenbeckprocess::OrnsteinUhlenbeckProcess;
 pub use stochasticprocessarray::StochasticProcessArray;
