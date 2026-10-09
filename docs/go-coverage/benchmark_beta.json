@@ -1,0 +1,12 @@
+{
+  "domain": "benchmark_beta",
+  "entries": [
+    {
+      "c": "itofin_benchmark_beta",
+      "go": "BenchmarkBeta",
+      "python": "itofin.statistics.benchmark_beta",
+      "status": "implemented",
+      "tests": "TestBenchmarkBetaIndependentFixtures"
+    }
+  ]
+}

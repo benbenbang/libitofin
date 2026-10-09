@@ -6,6 +6,7 @@
 //! (#485-#487).
 
 mod bates;
+mod benchmark_beta;
 mod bma;
 mod bootstrap;
 mod calibration;
@@ -462,6 +463,10 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     let statistics = PyModule::new(py, "statistics")?;
     statistics.add_class::<drawdown::PyDrawdownResult>()?;
     statistics.add_function(wrap_pyfunction!(drawdown::maximum_drawdown, &statistics)?)?;
+    statistics.add_function(wrap_pyfunction!(
+        benchmark_beta::benchmark_beta,
+        &statistics
+    )?)?;
     statistics.add_class::<convergence_statistics::PyConvergenceStatistics>()?;
     statistics.add_function(wrap_pyfunction!(
         convergence_statistics::convergence_table,
