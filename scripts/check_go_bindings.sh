@@ -80,3 +80,4 @@ go run ./examples/european_option
 go run ./examples/portfolio
 
 go run ./examples/drawdown
+go run ./examples/benchmark_beta
