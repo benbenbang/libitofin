@@ -1,0 +1,84 @@
+{
+  "cases": [
+    {
+      "downside": 0.011180339887498949,
+      "name": "monthly_hand",
+      "periods_per_year": 12.0,
+      "returns": [
+        0.02,
+        -0.01,
+        0.03,
+        -0.02
+      ],
+      "sharpe": 0.7276068751089989,
+      "sortino": 1.5491933384829668,
+      "target": 0.0
+    },
+    {
+      "downside": 0.018027756377319945,
+      "name": "positive_mar",
+      "periods_per_year": 1.0,
+      "returns": [
+        0.02,
+        -0.01,
+        0.03,
+        -0.02
+      ],
+      "sharpe": -0.21004201260420147,
+      "sortino": -0.2773500981126146,
+      "target": 0.01
+    },
+    {
+      "downside": 0.007071067811865475,
+      "name": "one_shortfall",
+      "periods_per_year": 1.0,
+      "returns": [
+        -0.01,
+        0.03
+      ],
+      "sharpe": 0.3535533905932738,
+      "sortino": 1.4142135623730951,
+      "target": 0.0
+    },
+    {
+      "downside": 0.018257418583505537,
+      "name": "negative_mean",
+      "periods_per_year": 252.0,
+      "returns": [
+        -0.03,
+        -0.01,
+        0.01
+      ],
+      "sharpe": -7.937253933193772,
+      "sortino": -8.694826047713663,
+      "target": 0.0
+    },
+    {
+      "downside": 0.2,
+      "name": "tail",
+      "periods_per_year": 252.0,
+      "returns": [
+        -0.4,
+        0.01,
+        0.01,
+        0.01
+      ],
+      "sharpe": -7.1628876958090135,
+      "sortino": -7.341959888204239,
+      "target": 0.0
+    },
+    {
+      "downside": 0.7071067811865476,
+      "name": "zero_mean",
+      "periods_per_year": 1.0,
+      "returns": [
+        -1.0,
+        1.0
+      ],
+      "sharpe": 0.0,
+      "sortino": 0.0,
+      "target": 0.0
+    }
+  ],
+  "provenance": "Independent 80-digit Python Decimal definitions; generate.py"
+}
