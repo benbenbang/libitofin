@@ -67,3 +67,6 @@ links to the language guides and project documentation.
 
 - [Small LOW Rust additions](low-small-additions.md): additive helpers, immutable
   legacy components, independent references and deferred scope.
+
+- [Bond Z-spread analytics](bond-zspread.md): live-curve clean/dirty quotes and
+  checked spread inversion with settlement and current-notional conventions.
