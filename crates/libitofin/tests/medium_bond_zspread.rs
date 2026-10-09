@@ -196,3 +196,307 @@ fn compiled_oracles_cover_ex_coupon_amortization_irregular_periods_and_settlemen
         }
     }
 }
+
+#[test]
+fn defaults_honor_bond_settlement_and_cashflow_settings() {
+    let settings = settings();
+    settings.set_evaluation_date(date(7, 2027));
+    settings.set_include_reference_date_events(true);
+    settings.set_include_todays_cash_flows(Some(true));
+    let bond = bond(400.0, true, true, settings.clone());
+    let discount = curve();
+    for comp in [
+        Compounding::Simple,
+        Compounding::Compounded,
+        Compounding::Continuous,
+        Compounding::SimpleThenCompounded,
+        Compounding::CompoundedThenSimple,
+    ] {
+        let default = BondFunctions::dirty_price_at_z_spread(
+            &bond,
+            discount.clone(),
+            0.0,
+            comp,
+            Frequency::Semiannual,
+            None,
+        )
+        .unwrap();
+        let explicit = BondFunctions::dirty_price_at_z_spread(
+            &bond,
+            discount.clone(),
+            0.0,
+            comp,
+            Frequency::Semiannual,
+            Some(date(7, 2027)),
+        )
+        .unwrap();
+        assert_close(default, explicit);
+        assert_close(
+            default,
+            BondFunctions::dirty_price(
+                &bond,
+                discount.current_link().unwrap().as_ref(),
+                Some(date(7, 2027)),
+            )
+            .unwrap(),
+        );
+    }
+    settings.set_evaluation_date(date(10, 2027));
+    assert_close(
+        BondFunctions::clean_price_at_z_spread(
+            &bond,
+            discount.clone(),
+            0.0125,
+            Compounding::Continuous,
+            Frequency::Semiannual,
+            None,
+        )
+        .unwrap(),
+        BondFunctions::clean_price_at_z_spread(
+            &bond,
+            discount,
+            0.0125,
+            Compounding::Continuous,
+            Frequency::Semiannual,
+            Some(date(10, 2027)),
+        )
+        .unwrap(),
+    );
+}
+
+#[test]
+fn invalid_inputs_nontradable_bonds_and_solver_failures_are_errors() {
+    let bond = bond(400.0, true, true, settings());
+    let settlement = Some(date(3, 2027));
+    for spread in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        assert!(
+            BondFunctions::dirty_price_at_z_spread(
+                &bond,
+                curve(),
+                spread,
+                Compounding::Continuous,
+                Frequency::Annual,
+                settlement
+            )
+            .is_err()
+        );
+        assert!(
+            BondFunctions::clean_price_at_z_spread(
+                &bond,
+                curve(),
+                spread,
+                Compounding::Continuous,
+                Frequency::Annual,
+                settlement
+            )
+            .is_err()
+        );
+    }
+    for price in [BondPrice::Clean(f64::NAN), BondPrice::Dirty(f64::INFINITY)] {
+        assert!(
+            BondFunctions::z_spread(
+                &bond,
+                price,
+                curve(),
+                Compounding::Continuous,
+                Frequency::Annual,
+                settlement,
+                None,
+                None,
+                None
+            )
+            .is_err()
+        );
+    }
+    for accuracy in [0.0, -1.0, f64::NAN, f64::INFINITY] {
+        assert!(
+            BondFunctions::z_spread(
+                &bond,
+                BondPrice::Clean(100.0),
+                curve(),
+                Compounding::Continuous,
+                Frequency::Annual,
+                settlement,
+                Some(accuracy),
+                None,
+                None
+            )
+            .is_err()
+        );
+    }
+    for guess in [f64::NAN, f64::INFINITY] {
+        assert!(
+            BondFunctions::z_spread(
+                &bond,
+                BondPrice::Clean(100.0),
+                curve(),
+                Compounding::Continuous,
+                Frequency::Annual,
+                settlement,
+                None,
+                None,
+                Some(guess)
+            )
+            .is_err()
+        );
+    }
+    for max in [0, 1] {
+        assert!(
+            BondFunctions::z_spread(
+                &bond,
+                BondPrice::Clean(100.0),
+                curve(),
+                Compounding::Continuous,
+                Frequency::Annual,
+                settlement,
+                None,
+                Some(max),
+                None
+            )
+            .is_err()
+        );
+    }
+    assert!(
+        BondFunctions::dirty_price_at_z_spread(
+            &bond,
+            Handle::empty(),
+            0.01,
+            Compounding::Continuous,
+            Frequency::Annual,
+            settlement
+        )
+        .is_err()
+    );
+    for day in [7, 8] {
+        let settlement = Some(date(day, 2028));
+        assert!(
+            BondFunctions::dirty_price_at_z_spread(
+                &bond,
+                curve(),
+                0.01,
+                Compounding::Continuous,
+                Frequency::Annual,
+                settlement
+            )
+            .is_err()
+        );
+        assert!(
+            BondFunctions::clean_price_at_z_spread(
+                &bond,
+                curve(),
+                0.01,
+                Compounding::Continuous,
+                Frequency::Annual,
+                settlement
+            )
+            .is_err()
+        );
+        assert!(
+            BondFunctions::z_spread(
+                &bond,
+                BondPrice::Clean(100.0),
+                curve(),
+                Compounding::Continuous,
+                Frequency::Annual,
+                settlement,
+                None,
+                None,
+                None
+            )
+            .is_err()
+        );
+    }
+    let empty = Bond::new(0, NullCalendar::new(), None, vec![], settings()).unwrap();
+    assert!(
+        BondFunctions::dirty_price_at_z_spread(
+            &empty,
+            curve(),
+            0.01,
+            Compounding::Continuous,
+            Frequency::Annual,
+            settlement
+        )
+        .is_err()
+    );
+}
+
+#[test]
+fn large_notional_normalizes_before_scaling_and_malformed_cashflows_error() {
+    for (notional, rate) in [(1e308, 0.0), (1000.0, f64::NAN)] {
+        let coupon: Shared<dyn CashFlow> = shared(FixedRateCoupon::from_rate(
+            date(7, 2028),
+            notional,
+            rate,
+            Actual360::new(),
+            date(7, 2026),
+            date(7, 2028),
+            None,
+            None,
+            None,
+        ));
+        let bond = Bond::from_coupons(
+            0,
+            NullCalendar::new(),
+            Some(date(7, 2026)),
+            vec![coupon],
+            settings(),
+        )
+        .unwrap();
+        let settlement = Some(date(10, 2027));
+        let dirty = BondFunctions::dirty_price_at_z_spread(
+            &bond,
+            curve(),
+            0.0125,
+            Compounding::Continuous,
+            Frequency::Annual,
+            settlement,
+        );
+        if rate.is_nan() {
+            assert!(dirty.is_err());
+            assert!(
+                BondFunctions::z_spread(
+                    &bond,
+                    BondPrice::Clean(100.0),
+                    curve(),
+                    Compounding::Continuous,
+                    Frequency::Annual,
+                    settlement,
+                    None,
+                    None,
+                    None
+                )
+                .is_err()
+            );
+        } else {
+            let dirty = dirty.unwrap();
+            assert_close(dirty, 100.0 * (-0.0425 * 363.0_f64 / 360.0).exp());
+            let root = BondFunctions::z_spread(
+                &bond,
+                BondPrice::Dirty(dirty),
+                curve(),
+                Compounding::Continuous,
+                Frequency::Annual,
+                settlement,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+            assert_close(root, 0.0125);
+            assert!(
+                BondFunctions::z_spread(
+                    &bond,
+                    BondPrice::Dirty(400.0),
+                    curve(),
+                    Compounding::Continuous,
+                    Frequency::Annual,
+                    settlement,
+                    None,
+                    None,
+                    None
+                )
+                .is_err()
+            );
+        }
+    }
+}
