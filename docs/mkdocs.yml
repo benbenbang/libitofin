@@ -115,6 +115,7 @@ nav:
   - Implied volatility term structure: implied-vol-term-structure.md
   - Black-Scholes theta: black-scholes-theta.md
   - FX forwards: fx-forwards.md
+  - Hull-White forward process: hullwhite-forward-process.md
   - Rust API: rust.md
   - Project:
       - Repository index: https://github.com/benbenbang/libitofin#readme

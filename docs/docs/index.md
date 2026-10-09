@@ -81,3 +81,5 @@ links to the language guides and project documentation.
 - [Black-Scholes theta](black-scholes-theta.md): current-market theta from supplied Greeks with checked source-order arithmetic.
 
 - [FX forwards](fx-forwards.md): explicit settlement-normalized currency-tagged valuation and snapshot spot inputs.
+
+- [Hull-White forward process](hullwhite-forward-process.md): live yield curves, forward-measure transitions and checked stable limiting formulas.
