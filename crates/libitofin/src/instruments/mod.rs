@@ -4,6 +4,7 @@
 //! instruments needed by the European-option slice.
 
 mod bond;
+mod bondforward;
 mod bonds;
 mod callablebond;
 mod capfloor;
@@ -30,6 +31,7 @@ mod yearonyearinflationswap;
 mod zerocouponinflationswap;
 
 pub use bond::{Bond, BondArguments, BondEngine, BondPrice, BondPriceType, BondResults};
+pub use bondforward::BondForward;
 pub use bonds::FixedRateBond;
 pub use callablebond::{
     Callability, CallabilitySchedule, CallabilityType, CallableBondArguments, CallableFixedRateBond,
