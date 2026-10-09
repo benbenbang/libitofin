@@ -320,3 +320,70 @@ For asset `[1,3,2,10]`, benchmark `[-1,0,2,9]` and weights `[1,2,3,0]`,
 weighted covariance is `1/27`, benchmark variance is `53/27` and beta is `1/53`.
 Unit weights give beta `53/61`. Rust, Go and Python consume the same tracked
 CSV, with C/C++ clients separately checking these rational expectations.
+
+## Explicit-frequency performance ratios
+
+These **unweighted** functions accept signed simple returns in decimal units
+(`0.02 = 2%`). No frequency, target or risk-free rate is inferred. Both ratios
+require at least two observations. Targets are finite scalar **per-period**
+returns, not annual rates or vectors; align them with the observations before
+calling. Vector targets and weights are deliberately not supported.
+
+| Function | Definition |
+| --- | --- |
+| `sharpe_ratio` / `SharpeRatio` | `(mean(r) - risk_free_return) / sample_std(r) × sqrt(periods_per_year)` |
+| `sortino_ratio` / `SortinoRatio` | `(mean(r) - MAR) / D × sqrt(periods_per_year)` |
+| `target_downside_deviation` / `TargetDownsideDeviation` | `D = sqrt(sum(min(r - MAR, 0)^2) / N)` |
+
+Sharpe's centered squares divide by **N-1**. Sortino's shortfall squares divide
+by **all N observations**, including returns meeting the target, without a
+Bessel correction. This new utility is **not** the existing conditional
+`downside_deviation` / `StatisticsDownsideDeviation`; that API stays unchanged.
+The downside utility requires at least one observation and returns zero when
+there is no shortfall. Ratios instead raise an error for zero denominators,
+including all-positive Sortino samples at target zero. No epsilon or infinity
+substitute is used. A flat negative sample can have a valid negative Sortino
+but its Sharpe is undefined. Returns equal to target contribute zero downside.
+
+For monthly `[+2%, -1%, +3%, -2%]` with target zero, the arithmetic mean is
+`0.5%`, sample variance is `0.0017/3`, and downside is
+`sqrt((0 + 0.01² + 0 + 0.02²)/4) = 0.011180339887498948`.
+The unannualized Sortino is `1/sqrt(5)`; choosing `periods_per_year=12`
+produces `sqrt(12/5) = 1.5491933384829668`.
+
+Square-root annualization is an **explicit statistical scaling convention**.
+It is not exact compounded annual return or annual downside risk. Serial
+correlation, changing distributions and aggregation across periods can make it
+misleading. Compare ratios only with matching targets and sampling conventions.
+Nonfinite inputs, invalid frequency, nonfinite subtraction/output and invalid
+counts are errors. Scaled squared deviations and anchored centering reduce
+avoidable overflow/underflow and cancellation, but inputs remain binary64, not
+arbitrary-precision arithmetic. C caller outputs remain unchanged on error;
+these stateless APIs retain no handles or session state.
+
+=== "Python"
+
+    ```python
+    --8<-- "example/python/performance_ratios.py"
+    ```
+
+=== "Go"
+
+    ```go
+    --8<-- "sdk/go/examples/performance_ratios/main.go"
+    ```
+
+=== "Rust"
+
+    ```rust
+    use libitofin::math::statistics::{sharpe_ratio, sortino_ratio};
+
+    let returns = [0.02, -0.01, 0.03, -0.02];
+    let sharpe = sharpe_ratio(&returns, 0.0, 12.0)?;
+    let sortino = sortino_ratio(&returns, 0.0, 12.0)?;
+    ```
+
+Run `python example/python/performance_ratios.py` or, from `sdk/go`,
+`go run ./examples/performance_ratios` after installing the native library.
+Independent 80-digit Python Decimal definitions and shared binding fixtures
+live in `scripts/fixtures/performance-ratios/`; regenerate with its `generate.py`.
