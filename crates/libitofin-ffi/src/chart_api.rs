@@ -4,7 +4,7 @@ use crate::boundary::{
     BindingError, BindingResult, ItofinError, check_ptr, input_slice, without_context,
 };
 use libitofin::math::chart::{
-    ChartSeries, bollinger_bands, ema, kd, macd, obv, rsi, sma, volume_bars, vwap,
+    ChartSeries, atr, bollinger_bands, ema, kd, macd, obv, rsi, sma, true_range, volume_bars, vwap,
 };
 use libitofin::types::Real;
 
@@ -45,6 +45,25 @@ unsafe fn volume_line(
     first_valid: *mut usize,
     compute: fn(&[Real], &[Real]) -> libitofin::errors::QlResult<ChartSeries>,
 ) -> BindingResult<()> {
+    unsafe {
+        chart_series_output(len, out, capacity, first_valid, || {
+            Ok(compute(
+                input_slice(price, len)?,
+                input_slice(volume, len)?,
+            )?)
+        })
+    }
+}
+
+/// # Safety
+/// Inputs and outputs follow the crate-level pointer and non-overlap contract.
+unsafe fn chart_series_output(
+    len: usize,
+    out: *mut Real,
+    capacity: usize,
+    first_valid: *mut usize,
+    compute: impl FnOnce() -> BindingResult<ChartSeries>,
+) -> BindingResult<()> {
     if capacity < len {
         return Err(BindingError::invalid("output capacity too small"));
     }
@@ -52,14 +71,73 @@ unsafe fn volume_line(
     if len > 0 {
         check_ptr(out)?;
     }
-    let result = compute(unsafe { input_slice(price, len)? }, unsafe {
-        input_slice(volume, len)?
-    })?;
+    let result = compute()?;
     if len > 0 {
         unsafe { std::ptr::copy_nonoverlapping(result.values.as_ptr(), out, len) };
     }
     unsafe { first_valid.write(result.first_valid) };
     Ok(())
+}
+
+/// Compute gap-aware true range, using high-low for the first bar.
+/// # Safety
+/// Inputs each hold `len` doubles. Follow the crate-level pointer/non-overlap
+/// contract. `out` holds `capacity` doubles and `first_valid` holds one size_t.
+#[unsafe(no_mangle)]
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn itofin_chart_true_range(
+    high: *const Real,
+    low: *const Real,
+    close: *const Real,
+    len: usize,
+    out: *mut Real,
+    capacity: usize,
+    first_valid: *mut usize,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        without_context(error, || {
+            chart_series_output(len, out, capacity, first_valid, || {
+                Ok(true_range(
+                    input_slice(high, len)?,
+                    input_slice(low, len)?,
+                    input_slice(close, len)?,
+                )?)
+            })
+        })
+    }
+}
+
+/// Compute Wilder ATR seeded by the first `period` true ranges, including bar 0.
+/// Warmup slots are zero; first-valid is `period - 1`, capped at `len`.
+/// # Safety
+/// Inputs each hold `len` doubles. Follow the crate-level pointer/non-overlap
+/// contract. `out` holds `capacity` doubles and `first_valid` holds one size_t.
+#[unsafe(no_mangle)]
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn itofin_chart_atr(
+    high: *const Real,
+    low: *const Real,
+    close: *const Real,
+    len: usize,
+    period: usize,
+    out: *mut Real,
+    capacity: usize,
+    first_valid: *mut usize,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        without_context(error, || {
+            chart_series_output(len, out, capacity, first_valid, || {
+                Ok(atr(
+                    input_slice(high, len)?,
+                    input_slice(low, len)?,
+                    input_slice(close, len)?,
+                    period,
+                )?)
+            })
+        })
+    }
 }
 
 /// Compute cumulative VWAP of supplied prices, starting a session per call.

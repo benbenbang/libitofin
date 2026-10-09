@@ -1746,6 +1746,38 @@ int32_t itofin_handle_release(struct ItofinContext *ctx,
                               struct ItofinError *error);
 
 /**
+ * Compute gap-aware true range, using high-low for the first bar.
+ * # Safety
+ * Inputs each hold `len` doubles. Follow the crate-level pointer/non-overlap
+ * contract. `out` holds `capacity` doubles and `first_valid` holds one size_t.
+ */
+int32_t itofin_chart_true_range(const ItofinReal *high,
+                                const ItofinReal *low,
+                                const ItofinReal *close,
+                                size_t len,
+                                ItofinReal *out,
+                                size_t capacity,
+                                size_t *first_valid,
+                                struct ItofinError *error);
+
+/**
+ * Compute Wilder ATR seeded by the first `period` true ranges, including bar 0.
+ * Warmup slots are zero; first-valid is `period - 1`, capped at `len`.
+ * # Safety
+ * Inputs each hold `len` doubles. Follow the crate-level pointer/non-overlap
+ * contract. `out` holds `capacity` doubles and `first_valid` holds one size_t.
+ */
+int32_t itofin_chart_atr(const ItofinReal *high,
+                         const ItofinReal *low,
+                         const ItofinReal *close,
+                         size_t len,
+                         size_t period,
+                         ItofinReal *out,
+                         size_t capacity,
+                         size_t *first_valid,
+                         struct ItofinError *error);
+
+/**
  * Compute cumulative VWAP of supplied prices, starting a session per call.
  * Zero cumulative volume is missing; later zero volume carries the last VWAP.
  * # Safety
