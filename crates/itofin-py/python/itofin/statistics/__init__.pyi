@@ -9,6 +9,7 @@ __all__ = [
     "GeneralStatistics",
     "IncrementalStatistics",
     "average_shortfall",
+    "benchmark_beta",
     "convergence_table",
     "correlation_matrix",
     "covariance_matrix",
@@ -227,6 +228,18 @@ class IncrementalStatistics:
 def average_shortfall(observations: typing.Sequence[builtins.float], target: builtins.float, *, weights: typing.Optional[typing.Sequence[builtins.float]] = None) -> builtins.float:
     r"""
     Weighted mean of target minus observations strictly below target.
+    """
+
+def benchmark_beta(asset_returns: typing.Sequence[builtins.float], benchmark_returns: typing.Sequence[builtins.float], *, weights: typing.Optional[typing.Sequence[builtins.float]] = None) -> builtins.float:
+    r"""
+    Weighted covariance / benchmark variance for 2-100000 aligned return pairs.
+
+    No annualization, data feed or risk-free adjustment. Weights are optional,
+    finite and nonnegative with finite positive total. Both moments apply the
+    same observation-count correction, counting zero-weight rows. All samples
+    must be finite; zero benchmark variance or nonfinite moments/beta raise
+    ItofinError. Caller owns date/frequency alignment. Inputs are unchanged;
+    no native handle or context needs closing.
     """
 
 def convergence_table(observations: typing.Sequence[builtins.float], *, weights: typing.Optional[typing.Sequence[builtins.float]] = None) -> builtins.list[tuple[builtins.int, builtins.float]]:
