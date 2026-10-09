@@ -1,4 +1,4 @@
-use libitofin::math::abcdmathfunction::AbcdMathFunction;
+use libitofin::math::abcdmathfunction::{AbcdMathFunction, validate};
 use libitofin::termstructures::volatility::{AbcdFunction, AbcdSquared};
 
 fn close(actual: f64, expected: f64, tolerance: f64) {
@@ -72,6 +72,116 @@ fn compiled_native_integrated_covariance_and_variance() {
     }
 }
 
+#[test]
+fn cutoff_zero_intervals_additivity_and_signed_time_translation() {
+    let f = AbcdFunction::default();
+    assert_eq!(f.covariance(2.0, 5.0, 2.0, 3.0).unwrap(), 0.0);
+    assert_eq!(f.covariance(0.5, 0.5, 2.0, 3.0).unwrap(), 0.0);
+    assert!(f.instantaneous_covariance(2.0, 2.0, 3.0).unwrap() > 0.0);
+    assert_eq!(f.instantaneous_covariance(2.01, 2.0, 3.0).unwrap(), 0.0);
+    close(
+        f.covariance(-1.0, 2.5, 2.0, 3.0).unwrap(),
+        f.covariance(-1.0, 0.7, 2.0, 3.0).unwrap() + f.covariance(0.7, 2.5, 2.0, 3.0).unwrap(),
+        2e-15,
+    );
+    close(
+        f.covariance(-10.0, -9.0, -8.0, -7.0).unwrap(),
+        f.covariance(0.0, 1.0, 2.0, 3.0).unwrap(),
+        1e-15,
+    );
+}
+
+#[test]
+fn small_decay_and_long_maturity_remain_finite() {
+    for &[c, expected] in HIGH_PRECISION_SMALL_DECAY {
+        let f = AbcdFunction::new(0.2, 0.1, c, 0.3).unwrap();
+        close(f.covariance(0.0, 1.0, 2.0, 3.0).unwrap(), expected, 2e-15);
+    }
+    let f = AbcdFunction::default();
+    close(
+        f.covariance(0.0, 1.0, 2000.0, 2001.0).unwrap(),
+        0.17 * 0.17,
+        1e-15,
+    );
+    let constant = AbcdFunction::new(0.0, 0.0, 1e-50, 0.2).unwrap();
+    close(constant.variance(1.0, 3.0, 10.0).unwrap(), 0.08, 1e-15);
+}
+
+#[test]
+fn near_zero_shapes_use_stable_shifted_values_and_integrals() {
+    let tiny = AbcdFunction::new(-1.0, 0.0, 1e-12, 1.0).unwrap();
+    close(tiny.value(1.0).unwrap(), 9.999999999995e-13, 3e-28);
+    close(
+        tiny.variance(0.0, 1.0, 1.0).unwrap(),
+        3.3333333333308333e-25,
+        2e-40,
+    );
+    close(
+        tiny.variance(0.0, 0.1, 0.1).unwrap(),
+        3.3333333333330835e-28,
+        2e-43,
+    );
+    let short = AbcdFunction::new(-1.0, 0.0, 0.5, 1.0).unwrap();
+    close(
+        short.variance(0.0, 1e-8, 1e-8).unwrap(),
+        8.333333302083334e-26,
+        5e-41,
+    );
+    assert!(validate(1e300, -1e-20, 1e-320, 1.0).is_err());
+}
+
+#[test]
+fn finite_coefficient_and_stationary_minimum_validation() {
+    for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        for i in 0..4 {
+            let mut coeff = [0.2, 0.1, 0.5, 0.2];
+            coeff[i] = bad;
+            assert!(AbcdMathFunction::new(coeff[0], coeff[1], coeff[2], coeff[3]).is_err());
+        }
+    }
+    for coeff in [
+        [0.2, 0.1, 0.0, 0.2],
+        [0.2, 0.1, -0.5, 0.2],
+        [-0.3, 0.1, 0.5, 0.2],
+        [0.2, -1.0, 0.5, 0.01],
+        [0.2, -0.01, 0.5, 0.0],
+    ] {
+        assert!(validate(coeff[0], coeff[1], coeff[2], coeff[3]).is_err());
+    }
+    assert!(validate(0.2, -0.1, 0.5, 0.2).is_ok());
+    assert!(validate(-0.1, -0.01, 0.5, 0.2).is_ok());
+    assert!(validate(f64::MAX, 0.0, 1.0, f64::MAX).is_err());
+}
+
+#[test]
+fn non_finite_and_reversed_queries_are_checked_even_after_cutoff() {
+    let f = AbcdFunction::default();
+    for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        assert!(f.value(bad).is_err());
+        for i in 0..4 {
+            let mut times = [5.0, 6.0, 2.0, 3.0];
+            times[i] = bad;
+            assert!(
+                f.covariance(times[0], times[1], times[2], times[3])
+                    .is_err()
+            );
+        }
+        assert!(AbcdSquared::new(0.2, 0.1, 0.5, 0.2, bad, 1.0).is_err());
+        assert!(f.instantaneous_covariance(bad, 1.0, 2.0).is_err());
+    }
+    assert!(f.covariance(2.0, 1.0, 4.0, 5.0).is_err());
+    assert!(
+        f.covariance(-f64::MAX, f64::MAX, f64::MAX, f64::MAX)
+            .is_err()
+    );
+    assert!(
+        f.instantaneous_covariance(-f64::MAX, f64::MAX, 1.0)
+            .is_err()
+    );
+    let huge = AbcdFunction::new(1e200, 0.0, 0.5, 0.0).unwrap();
+    assert!(huge.instantaneous_covariance(0.0, 0.0, 0.0).is_err());
+    assert!(huge.variance(0.0, 1.0, 1.0).is_err());
+}
 const NATIVE_VALUES: &[[f64; 6]] = &[
     [0.002, 0.001, 0.16, 0.0005, -2.0, 0.0],
     [0.002, 0.001, 0.16, 0.0005, 0.0, 0.0025],
@@ -314,4 +424,10 @@ const NATIVE_INSTANTANEOUS: &[[f64; 8]] = &[
     [0.0, 0.0, 0.7, 0.2, 1.0, 1.0, 2.0, 0.04000000000000001],
     [0.0, 0.0, 0.7, 0.2, 2.0, 1.0, 2.0, 0.0],
     [0.0, 0.0, 0.7, 0.2, -1.0, 1.0, 2.0, 0.04000000000000001],
+];
+
+const HIGH_PRECISION_SMALL_DECAY: &[[f64; 2]] = &[
+    [1e-50, 0.48833333333333334],
+    [1e-15, 0.4883333333333322],
+    [1e-8, 0.48833332186666684],
 ];
