@@ -111,6 +111,7 @@ nav:
   - Small LOW Rust additions: low-small-additions.md
   - Bond Z-spread analytics: bond-zspread.md
   - Exchange-rate chaining: exchange-rate-chaining.md
+  - Bond forwards: bond-forward.md
   - Rust API: rust.md
   - Project:
       - Repository index: https://github.com/benbenbang/libitofin#readme

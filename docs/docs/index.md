@@ -73,3 +73,5 @@ links to the language guides and project documentation.
 
 - [Exchange-rate chaining](exchange-rate-chaining.md): ordered direct/derived
   conversions, currency orientations and checked numerical boundaries.
+
+- [Bond forwards](bond-forward.md): retained live bonds, explicit income/financing curves and checked delivery quotes.
