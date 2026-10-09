@@ -1,9 +1,9 @@
-//! Discount-curve and yield bond analytics.
+//! Discount-curve, yield and Z-spread bond analytics.
 //!
 //! Port of the `YieldTermStructure` and yield (IRR) subsets of
 //! `ql/pricingengines/bond/bondfunctions.{hpp,cpp}`: the price, accrued, rate
-//! and yield/duration/convexity wrappers that add a tradability guard and
-//! delegate to the matching [`CashFlows`] overload (`bondfunctions.cpp:224-486`).
+//! and yield/duration/convexity/Z-spread wrappers that add a tradability guard and
+//! delegate to the matching [`CashFlows`] overload (`bondfunctions.cpp:224-580`).
 //! Each reads the bond's own cash flows and settings rather than a global
 //! evaluation date (D5).
 //!
@@ -22,6 +22,7 @@
 
 use crate::cashflows::{CashFlows, Duration};
 use crate::errors::QlResult;
+use crate::handle::Handle;
 use crate::instruments::{Bond, BondPrice};
 use crate::interestrate::{Compounding, InterestRate};
 use crate::require;
@@ -29,7 +30,7 @@ use crate::termstructures::yieldtermstructure::YieldTermStructure;
 use crate::time::date::Date;
 use crate::time::daycounter::DayCounter;
 use crate::time::frequency::Frequency;
-use crate::types::{Rate, Real, Time};
+use crate::types::{Rate, Real, Spread, Time};
 
 /// Free-function bond analytics over a discount curve.
 pub struct BondFunctions;
@@ -394,6 +395,127 @@ impl BondFunctions {
     ) -> QlResult<Real> {
         let y = InterestRate::new(yield_rate, day_counter, compounding, frequency)?;
         Self::clean_price_at_yield(bond, &y, settlement)
+    }
+
+    /// The dirty price per 100 of notional on `discount_curve` shifted by a
+    /// parallel zero-rate `z_spread` (`bondfunctions.cpp:507`).
+    ///
+    /// # Errors
+    ///
+    /// The bond must be tradable, the spread and result finite, and the
+    /// spreaded discount curve must accept the requested dates/conventions.
+    pub fn dirty_price_at_z_spread(
+        bond: &Bond,
+        discount_curve: Handle<dyn YieldTermStructure>,
+        z_spread: Spread,
+        compounding: Compounding,
+        frequency: Frequency,
+        settlement: Option<Date>,
+    ) -> QlResult<Real> {
+        let settlement = Self::settlement_or_eval(bond, settlement)?;
+        let notional = Self::require_tradable(bond, settlement)?;
+        require!(z_spread.is_finite(), "z-spread must be finite");
+        let npv = CashFlows::npv_at_z_spread(
+            bond.cashflows(),
+            discount_curve,
+            z_spread,
+            compounding,
+            frequency,
+            bond.settings(),
+            Some(false),
+            Some(settlement),
+            None,
+        )?;
+        let dirty = (npv / notional) * 100.0;
+        require!(dirty.is_finite(), "dirty price must be finite");
+        Ok(dirty)
+    }
+
+    /// The clean price per 100 of notional on `discount_curve` shifted by a
+    /// parallel zero-rate `z_spread` (`bondfunctions.cpp:492`).
+    ///
+    /// # Errors
+    ///
+    /// The bond must be tradable, the spread and result finite, and the
+    /// spreaded discount curve must accept the requested dates/conventions.
+    pub fn clean_price_at_z_spread(
+        bond: &Bond,
+        discount_curve: Handle<dyn YieldTermStructure>,
+        z_spread: Spread,
+        compounding: Compounding,
+        frequency: Frequency,
+        settlement: Option<Date>,
+    ) -> QlResult<Real> {
+        let settlement = Self::settlement_or_eval(bond, settlement)?;
+        let dirty = Self::dirty_price_at_z_spread(
+            bond,
+            discount_curve,
+            z_spread,
+            compounding,
+            frequency,
+            Some(settlement),
+        )?;
+        let clean = dirty - bond.accrued_amount(Some(settlement))?;
+        require!(clean.is_finite(), "clean price must be finite");
+        Ok(clean)
+    }
+
+    /// The zero-rate spread that reprices the bond at `price` on
+    /// `discount_curve` (`bondfunctions.cpp:534`).
+    ///
+    /// `accuracy` defaults to `1e-10`, `max_evaluations` to `100` and `guess`
+    /// to `0.0`.
+    ///
+    /// # Errors
+    ///
+    /// The bond must be tradable at the settlement date, and the solve must
+    /// converge. Non-finite prices/guesses, non-positive or non-finite accuracy,
+    /// zero evaluation limits, and non-finite scaled targets are rejected.
+    #[allow(clippy::too_many_arguments)]
+    pub fn z_spread(
+        bond: &Bond,
+        price: BondPrice,
+        discount_curve: Handle<dyn YieldTermStructure>,
+        compounding: Compounding,
+        frequency: Frequency,
+        settlement: Option<Date>,
+        accuracy: Option<Real>,
+        max_evaluations: Option<usize>,
+        guess: Option<Rate>,
+    ) -> QlResult<Spread> {
+        let settlement = Self::settlement_or_eval(bond, settlement)?;
+        let notional = Self::require_tradable(bond, settlement)?;
+        require!(price.amount().is_finite(), "bond price must be finite");
+        let accuracy = accuracy.unwrap_or(1.0e-10);
+        require!(
+            accuracy.is_finite() && accuracy > 0.0,
+            "accuracy must be finite and positive"
+        );
+        let max_evaluations = max_evaluations.unwrap_or(100);
+        require!(max_evaluations > 0, "maximum evaluations must be positive");
+        let guess = guess.unwrap_or(0.0);
+        require!(guess.is_finite(), "z-spread guess must be finite");
+        let mut dirty = price.amount();
+        if matches!(price, BondPrice::Clean(_)) {
+            dirty += bond.accrued_amount(Some(settlement))?;
+        }
+        require!(dirty.is_finite(), "dirty price must be finite");
+        let npv = (dirty / 100.0) * notional;
+        require!(npv.is_finite(), "target NPV must be finite");
+        CashFlows::z_spread(
+            bond.cashflows(),
+            npv,
+            discount_curve,
+            compounding,
+            frequency,
+            bond.settings(),
+            Some(false),
+            Some(settlement),
+            Some(settlement),
+            Some(accuracy),
+            Some(max_evaluations),
+            Some(guess),
+        )
     }
 
     fn settlement_or_eval(bond: &Bond, settlement: Option<Date>) -> QlResult<Date> {
