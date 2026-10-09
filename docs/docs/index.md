@@ -75,3 +75,5 @@ links to the language guides and project documentation.
   conversions, currency orientations and checked numerical boundaries.
 
 - [Bond forwards](bond-forward.md): retained live bonds, explicit income/financing curves and checked delivery quotes.
+
+- [Implied volatility term structure](implied-vol-term-structure.md): fixed-reference forward variance, live source handles and explicit extrapolation.
