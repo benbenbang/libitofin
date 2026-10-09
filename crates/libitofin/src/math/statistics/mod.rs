@@ -13,6 +13,7 @@ use crate::fail;
 use crate::types::{Real, Size};
 
 mod batch;
+mod benchmark_beta;
 mod convergence;
 mod discrepancy;
 mod drawdown;
@@ -25,6 +26,7 @@ mod sequence;
 mod sequence_shape;
 
 pub use batch::{BatchStatistic, evaluate_batch};
+pub use benchmark_beta::benchmark_beta;
 pub use convergence::{
     ConvergencePoint, ConvergenceStatistics, DoublingConvergenceSteps, MAX_CONVERGENCE_SAMPLES,
     evaluate_convergence_batch, validate_convergence_length,
