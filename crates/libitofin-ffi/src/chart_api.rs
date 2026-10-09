@@ -748,3 +748,7 @@ mod vwap_obv_tests;
 #[cfg(test)]
 #[path = "chart_atr_tests.rs"]
 mod atr_tests;
+
+#[cfg(test)]
+#[path = "chart_keltner_tests.rs"]
+mod keltner_tests;
