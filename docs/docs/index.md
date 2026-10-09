@@ -70,3 +70,6 @@ links to the language guides and project documentation.
 
 - [Bond Z-spread analytics](bond-zspread.md): live-curve clean/dirty quotes and
   checked spread inversion with settlement and current-notional conventions.
+
+- [Exchange-rate chaining](exchange-rate-chaining.md): ordered direct/derived
+  conversions, currency orientations and checked numerical boundaries.
