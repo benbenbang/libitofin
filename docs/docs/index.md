@@ -83,3 +83,5 @@ links to the language guides and project documentation.
 - [FX forwards](fx-forwards.md): explicit settlement-normalized currency-tagged valuation and snapshot spot inputs.
 
 - [Hull-White forward process](hullwhite-forward-process.md): live yield curves, forward-measure transitions and checked stable limiting formulas.
+
+- [Quanto term structure](quanto-term-structure.md): linked standalone quanto dividend yields with native numeric-time conventions.
