@@ -1,0 +1,40 @@
+{
+  "domain": "drawdown",
+  "entries": [
+    {
+      "c": "itofin_maximum_drawdown",
+      "go": "MaximumDrawdown",
+      "python": "itofin.statistics.maximum_drawdown",
+      "status": "implemented",
+      "tests": "TestMaximumDrawdownIndependentFixturesAndSnapshots"
+    },
+    {
+      "c": "itofin_maximum_drawdown",
+      "go": "DrawdownResult",
+      "python": "itofin.statistics.DrawdownResult",
+      "status": "implemented",
+      "tests": "TestMaximumDrawdownIndependentFixturesAndSnapshots"
+    },
+    {
+      "c": "itofin_maximum_drawdown",
+      "go": "DrawdownResult.Drawdown",
+      "python": "itofin.statistics.DrawdownResult.drawdown",
+      "status": "implemented",
+      "tests": "TestMaximumDrawdownIndependentFixturesAndSnapshots"
+    },
+    {
+      "c": "itofin_maximum_drawdown",
+      "go": "DrawdownResult.PeakIndex",
+      "python": "itofin.statistics.DrawdownResult.peak_index",
+      "status": "implemented",
+      "tests": "TestMaximumDrawdownIndependentFixturesAndSnapshots"
+    },
+    {
+      "c": "itofin_maximum_drawdown",
+      "go": "DrawdownResult.TroughIndex",
+      "python": "itofin.statistics.DrawdownResult.trough_index",
+      "status": "implemented",
+      "tests": "TestMaximumDrawdownIndependentFixturesAndSnapshots"
+    }
+  ]
+}
