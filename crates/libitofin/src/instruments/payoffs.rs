@@ -2,8 +2,8 @@
 //!
 //! Port of the plain-vanilla subset of `ql/instruments/payoffs.{hpp,cpp}`:
 //! the [`TypePayoff`] and [`StrikedTypePayoff`] intermediate contracts, the
-//! [`PlainVanillaPayoff`] and the [`CashOrNothingPayoff`]. The remaining
-//! payoffs (`NullPayoff`, `FloatingTypePayoff`, `PercentageStrikePayoff`,
+//! [`PlainVanillaPayoff`], [`CashOrNothingPayoff`] and [`NullPayoff`]. The remaining
+//! payoffs (`FloatingTypePayoff`, `PercentageStrikePayoff`,
 //! `AssetOrNothingPayoff`, `GapPayoff`, `SuperFundPayoff`,
 //! `SuperSharePayoff`) are follow-up work.
 
@@ -12,6 +12,30 @@ use std::any::Any;
 use crate::option::OptionType;
 use crate::payoff::Payoff;
 use crate::types::Real;
+
+/// Dummy payoff for engines that define settlement independently of a scalar payoff.
+///
+/// Matches QuantLib's `NullPayoff` name and deliberate evaluation failure.
+/// It is not a zero payoff and does not enable an additional pricing engine.
+///
+/// # Panics
+/// [`Payoff::value`] always panics with `dummy payoff given`.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct NullPayoff;
+
+impl Payoff for NullPayoff {
+    fn name(&self) -> String {
+        "Null".into()
+    }
+
+    fn description(&self) -> String {
+        self.name()
+    }
+
+    fn value(&self, _price: Real) -> Real {
+        panic!("dummy payoff given")
+    }
+}
 
 /// Intermediate contract for put/call payoffs (QuantLib's `TypePayoff`).
 pub trait TypePayoff: Payoff {

@@ -226,6 +226,11 @@ impl HullWhite {
         self.base.r0()
     }
 
+    /// Current short-rate volatility, including calibration parameter updates.
+    pub fn sigma(&self) -> Real {
+        self.base.sigma()
+    }
+
     /// The fitted-curve handle (`termStructure()`, `model.hpp:77`), from which the
     /// [`JamshidianSwaptionEngine`](crate::pricingengines::swaption::JamshidianSwaptionEngine)
     /// (#392) reads the reference date and day counter it turns the swaption's
