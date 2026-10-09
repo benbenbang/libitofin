@@ -21,6 +21,7 @@ mod gaussianstatistics;
 mod generalstatistics;
 mod histogram;
 mod incrementalstatistics;
+mod performance_ratios;
 mod riskstatistics;
 mod sequence;
 mod sequence_shape;
@@ -40,6 +41,7 @@ pub use gaussianstatistics::{GaussianStatistics, StatsHolder};
 pub use generalstatistics::GeneralStatistics;
 pub use histogram::{Histogram, HistogramAlgorithm};
 pub use incrementalstatistics::IncrementalStatistics;
+pub use performance_ratios::{sharpe_ratio, sortino_ratio, target_downside_deviation};
 pub use riskstatistics::RiskStatistics;
 pub use sequence::{SequenceStatistics, evaluate_sequence_batch};
 pub use sequence_shape::{
