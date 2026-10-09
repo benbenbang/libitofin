@@ -87,3 +87,5 @@ links to the language guides and project documentation.
 - [Quanto term structure](quanto-term-structure.md): linked standalone quanto dividend yields with native numeric-time conventions.
 
 - [ABCD math and volatility](abcd.md): coefficient validation, volatility shape and integrated variance/covariance.
+
+- [Householder utilities](householder.md): checked reflections, orthogonal matrices and explicit native application conventions.
