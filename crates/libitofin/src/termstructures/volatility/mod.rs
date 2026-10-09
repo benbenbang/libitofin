@@ -26,6 +26,7 @@
 //!   the traits).
 //! - `QL_ENSURE` on non-decreasing variances becomes an `Err`, per D4.
 
+mod abcd;
 mod blackconstantvol;
 mod blackvariancecurve;
 mod blackvariancesurface;
@@ -45,6 +46,7 @@ mod smilesection;
 mod swaption;
 mod volatilitytype;
 
+pub use abcd::{AbcdFunction, AbcdSquared};
 pub use blackconstantvol::BlackConstantVol;
 pub use blackvariancecurve::{BlackVarianceCurve, BlackVolTimeExtrapolation};
 pub use blackvariancesurface::{BlackVarianceSurface, Extrapolation};
