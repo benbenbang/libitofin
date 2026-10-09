@@ -15,6 +15,7 @@ use crate::types::{Real, Size};
 mod batch;
 mod convergence;
 mod discrepancy;
+mod drawdown;
 mod gaussianstatistics;
 mod generalstatistics;
 mod histogram;
@@ -32,6 +33,7 @@ pub use discrepancy::{
     DiscrepancyStatistics, MAX_DISCREPANCY_ROWS, MAX_DISCREPANCY_WORK, evaluate_discrepancy_batch,
     validate_discrepancy_shape,
 };
+pub use drawdown::{DrawdownResult, maximum_drawdown};
 pub use gaussianstatistics::{GaussianStatistics, StatsHolder};
 pub use generalstatistics::GeneralStatistics;
 pub use histogram::{Histogram, HistogramAlgorithm};
