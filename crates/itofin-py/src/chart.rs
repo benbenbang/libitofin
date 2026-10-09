@@ -250,6 +250,39 @@ pub(crate) fn obv(close: Vec<f64>, volume: Vec<f64>) -> PyResult<PyChartSeries> 
         .map_err(Into::into)
 }
 
+/// Gap-aware true range, with high-low used for the first bar.
+/// Finite ordered HLC inputs and finite differences are required.
+#[gen_stub_pyfunction(module = "itofin.chart")]
+#[pyfunction]
+pub(crate) fn true_range(
+    high: Vec<f64>,
+    low: Vec<f64>,
+    close: Vec<f64>,
+) -> PyResult<PyChartSeries> {
+    chart::true_range(&high, &low, &close)
+        .map(PyChartSeries::from_core)
+        .map_err(PyQlError::from)
+        .map_err(Into::into)
+}
+
+/// Wilder ATR with an arithmetic seed over the first period true ranges.
+/// Bar zero contributes high-low; first-valid is period-1, capped at length.
+/// Default period is 14; period one returns exactly the true-range series.
+#[gen_stub_pyfunction(module = "itofin.chart")]
+#[pyfunction]
+#[pyo3(signature = (high, low, close, period = 14))]
+pub(crate) fn atr(
+    high: Vec<f64>,
+    low: Vec<f64>,
+    close: Vec<f64>,
+    period: usize,
+) -> PyResult<PyChartSeries> {
+    chart::atr(&high, &low, &close, period)
+        .map(PyChartSeries::from_core)
+        .map_err(PyQlError::from)
+        .map_err(Into::into)
+}
+
 /// Validate OHLCV bars and return raw volume with close-versus-open direction.
 #[gen_stub_pyfunction(module = "itofin.chart")]
 #[pyfunction]

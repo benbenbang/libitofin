@@ -17,6 +17,7 @@ __all__ = [
     "OhlcOvernightEstimates",
     "OhlcPointEstimates",
     "VolumeBars",
+    "atr",
     "bollinger_bands",
     "constant_volatility",
     "ema",
@@ -35,6 +36,7 @@ __all__ = [
     "simple_local_volatility",
     "simple_local_volatility_constant_fraction",
     "sma",
+    "true_range",
     "volume_bars",
     "vwap",
 ]
@@ -263,6 +265,13 @@ class VolumeBars:
         Per-bar direction: -1 for down, 0 for flat, 1 for up.
         """
 
+def atr(high: typing.Sequence[builtins.float], low: typing.Sequence[builtins.float], close: typing.Sequence[builtins.float], period: builtins.int = 14) -> ChartSeries:
+    r"""
+    Wilder ATR with an arithmetic seed over the first period true ranges.
+    Bar zero contributes high-low; first-valid is period-1, capped at length.
+    Default period is 14; period one returns exactly the true-range series.
+    """
+
 def bollinger_bands(close: typing.Sequence[builtins.float], period: builtins.int = 20, multiplier: builtins.float = 2.0) -> BollingerBands:
     r"""
     Bollinger bands using a population standard deviation over each window.
@@ -352,6 +361,12 @@ def simple_local_volatility_constant_fraction(close: typing.Sequence[builtins.fl
 def sma(close: typing.Sequence[builtins.float], period: builtins.int) -> ChartSeries:
     r"""
     Simple moving average, seeded after `period` closing prices.
+    """
+
+def true_range(high: typing.Sequence[builtins.float], low: typing.Sequence[builtins.float], close: typing.Sequence[builtins.float]) -> ChartSeries:
+    r"""
+    Gap-aware true range, with high-low used for the first bar.
+    Finite ordered HLC inputs and finite differences are required.
     """
 
 def volume_bars(open: typing.Sequence[builtins.float], high: typing.Sequence[builtins.float], low: typing.Sequence[builtins.float], close: typing.Sequence[builtins.float], volume: typing.Sequence[builtins.float]) -> VolumeBars:
