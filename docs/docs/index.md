@@ -64,3 +64,6 @@ links to the language guides and project documentation.
 - [Development](https://github.com/benbenbang/libitofin/blob/main/wiki/development.md)
 - [Design](https://github.com/benbenbang/libitofin/blob/main/wiki/design.md)
 - [QuantLib compatibility](https://github.com/benbenbang/libitofin/blob/main/wiki/compatibility.md)
+
+- [Small LOW Rust additions](low-small-additions.md): additive helpers, immutable
+  legacy components, independent references and deferred scope.
