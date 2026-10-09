@@ -352,6 +352,67 @@ The formulas follow [StockCharts VWAP](https://chartschool.stockcharts.com/table
 and [OBV](https://chartschool.stockcharts.com/table-of-contents/technical-indicators-and-overlays/technical-indicators/on-balance-volume-obv).
 The zero OBV seed and missing zero-volume VWAP prefix are explicit local conventions.
 
+## True range and Wilder ATR
+
+`true_range`/`TrueRange` measures each bar's range including overnight gaps.
+Bar zero uses `high - low`; later bars take the maximum of that range,
+`abs(high - previous_close)`, and `abs(low - previous_close)`. It is valid from
+index zero, even when the first range is zero.
+
+`atr`/`ATR` seeds the arithmetic mean of the **first `period` true ranges,
+including bar zero**, then applies Wilder smoothing:
+`previous + (true_range - previous) / period`. The default is 14 bars.
+`first_valid` is `period - 1`, capped at the input length; shorter inputs are
+entirely missing. Period one returns the exact true-range series.
+
+=== "Python"
+
+    ```python
+    from itofin import chart
+
+    high = [12.0, 16.0, 11.0]
+    low = [10.0, 14.0, 9.0]
+    close = [11.0, 15.0, 10.0]
+    ranges = chart.true_range(high, low, close)
+    smoothed = chart.atr(high, low, close, period=3)
+    assert ranges.to_list() == [2.0, 5.0, 6.0]
+    assert smoothed.first_valid == 2
+    assert smoothed.to_list()[:2] == [None, None]
+    assert abs(smoothed.values[2] - 13 / 3) < 1e-12
+    ```
+
+=== "Go"
+
+    ```go
+    import itofin "github.com/benbenbang/libitofin/sdk/go"
+
+    high := []float64{12, 16, 11}
+    low := []float64{10, 14, 9}
+    close := []float64{11, 15, 10}
+    ranges, err := itofin.TrueRange(high, low, close)
+    if err != nil { panic(err) }
+    smoothed, err := itofin.ATR(high, low, close, 3)
+    if err != nil { panic(err) }
+    _ = ranges.Values
+    _ = smoothed.NullableValues()
+    ```
+
+Python's omitted `period` and Go's `DefaultATR` both select 14. Rust exposes
+`math::chart::{true_range, atr, atr_default}`; C exposes
+`itofin_chart_true_range` and `itofin_chart_atr` with caller-owned buffers.
+The six-bar hand fixture has ranges `[2, 5, 6, 5, 2, 1]` and ATR(3) values
+`[missing, missing, 13/3, 41/9, 100/27, 227/81]` across all four facades.
+
+HLC arrays must have equal lengths and finite values with
+`low <= close <= high`; negative prices are valid. Periods must be positive.
+Every raw range difference must stay finite, including during warmup.
+The seed uses an incremental mean to avoid overflowing an otherwise finite
+average. Ordinary floating-point rounding still applies. C errors leave
+outputs and `first_valid` unchanged.
+
+Formula references: [Fidelity ATR](https://www.fidelity.com/learning-center/trading-investing/technical-analysis/technical-indicator-guide/atr)
+and [AAII's first-bar and seed convention](https://www.aaii.com/journal/article/average-true-range-atr).
+
 ## Bollinger Bands and RSI
 
 Bollinger Bands use a trailing population standard deviation. The default is
