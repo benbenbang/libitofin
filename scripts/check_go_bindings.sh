@@ -46,6 +46,12 @@ cc -std=c11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
 c++ -x c++ -std=c++11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
   crates/libitofin-ffi/tests/chart_atr.c -Ltarget/release -litofin_ffi -o target/cpp-chart-atr
 ./target/cpp-chart-atr
+cc -std=c11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
+  crates/libitofin-ffi/tests/chart_keltner.c -Ltarget/release -litofin_ffi -o target/c-chart-keltner
+./target/c-chart-keltner
+c++ -x c++ -std=c++11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
+  crates/libitofin-ffi/tests/chart_keltner.c -Ltarget/release -litofin_ffi -o target/cpp-chart-keltner
+./target/cpp-chart-keltner
 cargo build -p libitofin-ffi --release --features optimization-method-oracle
 cd sdk/go
 go vet ./...
