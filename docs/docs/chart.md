@@ -446,6 +446,65 @@ Python functions accept explicit periods and also provide these defaults. Go
 offers `ChartBollingerBands` and `RSI` for explicit parameters, alongside the
 default helpers.
 
+## Modern Keltner channels
+
+`keltner_channels`/`ChartKeltnerChannels` uses the existing **EMA of closes**
+for its center and shared **Wilder ATR** for width. This is the modern variant,
+not the original typical-price SMA with a high-low-range envelope. Separate
+`center_period` and `atr_period` settings preserve each indicator's arithmetic
+seed. Upper and lower bands are `center +/- multiplier * ATR`.
+
+Defaults are **EMA 20, ATR 10, multiplier 2**. The ATR period here is 10,
+not standalone `atr`/`DefaultATR`'s 14. Every returned `center`, `upper`, and
+`lower` series has the same first-valid index: the later of the two warmups,
+capped at the input length. All earlier values are zero placeholders and
+render as missing through `to_list()` or `NullableValues()`.
+
+=== "Python"
+
+    ```python
+    from itofin import chart
+
+    channels = chart.keltner_channels(
+        high=[12.0, 16.0, 11.0], low=[10.0, 14.0, 9.0],
+        close=[11.0, 15.0, 10.0],
+        center_period=3, atr_period=2, multiplier=1.5,
+    )
+    assert channels.center.to_list() == [None, None, 12.0]
+    assert channels.upper.values[2] == 153 / 8
+    assert channels.lower.values[2] == 39 / 8
+    ```
+
+=== "Go"
+
+    ```go
+    import itofin "github.com/benbenbang/libitofin/sdk/go"
+
+    channels, err := itofin.ChartKeltnerChannels(
+        []float64{12, 16, 11}, []float64{10, 14, 9},
+        []float64{11, 15, 10}, 3, 2, 1.5,
+    )
+    if err != nil { panic(err) }
+    _ = channels.Center.NullableValues()
+    _ = channels.Upper.Values
+    ```
+
+Python returns a read-only `KeltnerChannels` result; its series getters and
+NumPy values return copies. Go's `DefaultKeltnerChannels` selects the defaults.
+Rust exposes `math::chart::{KeltnerChannels, keltner_channels,
+keltner_channels_default}`. C's `itofin_chart_keltner_channels` writes
+channel-major center, upper, then lower values with one shared `first_valid`.
+
+Both periods must be positive and the multiplier finite and nonnegative.
+Multiplier zero collapses the envelopes to the center but still validates
+all HLC values and true-range differences, including during warmup. Inputs
+must have equal lengths, finite values and `low <= close <= high`; negative
+prices remain valid. Overflowing ATR offsets or either band returns an error,
+with C outputs and metadata unchanged. Floating-point rounding still applies.
+
+References: [StockCharts modern formula and defaults](https://chartschool.stockcharts.com/table-of-contents/technical-indicators-and-overlays/technical-overlays/keltner-channels)
+and [TradingView's close-price source](https://www.tradingview.com/support/solutions/43000502266-keltner-channels-kc/).
+
 ## Taiwan KD and MACD
 
 Taiwan KD uses a nine-bar highest-high/lowest-low RSV by default. A flat range

@@ -538,6 +538,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     chart.add_class::<chart_garch::PyGarch11FitResult>()?;
     chart.add_class::<chart::PyVolumeBars>()?;
     chart.add_class::<chart::PyBollingerBands>()?;
+    chart.add_class::<chart::PyKeltnerChannels>()?;
     chart.add_class::<chart::PyKd>()?;
     chart.add_class::<chart::PyMacd>()?;
     chart.add_class::<chart_ohlc_overnight::PyOhlcOvernightEstimates>()?;
@@ -551,6 +552,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     chart.add_function(wrap_pyfunction!(chart::atr, &chart)?)?;
     chart.add_function(wrap_pyfunction!(chart::volume_bars, &chart)?)?;
     chart.add_function(wrap_pyfunction!(chart::bollinger_bands, &chart)?)?;
+    chart.add_function(wrap_pyfunction!(chart::keltner_channels, &chart)?)?;
     chart.add_function(wrap_pyfunction!(chart::rsi, &chart)?)?;
     chart.add_function(wrap_pyfunction!(chart::kd, &chart)?)?;
     chart.add_function(wrap_pyfunction!(chart::macd, &chart)?)?;

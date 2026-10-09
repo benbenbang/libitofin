@@ -191,6 +191,48 @@
       "python": "itofin.chart.atr",
       "status": "implemented",
       "tests": "TestChartATREmptyShortDefaultsAndPeriodOne"
+    },
+    {
+      "c": "itofin_chart_keltner_channels",
+      "go": "KeltnerChannels",
+      "python": "itofin.chart.KeltnerChannels",
+      "status": "implemented",
+      "tests": "TestChartKeltnerIndependentFixtureAndOwnership"
+    },
+    {
+      "c": "itofin_chart_keltner_channels",
+      "go": "ChartKeltnerChannels",
+      "python": "itofin.chart.keltner_channels",
+      "status": "implemented",
+      "tests": "TestChartKeltnerIndependentFixtureAndOwnership"
+    },
+    {
+      "c": "itofin_chart_keltner_channels",
+      "go": "DefaultKeltnerChannels",
+      "python": "itofin.chart.keltner_channels",
+      "status": "implemented",
+      "tests": "TestChartKeltnerDefaultsEmptyShortFlatAndZero"
+    },
+    {
+      "c": "itofin_chart_keltner_channels",
+      "go": "KeltnerChannels.Center",
+      "python": "itofin.chart.KeltnerChannels.center",
+      "status": "implemented",
+      "tests": "TestChartKeltnerIndependentFixtureAndOwnership"
+    },
+    {
+      "c": "itofin_chart_keltner_channels",
+      "go": "KeltnerChannels.Upper",
+      "python": "itofin.chart.KeltnerChannels.upper",
+      "status": "implemented",
+      "tests": "TestChartKeltnerIndependentFixtureAndOwnership"
+    },
+    {
+      "c": "itofin_chart_keltner_channels",
+      "go": "KeltnerChannels.Lower",
+      "python": "itofin.chart.KeltnerChannels.lower",
+      "status": "implemented",
+      "tests": "TestChartKeltnerIndependentFixtureAndOwnership"
     }
   ]
 }
