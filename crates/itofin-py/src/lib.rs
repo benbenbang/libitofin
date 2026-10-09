@@ -19,6 +19,7 @@ mod chart_garch;
 mod chart_ohlc_overnight;
 mod chart_ohlc_volatility;
 mod chart_prices;
+mod chart_williams;
 mod convergence_statistics;
 mod credit;
 mod creditdensity;
@@ -550,6 +551,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     chart.add_function(wrap_pyfunction!(chart::obv, &chart)?)?;
     chart.add_function(wrap_pyfunction!(chart::true_range, &chart)?)?;
     chart.add_function(wrap_pyfunction!(chart::atr, &chart)?)?;
+    chart.add_function(wrap_pyfunction!(chart_williams::williams_r, &chart)?)?;
     chart.add_function(wrap_pyfunction!(chart::volume_bars, &chart)?)?;
     chart.add_function(wrap_pyfunction!(chart::bollinger_bands, &chart)?)?;
     chart.add_function(wrap_pyfunction!(chart::keltner_channels, &chart)?)?;
