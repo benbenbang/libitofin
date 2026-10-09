@@ -10,6 +10,7 @@ mod keltner;
 mod trend_volume;
 mod true_range_atr;
 mod vwap_obv;
+mod williams;
 
 pub use bands_rsi::{BollingerBands, bollinger_bands, rsi};
 pub use kd_macd::{Kd, Macd, kd, kd_default, macd, macd_default};
@@ -17,6 +18,7 @@ pub use keltner::{KeltnerChannels, keltner_channels, keltner_channels_default};
 pub use trend_volume::{VolumeBars, ema, sma, volume_bars};
 pub use true_range_atr::{atr, atr_default, true_range};
 pub use vwap_obv::{obv, vwap};
+pub use williams::{williams_r, williams_r_default};
 
 /// Dense chart values aligned with the input bars. Entries before
 /// `first_valid` are zero placeholders and must be treated as missing.
