@@ -7,11 +7,13 @@ use crate::types::Real;
 mod bands_rsi;
 mod kd_macd;
 mod trend_volume;
+mod true_range_atr;
 mod vwap_obv;
 
 pub use bands_rsi::{BollingerBands, bollinger_bands, rsi};
 pub use kd_macd::{Kd, Macd, kd, kd_default, macd, macd_default};
 pub use trend_volume::{VolumeBars, ema, sma, volume_bars};
+pub use true_range_atr::{atr, atr_default, true_range};
 pub use vwap_obv::{obv, vwap};
 
 /// Dense chart values aligned with the input bars. Entries before
