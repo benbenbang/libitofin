@@ -2034,6 +2034,30 @@ int32_t itofin_heston_paths(const struct ItofinHestonInput *input,
                             struct ItofinError *error);
 
 /**
+ * Compute asset/benchmark beta from already aligned return samples.
+ *
+ * Requires 2-100,000 observations and equal asset/benchmark lengths. Null
+ * weights with zero length selects unit weights; otherwise weights must have
+ * one finite nonnegative entry per observation and a finite positive total.
+ * Count-corrected covariance/benchmark variance uses all rows, including
+ * zero-weight rows. No annualization or risk-free adjustment is applied.
+ * Zero benchmark variance and nonfinite calculations fail. On error `out`
+ * is unchanged. No handles or retained native allocations are created.
+ *
+ * # Safety
+ * Each input points to its stated number of readable doubles and `out` to
+ * one writable double. Pointers follow crate-level alignment/non-overlap rules.
+ */
+int32_t itofin_benchmark_beta(const ItofinReal *asset_returns,
+                              size_t asset_len,
+                              const ItofinReal *benchmark_returns,
+                              size_t benchmark_len,
+                              const ItofinReal *weights,
+                              size_t weights_len,
+                              ItofinReal *out,
+                              struct ItofinError *error);
+
+/**
  * # Safety
  * Pointers and context must satisfy the crate-level C caller contract.
  */
