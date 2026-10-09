@@ -1778,6 +1778,25 @@ int32_t itofin_chart_atr(const ItofinReal *high,
                          struct ItofinError *error);
 
 /**
+ * Compute inclusive rolling Williams percent R in [-100, 0], flat windows -50.
+ * Period must be positive; conventional default is 14. Finite rolling
+ * differences are required even during incomplete warmup. Failure is atomic.
+ * Warmup slots are zero; first-valid is `period - 1`, capped at `len`.
+ * # Safety
+ * Inputs each hold `len` doubles. Follow the crate-level pointer/non-overlap
+ * contract. `out` holds `capacity` doubles and `first_valid` holds one size_t.
+ */
+int32_t itofin_chart_williams_r(const ItofinReal *high,
+                                const ItofinReal *low,
+                                const ItofinReal *close,
+                                size_t len,
+                                size_t period,
+                                ItofinReal *out,
+                                size_t capacity,
+                                size_t *first_valid,
+                                struct ItofinError *error);
+
+/**
  * Compute modern EMA-close/Wilder-ATR Keltner channels. Output is channel
  * major: center, upper, then lower, with `len` values per channel. All share
  * the later first-valid index after both warmups.
