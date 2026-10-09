@@ -335,6 +335,24 @@ typedef struct ItofinMakeCdsConfig {
 } ItofinMakeCdsConfig;
 
 /**
+ * Maximum fractional running-peak loss and zero-based peak/trough indices.
+ */
+typedef struct ItofinDrawdownResult {
+  /**
+   * Nonnegative fractional loss, not a percentage or signed return.
+   */
+  ItofinReal drawdown;
+  /**
+   * Earliest equal running peak before the winning trough.
+   */
+  size_t peak_index;
+  /**
+   * First trough with the greatest computed loss.
+   */
+  size_t trough_index;
+} ItofinDrawdownResult;
+
+/**
  * Optional fields: time grid=1, equity grid=2, damping steps=4, scheme=8.
  * Scheme 0 is Douglas and scheme 1 is implicit Euler.
  */
@@ -2869,6 +2887,20 @@ int32_t itofin_discrepancy_statistics_evaluate(const ItofinReal *values,
                                                size_t weights_len,
                                                ItofinReal *out,
                                                struct ItofinError *error);
+
+/**
+ * Evaluate ordered finite strictly positive NAVs. Empty input is an error;
+ * one NAV or no decline returns zero and indices (0, 0). Tied peaks keep the
+ * earliest index and tied losses keep the first trough. Errors leave `out`
+ * unchanged. The result owns no handles or resources and needs no destruction.
+ * # Safety
+ * `values` holds `len` readable doubles and `out` one writable result. Follow
+ * the crate-level alignment, lifetime and non-overlap pointer contract.
+ */
+int32_t itofin_maximum_drawdown(const ItofinReal *values,
+                                size_t len,
+                                struct ItofinDrawdownResult *out,
+                                struct ItofinError *error);
 
 /**
  * Construct an FD engine retaining the Black-Scholes process. Attach it to a

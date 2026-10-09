@@ -58,6 +58,12 @@ cc -std=c11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
 c++ -x c++ -std=c++11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
   crates/libitofin-ffi/tests/chart_williams.c -Ltarget/release -litofin_ffi -o target/cpp-chart-williams
 ./target/cpp-chart-williams
+cc -std=c11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
+  crates/libitofin-ffi/tests/drawdown.c -Ltarget/release -litofin_ffi -o target/c-drawdown
+./target/c-drawdown
+c++ -x c++ -std=c++11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
+  crates/libitofin-ffi/tests/drawdown.c -Ltarget/release -litofin_ffi -o target/cpp-drawdown
+./target/cpp-drawdown
 cargo build -p libitofin-ffi --release --features optimization-method-oracle
 cd sdk/go
 go vet ./...
