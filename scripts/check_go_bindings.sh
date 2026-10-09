@@ -76,6 +76,12 @@ cc -std=c11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
 c++ -x c++ -std=c++11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
   crates/libitofin-ffi/tests/performance_ratios.c -Ltarget/release -litofin_ffi -o target/cpp-performance-ratios
 ./target/cpp-performance-ratios
+cc -std=c11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
+  crates/libitofin-ffi/tests/chart_adx.c -Ltarget/release -litofin_ffi -o target/c-chart-adx
+./target/c-chart-adx
+c++ -x c++ -std=c++11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
+  crates/libitofin-ffi/tests/chart_adx.c -Ltarget/release -litofin_ffi -o target/cpp-chart-adx
+./target/cpp-chart-adx
 cargo build -p libitofin-ffi --release --features optimization-method-oracle
 cd sdk/go
 go vet ./...

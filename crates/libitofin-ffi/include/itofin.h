@@ -1764,6 +1764,29 @@ int32_t itofin_handle_release(struct ItofinContext *ctx,
                               struct ItofinError *error);
 
 /**
+ * Compute Wilder +DI, -DI, DX and ADX in channel-major order.
+ * Each channel holds `len` values, with zero warmup placeholders. Four
+ * corresponding validity indices are written. DI/DX start at `period`;
+ * ADX starts at `2*period-1`, capped at `len`. Period one is supported.
+ * Inputs and arithmetic are validated before any output is written.
+ *
+ * # Safety
+ * Follow the crate-level pointer/non-overlap contract. Each HLC input holds
+ * `len` doubles. `out` holds `capacity` doubles. `first_valid` holds
+ * `first_valid_capacity` size_t entries, with capacity at least four.
+ */
+int32_t itofin_chart_adx(const ItofinReal *high,
+                         const ItofinReal *low,
+                         const ItofinReal *close,
+                         size_t len,
+                         size_t period,
+                         ItofinReal *out,
+                         size_t capacity,
+                         size_t *first_valid,
+                         size_t first_valid_capacity,
+                         struct ItofinError *error);
+
+/**
  * Compute gap-aware true range, using high-low for the first bar.
  * # Safety
  * Inputs each hold `len` doubles. Follow the crate-level pointer/non-overlap
