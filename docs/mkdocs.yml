@@ -118,6 +118,7 @@ nav:
   - Hull-White forward process: hullwhite-forward-process.md
   - Quanto term structure: quanto-term-structure.md
   - ABCD math and volatility: abcd.md
+  - Householder utilities: householder.md
   - Rust API: rust.md
   - Project:
       - Repository index: https://github.com/benbenbang/libitofin#readme
