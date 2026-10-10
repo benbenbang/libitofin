@@ -93,3 +93,5 @@ links to the language guides and project documentation.
 - [Zero-coupon bonds](zero-coupon-bonds.md): single-redemption contract and payment dates.
 
 - [Floating-rate bonds](floating-rate-bonds.md): Ibor coupons, gearing, caps/floors and ex-coupon schedules.
+
+- [Par asset swaps](asset-swaps.md): bullet-bond dirty upfront and floating fair spread.
