@@ -26,8 +26,8 @@
 //!   solver-backed through `BondFunctions`. The engine-priced
 //!   `Bond::yield(dayCounter, ...)` overload, the price-from-yield
 //!   `cleanPrice`/`dirtyPrice`, the coupon-rate and cash-flow-date inspectors,
-//!   `setSingleRedemption` and the `faceAmount` constructor remain follow-up
-//!   work.
+//!   and the `faceAmount` constructor remain follow-up work. Derived bonds
+//!   use the crate-private `set_single_redemption` helper.
 
 use std::any::Any;
 
@@ -306,6 +306,30 @@ impl Bond {
     /// `maturityDate_` assignment a derived bond such as `FixedRateBond` makes).
     pub(crate) fn set_maturity_date(&mut self, date: Date) {
         self.maturity_date = Some(date);
+    }
+
+    /// Appends one redemption and sets its two-point notional schedule.
+    ///
+    /// Mirrors the protected QuantLib `Bond::setSingleRedemption` helper.
+    ///
+    /// # Errors
+    ///
+    /// Propagates invalid redemption amount or payment date errors.
+    pub(crate) fn set_single_redemption(
+        &mut self,
+        notional: Real,
+        redemption: Real,
+        date: Date,
+    ) -> QlResult<()> {
+        let payment: Shared<dyn CashFlow> =
+            shared(Redemption::new(notional * redemption / 100.0, date)?);
+        self.notionals = vec![notional, 0.0];
+        self.notional_schedule = vec![Date::null(), date];
+        self.redemptions.clear();
+        self.base.register_with(payment.observable());
+        self.cashflows.push(Shared::clone(&payment));
+        self.redemptions.push(payment);
+        Ok(())
     }
 
     /// The payment date of the next cash flow after `settlement` (the evaluation
