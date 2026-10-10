@@ -89,3 +89,5 @@ links to the language guides and project documentation.
 - [ABCD math and volatility](abcd.md): coefficient validation, volatility shape and integrated variance/covariance.
 
 - [Householder utilities](householder.md): checked reflections, orthogonal matrices and explicit native application conventions.
+
+- [Zero-coupon bonds](zero-coupon-bonds.md): single-redemption contract and payment dates.
