@@ -97,3 +97,5 @@ links to the language guides and project documentation.
 - [Par asset swaps](asset-swaps.md): bullet-bond dirty upfront and floating fair spread.
 
 - [Cross-currency basis swaps](cross-currency-basis-swaps.md): plain non-resettable Ibor legs and explicit FX valuation.
+
+- [MF state process](mf-state-process.md): standalone Gaussian state law and checked piecewise variance.

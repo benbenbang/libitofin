@@ -124,6 +124,7 @@ nav:
   - Floating-rate bonds: floating-rate-bonds.md
   - Par asset swaps: asset-swaps.md
   - Cross-currency basis swaps: cross-currency-basis-swaps.md
+  - MF state process: mf-state-process.md
   - Rust API: rust.md
   - Project:
       - Repository index: https://github.com/benbenbang/libitofin#readme
