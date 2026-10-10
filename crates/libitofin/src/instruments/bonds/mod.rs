@@ -8,3 +8,5 @@ mod fixedratebond;
 pub use fixedratebond::FixedRateBond;
 mod zerocouponbond;
 pub use zerocouponbond::ZeroCouponBond;
+mod floatingratebond;
+pub use floatingratebond::FloatingRateBond;

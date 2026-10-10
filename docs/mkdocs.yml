@@ -121,6 +121,7 @@ nav:
   - ABCD math and volatility: abcd.md
   - Householder utilities: householder.md
   - Zero-coupon bonds: zero-coupon-bonds.md
+  - Floating-rate bonds: floating-rate-bonds.md
   - Rust API: rust.md
   - Project:
       - Repository index: https://github.com/benbenbang/libitofin#readme

@@ -332,6 +332,11 @@ impl Bond {
         Ok(())
     }
 
+    /// Sets the issue date after constructing a derived bond's coupon leg.
+    pub(crate) fn set_issue_date(&mut self, date: Option<Date>) {
+        self.issue_date = date;
+    }
+
     /// The payment date of the next cash flow after `settlement` (the evaluation
     /// date's settlement date when `None`), or `None` once all flows have paid.
     ///
