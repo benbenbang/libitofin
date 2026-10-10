@@ -180,6 +180,10 @@ fn construct(
 
 struct Market {
     bond: FloatingRateBond,
+    settings: Shared<Settings<Date>>,
+    forecast: RelinkableHandle<dyn YieldTermStructure>,
+    discount: RelinkableHandle<dyn YieldTermStructure>,
+    vol_quote: Shared<SimpleQuote>,
     today: Date,
 }
 
@@ -233,7 +237,14 @@ fn market(c: &Case) -> Market {
             None,
             settings.clone(),
         )));
-    Market { bond, today }
+    Market {
+        bond,
+        settings,
+        forecast,
+        discount,
+        vol_quote,
+        today,
+    }
 }
 
 fn near(actual: f64, expected: f64, tolerance: f64) {
@@ -319,5 +330,231 @@ fn native_quantlib_coupon_geometry_rates_and_discounted_prices() {
             m.bond.bond().maturity_date().unwrap(),
             m.bond.bond().redemptions()[0].date()
         );
+    }
+}
+
+#[test]
+fn index_curve_volatility_pricer_and_settings_invalidate_lazy_prices() {
+    let mut m = market(&case("collar"));
+    let initial = m.bond.bond_mut().npv().unwrap();
+    assert!(m.bond.bond().base().is_calculated());
+    m.forecast.link_to(curve(m.today, 0.035));
+    assert!(!m.bond.bond().base().is_calculated());
+    let changed_forward = m.bond.bond_mut().npv().unwrap();
+    assert!(changed_forward > initial);
+    m.vol_quote.set_value(0.35);
+    assert!(!m.bond.bond().base().is_calculated());
+    let changed_vol = m.bond.bond_mut().npv().unwrap();
+    assert!((changed_vol - changed_forward).abs() > 1e-5);
+    m.discount.link_to(curve(m.today, 0.04));
+    assert!(!m.bond.bond().base().is_calculated());
+    assert!(m.bond.bond_mut().npv().unwrap() < changed_vol);
+    m.bond
+        .set_coupon_pricer(shared_mut(BlackIborCouponPricer::new()));
+    assert!(!m.bond.bond().base().is_calculated());
+    assert!(m.bond.bond_mut().npv().is_err());
+    m.settings
+        .set_evaluation_date(Date::new(2, Month::March, 2027));
+    assert!(!m.bond.bond().base().is_calculated());
+    assert!(m.bond.bond().is_expired().unwrap());
+    assert_eq!(m.bond.bond_mut().npv().unwrap(), 0.0);
+    assert_eq!(m.bond.bond_mut().dirty_price().unwrap(), 0.0);
+}
+
+#[test]
+fn fixed_only_observes_index_and_survives_into_base_without_forecasts() {
+    let mut m = market(&case("fixed"));
+    let initial = m.bond.bond_mut().npv().unwrap();
+    assert!(m.bond.ibor_coupons().iter().all(Option::is_none));
+    m.forecast.link_to(curve(m.today, 0.06));
+    assert!(!m.bond.bond().base().is_calculated());
+    near(m.bond.bond_mut().npv().unwrap(), initial, 0.0);
+    m.bond
+        .index()
+        .add_fixing(Date::new(29, Month::January, 2026), 0.1)
+        .unwrap();
+    assert!(!m.bond.bond().base().is_calculated());
+    let mut base = m.bond.into_bond();
+    near(base.npv().unwrap(), initial, 0.0);
+    m.forecast.link_to(curve(m.today, 0.07));
+    assert!(!base.base().is_calculated());
+    near(base.npv().unwrap(), initial, 0.0);
+}
+
+#[test]
+fn known_fixing_missing_then_added_and_cleared_is_observed() {
+    let m = market(&case("ex_known"));
+    let mut bond = m.bond;
+    let amount = bond.bond().cashflows()[0].amount().unwrap();
+    bond.index().clear_fixings();
+    assert!(bond.bond().cashflows()[0].amount().is_err());
+    bond.index()
+        .add_fixing(Date::new(29, Month::January, 2026), 0.025)
+        .unwrap();
+    assert!(bond.bond().cashflows()[0].amount().unwrap() < amount);
+    let initial = bond.bond_mut().npv().unwrap();
+    bond.index().clear_fixings();
+    assert!(!bond.bond().base().is_calculated());
+    near(bond.bond_mut().npv().unwrap(), initial, 0.0);
+    assert!(bond.bond().accrued_amount(None).is_err());
+}
+
+#[test]
+fn default_pricer_cap_pricer_requirement_and_late_issue_date_match_source() {
+    let m = market(&case("plain_par"));
+    let index = Shared::clone(m.bond.index());
+    let plain = construct(
+        &case("plain_par"),
+        schedule(),
+        index.clone(),
+        m.settings.clone(),
+        None,
+    )
+    .unwrap();
+    assert!(plain.bond().cashflows()[0].amount().is_ok());
+    let capped = construct(
+        &case("collar"),
+        schedule(),
+        index.clone(),
+        m.settings.clone(),
+        None,
+    )
+    .unwrap();
+    assert!(
+        capped.bond().cashflows()[0]
+            .amount()
+            .unwrap_err()
+            .message()
+            .contains("pricer not set")
+    );
+    let mut absent = case("plain_par");
+    absent.caps = vec![f64::null()];
+    let sentinel = construct(&absent, schedule(), index.clone(), m.settings.clone(), None).unwrap();
+    assert!(
+        sentinel.bond().cashflows()[0]
+            .amount()
+            .unwrap_err()
+            .message()
+            .contains("pricer not set")
+    );
+    let late = Date::new(1, Month::December, 2026);
+    let bond = construct(
+        &case("plain_par"),
+        schedule(),
+        index,
+        m.settings,
+        Some(late),
+    )
+    .unwrap();
+    assert_eq!(bond.bond().issue_date(), Some(late));
+    assert_eq!(bond.bond().settlement_date(None).unwrap(), late);
+}
+
+#[test]
+fn invalid_schedules_vectors_and_floating_collars_return_errors() {
+    let m = market(&case("plain_par"));
+    let index = Shared::clone(m.bond.index());
+    for dates in [vec![], vec![m.today], vec![Date::null(), m.today]] {
+        assert!(
+            construct(
+                &case("plain_par"),
+                Schedule::from_dates(dates),
+                index.clone(),
+                m.settings.clone(),
+                None
+            )
+            .is_err()
+        );
+    }
+    for field in 0..4 {
+        let mut c = case("plain_par");
+        let vector = match field {
+            0 => &mut c.gearings,
+            1 => &mut c.spreads,
+            2 => &mut c.caps,
+            _ => &mut c.floors,
+        };
+        *vector = vec![0.01; 4];
+        assert!(construct(&c, schedule(), index.clone(), m.settings.clone(), None).is_err());
+    }
+    let mut c = case("collar");
+    c.caps = vec![0.01];
+    assert!(construct(&c, schedule(), index.clone(), m.settings.clone(), None).is_err());
+    c.gearings = vec![0.0];
+    assert!(construct(&c, schedule(), index, m.settings, None).is_ok());
+}
+
+#[test]
+fn nonfinite_coupon_inputs_and_mismatched_settings_are_rejected() {
+    let m = market(&case("plain_par"));
+    let index = Shared::clone(m.bond.index());
+    assert!(
+        construct(
+            &case("plain_par"),
+            schedule(),
+            index.clone(),
+            shared(Settings::new()),
+            None
+        )
+        .is_err()
+    );
+    let mut fixed = case("fixed");
+    fixed.caps.clear();
+    fixed.floors = vec![f64::MAX];
+    let huge = construct(&fixed, schedule(), index.clone(), m.settings.clone(), None).unwrap();
+    assert_eq!(
+        huge.bond().cashflows()[0]
+            .as_coupon()
+            .unwrap()
+            .rate()
+            .unwrap(),
+        f64::MAX
+    );
+    let mut geared = case("plain_par");
+    geared.gearings = vec![f64::null()];
+    let huge_gearing =
+        construct(&geared, schedule(), index.clone(), m.settings.clone(), None).unwrap();
+    assert_eq!(
+        huge_gearing.ibor_coupons()[0].as_ref().unwrap().gearing(),
+        f64::null()
+    );
+    for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        for field in 0..4 {
+            let mut c = case("plain_par");
+            let vector = match field {
+                0 => &mut c.gearings,
+                1 => &mut c.spreads,
+                2 => &mut c.caps,
+                _ => &mut c.floors,
+            };
+            *vector = vec![value];
+            assert!(construct(&c, schedule(), index.clone(), m.settings.clone(), None).is_err());
+        }
+        for (face, redemption) in [(value, 100.0), (100.0, value), (f64::MAX / 2.0, 1000.0)] {
+            assert!(
+                FloatingRateBond::new(
+                    2,
+                    face,
+                    schedule(),
+                    index.clone(),
+                    Actual360::new(),
+                    Bdc::Following,
+                    None,
+                    vec![],
+                    vec![],
+                    vec![],
+                    vec![],
+                    redemption,
+                    None,
+                    None,
+                    Target::new(),
+                    Bdc::Unadjusted,
+                    false,
+                    Bdc::Preceding,
+                    m.settings.clone(),
+                )
+                .is_err()
+            );
+        }
     }
 }
