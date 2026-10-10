@@ -85,3 +85,5 @@ pub use varianceswap::{
     VarianceSwap, VarianceSwapArguments, VarianceSwapEngine, VarianceSwapOptionWeight,
     VarianceSwapResults,
 };
+mod assetswap;
+pub use assetswap::AssetSwap;
