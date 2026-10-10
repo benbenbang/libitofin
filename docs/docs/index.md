@@ -91,3 +91,5 @@ links to the language guides and project documentation.
 - [Householder utilities](householder.md): checked reflections, orthogonal matrices and explicit native application conventions.
 
 - [Zero-coupon bonds](zero-coupon-bonds.md): single-redemption contract and payment dates.
+
+- [Floating-rate bonds](floating-rate-bonds.md): Ibor coupons, gearing, caps/floors and ex-coupon schedules.

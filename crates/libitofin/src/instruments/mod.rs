@@ -79,6 +79,7 @@ pub mod bmaswap;
 pub use bmaswap::BMASwap;
 
 mod varianceswap;
+pub use bonds::FloatingRateBond;
 pub use bonds::ZeroCouponBond;
 pub use varianceswap::{
     VarianceSwap, VarianceSwapArguments, VarianceSwapEngine, VarianceSwapOptionWeight,
