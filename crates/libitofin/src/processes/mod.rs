@@ -36,3 +36,5 @@ pub use hullwhiteprocess::HullWhiteForwardProcess;
 pub use merton76process::Merton76Process;
 pub use ornsteinuhlenbeckprocess::OrnsteinUhlenbeckProcess;
 pub use stochasticprocessarray::StochasticProcessArray;
+mod mfstateprocess;
+pub use mfstateprocess::MfStateProcess;
