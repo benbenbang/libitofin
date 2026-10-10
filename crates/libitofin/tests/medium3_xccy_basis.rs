@@ -227,3 +227,172 @@ fn curve_quotes_and_relinks_are_live_without_cache() {
     market.curves[3].reset();
     assert!(swap.quote_leg_pv().is_err());
 }
+#[test]
+fn common_exchange_dates_and_notional_signs_match_native_law() {
+    let row = &rows()[1].1;
+    let market = Market::new(row);
+    let swap = market.standard(row, row[7]);
+    for (leg, notional) in [(swap.base_leg(), 1_000_000.0), (swap.quote_leg(), row[6])] {
+        assert_eq!(leg[0].date(), dates(false)[0]);
+        assert_eq!(leg.last().unwrap().date(), *dates(true).last().unwrap());
+        assert_eq!(leg[0].amount().unwrap(), -notional);
+        assert_eq!(leg.last().unwrap().amount().unwrap(), notional);
+    }
+    let base = swap.base_leg_pv().unwrap();
+    let quote = swap.quote_leg_pv().unwrap();
+    close(swap.npv().unwrap().value(), quote / 1.27 - base, 1e-12);
+}
+#[test]
+fn invalid_inputs_fail_before_building_or_valuing_legs() {
+    let row = &rows()[0].1;
+    let market = Market::new(row);
+    for fx in [0.0, -1.0, f64::NAN, f64::INFINITY] {
+        assert!(
+            market
+                .swap(
+                    row,
+                    row[7],
+                    Schedule::from_dates(dates(false)),
+                    ExchangeRate::new(Currency::eur(), Currency::usd(), fx)
+                )
+                .is_err()
+        );
+    }
+    for spot in [
+        ExchangeRate::new(Currency::usd(), Currency::eur(), 1.27),
+        ExchangeRate::new(Currency::eur(), Currency::eur(), 1.27),
+    ] {
+        assert!(
+            market
+                .swap(row, row[7], Schedule::from_dates(dates(false)), spot)
+                .is_err()
+        );
+    }
+    for n in [0.0, -1.0, f64::NAN, f64::INFINITY] {
+        let mut invalid = row.clone();
+        invalid[6] = n;
+        assert!(
+            market
+                .swap(
+                    &invalid,
+                    row[7],
+                    Schedule::from_dates(dates(false)),
+                    ExchangeRate::new(Currency::eur(), Currency::usd(), 1.27)
+                )
+                .is_err()
+        );
+    }
+    for spread in [f64::NAN, f64::INFINITY] {
+        assert!(
+            market
+                .swap(
+                    row,
+                    spread,
+                    Schedule::from_dates(dates(false)),
+                    ExchangeRate::new(Currency::eur(), Currency::usd(), 1.27)
+                )
+                .is_err()
+        );
+    }
+    for schedule in [
+        vec![],
+        vec![Date::null(), date(46030.0)],
+        vec![date(46030.0), date(46030.0)],
+        vec![date(46031.0), date(46030.0)],
+    ] {
+        assert!(
+            market
+                .swap(
+                    row,
+                    row[7],
+                    Schedule::from_dates(schedule),
+                    ExchangeRate::new(Currency::eur(), Currency::usd(), 1.27)
+                )
+                .is_err()
+        );
+    }
+    let mut overnight = Market::new(row);
+    overnight.base = shared(IborIndex::new(
+        "overnight".into(),
+        Period::new(1, TimeUnit::Days),
+        0,
+        Currency::eur(),
+        NullCalendar::new(),
+        BusinessDayConvention::Following,
+        false,
+        Actual360::new(),
+        overnight.curves[0].handle(),
+        overnight.settings.clone(),
+    ));
+    assert!(
+        overnight
+            .swap(
+                row,
+                row[7],
+                Schedule::from_dates(dates(false)),
+                ExchangeRate::new(Currency::eur(), Currency::usd(), 1.27)
+            )
+            .is_err()
+    );
+    let mut mismatched = Market::new(row);
+    mismatched.settings = shared(Settings::new());
+    assert!(
+        mismatched
+            .swap(
+                row,
+                row[7],
+                Schedule::from_dates(dates(false)),
+                ExchangeRate::new(Currency::eur(), Currency::usd(), 1.27)
+            )
+            .is_err()
+    );
+    let swap = market.standard(row, row[7]);
+    assert!(
+        swap.with_valuation_dates(Date::null(), date(46027.0), false)
+            .is_err()
+    );
+    let swap = market
+        .standard(row, row[7])
+        .with_spot_settlement_date(date(46026.0))
+        .unwrap();
+    assert!(swap.npv().is_err());
+    let swap = market
+        .standard(row, row[7])
+        .with_valuation_dates(date(46026.0), date(46027.0), false)
+        .unwrap();
+    assert!(swap.npv().is_err());
+}
+#[test]
+fn evaluation_cutoff_defaults_and_missing_fixings_are_not_ignored() {
+    let row = &rows()[0].1;
+    let market = Market::new(row);
+    let build = || {
+        XccyBasisSwap::new(
+            Schedule::from_dates(dates(false)),
+            market.base.clone(),
+            market.curves[2].handle(),
+            1_000_000.0,
+            Actual360::new(),
+            Schedule::from_dates(dates(false)),
+            market.quote.clone(),
+            market.curves[3].handle(),
+            row[6],
+            Actual360::new(),
+            row[7],
+            ExchangeRate::new(Currency::eur(), Currency::usd(), 1.27),
+            None,
+            market.settings.clone(),
+        )
+        .unwrap()
+    };
+    let swap = build();
+    close(swap.npv_in_quote().unwrap().value(), row[17], 2e-9);
+    market.settings.set_evaluation_date(date(46121.0));
+    assert!(swap.npv().is_err());
+    market.base.add_fixing(date(46120.0), 0.022).unwrap();
+    market.quote.add_fixing(date(46120.0), 0.034).unwrap();
+    assert!(swap.npv().is_ok());
+    market.settings.set_evaluation_date(date(46753.0));
+    close(swap.npv().unwrap().value(), 0.0, 0.0);
+    assert!(swap.fair_quote_basis_spread().is_err());
+}
