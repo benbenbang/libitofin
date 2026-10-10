@@ -87,3 +87,5 @@ pub use varianceswap::{
 };
 mod assetswap;
 pub use assetswap::AssetSwap;
+mod xccybasisswap;
+pub use xccybasisswap::XccyBasisSwap;
