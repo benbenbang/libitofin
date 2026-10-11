@@ -602,6 +602,64 @@ pub fn bachelier_black_formula_std_dev_derivative(
     Ok(discount * phi.derivative(d1))
 }
 
+/// QuantLib's Bachelier asset ITM helper (`blackformula.cpp:950`).
+///
+/// For positive `std_dev`, returns `Phi(sign * (forward - strike) / std_dev)`.
+/// At exactly zero, preserves QuantLib's intrinsic-value convention instead:
+/// `max(sign * (forward - strike), 0)`. That branch is not a probability and
+/// can exceed one; its at-the-money value is zero, not the positive-volatility
+/// limit of one half. Negative forwards and strikes are supported.
+///
+/// Divergence: rejects non-finite inputs and an unrepresentable intrinsic value.
+/// For positive volatility, an overflowing difference is divided before
+/// subtraction, retaining a representable standardized distance. An infinite
+/// standardized distance legitimately yields a normal-CDF endpoint.
+///
+/// # Errors
+///
+/// Returns an error for non-finite inputs, negative `std_dev`, or a zero-volatility
+/// intrinsic value larger than the representable finite range.
+///
+/// # Examples
+///
+/// ```
+/// use libitofin::option::OptionType;
+/// use libitofin::pricingengines::blackformula::bachelier_black_formula_asset_itm_probability;
+/// let value = bachelier_black_formula_asset_itm_probability(
+///     OptionType::Call, -0.01, -0.01, 0.005,
+/// )?;
+/// assert_eq!(value, 0.5);
+/// # Ok::<(), libitofin::errors::QlError>(())
+/// ```
+pub fn bachelier_black_formula_asset_itm_probability(
+    option_type: OptionType,
+    strike: Real,
+    forward: Real,
+    std_dev: Real,
+) -> QlResult<Real> {
+    check_std_dev(std_dev)?;
+    if !strike.is_finite() || !forward.is_finite() {
+        fail!("strike ({strike}) and forward ({forward}) must be finite");
+    }
+
+    let sign = sign_of(option_type);
+    let difference = forward - strike;
+    if std_dev == 0.0 {
+        let intrinsic = (difference * sign).max(0.0);
+        if !intrinsic.is_finite() {
+            fail!("zero-volatility intrinsic value must be finite");
+        }
+        return Ok(intrinsic);
+    }
+
+    let h = if difference.is_finite() {
+        difference / std_dev
+    } else {
+        forward / std_dev - strike / std_dev
+    };
+    Ok(CumulativeNormalDistribution::standard().value(sign * h))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

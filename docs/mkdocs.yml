@@ -70,6 +70,7 @@ plugins:
             filters: ["!^_"]
 
 nav:
+  - Bachelier asset ITM: normal-itm.md
   - OIS payer and receiver: ois-side.md
   - Home: index.md
   - Getting started: getting-started.md
