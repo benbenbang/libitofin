@@ -109,3 +109,5 @@ links to the language guides and project documentation.
 - [Cap/floor optionlets](capfloor-optionlets.md): shared coupon extraction and pricing decomposition.
 
 - [Constant GSR process](gsr-process.md): exact Gaussian forward-measure dynamics and checked constant grids.
+
+- [Plain float-float swaps](float-float-swaps.md): two-Ibor-leg signed valuation and fair spreads.

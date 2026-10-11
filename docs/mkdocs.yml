@@ -137,3 +137,4 @@ nav:
       - Design: https://github.com/benbenbang/libitofin/blob/main/wiki/design.md
       - QuantLib compatibility: https://github.com/benbenbang/libitofin/blob/main/wiki/compatibility.md
   - Constant GSR process: gsr-process.md
+  - Plain float-float swaps: float-float-swaps.md

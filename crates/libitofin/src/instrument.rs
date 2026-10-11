@@ -127,6 +127,12 @@ impl InstrumentBase {
         self.swap_engine(None);
     }
 
+    /// Invalidates cached results without notifying downstream observers.
+    /// Retains the frozen state for internally detected input changes.
+    pub(crate) fn invalidate_silently(&self) {
+        self.lazy.borrow_mut().invalidate_silently();
+    }
+
     /// Installs a pricing engine and invalidates the cached results *without
     /// notifying observers*.
     ///

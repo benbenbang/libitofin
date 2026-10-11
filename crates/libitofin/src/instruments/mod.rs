@@ -11,6 +11,7 @@ mod capfloor;
 mod claim;
 mod creditdefaultswap;
 mod fixedvsfloatingswap;
+mod floatfloatswap;
 mod forwardrateagreement;
 mod futures;
 mod inflationcapfloor;
@@ -90,3 +91,5 @@ mod assetswap;
 pub use assetswap::AssetSwap;
 mod xccybasisswap;
 pub use xccybasisswap::XccyBasisSwap;
+
+pub use floatfloatswap::FloatFloatSwap;
