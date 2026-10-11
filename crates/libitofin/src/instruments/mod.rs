@@ -35,7 +35,8 @@ pub use bond::{Bond, BondArguments, BondEngine, BondPrice, BondPriceType, BondRe
 pub use bondforward::BondForward;
 pub use bonds::FixedRateBond;
 pub use callablebond::{
-    Callability, CallabilitySchedule, CallabilityType, CallableBondArguments, CallableFixedRateBond,
+    Callability, CallabilitySchedule, CallabilityType, CallableBondArguments,
+    CallableFixedRateBond, CallableZeroCouponBond,
 };
 pub use capfloor::{CapFloor, CapFloorArguments, CapFloorType};
 pub use claim::{Claim, FaceValueAccrualClaim, FaceValueClaim};
