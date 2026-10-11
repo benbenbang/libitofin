@@ -123,3 +123,5 @@ links to the language guides and project documentation.
 - [Callable zero-coupon bonds](callable-zero-coupon-bonds.md): hard calls/puts and Hull-White lattice quotes.
 
 - [Black callable bonds](black-callable-bonds.md).
+
+- [Callable implied volatility](callable-implied-volatility.md).
