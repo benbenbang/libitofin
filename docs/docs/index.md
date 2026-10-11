@@ -121,3 +121,5 @@ links to the language guides and project documentation.
 - [Floating-type payoff](floating-type-payoff.md): a supplied strike at each scalar evaluation.
 
 - [Callable zero-coupon bonds](callable-zero-coupon-bonds.md): hard calls/puts and Hull-White lattice quotes.
+
+- [Black callable bonds](black-callable-bonds.md).
