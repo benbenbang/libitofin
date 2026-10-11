@@ -158,6 +158,26 @@ impl Arguments for CallableBondArguments {
     }
 }
 
+fn checked_callable_settlement_date(bond: &Bond, settings: &Settings<Date>) -> QlResult<Date> {
+    let mut date = settings
+        .evaluation_date()
+        .ok_or_else(|| crate::errors::QlError::new("evaluation date is unset", file!(), line!()))?;
+    require!(date != Date::null(), "null evaluation date");
+    let calendar = bond.calendar();
+    let mut remaining = bond.settlement_days();
+    while remaining > 0 || calendar.is_holiday(date) {
+        require!(
+            date < Date::max_date(),
+            "settlement exceeds supported date range"
+        );
+        date += 1;
+        if calendar.is_business_day(date) {
+            remaining = remaining.saturating_sub(1);
+        }
+    }
+    Ok(bond.issue_date().map_or(date, |issue| date.max(issue)))
+}
+
 /// A fixed-rate bond with dated hard issuer calls or holder puts.
 ///
 /// This composes the existing fixed-rate bond and shares its instrument base,
@@ -284,6 +304,10 @@ impl CallableFixedRateBond {
         })
     }
 
+    fn checked_settlement_date(&self) -> QlResult<Date> {
+        checked_callable_settlement_date(self.bond(), &self.settings)
+    }
+
     /// The immutable exercise schedule.
     pub fn callability(&self) -> &CallabilitySchedule {
         &self.put_call_schedule
@@ -311,7 +335,9 @@ impl CallableFixedRateBond {
     /// Propagates pricing, settlement and notional errors.
     pub fn dirty_price(&mut self) -> QlResult<Real> {
         self.calculate()?;
-        let notional = self.bond().notional(None)?;
+        let notional = self
+            .bond()
+            .notional(Some(self.checked_settlement_date()?))?;
         if notional == 0.0 {
             return Ok(0.0);
         }
@@ -326,7 +352,10 @@ impl CallableFixedRateBond {
     ///
     /// Propagates pricing, settlement, notional and accrual errors.
     pub fn clean_price(&mut self) -> QlResult<Real> {
-        let price = self.dirty_price()? - self.bond().accrued_amount(None)?;
+        let price = self.dirty_price()?
+            - self
+                .bond()
+                .accrued_amount(Some(self.checked_settlement_date()?))?;
         require!(price.is_finite(), "callable clean price overflow");
         Ok(price)
     }
@@ -353,7 +382,7 @@ impl Instrument for CallableFixedRateBond {
         let Some(args) = (arguments as &mut dyn Any).downcast_mut::<CallableBondArguments>() else {
             fail!("wrong argument type");
         };
-        let settlement = self.bond().settlement_date(None)?;
+        let settlement = self.checked_settlement_date()?;
         let redemption =
             self.bond().redemptions().first().ok_or_else(|| {
                 crate::errors::QlError::new("missing redemption", file!(), line!())
@@ -560,23 +589,7 @@ impl CallableZeroCouponBond {
     }
 
     fn checked_settlement_date(&self) -> QlResult<Date> {
-        let mut date = self.settings.evaluation_date().ok_or_else(|| {
-            crate::errors::QlError::new("evaluation date is unset", file!(), line!())
-        })?;
-        require!(date != Date::null(), "null evaluation date");
-        let calendar = self.bond.calendar();
-        let mut remaining = self.bond.settlement_days();
-        while remaining > 0 || calendar.is_holiday(date) {
-            require!(
-                date < Date::max_date(),
-                "settlement exceeds supported date range"
-            );
-            date += 1;
-            if calendar.is_business_day(date) {
-                remaining = remaining.saturating_sub(1);
-            }
-        }
-        Ok(self.bond.issue_date().map_or(date, |issue| date.max(issue)))
+        checked_callable_settlement_date(&self.bond, &self.settings)
     }
 
     fn flags(settings: &Settings<Date>) -> (bool, Option<bool>) {
