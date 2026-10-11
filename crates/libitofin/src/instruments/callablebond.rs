@@ -5,6 +5,8 @@
 //! 100 of face amount; clean exercise prices use indenture accrued interest,
 //! independently of market ex-coupon conventions.
 
+mod impliedvolatility;
+
 use std::any::Any;
 use std::cell::Cell;
 
