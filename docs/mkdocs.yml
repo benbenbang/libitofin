@@ -70,6 +70,7 @@ plugins:
             filters: ["!^_"]
 
 nav:
+  - OIS payer and receiver: ois-side.md
   - Home: index.md
   - Getting started: getting-started.md
   - Go SDK: go.md

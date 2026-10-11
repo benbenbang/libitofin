@@ -111,3 +111,5 @@ links to the language guides and project documentation.
 - [Constant GSR process](gsr-process.md): exact Gaussian forward-measure dynamics and checked constant grids.
 
 - [Plain float-float swaps](float-float-swaps.md): two-Ibor-leg signed valuation and fair spreads.
+
+- [OIS payer and receiver](ois-side.md): explicit swap side with the existing payer default.
