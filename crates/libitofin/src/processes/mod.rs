@@ -14,6 +14,7 @@ pub mod discretization;
 pub mod forwardmeasureprocess;
 mod geometricbrownianprocess;
 mod gjrgarchprocess;
+pub mod gsrprocess;
 mod hestonprocess;
 mod hullwhiteprocess;
 mod merton76process;
@@ -31,6 +32,7 @@ pub use geometricbrownianprocess::GeometricBrownianMotionProcess;
 pub use gjrgarchprocess::{
     GjrGarchCoefficients, GjrGarchDiscretization, GjrGarchParameters, GjrGarchProcess,
 };
+pub use gsrprocess::GsrProcess;
 pub use hestonprocess::{Discretization as HestonDiscretization, HestonProcess};
 pub use hullwhiteprocess::HullWhiteForwardProcess;
 pub use merton76process::Merton76Process;
