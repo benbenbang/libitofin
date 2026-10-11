@@ -136,3 +136,4 @@ nav:
       - Development: https://github.com/benbenbang/libitofin/blob/main/wiki/development.md
       - Design: https://github.com/benbenbang/libitofin/blob/main/wiki/design.md
       - QuantLib compatibility: https://github.com/benbenbang/libitofin/blob/main/wiki/compatibility.md
+  - Constant GSR process: gsr-process.md
