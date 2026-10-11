@@ -313,3 +313,6 @@ impl PricingEngine for BlackCallableFixedRateBondEngine {
         Ok(())
     }
 }
+#[cfg(test)]
+#[path = "blackcallablebondengine_tests.rs"]
+mod tests;
