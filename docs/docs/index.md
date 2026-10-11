@@ -119,3 +119,5 @@ links to the language guides and project documentation.
 - [Percentage-strike payoff](percentage-strike-payoff.md): dimensionless moneyness and exact multiplication order.
 
 - [Floating-type payoff](floating-type-payoff.md): a supplied strike at each scalar evaluation.
+
+- [Callable zero-coupon bonds](callable-zero-coupon-bonds.md): hard calls/puts and Hull-White lattice quotes.
