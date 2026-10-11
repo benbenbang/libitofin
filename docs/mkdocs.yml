@@ -127,6 +127,7 @@ nav:
   - MF state process: mf-state-process.md
   - Rust API: rust.md
   - Project:
+      - Release recovery: release-recovery.md
       - Repository index: https://github.com/benbenbang/libitofin#readme
       - Status and scope: https://github.com/benbenbang/libitofin/blob/main/wiki/status.md
       - Development: https://github.com/benbenbang/libitofin/blob/main/wiki/development.md
