@@ -6,6 +6,11 @@
 //! discount factor when settlement follows the curve reference date. This is not
 //! a callable volatility surface or a multiple-exercise model.
 
+#[path = "blackcallablebondyield.rs"]
+mod yieldconversion;
+
+use yieldconversion::solve_forward_yield;
+
 use crate::cashflow::Leg;
 use crate::cashflows::{CashFlows, Duration};
 use crate::errors::QlResult;
@@ -155,19 +160,14 @@ impl BlackCallableFixedRateBondEngine {
             forward_npv.is_finite() && forward_npv > 0.0,
             "invalid forward bond NPV"
         );
-        let yield_rate = CashFlows::solve_yield(
+        let yield_rate = solve_forward_yield(
             &args.cashflows,
             forward_npv,
+            args.bond.face_amount,
             day_counter.clone(),
-            Compounding::Compounded,
             frequency,
             &self.settings,
-            Some(false),
-            Some(exercise),
-            Some(exercise),
-            None,
-            None,
-            None,
+            exercise,
         )?;
         let rate = InterestRate::new(yield_rate, day_counter, Compounding::Compounded, frequency)?;
         let duration = CashFlows::duration(
@@ -278,7 +278,7 @@ impl PricingEngine for BlackCallableFixedRateBondEngine {
         }
         income /= settlement_discount;
         let forward = (value - income) * settlement_discount / exercise_discount;
-        let strike = args.bond.callability_prices[0] * args.bond.face_amount / 100.0;
+        let strike = (args.bond.callability_prices[0] / 100.0) * args.bond.face_amount;
         require!(
             forward.is_finite() && forward > 0.0 && strike.is_finite() && strike >= 0.0,
             "invalid Black callable forward or strike"
@@ -313,6 +313,7 @@ impl PricingEngine for BlackCallableFixedRateBondEngine {
         Ok(())
     }
 }
+
 #[cfg(test)]
 #[path = "blackcallablebondengine_tests.rs"]
 mod tests;
