@@ -3,6 +3,10 @@ name: Python wheels
 on:
   workflow_call:
     inputs:
+      release_revision:
+        description: "Resolved immutable release commit; optional for standalone runs"
+        type: string
+        default: ''
       release_tag:
         description: "Exact release tag; empty builds the current checkout"
         type: string
@@ -79,7 +83,7 @@ jobs:
         continue-on-error: ${{ matrix.optional }}
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.release_tag }}
+          ref: ${{ inputs.release_revision || inputs.release_tag }}
       - name: set up Python
         id: python
         continue-on-error: ${{ matrix.optional }}
@@ -93,7 +97,10 @@ jobs:
         continue-on-error: ${{ matrix.optional }}
         env:
           RELEASE_TAG: ${{ inputs.release_tag }}
-        run: python scripts/check_release_version.py "$RELEASE_TAG"
+          RELEASE_REVISION: ${{ inputs.release_revision }}
+        run: |
+          python scripts/check_release_version.py "$RELEASE_TAG"
+          test -z "$RELEASE_REVISION" || test "$(git rev-parse HEAD)" = "$RELEASE_REVISION"
       - name: resolve the expected version
         id: version
         continue-on-error: ${{ matrix.optional }}

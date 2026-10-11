@@ -3,6 +3,10 @@ name: Go release publication
 on:
   workflow_call:
     inputs:
+      release_revision:
+        description: "Resolved immutable release commit; optional for standalone runs"
+        type: string
+        default: ''
       release_tag:
         description: "Existing published core release tag (vVERSION)"
         required: true
@@ -30,13 +34,15 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: ${{ inputs.release_tag }}
+          ref: ${{ inputs.release_revision || inputs.release_tag }}
       - name: Validate release identity
         id: release
         env:
           RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_REVISION: ${{ inputs.release_revision }}
           GH_TOKEN: ${{ github.token }}
         run: |
+          test -z "$RELEASE_REVISION" || test "$(git rev-parse HEAD)" = "$RELEASE_REVISION"
           version=$(python3 scripts/check_release_version.py "$RELEASE_TAG")
           test "$RELEASE_TAG" = "v$version"
           test "$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft)" = false

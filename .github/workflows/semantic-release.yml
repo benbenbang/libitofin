@@ -17,6 +17,20 @@ on:
         default: false
         type: boolean
 
+      release_tag:
+        description: "Resume an existing stable release (vVERSION); empty creates a new release"
+        default: ''
+        type: string
+      publish_targets:
+        description: "Which publication channels to run"
+        default: all
+        type: choice
+        options: [all, rust, python, go]
+      python_artifact_run_id:
+        description: "Reuse complete successful wheel artifacts from this run instead of rebuilding"
+        default: ''
+        type: string
+
 concurrency:
   group: coordinated-release
   cancel-in-progress: false
@@ -24,7 +38,7 @@ concurrency:
 jobs:
   semantic-release:
     name: semantic-release
-    if: ${{ inputs.prompt == 'true' }}
+    if: ${{ inputs.prompt == 'true' && inputs.release_tag == '' }}
     uses: benbenbang/reusable-workflows/.github/workflows/semantic-release.yml@main
     permissions:
       contents: read
@@ -37,99 +51,163 @@ jobs:
       new_version_title: "🧮 LibItoFin"
       dry_run: ${{ inputs.dry_run }}
 
+  resolve-release:
+    needs: semantic-release
+    if: ${{ !cancelled() && inputs.prompt == 'true' && (needs.semantic-release.result == 'success' || needs.semantic-release.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      publish: ${{ steps.release.outputs.publish }}
+      tag: ${{ steps.release.outputs.tag }}
+      revision: ${{ steps.release.outputs.revision }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Resolve and validate immutable release identity
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED_TAG: ${{ inputs.release_tag }}
+          NEW_RELEASE: ${{ needs.semantic-release.outputs.new_release }}
+          NEW_TAG: ${{ needs.semantic-release.outputs.new_release_tag }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          PYTHON_ARTIFACT_RUN_ID: ${{ inputs.python_artifact_run_id }}
+        run: python3 scripts/resolve_release.py
+
   publish-optimizer:
     name: publish itofin-optimize to crates.io
-    needs: semantic-release
-    if: ${{ needs.semantic-release.outputs.new_release == 'true' && !inputs.dry_run }}
+    needs: resolve-release
+    if: ${{ !cancelled() && needs.resolve-release.result == 'success' && needs.resolve-release.outputs.publish == 'true' && (inputs.publish_targets == 'all' || inputs.publish_targets == 'rust') }}
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
       id-token: write
+    env:
+      CARGO_HTTP_MULTIPLEXING: 'false'
+      CARGO_NET_RETRY: '5'
+      RELEASE_TAG: ${{ needs.resolve-release.outputs.tag }}
+      RELEASE_REVISION: ${{ needs.resolve-release.outputs.revision }}
     steps:
-      - name: checkout the released tag
+      - name: checkout publication tooling
+        uses: actions/checkout@v4
+      - name: checkout immutable released source
         uses: actions/checkout@v4
         with:
-          ref: ${{ needs.semantic-release.outputs.new_release_tag }}
-      - name: install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-      - name: Verify the committed release version
-        env:
-          RELEASE_TAG: ${{ needs.semantic-release.outputs.new_release_tag }}
-        run: python3 scripts/check_release_version.py "$RELEASE_TAG"
+          ref: ${{ needs.resolve-release.outputs.revision }}
+          path: release
+      - name: read released Rust toolchain
+        id: rust
+        run: python3 -c 'import os,tomllib; v=tomllib.load(open("release/rust-toolchain.toml","rb"))["toolchain"]["channel"]; assert "\n" not in v; open(os.environ["GITHUB_OUTPUT"],"a").write(f"toolchain={v}\n")'
+      - name: install released Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.rust.outputs.toolchain }}
+      - name: Verify package and reconcile existing publication
+        id: package
+        run: python3 scripts/publish_release_crate.py itofin-optimize "$RELEASE_TAG" "$RELEASE_REVISION" --root release
       - name: authenticate to crates.io via OIDC trusted publishing
+        if: steps.package.outputs.upload_required == 'true'
         uses: rust-lang/crates-io-auth-action@v1
         id: auth
-      - name: publish
+      - name: publish once and verify registry completion
+        if: steps.package.outputs.upload_required == 'true'
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
-        run: cargo publish -p itofin-optimize --locked
+        run: python3 scripts/publish_release_crate.py itofin-optimize "$RELEASE_TAG" "$RELEASE_REVISION" --root release --publish
 
   publish-crate:
     name: publish libitofin to crates.io
-    needs: [semantic-release, publish-optimizer]
-    if: ${{ needs.semantic-release.outputs.new_release == 'true' && !inputs.dry_run }}
+    needs: [resolve-release, publish-optimizer]
+    if: ${{ !cancelled() && needs.resolve-release.result == 'success' && needs.publish-optimizer.result == 'success' && needs.resolve-release.outputs.publish == 'true' && (inputs.publish_targets == 'all' || inputs.publish_targets == 'rust') }}
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
-      id-token: write # mint the OIDC token crates.io trusted publishing verifies
+      id-token: write
+    env:
+      CARGO_HTTP_MULTIPLEXING: 'false'
+      CARGO_NET_RETRY: '5'
+      RELEASE_TAG: ${{ needs.resolve-release.outputs.tag }}
+      RELEASE_REVISION: ${{ needs.resolve-release.outputs.revision }}
     steps:
-      - name: checkout the released tag
+      - name: checkout publication tooling
+        uses: actions/checkout@v4
+      - name: checkout immutable released source
         uses: actions/checkout@v4
         with:
-          ref: ${{ needs.semantic-release.outputs.new_release_tag }}
-      - name: install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-      - name: Verify the committed release version
-        env:
-          RELEASE_TAG: ${{ needs.semantic-release.outputs.new_release_tag }}
-        run: python3 scripts/check_release_version.py "$RELEASE_TAG"
+          ref: ${{ needs.resolve-release.outputs.revision }}
+          path: release
+      - name: read released Rust toolchain
+        id: rust
+        run: python3 -c 'import os,tomllib; v=tomllib.load(open("release/rust-toolchain.toml","rb"))["toolchain"]["channel"]; assert "\n" not in v; open(os.environ["GITHUB_OUTPUT"],"a").write(f"toolchain={v}\n")'
+      - name: install released Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.rust.outputs.toolchain }}
+      - name: Verify package and reconcile existing publication
+        id: package
+        run: python3 scripts/publish_release_crate.py libitofin "$RELEASE_TAG" "$RELEASE_REVISION" --root release
       - name: authenticate to crates.io via OIDC trusted publishing
+        if: steps.package.outputs.upload_required == 'true'
         uses: rust-lang/crates-io-auth-action@v1
         id: auth
-      - name: publish
+      - name: publish once and verify registry completion
+        if: steps.package.outputs.upload_required == 'true'
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
-        run: cargo publish -p libitofin --locked
+        run: python3 scripts/publish_release_crate.py libitofin "$RELEASE_TAG" "$RELEASE_REVISION" --root release --publish
 
   build-python-wheels:
     name: build itofin wheels
-    needs: semantic-release
-    if: ${{ needs.semantic-release.outputs.new_release == 'true' && !inputs.dry_run }}
+    needs: resolve-release
+    if: ${{ !cancelled() && needs.resolve-release.result == 'success' && needs.resolve-release.outputs.publish == 'true' && (inputs.publish_targets == 'all' || inputs.publish_targets == 'python') && inputs.python_artifact_run_id == '' }}
     permissions:
       contents: read
     uses: ./.github/workflows/python-wheels.yml
     with:
-      release_tag: ${{ needs.semantic-release.outputs.new_release_tag }}
+      release_tag: ${{ needs.resolve-release.outputs.tag }}
+      release_revision: ${{ needs.resolve-release.outputs.revision }}
 
   publish-pypi:
     name: publish itofin to PyPI
-    needs: [semantic-release, build-python-wheels]
-    if: ${{ needs.semantic-release.outputs.new_release == 'true' && !inputs.dry_run }}
+    needs: [resolve-release, build-python-wheels]
+    if: ${{ !cancelled() && needs.resolve-release.result == 'success' && needs.resolve-release.outputs.publish == 'true' && (inputs.publish_targets == 'all' || inputs.publish_targets == 'python') && (needs.build-python-wheels.result == 'success' || (inputs.python_artifact_run_id != '' && needs.build-python-wheels.result == 'skipped')) }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write # mint the OIDC token PyPI trusted publishing verifies
+      actions: read
+      id-token: write
     environment: pypi
     steps:
-      - name: download all built distributions
+      - uses: actions/checkout@v4
+      - name: download all validated built distributions
         uses: actions/download-artifact@v4
         with:
           pattern: wheels-*
           merge-multiple: true
           path: dist
-      - name: publish to PyPI via OIDC trusted publishing
+          run-id: ${{ inputs.python_artifact_run_id || github.run_id }}
+          github-token: ${{ github.token }}
+      - name: Verify complete distributions and already-published file hashes
+        id: package
+        env:
+          RELEASE_TAG: ${{ needs.resolve-release.outputs.tag }}
+        run: python3 scripts/prepare_release_pypi.py "$RELEASE_TAG" dist --verify-downloads
+      - name: publish missing verified files via OIDC trusted publishing
+        if: steps.package.outputs.upload_required == 'true'
         uses: pypa/gh-action-pypi-publish@release/v1
-        # For a TestPyPI dry-run, register a separate TestPyPI trusted publisher,
-        # then uncomment the override below (and remove it for the real publish):
-        # with:
-        #   repository-url: https://test.pypi.org/legacy/
 
   publish-go:
     name: Publish and verify Go bindings
-    needs: semantic-release
-    if: ${{ needs.semantic-release.outputs.new_release == 'true' && !inputs.dry_run }}
+    needs: resolve-release
+    if: ${{ !cancelled() && needs.resolve-release.result == 'success' && needs.resolve-release.outputs.publish == 'true' && (inputs.publish_targets == 'all' || inputs.publish_targets == 'go') }}
     permissions:
       contents: write
     uses: ./.github/workflows/go-release.yml
     with:
-      release_tag: ${{ needs.semantic-release.outputs.new_release_tag }}
+      release_tag: ${{ needs.resolve-release.outputs.tag }}
+      release_revision: ${{ needs.resolve-release.outputs.revision }}
