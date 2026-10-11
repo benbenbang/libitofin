@@ -70,6 +70,7 @@ plugins:
             filters: ["!^_"]
 
 nav:
+  - Callable zero-coupon bonds: callable-zero-coupon-bonds.md
   - Floating-type payoff: floating-type-payoff.md
   - Percentage-strike payoff: percentage-strike-payoff.md
   - Bachelier asset ITM: normal-itm.md

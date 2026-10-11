@@ -29,7 +29,7 @@ No release or complete QuantLib product-family parity is implied.
 | Numerical contracts | Forward-measure horizon and covariance conversion | The process horizon setter validates finite nonnegative values and notifies observers; direct `ForwardMeasureTime` state updates do not notify. Covariance is a deterministic conversion from standard deviations and correlation, not a sample estimator. It neither checks positive semidefiniteness nor repairs correlation inputs. |
 | Compact linear algebra | `TridiagonalOperator` | Compact three-diagonal application, Thomas solves and reusable output buffers. Fallible constructors, application and solves reject invalid inputs and unusable pivots. Infallible endpoint setters and arithmetic operators can panic on invalid inputs or overflow. No sparse matrix export or pivoting solver is added. |
 | Existing 1D FD queries | `Fdm1DimSolver`, `FdmBlackScholesSolver` | Existing value/Greek formulas and theta availability remain unchanged. Invalid coordinates are rejected, and observable process changes invalidate cached Black-Scholes snapshots. |
-| Callable fixed-rate bonds | `CallableFixedRateBond`, `TreeCallableFixedRateBondEngine` | Hard issuer-call/holder-put decisions use an event-aligned Hull-White tree. Clean exercise prices include indenture accrued interest independently of market ex-coupon rules. Live curve/model updates rebuild valuation. |
+| Callable bonds | `CallableFixedRateBond`, `CallableZeroCouponBond`, `TreeCallableFixedRateBondEngine` | Hard issuer-call/holder-put decisions use an event-aligned Hull-White tree. Clean exercise prices include indenture accrued interest independently of market ex-coupon rules. Live curve/model updates rebuild valuation. |
 
 ## Checked money and FX
 
@@ -67,14 +67,15 @@ amounts are valid; exchange rates must be finite and positive.
 
 ## Callable-bond limits
 
-- Fixed-rate bonds and hard calls/puts only, priced with Hull-White.
+- Fixed-rate and [zero-coupon bonds](callable-zero-coupon-bonds.md) with hard
+  calls/puts, priced with Hull-White.
 - Exercise rights are dated clean or dirty prices per 100, not percentage values
   passed as fractions.
 - Settlement must not precede the curve reference date.
 - Malformed schedules, expired exercise rights, invalid values and unavailable
   live curve handles are handled explicitly.
-- No zero-coupon convenience class, Black callable engine, OAS, implied
-  volatility or effective-duration API is introduced by this slice.
+- No Black callable engine, OAS, implied volatility or effective-duration API
+  is introduced by these slices.
 - Clearing a live Hull-White curve handle no longer panics in observer refresh.
   A callable price request fails while the handle is unavailable and recovers
   after a valid relink; no stale price is presented as current valuation.
