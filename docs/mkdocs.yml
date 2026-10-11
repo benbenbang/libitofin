@@ -125,6 +125,7 @@ nav:
   - Par asset swaps: asset-swaps.md
   - Cross-currency basis swaps: cross-currency-basis-swaps.md
   - MF state process: mf-state-process.md
+  - Asset-or-nothing payoff: asset-or-nothing-payoff.md
   - Rust API: rust.md
   - Project:
       - Release recovery: release-recovery.md
