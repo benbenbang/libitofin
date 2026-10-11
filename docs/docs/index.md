@@ -105,3 +105,5 @@ links to the language guides and project documentation.
 - [Asset-or-nothing payoff](asset-or-nothing-payoff.md): strict digital asset payment.
 
 - [Gap payoff](gap-payoff.md): separate trigger and payment strikes.
+
+- [Cap/floor optionlets](capfloor-optionlets.md): shared coupon extraction and pricing decomposition.

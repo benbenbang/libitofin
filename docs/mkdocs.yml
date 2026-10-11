@@ -127,6 +127,7 @@ nav:
   - MF state process: mf-state-process.md
   - Asset-or-nothing payoff: asset-or-nothing-payoff.md
   - Gap payoff: gap-payoff.md
+  - Cap/floor optionlets: capfloor-optionlets.md
   - Rust API: rust.md
   - Project:
       - Release recovery: release-recovery.md

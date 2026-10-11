@@ -18,8 +18,8 @@
 //! - Arbitrary user-defined floating coupon types are not accepted.
 //! - [`MakeCapFloor`](super::MakeCapFloor) builds the market cap/floor and
 //!   [`CapFloor::last_floating_rate_coupon`] exposes the trailing coupon the
-//!   optionlet stripper reads; `optionlet`, `impliedVolatility` and `deepUpdate`
-//!   remain unported, as no ported test reaches them.
+//!   optionlet stripper reads; `impliedVolatility` and `deepUpdate` remain unported.
+//!   [`CapFloor::optionlet`] retains a shared coupon without inheriting an engine.
 //! - The `CapFloor::arguments` bundle carries `start_dates` (read by the analytic
 //!   Hull-White engine to form each optionlet's exercise maturity, #438); the C++
 //!   `spreads` and `indexes` are filled but unread by any ported engine, so they
@@ -245,6 +245,58 @@ impl CapFloor {
     /// Number of Ibor or overnight coupons in the instrument.
     pub fn coupon_count(&self) -> usize {
         self.coupons.len() + self.overnight_coupons.len()
+    }
+
+    /// Extracts the zero-based optionlet, retaining its shared coupon and settings.
+    ///
+    /// Only the strikes relevant to this instrument's type are copied. The new
+    /// instrument has no pricing engine or cached results, matching QuantLib;
+    /// attach an engine explicitly before pricing a live optionlet.
+    ///
+    /// # Errors
+    /// Returns an error when `index` is outside the floating leg, including an
+    /// empty leg.
+    pub fn optionlet(&self, index: usize) -> QlResult<Self> {
+        require!(
+            index < self.coupon_count(),
+            "optionlet index {index} does not exist, only {} coupons",
+            self.coupon_count()
+        );
+        let cap_rates = if matches!(
+            self.cap_floor_type,
+            CapFloorType::Cap | CapFloorType::Collar
+        ) {
+            vec![self.cap_rates[index]]
+        } else {
+            Vec::new()
+        };
+        let floor_rates = if matches!(
+            self.cap_floor_type,
+            CapFloorType::Floor | CapFloorType::Collar
+        ) {
+            vec![self.floor_rates[index]]
+        } else {
+            Vec::new()
+        };
+        if let Some(coupon) = self.coupons.get(index) {
+            Self::new(
+                self.cap_floor_type,
+                vec![Shared::clone(coupon)],
+                cap_rates,
+                floor_rates,
+                Shared::clone(&self.settings),
+            )
+        } else {
+            Self::from_overnight(
+                self.cap_floor_type,
+                vec![Shared::clone(
+                    &self.overnight_coupons[index - self.coupons.len()],
+                )],
+                cap_rates,
+                floor_rates,
+                Shared::clone(&self.settings),
+            )
+        }
     }
 
     /// The floating coupons.
