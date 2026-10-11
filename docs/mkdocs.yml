@@ -70,6 +70,7 @@ plugins:
             filters: ["!^_"]
 
 nav:
+  - Percentage-strike payoff: percentage-strike-payoff.md
   - Bachelier asset ITM: normal-itm.md
   - OIS payer and receiver: ois-side.md
   - Home: index.md

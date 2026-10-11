@@ -3,8 +3,8 @@
 //! Port of the scalar payoff subset of `ql/instruments/payoffs.{hpp,cpp}`:
 //! the [`TypePayoff`] and [`StrikedTypePayoff`] intermediate contracts, the
 //! [`PlainVanillaPayoff`], [`CashOrNothingPayoff`], [`AssetOrNothingPayoff`],
-//! [`GapPayoff`] and [`NullPayoff`]. The remaining payoffs
-//! (`FloatingTypePayoff`, `PercentageStrikePayoff`, `SuperFundPayoff`,
+//! [`GapPayoff`], [`PercentageStrikePayoff`] and [`NullPayoff`]. The remaining payoffs
+//! (`FloatingTypePayoff`, `SuperFundPayoff`,
 //! `SuperSharePayoff`) are follow-up work.
 
 use std::any::Any;
@@ -298,6 +298,65 @@ impl TypePayoff for GapPayoff {
 impl StrikedTypePayoff for GapPayoff {
     fn strike(&self) -> Real {
         self.strike
+    }
+}
+
+/// Payoff with a dimensionless strike expressed as moneyness.
+///
+/// A call pays `price * max(1 - moneyness, 0)` and a put pays
+/// `price * max(moneyness - 1, 0)`. The factor is floored before
+/// multiplication, so a negative price can produce a negative payoff.
+/// Matches QuantLib's `PercentageStrikePayoff` without positivity or
+/// finiteness validation, following the existing infallible payoff API.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PercentageStrikePayoff {
+    option_type: OptionType,
+    moneyness: Real,
+}
+
+impl PercentageStrikePayoff {
+    /// Builds a percentage-strike payoff. `moneyness` is a ratio, not an
+    /// absolute strike or a percentage scaled by 100.
+    pub fn new(option_type: OptionType, moneyness: Real) -> Self {
+        Self {
+            option_type,
+            moneyness,
+        }
+    }
+}
+
+impl Payoff for PercentageStrikePayoff {
+    fn name(&self) -> String {
+        "PercentageStrike".into()
+    }
+
+    fn description(&self) -> String {
+        format!(
+            "{} {}, {} strike",
+            self.name(),
+            self.option_type,
+            self.moneyness
+        )
+    }
+
+    fn value(&self, price: Real) -> Real {
+        let factor = match self.option_type {
+            OptionType::Call => 1.0 - self.moneyness,
+            OptionType::Put => self.moneyness - 1.0,
+        };
+        price * if factor < 0.0 { 0.0 } else { factor }
+    }
+}
+
+impl TypePayoff for PercentageStrikePayoff {
+    fn option_type(&self) -> OptionType {
+        self.option_type
+    }
+}
+
+impl StrikedTypePayoff for PercentageStrikePayoff {
+    fn strike(&self) -> Real {
+        self.moneyness
     }
 }
 
