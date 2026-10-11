@@ -1,5 +1,7 @@
 # itofin
 
+For interrupted publication, see [release recovery](release-recovery.md).
+
 [`libitofin`](https://crates.io/crates/libitofin) is a ground-up port of
 [QuantLib](https://www.quantlib.org/) into idiomatic Rust, with Python and Go
 bindings. All three language surfaces share the Rust numerical core.
