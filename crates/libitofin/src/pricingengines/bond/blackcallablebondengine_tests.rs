@@ -278,3 +278,145 @@ fn existing_callable_argument_struct_literals_remain_source_compatible() {
     };
     arguments.validate().unwrap();
 }
+
+#[test]
+fn ex_coupon_income_subtraction_respects_ownership_at_settlement() {
+    let settings = settings();
+    let evaluation = Date::new(10, January, 2026);
+    settings.set_evaluation_date(evaluation);
+    let schedule = MakeSchedule::new()
+        .from(Date::new(15, January, 2025))
+        .to(maturity())
+        .with_frequency(Frequency::Semiannual)
+        .with_calendar(NullCalendar::new())
+        .with_convention(Unadjusted)
+        .with_termination_date_convention(Unadjusted)
+        .backwards()
+        .build();
+    let mut bond = CallableFixedRateBond::with_ex_coupon(
+        0,
+        1000.0,
+        schedule,
+        vec![0.055],
+        Actual365Fixed::new(),
+        Unadjusted,
+        100.0,
+        Some(Date::new(15, January, 2025)),
+        vec![right(false, exercise())],
+        Some(crate::time::period::Period::new(
+            10,
+            crate::time::timeunit::TimeUnit::Days,
+        )),
+        NullCalendar::new(),
+        Unadjusted,
+        false,
+        Shared::clone(&settings),
+    )
+    .unwrap();
+    let curve: Shared<dyn YieldTermStructure> = shared(FlatForward::with_rate(
+        evaluation,
+        0.04,
+        Actual365Fixed::new(),
+        Compounding::Continuous,
+        Frequency::Annual,
+    ));
+    let pricing = shared_mut(BlackCallableFixedRateBondEngine::new(
+        Handle::new(shared(SimpleQuote::new(0.2)) as Shared<dyn Quote>),
+        Handle::new(curve),
+        settings,
+    ));
+    bond.base_mut()
+        .set_pricing_engine(pricing as SharedMut<dyn PricingEngine>);
+    near(bond.npv().unwrap(), 1025.7631785714432);
+}
+
+#[test]
+fn fixed_quote_and_setup_guard_settlement_date_overflow() {
+    let settings = settings();
+    let bond = fixed(3, false, Shared::clone(&settings));
+    let mut pricing = BlackCallableFixedRateBondEngine::new(
+        Handle::new(shared(SimpleQuote::new(0.1)) as Shared<dyn Quote>),
+        Handle::new(curve(0.04)),
+        Shared::clone(&settings),
+    );
+    settings.set_evaluation_date(Date::max_date());
+    assert!(bond.setup_arguments(pricing.arguments_mut()).is_err());
+    let mut bond = bond;
+    assert!(bond.dirty_price().is_err());
+    assert!(bond.clean_price().is_err());
+}
+
+#[test]
+fn forward_yield_and_prices_are_scale_invariant_for_tiny_face() {
+    for face in [1.0e-12, 1.0e-25, 1.0e-100] {
+        let settings = settings();
+        let mut bond = CallableZeroCouponBond::new(
+            3,
+            face,
+            NullCalendar::new(),
+            maturity(),
+            Actual365Fixed::new(),
+            Unadjusted,
+            100.0,
+            Some(today()),
+            vec![right(true, exercise())],
+            Shared::clone(&settings),
+        )
+        .unwrap();
+        bond.base_mut()
+            .set_pricing_engine(engine(0.35, Shared::clone(&settings)));
+        let price = bond.dirty_price().unwrap();
+        let mut reference = zero(3, true, Shared::clone(&settings));
+        reference
+            .base_mut()
+            .set_pricing_engine(engine(0.35, settings));
+        assert!((price - reference.dirty_price().unwrap()).abs() < 1.0e-10);
+    }
+}
+
+#[test]
+fn exactly_zero_forward_yield_prices_intrinsic_without_rounding_negative() {
+    let evaluation = Date::new(12, crate::time::date::Month::October, 2026);
+    for put in [false, true] {
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(evaluation);
+        let right = Callability::new(
+            BondPrice::Clean(97.25),
+            if put {
+                CallabilityType::Put
+            } else {
+                CallabilityType::Call
+            },
+            evaluation + 18,
+        )
+        .unwrap();
+        let mut bond = CallableZeroCouponBond::new(
+            17,
+            12345.0,
+            NullCalendar::new(),
+            Date::new(12, crate::time::date::Month::October, 2027),
+            Actual365Fixed::new(),
+            Unadjusted,
+            107.5,
+            Some(evaluation),
+            vec![right],
+            Shared::clone(&settings),
+        )
+        .unwrap();
+        let curve: Shared<dyn YieldTermStructure> = shared(FlatForward::with_rate(
+            evaluation,
+            0.0,
+            Actual365Fixed::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        ));
+        let pricing = shared_mut(BlackCallableFixedRateBondEngine::new(
+            Handle::new(shared(SimpleQuote::new(0.23)) as Shared<dyn Quote>),
+            Handle::new(curve),
+            settings,
+        ));
+        bond.base_mut()
+            .set_pricing_engine(pricing as SharedMut<dyn PricingEngine>);
+        near(bond.dirty_price().unwrap(), if put { 107.5 } else { 97.25 });
+    }
+}
