@@ -2,9 +2,9 @@
 //!
 //! Port of the scalar payoff subset of `ql/instruments/payoffs.{hpp,cpp}`:
 //! the [`TypePayoff`] and [`StrikedTypePayoff`] intermediate contracts, the
-//! [`PlainVanillaPayoff`], [`CashOrNothingPayoff`], [`AssetOrNothingPayoff`] and
-//! [`NullPayoff`]. The remaining payoffs (`FloatingTypePayoff`, `PercentageStrikePayoff`,
-//! `GapPayoff`, `SuperFundPayoff`,
+//! [`PlainVanillaPayoff`], [`CashOrNothingPayoff`], [`AssetOrNothingPayoff`],
+//! [`GapPayoff`] and [`NullPayoff`]. The remaining payoffs
+//! (`FloatingTypePayoff`, `PercentageStrikePayoff`, `SuperFundPayoff`,
 //! `SuperSharePayoff`) are follow-up work.
 
 use std::any::Any;
@@ -229,6 +229,73 @@ impl TypePayoff for AssetOrNothingPayoff {
 }
 
 impl StrikedTypePayoff for AssetOrNothingPayoff {
+    fn strike(&self) -> Real {
+        self.strike
+    }
+}
+
+/// Gap payoff with a trigger strike and a separate payment strike.
+///
+/// A call pays `price - second_strike` when `price - strike >= 0`; a put
+/// pays `second_strike - price` when `strike - price >= 0`. The trigger is
+/// inclusive, and negative payments are not floored. Matches QuantLib's
+/// `GapPayoff` and the existing infallible payoff construction contract.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct GapPayoff {
+    option_type: OptionType,
+    strike: Real,
+    second_strike: Real,
+}
+
+impl GapPayoff {
+    /// Builds a gap payoff with a trigger `strike` and payment `second_strike`.
+    /// No positivity or finiteness validation is imposed.
+    pub fn new(option_type: OptionType, strike: Real, second_strike: Real) -> Self {
+        Self {
+            option_type,
+            strike,
+            second_strike,
+        }
+    }
+
+    /// The payment strike, distinct from the trigger returned by
+    /// [`StrikedTypePayoff::strike`].
+    pub fn second_strike(&self) -> Real {
+        self.second_strike
+    }
+}
+
+impl Payoff for GapPayoff {
+    fn name(&self) -> String {
+        "Gap".into()
+    }
+
+    fn description(&self) -> String {
+        format!(
+            "{} {}, {} strike, {} strike payoff",
+            self.name(),
+            self.option_type,
+            self.strike,
+            self.second_strike
+        )
+    }
+
+    fn value(&self, price: Real) -> Real {
+        match self.option_type {
+            OptionType::Call if price - self.strike >= 0.0 => price - self.second_strike,
+            OptionType::Put if self.strike - price >= 0.0 => self.second_strike - price,
+            OptionType::Call | OptionType::Put => 0.0,
+        }
+    }
+}
+
+impl TypePayoff for GapPayoff {
+    fn option_type(&self) -> OptionType {
+        self.option_type
+    }
+}
+
+impl StrikedTypePayoff for GapPayoff {
     fn strike(&self) -> Real {
         self.strike
     }

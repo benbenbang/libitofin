@@ -103,3 +103,5 @@ links to the language guides and project documentation.
 - [MF state process](mf-state-process.md): standalone Gaussian state law and checked piecewise variance.
 
 - [Asset-or-nothing payoff](asset-or-nothing-payoff.md): strict digital asset payment.
+
+- [Gap payoff](gap-payoff.md): separate trigger and payment strikes.

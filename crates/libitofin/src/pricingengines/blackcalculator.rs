@@ -3,9 +3,9 @@
 //! Port of `ql/pricingengines/blackcalculator.{hpp,cpp}`: a
 //! [`BlackCalculator`] prices a European payoff on a forward and exposes the
 //! full greek set. The plain-vanilla and cash-or-nothing payoffs are
-//! supported; the C++ visitor's remaining arms (`AssetOrNothingPayoff`,
-//! `GapPayoff`) follow those payoffs as a follow-up, as do `strike_gamma`,
-//! `vanna` and `volga`.
+//! supported. Asset-or-nothing and gap scalar payoffs are available, but their
+//! C++ visitor arms remain unsupported here, as do `strike_gamma`, `vanna`
+//! and `volga`.
 //!
 //! Known limitation carried over from the reference: the zero-volatility
 //! branches below return the plain-vanilla ladder, which is meaningless for a
