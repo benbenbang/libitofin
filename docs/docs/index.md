@@ -115,3 +115,5 @@ links to the language guides and project documentation.
 - [OIS payer and receiver](ois-side.md): explicit swap side with the existing payer default.
 
 - [Bachelier asset ITM](normal-itm.md): normal-model helper and its zero-volatility convention.
+
+- [Percentage-strike payoff](percentage-strike-payoff.md): dimensionless moneyness and exact multiplication order.
