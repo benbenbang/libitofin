@@ -1,16 +1,17 @@
-//! Fixed-rate callable and puttable bonds for short-rate lattice valuation.
+//! Fixed-rate and zero-coupon callable/puttable bonds for lattice valuation.
 //!
-//! Port of the fixed-rate product and argument setup in
+//! Port of the bond products and argument setup in
 //! `ql/experimental/callablebonds/callablebond.{hpp,cpp}`. Prices are quoted per
 //! 100 of face amount; clean exercise prices use indenture accrued interest,
 //! independently of market ex-coupon conventions.
 
 use std::any::Any;
+use std::cell::Cell;
 
 use crate::errors::QlResult;
 use crate::event::event_has_occurred;
 use crate::instrument::{Instrument, InstrumentBase};
-use crate::instruments::{Bond, BondPrice, FixedRateBond};
+use crate::instruments::{Bond, BondPrice, FixedRateBond, ZeroCouponBond};
 use crate::pricingengine::{Arguments, Results};
 use crate::settings::Settings;
 use crate::shared::Shared;
@@ -406,6 +407,290 @@ impl Instrument for CallableFixedRateBond {
             args.callability_dates.push(call_date);
             args.callability_types.push(callability.call_type());
             args.callability_prices.push(price);
+        }
+        Ok(())
+    }
+}
+
+/// A zero-coupon bond with dated hard issuer calls or holder puts.
+///
+/// Uses the underlying bond's instrument base, observers and settlement results.
+/// Clean and dirty exercise quotes coincide because no interest accrues.
+pub struct CallableZeroCouponBond {
+    bond: Bond,
+    put_call_schedule: CallabilitySchedule,
+    face_amount: Real,
+    day_counter: DayCounter,
+    settings: Shared<Settings<Date>>,
+    settings_flags: Cell<(bool, Option<bool>)>,
+}
+
+impl CallableZeroCouponBond {
+    /// Constructs a single-redemption callable bond.
+    ///
+    /// `redemption` and exercise prices are per 100 of face. Contractual maturity
+    /// is unadjusted; the redemption payment follows `payment_convention`.
+    /// Exercise rights retain the supplied order, including coincident events.
+    ///
+    /// # Errors
+    /// Rejects nonpositive/nonfinite face, negative/nonfinite redemption,
+    /// invalid issue dates and exercise after maturity or adjusted redemption.
+    /// Propagates zero-coupon construction errors, including scaled overflow.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        settlement_days: Natural,
+        face_amount: Real,
+        calendar: Calendar,
+        maturity_date: Date,
+        day_counter: DayCounter,
+        payment_convention: BusinessDayConvention,
+        redemption: Real,
+        issue_date: Option<Date>,
+        put_call_schedule: CallabilitySchedule,
+        settings: Shared<Settings<Date>>,
+    ) -> QlResult<Self> {
+        require!(
+            face_amount.is_finite() && face_amount > 0.0,
+            "face amount must be finite and positive"
+        );
+        require!(
+            redemption.is_finite() && redemption >= 0.0,
+            "redemption must be finite and nonnegative"
+        );
+        require!(maturity_date != Date::null(), "null maturity date");
+        require!(
+            settlement_days <= (Date::max_date() - Date::min_date()) as Natural,
+            "settlement lag exceeds supported date range"
+        );
+        let payment_date = Self::adjusted_date(&calendar, maturity_date, payment_convention)?;
+        if let Some(issue) = issue_date {
+            require!(
+                issue != Date::null() && issue <= maturity_date && issue <= payment_date,
+                "invalid issue date"
+            );
+        }
+        require!(
+            put_call_schedule
+                .iter()
+                .all(|call| call.date() <= maturity_date && call.date() <= payment_date),
+            "bond cannot redeem before the last call/put date"
+        );
+        let bond = ZeroCouponBond::new(
+            settlement_days,
+            calendar,
+            face_amount,
+            maturity_date,
+            payment_convention,
+            redemption,
+            issue_date,
+            Shared::clone(&settings),
+        )?
+        .into_bond();
+        Ok(Self {
+            bond,
+            put_call_schedule,
+            face_amount,
+            day_counter,
+            settings_flags: Cell::new(Self::flags(&settings)),
+            settings,
+        })
+    }
+
+    fn adjusted_date(
+        calendar: &Calendar,
+        date: Date,
+        convention: BusinessDayConvention,
+    ) -> QlResult<Date> {
+        use BusinessDayConvention::*;
+        let roll = |mut candidate: Date, step| -> QlResult<Date> {
+            while calendar.is_holiday(candidate) {
+                require!(
+                    if step > 0 {
+                        candidate < Date::max_date()
+                    } else {
+                        candidate > Date::min_date()
+                    },
+                    "payment adjustment exceeds supported date range"
+                );
+                candidate += step;
+            }
+            Ok(candidate)
+        };
+        match convention {
+            Unadjusted => Ok(date),
+            Following => roll(date, 1),
+            Preceding => roll(date, -1),
+            ModifiedFollowing | HalfMonthModifiedFollowing => {
+                let next = roll(date, 1)?;
+                if next.month() != date.month()
+                    || (convention == HalfMonthModifiedFollowing
+                        && date.day_of_month() <= 15
+                        && next.day_of_month() > 15)
+                {
+                    roll(date, -1)
+                } else {
+                    Ok(next)
+                }
+            }
+            ModifiedPreceding => {
+                let previous = roll(date, -1)?;
+                if previous.month() != date.month() {
+                    roll(date, 1)
+                } else {
+                    Ok(previous)
+                }
+            }
+            Nearest => {
+                let (mut next, mut previous) = (date, date);
+                while calendar.is_holiday(next) && calendar.is_holiday(previous) {
+                    require!(
+                        next < Date::max_date() && previous > Date::min_date(),
+                        "payment adjustment exceeds supported date range"
+                    );
+                    next += 1;
+                    previous -= 1;
+                }
+                Ok(if calendar.is_holiday(next) {
+                    previous
+                } else {
+                    next
+                })
+            }
+        }
+    }
+
+    fn checked_settlement_date(&self) -> QlResult<Date> {
+        let mut date = self.settings.evaluation_date().ok_or_else(|| {
+            crate::errors::QlError::new("evaluation date is unset", file!(), line!())
+        })?;
+        require!(date != Date::null(), "null evaluation date");
+        let calendar = self.bond.calendar();
+        let mut remaining = self.bond.settlement_days();
+        while remaining > 0 || calendar.is_holiday(date) {
+            require!(
+                date < Date::max_date(),
+                "settlement exceeds supported date range"
+            );
+            date += 1;
+            if calendar.is_business_day(date) {
+                remaining = remaining.saturating_sub(1);
+            }
+        }
+        Ok(self.bond.issue_date().map_or(date, |issue| date.max(issue)))
+    }
+
+    fn flags(settings: &Settings<Date>) -> (bool, Option<bool>) {
+        (
+            settings.include_reference_date_events(),
+            settings.include_todays_cash_flows(),
+        )
+    }
+
+    /// The immutable exercise schedule.
+    pub fn callability(&self) -> &CallabilitySchedule {
+        &self.put_call_schedule
+    }
+
+    /// The underlying bond for cash-flow, settlement and notional queries.
+    pub fn bond(&self) -> &Bond {
+        &self.bond
+    }
+
+    /// The payment day counter supplied at construction.
+    pub fn day_counter(&self) -> &DayCounter {
+        &self.day_counter
+    }
+
+    /// The engine's value at settlement, in currency units.
+    ///
+    /// # Errors
+    /// Propagates pricing failures or missing settlement results.
+    pub fn settlement_value(&mut self) -> QlResult<Real> {
+        self.calculate()?;
+        self.bond.settlement_value()
+    }
+
+    /// The settlement price per 100 of face, including accrued interest.
+    ///
+    /// # Errors
+    /// Propagates pricing, notional and settlement errors or quote overflow.
+    pub fn dirty_price(&mut self) -> QlResult<Real> {
+        self.calculate()?;
+        if self.is_expired()? {
+            return Ok(0.0);
+        }
+        let notional = self.bond.notional(Some(self.checked_settlement_date()?))?;
+        if notional == 0.0 {
+            return Ok(0.0);
+        }
+        let price = (self.settlement_value()? / notional) * 100.0;
+        require!(price.is_finite(), "callable dirty price overflow");
+        Ok(price)
+    }
+
+    /// The settlement price per 100, equal to the dirty price for this bond.
+    ///
+    /// # Errors
+    /// Propagates the same errors as [`dirty_price`](Self::dirty_price).
+    pub fn clean_price(&mut self) -> QlResult<Real> {
+        self.dirty_price()
+    }
+}
+
+impl Instrument for CallableZeroCouponBond {
+    fn base(&self) -> &InstrumentBase {
+        let flags = Self::flags(&self.settings);
+        if self.settings_flags.replace(flags) != flags {
+            self.bond.base().invalidate_silently();
+        }
+        self.bond.base()
+    }
+    fn base_mut(&mut self) -> &mut InstrumentBase {
+        self.bond.base_mut()
+    }
+    fn is_expired(&self) -> QlResult<bool> {
+        require!(
+            self.settings
+                .evaluation_date()
+                .is_some_and(|date| date != Date::null()),
+            "evaluation date must be set and nonnull"
+        );
+        self.bond.is_expired()
+    }
+    fn setup_expired(&mut self) {
+        self.bond.setup_expired();
+    }
+    fn fetch_results(&mut self, results: &dyn Results) -> QlResult<()> {
+        self.bond.fetch_results(results)
+    }
+    fn setup_arguments(&self, arguments: &mut dyn Arguments) -> QlResult<()> {
+        let Some(args) = (arguments as &mut dyn Any).downcast_mut::<CallableBondArguments>() else {
+            fail!("wrong argument type");
+        };
+        let settlement = self.checked_settlement_date()?;
+        let redemption =
+            self.bond.redemptions().first().ok_or_else(|| {
+                crate::errors::QlError::new("missing redemption", file!(), line!())
+            })?;
+        *args = CallableBondArguments {
+            settlement_date: Some(settlement),
+            face_amount: self.face_amount,
+            redemption: redemption.amount()?,
+            redemption_date: Some(redemption.date()),
+            ..CallableBondArguments::default()
+        };
+        for callability in &self.put_call_schedule {
+            if event_has_occurred(
+                callability.date(),
+                &self.settings,
+                Some(settlement),
+                Some(false),
+            )? {
+                continue;
+            }
+            args.callability_dates.push(callability.date());
+            args.callability_types.push(callability.call_type());
+            args.callability_prices.push(callability.price().amount());
         }
         Ok(())
     }
