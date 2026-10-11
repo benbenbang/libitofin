@@ -13,6 +13,7 @@ use crate::event::event_has_occurred;
 use crate::instrument::{Instrument, InstrumentBase};
 use crate::instruments::{Bond, BondPrice, FixedRateBond, ZeroCouponBond};
 use crate::pricingengine::{Arguments, Results};
+use crate::pricingengines::bond::BlackCallableBondArguments;
 use crate::settings::Settings;
 use crate::shared::Shared;
 use crate::time::businessdayconvention::BusinessDayConvention;
@@ -20,6 +21,7 @@ use crate::time::calendar::Calendar;
 use crate::time::calendars::nullcalendar::NullCalendar;
 use crate::time::date::Date;
 use crate::time::daycounter::DayCounter;
+use crate::time::frequency::Frequency;
 use crate::time::period::Period;
 use crate::time::schedule::Schedule;
 use crate::types::{Natural, Rate, Real};
@@ -379,6 +381,15 @@ impl Instrument for CallableFixedRateBond {
     }
 
     fn setup_arguments(&self, arguments: &mut dyn Arguments) -> QlResult<()> {
+        if let Some(args) = (arguments as &mut dyn Any).downcast_mut::<BlackCallableBondArguments>()
+        {
+            self.setup_arguments(&mut args.bond)?;
+            args.cashflows = self.bond().cashflows().clone();
+            args.payment_day_counter = Some(self.bond.day_counter().clone());
+            args.frequency = self.bond.frequency();
+            args.callability_count = self.put_call_schedule.len();
+            return Ok(());
+        }
         let Some(args) = (arguments as &mut dyn Any).downcast_mut::<CallableBondArguments>() else {
             fail!("wrong argument type");
         };
@@ -677,6 +688,15 @@ impl Instrument for CallableZeroCouponBond {
         self.bond.fetch_results(results)
     }
     fn setup_arguments(&self, arguments: &mut dyn Arguments) -> QlResult<()> {
+        if let Some(args) = (arguments as &mut dyn Any).downcast_mut::<BlackCallableBondArguments>()
+        {
+            self.setup_arguments(&mut args.bond)?;
+            args.cashflows = self.bond().cashflows().clone();
+            args.payment_day_counter = Some(self.day_counter.clone());
+            args.frequency = Frequency::Once;
+            args.callability_count = self.put_call_schedule.len();
+            return Ok(());
+        }
         let Some(args) = (arguments as &mut dyn Any).downcast_mut::<CallableBondArguments>() else {
             fail!("wrong argument type");
         };

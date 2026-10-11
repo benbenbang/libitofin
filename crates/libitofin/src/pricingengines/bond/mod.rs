@@ -5,11 +5,13 @@
 //!
 //! [`Bond`]: crate::instruments::Bond
 
+mod blackcallablebondengine;
 mod bondfunctions;
 mod discountingbondengine;
 mod discretizedcallablebond;
 mod treecallablebondengine;
 
+pub use blackcallablebondengine::{BlackCallableBondArguments, BlackCallableFixedRateBondEngine};
 pub use bondfunctions::BondFunctions;
 pub use discountingbondengine::DiscountingBondEngine;
 pub use discretizedcallablebond::DiscretizedCallableFixedRateBond;
