@@ -18,6 +18,7 @@
 //!
 //! The builder exposes the overrides [`OISRateHelper::initialize_dates`] and the
 //! swap oracles use:
+//! [`with_type`](MakeOis::with_type),
 //! [`with_effective_date`](MakeOis::with_effective_date),
 //! [`with_overnight_leg_spread`](MakeOis::with_overnight_leg_spread),
 //! [`with_nominal`](MakeOis::with_nominal),
@@ -54,7 +55,6 @@
 //!
 //! Still deferred, defaulting to the C++ default (`makeois.hpp:96-137`):
 //!
-//! - swap type (`receiveFixed` / `withType`): defaults to `Payer`;
 //! - the per-leg schedule variants (`withFixedLegCalendar` /
 //!   `withOvernightLegCalendar`, `withFixedLegPaymentFrequency`, the `*LegRule` /
 //!   `*LegConvention` / `*LegEndOfMonth` splits, `withMaturityEndOfMonth`): the
@@ -186,6 +186,17 @@ impl MakeOis {
             lockout_days: 0,
             observation_shift: false,
         }
+    }
+
+    /// Sets which leg is paid (`MakeOIS::withType`): a [`SwapType::Payer`]
+    /// pays fixed and receives overnight; a [`SwapType::Receiver`] does the
+    /// opposite. The default remains [`SwapType::Payer`].
+    ///
+    /// This also applies to the temporary swap used when filling a missing
+    /// fixed rate. Repeated calls use the last supplied type.
+    pub fn with_type(mut self, swap_type: SwapType) -> MakeOis {
+        self.swap_type = swap_type;
+        self
     }
 
     /// Sets the fixed-leg day count, overriding the default (the overnight
