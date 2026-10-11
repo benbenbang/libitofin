@@ -117,3 +117,5 @@ links to the language guides and project documentation.
 - [Bachelier asset ITM](normal-itm.md): normal-model helper and its zero-volatility convention.
 
 - [Percentage-strike payoff](percentage-strike-payoff.md): dimensionless moneyness and exact multiplication order.
+
+- [Floating-type payoff](floating-type-payoff.md): a supplied strike at each scalar evaluation.

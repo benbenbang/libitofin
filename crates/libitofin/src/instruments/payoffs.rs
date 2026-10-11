@@ -3,8 +3,8 @@
 //! Port of the scalar payoff subset of `ql/instruments/payoffs.{hpp,cpp}`:
 //! the [`TypePayoff`] and [`StrikedTypePayoff`] intermediate contracts, the
 //! [`PlainVanillaPayoff`], [`CashOrNothingPayoff`], [`AssetOrNothingPayoff`],
-//! [`GapPayoff`], [`PercentageStrikePayoff`] and [`NullPayoff`]. The remaining payoffs
-//! (`FloatingTypePayoff`, `SuperFundPayoff`,
+//! [`GapPayoff`], [`PercentageStrikePayoff`], [`FloatingTypePayoff`] and [`NullPayoff`]. The remaining payoffs
+//! (`SuperFundPayoff`,
 //! `SuperSharePayoff`) are follow-up work.
 
 use std::any::Any;
@@ -357,6 +357,76 @@ impl TypePayoff for PercentageStrikePayoff {
 impl StrikedTypePayoff for PercentageStrikePayoff {
     fn strike(&self) -> Real {
         self.moneyness
+    }
+}
+
+/// Vanilla payoff with its strike supplied at evaluation rather than stored.
+///
+/// Matches QuantLib's `FloatingTypePayoff`. Use [`Self::value_with_strike`]
+/// to evaluate a call or put. This is a [`TypePayoff`], not a
+/// [`StrikedTypePayoff`], and does not enable an additional pricing engine.
+/// The scalar Black calculator rejects it at compile time:
+///
+/// ```compile_fail
+/// use libitofin::instruments::FloatingTypePayoff;
+/// use libitofin::option::OptionType;
+/// use libitofin::pricingengines::BlackCalculator;
+/// let payoff = FloatingTypePayoff::new(OptionType::Call);
+/// BlackCalculator::with_striked_payoff(&payoff, 100.0, 0.2, 1.0);
+/// ```
+///
+/// # Panics
+///
+/// [`Payoff::value`] always panics with `floating payoff not handled` because
+/// its one-input contract cannot supply the strike. This mirrors QuantLib's
+/// deliberate evaluation failure and the existing [`NullPayoff`] convention.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct FloatingTypePayoff {
+    option_type: OptionType,
+}
+
+impl FloatingTypePayoff {
+    /// Builds a floating-strike payoff of the given option type.
+    pub fn new(option_type: OptionType) -> Self {
+        Self { option_type }
+    }
+
+    /// Evaluates `max(price - strike, 0)` for a call or
+    /// `max(strike - price, 0)` for a put, using this evaluation's strike.
+    ///
+    /// Neither input is validated. Negative values are supported; NaN,
+    /// infinity and signed zero preserve QuantLib's subtraction followed by
+    /// `std::max` comparison semantics. In particular, NaN is not floored.
+    pub fn value_with_strike(&self, price: Real, strike: Real) -> Real {
+        let intrinsic = match self.option_type {
+            OptionType::Call => price - strike,
+            OptionType::Put => strike - price,
+        };
+        if intrinsic < 0.0 { 0.0 } else { intrinsic }
+    }
+}
+
+impl Payoff for FloatingTypePayoff {
+    fn name(&self) -> String {
+        "FloatingType".into()
+    }
+
+    fn description(&self) -> String {
+        format!("{} {}", self.name(), self.option_type)
+    }
+
+    /// # Panics
+    ///
+    /// Always panics because no strike is provided. Use
+    /// [`Self::value_with_strike`] for supported evaluation.
+    fn value(&self, _price: Real) -> Real {
+        panic!("floating payoff not handled")
+    }
+}
+
+impl TypePayoff for FloatingTypePayoff {
+    fn option_type(&self) -> OptionType {
+        self.option_type
     }
 }
 
