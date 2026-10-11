@@ -101,3 +101,5 @@ links to the language guides and project documentation.
 - [Cross-currency basis swaps](cross-currency-basis-swaps.md): plain non-resettable Ibor legs and explicit FX valuation.
 
 - [MF state process](mf-state-process.md): standalone Gaussian state law and checked piecewise variance.
+
+- [Asset-or-nothing payoff](asset-or-nothing-payoff.md): strict digital asset payment.

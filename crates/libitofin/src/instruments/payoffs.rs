@@ -1,10 +1,10 @@
 //! Payoffs for various options.
 //!
-//! Port of the plain-vanilla subset of `ql/instruments/payoffs.{hpp,cpp}`:
+//! Port of the scalar payoff subset of `ql/instruments/payoffs.{hpp,cpp}`:
 //! the [`TypePayoff`] and [`StrikedTypePayoff`] intermediate contracts, the
-//! [`PlainVanillaPayoff`], [`CashOrNothingPayoff`] and [`NullPayoff`]. The remaining
-//! payoffs (`FloatingTypePayoff`, `PercentageStrikePayoff`,
-//! `AssetOrNothingPayoff`, `GapPayoff`, `SuperFundPayoff`,
+//! [`PlainVanillaPayoff`], [`CashOrNothingPayoff`], [`AssetOrNothingPayoff`] and
+//! [`NullPayoff`]. The remaining payoffs (`FloatingTypePayoff`, `PercentageStrikePayoff`,
+//! `GapPayoff`, `SuperFundPayoff`,
 //! `SuperSharePayoff`) are follow-up work.
 
 use std::any::Any;
@@ -172,6 +172,63 @@ impl TypePayoff for CashOrNothingPayoff {
 }
 
 impl StrikedTypePayoff for CashOrNothingPayoff {
+    fn strike(&self) -> Real {
+        self.strike
+    }
+}
+
+/// Binary asset-or-nothing payoff, paying the underlying price strictly beyond
+/// the strike and zero otherwise.
+///
+/// Matches QuantLib's `AssetOrNothingPayoff`. At the strike both call and put
+/// pay zero. Construction follows the existing infallible payoff contract;
+/// no positivity or finiteness validation is imposed.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct AssetOrNothingPayoff {
+    option_type: OptionType,
+    strike: Real,
+}
+
+impl AssetOrNothingPayoff {
+    /// Builds an asset-or-nothing payoff with the given type and strike.
+    pub fn new(option_type: OptionType, strike: Real) -> Self {
+        Self {
+            option_type,
+            strike,
+        }
+    }
+}
+
+impl Payoff for AssetOrNothingPayoff {
+    fn name(&self) -> String {
+        "AssetOrNothing".into()
+    }
+
+    fn description(&self) -> String {
+        format!(
+            "{} {}, {} strike",
+            self.name(),
+            self.option_type,
+            self.strike
+        )
+    }
+
+    fn value(&self, price: Real) -> Real {
+        let moneyness = match self.option_type {
+            OptionType::Call => price - self.strike,
+            OptionType::Put => self.strike - price,
+        };
+        if moneyness > 0.0 { price } else { 0.0 }
+    }
+}
+
+impl TypePayoff for AssetOrNothingPayoff {
+    fn option_type(&self) -> OptionType {
+        self.option_type
+    }
+}
+
+impl StrikedTypePayoff for AssetOrNothingPayoff {
     fn strike(&self) -> Real {
         self.strike
     }
