@@ -20,6 +20,7 @@ __all__ = [
     "BlackSwaptionEngine",
     "CashAnnuityModel",
     "CosHestonEngine",
+    "DiscountingBondEngine",
     "DiscountingSwapEngine",
     "ExponentialFittingControlVariate",
     "ExponentialFittingHestonEngine",
@@ -272,6 +273,13 @@ class CosHestonEngine:
         r"""
         Return the logarithm of the forward-to-spot ratio.
         """
+
+@typing.final
+class DiscountingBondEngine:
+    r"""
+    Observable discounting engine, with live curve and explicit retained settings.
+    """
+    def __new__(cls, discount_curve: termstructures.YieldTermStructure, settings: itofin.Settings, include_settlement_date_flows: typing.Optional[builtins.bool] = None) -> DiscountingBondEngine: ...
 
 @typing.final
 class DiscountingSwapEngine:

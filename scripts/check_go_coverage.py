@@ -81,6 +81,46 @@ def nonconstructible_enums():
     return eligible
 
 
+
+def nonconstructible_bases():
+    eligible = {}
+    python_root = ROOT / "crates/itofin-py/python"
+    for path in (python_root / "itofin").rglob("*.pyi"):
+        module = ".".join(path.relative_to(python_root).parts[:-1])
+        classes = [node for node in ast.parse(path.read_text()).body if isinstance(node, ast.ClassDef)]
+        for node in classes:
+            methods = {c.name: c for c in node.body if isinstance(c, (ast.FunctionDef, ast.AsyncFunctionDef))}
+            constructors = [c for c in node.body if isinstance(c, (ast.FunctionDef, ast.AsyncFunctionDef)) and c.name == "__new__"]
+            if (len(constructors) != 1 or not isinstance(constructors[0], ast.FunctionDef)
+                    or constructors[0].decorator_list or "__init__" in methods or "__int__" in methods):
+                continue
+            constructor = constructors[0]
+            args = constructor.args
+            if not (len(args.args) == 2 and not args.posonlyargs and not args.kwonlyargs
+                    and args.vararg is None and args.kwarg is None and not args.defaults
+                    and args.args[1].annotation is not None
+                    and ast.unparse(args.args[1].annotation) in {"typing.NoReturn", "typing.Never"}
+                    and constructor.returns is not None and ast.unparse(constructor.returns) == node.name):
+                continue
+            subclasses = set()
+            for child in classes:
+                if not any(isinstance(base, ast.Name) and base.id == node.name for base in child.bases):
+                    continue
+                initializers = [method for method in child.body if isinstance(method, ast.FunctionDef)
+                                and method.name in {"__new__", "__init__"}]
+                for method in initializers:
+                    parameters = method.args.posonlyargs + method.args.args + method.args.kwonlyargs
+                    if any(arg.annotation is not None and ast.unparse(arg.annotation)
+                           in {"typing.NoReturn", "typing.Never"} for arg in parameters):
+                        continue
+                    expected_return = child.name if method.name == "__new__" else "None"
+                    if method.returns is not None and ast.unparse(method.returns) == expected_return:
+                        subclasses.add(f"{module}.{child.name}.{method.name}")
+            if subclasses:
+                eligible[f"{module}.{node.name}.__new__"] = subclasses
+    return eligible
+
+
 def items(value):
     return [value] if isinstance(value, str) else value or []
 
@@ -89,6 +129,7 @@ def audit():
     symbols = inventory()
     records, classifications, errors = {}, {}, []
     eligible = nonconstructible_enums()
+    bases = nonconstructible_bases()
     native = "\n".join(p.read_text() for p in (ROOT / "crates/libitofin-ffi/src").rglob("*.rs"))
     header = (ROOT / "crates/libitofin-ffi/include/itofin.h").read_text()
     go = "\n".join(p.read_text() for p in (ROOT / "sdk/go").glob("*.go") if not p.name.endswith("_test.go"))
@@ -109,15 +150,17 @@ def audit():
                 if name in classifications:
                     errors.append(f"{name}: duplicate language-specific classification")
                 classifications[name] = record
-                if record.get("classification") != "nonconstructible-enum" or name not in eligible:
+                kind = record.get("classification")
+                is_base = kind == "nonconstructible-base"
+                if not ((kind == "nonconstructible-enum" and name in eligible) or (is_base and name in bases)):
                     errors.append(f"{name}: unsupported language-specific classification")
                 if not isinstance(record.get("reason"), str) or not record["reason"].strip():
                     errors.append(f"{name}: missing classification reason")
                 go_type = record.get("go", "")
                 if not isinstance(go_type, str) or not re.fullmatch(r"[A-Za-z_]\w*", go_type):
-                    errors.append(f"{name}: classification requires a Go enum type")
-                elif not re.search(r"\btype\s+" + re.escape(go_type) + r"\s+int32\b", go):
-                    errors.append(f"{name}: missing Go enum type {go_type}")
+                    errors.append(f"{name}: classification requires a Go {'base' if is_base else 'enum'} type")
+                elif not re.search(r"\btype\s+" + re.escape(go_type) + (r"\s+struct\b" if is_base else r"\s+int32\b"), go):
+                    errors.append(f"{name}: missing Go {'base' if is_base else 'enum'} type {go_type}")
                 continue
             elif status != "implemented":
                 errors.append(f"{name}: unknown mapping status {status}")
@@ -152,6 +195,18 @@ def audit():
             for row in type_mappings for value in items(row.get("go"))
         ):
             errors.append(f"{name}: corresponding Go type is not mapped")
+        if record.get("classification") == "nonconstructible-base":
+            if not any(rows and any(row.get("c") and row.get("go") for row in rows)
+                       for child in bases.get(name, set()) for rows in [records.get(child, [])]):
+                errors.append(f"{name}: constructible subclass constructor is not mapped")
+            go_type = record.get("go")
+            mapped_methods = [value for symbol, rows in records.items() if symbol.startswith(parent + ".")
+                              for row in rows for value in items(row.get("go"))
+                              if isinstance(go_type, str) and value.startswith(go_type + ".")]
+            if not any(re.search(r"\bfunc\s+\([^)]*\*" + re.escape(go_type) + r"\)\s+"
+                                 + re.escape(value.split(".")[1]) + r"\s*\(", go)
+                       for value in mapped_methods):
+                errors.append(f"{name}: corresponding Go base methods are not mapped")
         if name in covered:
             errors.append(f"{name}: conflicting implemented and language-specific mappings")
     linked_tests = {name for name, rows in records.items() if any(r.get("tests") for r in rows)}

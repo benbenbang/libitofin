@@ -16,10 +16,12 @@ import typing
 __all__ = [
     "BMASwap",
     "BermudanExercise",
+    "Bond",
     "CapFloor",
     "CapFloorType",
     "CreditDefaultSwap",
     "EuropeanExercise",
+    "FixedRateBond",
     "ForwardRateAgreement",
     "MakeCreditDefaultSwap",
     "MakeOis",
@@ -41,6 +43,7 @@ __all__ = [
     "VarianceSwap",
     "YearOnYearInflationSwap",
     "YoYInflationCapFloor",
+    "ZeroCouponBond",
     "ZeroCouponInflationSwap",
 ]
 
@@ -95,6 +98,58 @@ class BermudanExercise:
         r"""
         Return a copy of the sorted exercise dates.
         """
+
+class Bond:
+    r"""
+    Shared bond interface, constructed only through concrete bond classes.
+    """
+    def __new__(cls, _unconstructible: typing.NoReturn) -> Bond: ...
+    def set_engine(self, engine: pricingengines.DiscountingBondEngine) -> None:
+        r"""
+        Attach an engine sharing this bond's settings. Dependencies remain live.
+        """
+    def npv(self) -> builtins.float:
+        r"""
+        Present value in currency units, discounted to the curve reference date.
+        """
+    def settlement_value(self) -> builtins.float:
+        r"""
+        Dirty currency value at settlement; the today-flow flag can override exclusion.
+        """
+    def dirty_price(self) -> builtins.float:
+        r"""
+        Settlement price per 100 of current notional.
+        """
+    def clean_price(self) -> builtins.float:
+        r"""
+        Dirty quote less accrued interest, per 100 of current notional.
+        """
+    def accrued_amount(self, date: typing.Optional[time.Date] = None) -> builtins.float:
+        r"""
+        Accrued interest per 100; omitted date uses settlement.
+        """
+    def notional(self, date: typing.Optional[time.Date] = None) -> builtins.float:
+        r"""
+        Outstanding notional on date; omitted date uses settlement.
+        """
+    def settlement_date(self, date: typing.Optional[time.Date] = None) -> time.Date:
+        r"""
+        Calendar-adjusted settlement, floored at the issue date.
+        """
+    def settlement_days(self) -> builtins.int: ...
+    def calendar(self) -> time.Calendar: ...
+    def maturity_date(self) -> time.Date: ...
+    def issue_date(self) -> typing.Optional[time.Date]: ...
+    def cashflows(self) -> cashflows.Leg: ...
+    def redemptions(self) -> cashflows.Leg: ...
+    def is_expired(self) -> builtins.bool: ...
+    def is_calculated(self) -> builtins.bool: ...
+    def freeze(self) -> None:
+        r"""
+        Pin cached results while unexpired; native expiry can still bypass freeze.
+        """
+    def unfreeze(self) -> None: ...
+    def recalculate(self) -> None: ...
 
 @typing.final
 class CapFloor:
@@ -576,6 +631,16 @@ class EuropeanExercise:
         Args:
             date (Date): The single date the option may be exercised on.
         """
+
+@typing.final
+class FixedRateBond(Bond):
+    r"""
+    Fixed coupon bond, retaining the common Bond valuation interface.
+    """
+    def __new__(cls, settlement_days: builtins.int, face_amount: builtins.float, schedule: time.Schedule, coupons: typing.Sequence[builtins.float], accrual_day_counter: time.DayCounter, settings: itofin.Settings, payment_convention: time.BusinessDayConvention = time.BusinessDayConvention.Following, redemption: builtins.float = 100.0, issue_date: typing.Optional[time.Date] = None, payment_calendar: typing.Optional[time.Calendar] = None, ex_coupon_period: typing.Optional[time.Period] = None, ex_coupon_calendar: typing.Optional[time.Calendar] = None, ex_coupon_convention: time.BusinessDayConvention = time.BusinessDayConvention.Unadjusted, ex_coupon_end_of_month: builtins.bool = False, first_period_day_counter: typing.Optional[time.DayCounter] = None) -> FixedRateBond: ...
+    def frequency(self) -> time.Frequency: ...
+    def day_counter(self) -> time.DayCounter: ...
+    def first_period_day_counter(self) -> typing.Optional[time.DayCounter]: ...
 
 @typing.final
 class ForwardRateAgreement:
@@ -2197,6 +2262,13 @@ class YoYInflationCapFloor:
             ItofinError: If no engine is attached, which the core reports as
                 "null pricing engine", and on whatever the engine reports.
         """
+
+@typing.final
+class ZeroCouponBond(Bond):
+    r"""
+    One redemption on an adjusted payment date, with contractual maturity intact.
+    """
+    def __new__(cls, settlement_days: builtins.int, calendar: time.Calendar, face_amount: builtins.float, maturity_date: time.Date, settings: itofin.Settings, payment_convention: time.BusinessDayConvention = time.BusinessDayConvention.Following, redemption: builtins.float = 100.0, issue_date: typing.Optional[time.Date] = None) -> ZeroCouponBond: ...
 
 @typing.final
 class ZeroCouponInflationSwap:

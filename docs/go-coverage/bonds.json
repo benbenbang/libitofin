@@ -1,0 +1,415 @@
+{
+  "domain": "fixed-zero-bond-foundation",
+  "entries": [
+    {
+      "c": [
+        "itofin_fixed_rate_bond_new"
+      ],
+      "go": [
+        "Session.NewFixedRateBond"
+      ],
+      "python": "itofin.instruments.FixedRateBond",
+      "status": "implemented",
+      "tests": [
+        "TestBondNativeOracleAndRetainedLifecycle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_fixed_rate_bond_new"
+      ],
+      "go": [
+        "Session.NewFixedRateBond"
+      ],
+      "python": "itofin.instruments.FixedRateBond.__new__",
+      "status": "implemented",
+      "tests": [
+        "TestBondNativeOracleAndRetainedLifecycle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_zero_coupon_bond_new"
+      ],
+      "go": [
+        "Session.NewZeroCouponBond"
+      ],
+      "python": "itofin.instruments.ZeroCouponBond",
+      "status": "implemented",
+      "tests": [
+        "TestBondNativeOracleAndRetainedLifecycle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_zero_coupon_bond_new"
+      ],
+      "go": [
+        "Session.NewZeroCouponBond"
+      ],
+      "python": "itofin.instruments.ZeroCouponBond.__new__",
+      "status": "implemented",
+      "tests": [
+        "TestBondNativeOracleAndRetainedLifecycle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_bond_set_engine"
+      ],
+      "go": [
+        "Bond"
+      ],
+      "python": "itofin.instruments.Bond",
+      "status": "implemented",
+      "tests": [
+        "TestBondNativeOracleAndRetainedLifecycle"
+      ]
+    },
+    {
+      "classification": "nonconstructible-base",
+      "go": "Bond",
+      "python": "itofin.instruments.Bond.__new__",
+      "reason": "Python forbids standalone Bond construction with a NoReturn constructor; Go exposes the same retained base embedded by constructible FixedRateBond and ZeroCouponBond without a standalone Session factory.",
+      "status": "language-specific"
+    },
+    {
+      "c": [
+        "itofin_bond_set_engine"
+      ],
+      "go": [
+        "Bond.SetEngine"
+      ],
+      "python": "itofin.instruments.Bond.set_engine",
+      "status": "implemented",
+      "tests": [
+        "TestBondNativeOracleAndRetainedLifecycle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_bond_real"
+      ],
+      "go": [
+        "Bond.NPV"
+      ],
+      "python": "itofin.instruments.Bond.npv",
+      "status": "implemented",
+      "tests": [
+        "TestBondNativeOracleAndRetainedLifecycle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_bond_real"
+      ],
+      "go": [
+        "Bond.SettlementValue"
+      ],
+      "python": "itofin.instruments.Bond.settlement_value",
+      "status": "implemented",
+      "tests": [
+        "TestBondNativeOracleAndRetainedLifecycle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_bond_real"
+      ],
+      "go": [
+        "Bond.CleanPrice"
+      ],
+      "python": "itofin.instruments.Bond.clean_price",
+      "status": "implemented",
+      "tests": [
+        "TestBondNativeOracleAndRetainedLifecycle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_bond_real"
+      ],
+      "go": [
+        "Bond.DirtyPrice"
+      ],
+      "python": "itofin.instruments.Bond.dirty_price",
+      "status": "implemented",
+      "tests": [
+        "TestBondNativeOracleAndRetainedLifecycle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_bond_real"
+      ],
+      "go": [
+        "Bond.AccruedAmount"
+      ],
+      "python": "itofin.instruments.Bond.accrued_amount",
+      "status": "implemented",
+      "tests": [
+        "TestBondNativeOracleAndRetainedLifecycle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_bond_real"
+      ],
+      "go": [
+        "Bond.Notional"
+      ],
+      "python": "itofin.instruments.Bond.notional",
+      "status": "implemented",
+      "tests": [
+        "TestBondNativeOracleAndRetainedLifecycle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_bond_integer"
+      ],
+      "go": [
+        "Bond.SettlementDate"
+      ],
+      "python": "itofin.instruments.Bond.settlement_date",
+      "status": "implemented",
+      "tests": [
+        "TestBondNativeOracleAndRetainedLifecycle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_bond_integer"
+      ],
+      "go": [
+        "Bond.SettlementDays"
+      ],
+      "python": "itofin.instruments.Bond.settlement_days",
+      "status": "implemented",
+      "tests": [
+        "TestBondNativeOracleAndRetainedLifecycle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_bond_handle"
+      ],
+      "go": [
+        "Bond.Calendar"
+      ],
+      "python": "itofin.instruments.Bond.calendar",
+      "status": "implemented",
+      "tests": [
+        "TestBondNativeOracleAndRetainedLifecycle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_bond_integer"
+      ],
+      "go": [
+        "Bond.MaturityDate"
+      ],
+      "python": "itofin.instruments.Bond.maturity_date",
+      "status": "implemented",
+      "tests": [
+        "TestBondNativeOracleAndRetainedLifecycle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_bond_integer"
+      ],
+      "go": [
+        "Bond.IssueDate"
+      ],
+      "python": "itofin.instruments.Bond.issue_date",
+      "status": "implemented",
+      "tests": [
+        "TestBondNativeOracleAndRetainedLifecycle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_bond_handle"
+      ],
+      "go": [
+        "Bond.Cashflows"
+      ],
+      "python": "itofin.instruments.Bond.cashflows",
+      "status": "implemented",
+      "tests": [
+        "TestBondNativeOracleAndRetainedLifecycle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_bond_handle"
+      ],
+      "go": [
+        "Bond.Redemptions"
+      ],
+      "python": "itofin.instruments.Bond.redemptions",
+      "status": "implemented",
+      "tests": [
+        "TestBondNativeOracleAndRetainedLifecycle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_bond_integer"
+      ],
+      "go": [
+        "Bond.IsExpired"
+      ],
+      "python": "itofin.instruments.Bond.is_expired",
+      "status": "implemented",
+      "tests": [
+        "TestBondNativeOracleAndRetainedLifecycle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_bond_integer"
+      ],
+      "go": [
+        "Bond.IsCalculated"
+      ],
+      "python": "itofin.instruments.Bond.is_calculated",
+      "status": "implemented",
+      "tests": [
+        "TestBondNativeOracleAndRetainedLifecycle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_bond_action"
+      ],
+      "go": [
+        "Bond.Freeze"
+      ],
+      "python": "itofin.instruments.Bond.freeze",
+      "status": "implemented",
+      "tests": [
+        "TestBondReferenceEventPolicyHonorsFreeze"
+      ]
+    },
+    {
+      "c": [
+        "itofin_bond_action"
+      ],
+      "go": [
+        "Bond.Unfreeze"
+      ],
+      "python": "itofin.instruments.Bond.unfreeze",
+      "status": "implemented",
+      "tests": [
+        "TestBondReferenceEventPolicyHonorsFreeze"
+      ]
+    },
+    {
+      "c": [
+        "itofin_bond_action"
+      ],
+      "go": [
+        "Bond.Recalculate"
+      ],
+      "python": "itofin.instruments.Bond.recalculate",
+      "status": "implemented",
+      "tests": [
+        "TestBondReferenceEventPolicyHonorsFreeze"
+      ]
+    },
+    {
+      "c": [
+        "itofin_bond_integer"
+      ],
+      "go": [
+        "FixedRateBond.Frequency"
+      ],
+      "python": "itofin.instruments.FixedRateBond.frequency",
+      "status": "implemented",
+      "tests": [
+        "TestBondNativeOracleAndRetainedLifecycle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_bond_handle"
+      ],
+      "go": [
+        "FixedRateBond.DayCounter"
+      ],
+      "python": "itofin.instruments.FixedRateBond.day_counter",
+      "status": "implemented",
+      "tests": [
+        "TestBondNativeOracleAndRetainedLifecycle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_bond_handle"
+      ],
+      "go": [
+        "FixedRateBond.FirstPeriodDayCounter"
+      ],
+      "python": "itofin.instruments.FixedRateBond.first_period_day_counter",
+      "status": "implemented",
+      "tests": [
+        "TestBondNativeOracleAndRetainedLifecycle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_discounting_bond_engine_new"
+      ],
+      "go": [
+        "Session.NewDiscountingBondEngine"
+      ],
+      "python": "itofin.pricingengines.DiscountingBondEngine",
+      "status": "implemented",
+      "tests": [
+        "TestBondNativeOracleAndRetainedLifecycle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_discounting_bond_engine_new"
+      ],
+      "go": [
+        "Session.NewDiscountingBondEngine"
+      ],
+      "python": "itofin.pricingengines.DiscountingBondEngine.__new__",
+      "status": "implemented",
+      "tests": [
+        "TestBondNativeOracleAndRetainedLifecycle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_settings_include_reference_date_events"
+      ],
+      "go": [
+        "Settings.IncludeReferenceDateEvents"
+      ],
+      "python": "itofin.Settings.include_reference_date_events",
+      "status": "implemented",
+      "tests": [
+        "TestBondReferenceEventPolicyHonorsFreeze"
+      ]
+    },
+    {
+      "c": [
+        "itofin_settings_set_include_reference_date_events"
+      ],
+      "go": [
+        "Settings.SetIncludeReferenceDateEvents"
+      ],
+      "python": "itofin.Settings.set_include_reference_date_events",
+      "status": "implemented",
+      "tests": [
+        "TestBondReferenceEventPolicyHonorsFreeze"
+      ]
+    }
+  ]
+}

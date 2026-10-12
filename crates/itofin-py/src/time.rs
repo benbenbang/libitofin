@@ -498,7 +498,7 @@ impl PyCalendar {
     /// The horizon guard stands in front of the core `assert!` in the
     /// Indonesia and Saudi Arabia calendars, so an out-of-table year surfaces
     /// as an ItofinError rather than a panic.
-    fn checked(&self, date: &PyDate, action: &str) -> PyResult<Date> {
+    pub(crate) fn checked(&self, date: &PyDate, action: &str) -> PyResult<Date> {
         let date = non_null(date, action)?;
         if let Some(horizon) = self.horizon
             && date.year() > horizon
@@ -515,7 +515,13 @@ impl PyCalendar {
 
 /// A business-day calendar.
 #[gen_stub_pyclass]
-#[pyclass(name = "Calendar", unsendable, module = "itofin.time")]
+#[pyclass(
+    name = "Calendar",
+    unsendable,
+    skip_from_py_object,
+    module = "itofin.time"
+)]
+#[derive(Clone)]
 pub struct PyCalendar {
     inner: Calendar,
     /// The last year the calendar's holidays are tabulated for, when the core
@@ -1990,6 +1996,7 @@ impl PyDateGeneration {
 #[pyclass(name = "Schedule", unsendable, module = "itofin.time")]
 pub struct PySchedule {
     inner: Schedule,
+    calendar: PyCalendar,
 }
 
 #[gen_stub_pymethods]
@@ -2048,7 +2055,10 @@ impl PySchedule {
             .with_termination_date_convention(termination_convention)
             .with_rule(rule.inner())
             .build();
-        Ok(PySchedule { inner })
+        Ok(PySchedule {
+            inner,
+            calendar: calendar.clone(),
+        })
     }
 
     /// The number of dates in the schedule.
@@ -2094,6 +2104,10 @@ impl PySchedule {
 }
 
 impl PySchedule {
+    pub(crate) fn retained_calendar(&self) -> PyCalendar {
+        self.calendar.clone()
+    }
+
     /// The wrapped core Schedule (clone), for the swap facades in X2.
     #[allow(dead_code)]
     pub(crate) fn inner(&self) -> Schedule {

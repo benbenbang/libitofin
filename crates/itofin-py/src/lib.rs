@@ -8,6 +8,7 @@
 mod bates;
 mod benchmark_beta;
 mod bma;
+mod bonds;
 mod bootstrap;
 mod calibration;
 mod capfloor;
@@ -357,6 +358,9 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     cashflows.add_function(wrap_pyfunction!(cashflows::npv, &cashflows)?)?;
 
     let instruments = PyModule::new(py, "instruments")?;
+    instruments.add_class::<bonds::PyBond>()?;
+    instruments.add_class::<bonds::PyFixedRateBond>()?;
+    instruments.add_class::<bonds::PyZeroCouponBond>()?;
     instruments.add_class::<variance_swap::PyVarianceSwap>()?;
     instruments.add_class::<PyOptionType>()?;
     instruments.add_class::<PyVanillaOption>()?;
@@ -396,6 +400,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     models.add_class::<PyCalibrationErrorType>()?;
 
     let pricingengines = PyModule::new(py, "pricingengines")?;
+    pricingengines.add_class::<bonds::PyDiscountingBondEngine>()?;
     pricingengines.add_class::<variance_swap::PyReplicatingVarianceSwapEngine>()?;
     pricingengines.add_class::<mc_variance_swap::PyMCVarianceSwapEngine>()?;
     pricingengines.add_class::<PyCashAnnuityModel>()?;

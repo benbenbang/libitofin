@@ -7,6 +7,10 @@ nonconstructible Python enum declarations have reviewed language-specific
 classifications, counted separately from Go mappings. Go enums use typed integer
 constants and explicit conversions; native APIs validate their discriminants.
 Classifications cannot replace baseline implementations or hide new APIs.
+Nonconstructible shared bases use a separate `nonconstructible-base` typing
+classification only for an exact impossible constructor, actual constructible
+bound subclasses and real mapped Go base methods. This is not a factory
+implementation and is counted separately from implemented declarations.
 
 ## Native boundary
 

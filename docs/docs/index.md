@@ -12,6 +12,10 @@ bindings. All three language surfaces share the Rust numerical core.
 - **Typed and introspectable.** Every class ships hand-written `.pyi` stubs with Google-style
   docstrings, so editors autocomplete and this site renders the full signature.
 
+Go and Python now expose fixed/zero bond instruments and retained discounting
+engines: [bond binding guide](bond-bindings.md). Existing bootstrap helpers remain
+separate. Floating and analytical binding catch-up are in progress.
+
 ## Install
 
 === "Python"

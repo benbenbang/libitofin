@@ -56,6 +56,16 @@ impl PySettings {
         self.inner.using_at_par_coupons()
     }
 
+    /// Set the default inclusion of reference-date events for pricing engines.
+    fn set_include_reference_date_events(&self, value: bool) {
+        self.inner.set_include_reference_date_events(value);
+    }
+
+    /// Return the default reference-date event policy.
+    fn include_reference_date_events(&self) -> bool {
+        self.inner.include_reference_date_events()
+    }
+
     /// Set whether cash flows on today's date enter an NPV; None clears.
     ///
     /// The flag is three-valued, as in the core.
