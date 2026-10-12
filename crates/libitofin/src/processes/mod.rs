@@ -12,6 +12,7 @@ mod batesprocess;
 mod blackscholesprocess;
 pub mod discretization;
 pub mod forwardmeasureprocess;
+mod g2process;
 mod geometricbrownianprocess;
 mod gjrgarchprocess;
 pub mod gsrprocess;
@@ -28,6 +29,7 @@ pub use discretization::{
     ProcessDiscretization1D,
 };
 pub use forwardmeasureprocess::{ForwardMeasureProcess1D, ForwardMeasureTime};
+pub use g2process::G2Process;
 pub use geometricbrownianprocess::GeometricBrownianMotionProcess;
 pub use gjrgarchprocess::{
     GjrGarchCoefficients, GjrGarchDiscretization, GjrGarchParameters, GjrGarchProcess,
