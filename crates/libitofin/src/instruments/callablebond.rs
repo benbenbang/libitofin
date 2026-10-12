@@ -7,6 +7,8 @@
 
 mod impliedvolatility;
 
+mod oas;
+
 use std::any::Any;
 use std::cell::Cell;
 
