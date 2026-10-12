@@ -1,0 +1,168 @@
+{
+  "compounding": "Compounded",
+  "coupon": 0.05,
+  "curve_rate": 0.025,
+  "end": [
+    10,
+    1,
+    2027
+  ],
+  "face": 250.0,
+  "flow_amounts": [
+    6.2847222222222054,
+    6.388888888888888,
+    252.5
+  ],
+  "frequency": "Quarterly",
+  "npv_date": [
+    10,
+    4,
+    2026
+  ],
+  "oracle": "QuantLib 1.43",
+  "redemption": 101.0,
+  "reference": [
+    1,
+    1,
+    2026
+  ],
+  "rows": [
+    {
+      "include_reference": false,
+      "include_settlement_flows": null,
+      "include_today": null,
+      "npv": 252.8383524984084,
+      "z_spread": 0.006000000000000133
+    },
+    {
+      "include_reference": false,
+      "include_settlement_flows": false,
+      "include_today": null,
+      "npv": 252.8383524984084,
+      "z_spread": 0.006000000000000133
+    },
+    {
+      "include_reference": false,
+      "include_settlement_flows": true,
+      "include_today": null,
+      "npv": 259.0740853144671,
+      "z_spread": 0.006000000000000169
+    },
+    {
+      "include_reference": true,
+      "include_settlement_flows": null,
+      "include_today": null,
+      "npv": 259.0740853144671,
+      "z_spread": 0.006000000000000169
+    },
+    {
+      "include_reference": true,
+      "include_settlement_flows": false,
+      "include_today": null,
+      "npv": 252.8383524984084,
+      "z_spread": 0.006000000000000133
+    },
+    {
+      "include_reference": true,
+      "include_settlement_flows": true,
+      "include_today": null,
+      "npv": 259.0740853144671,
+      "z_spread": 0.006000000000000169
+    },
+    {
+      "include_reference": false,
+      "include_settlement_flows": null,
+      "include_today": false,
+      "npv": 252.8383524984084,
+      "z_spread": 0.006000000000000133
+    },
+    {
+      "include_reference": false,
+      "include_settlement_flows": false,
+      "include_today": false,
+      "npv": 252.8383524984084,
+      "z_spread": 0.006000000000000133
+    },
+    {
+      "include_reference": false,
+      "include_settlement_flows": true,
+      "include_today": false,
+      "npv": 252.8383524984084,
+      "z_spread": 0.006000000000000133
+    },
+    {
+      "include_reference": true,
+      "include_settlement_flows": null,
+      "include_today": false,
+      "npv": 252.8383524984084,
+      "z_spread": 0.006000000000000133
+    },
+    {
+      "include_reference": true,
+      "include_settlement_flows": false,
+      "include_today": false,
+      "npv": 252.8383524984084,
+      "z_spread": 0.006000000000000133
+    },
+    {
+      "include_reference": true,
+      "include_settlement_flows": true,
+      "include_today": false,
+      "npv": 252.8383524984084,
+      "z_spread": 0.006000000000000133
+    },
+    {
+      "include_reference": false,
+      "include_settlement_flows": null,
+      "include_today": true,
+      "npv": 259.0740853144671,
+      "z_spread": 0.006000000000000169
+    },
+    {
+      "include_reference": false,
+      "include_settlement_flows": false,
+      "include_today": true,
+      "npv": 259.0740853144671,
+      "z_spread": 0.006000000000000169
+    },
+    {
+      "include_reference": false,
+      "include_settlement_flows": true,
+      "include_today": true,
+      "npv": 259.0740853144671,
+      "z_spread": 0.006000000000000169
+    },
+    {
+      "include_reference": true,
+      "include_settlement_flows": null,
+      "include_today": true,
+      "npv": 259.0740853144671,
+      "z_spread": 0.006000000000000169
+    },
+    {
+      "include_reference": true,
+      "include_settlement_flows": false,
+      "include_today": true,
+      "npv": 259.0740853144671,
+      "z_spread": 0.006000000000000169
+    },
+    {
+      "include_reference": true,
+      "include_settlement_flows": true,
+      "include_today": true,
+      "npv": 259.0740853144671,
+      "z_spread": 0.006000000000000169
+    }
+  ],
+  "settlement": [
+    10,
+    7,
+    2026
+  ],
+  "start": [
+    10,
+    1,
+    2026
+  ],
+  "z_spread": 0.006
+}

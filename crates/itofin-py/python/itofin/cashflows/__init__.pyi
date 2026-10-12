@@ -18,6 +18,8 @@ __all__ = [
     "YoYInflationLeg",
     "YoYInflationOptionletCouponPricer",
     "npv",
+    "npv_at_z_spread",
+    "z_spread",
 ]
 
 @typing.final
@@ -588,4 +590,14 @@ def npv(leg: Leg, discount_curve: termstructures.YieldTermStructure, settings: i
     Raises:
         ItofinError: On a flow or curve lookup failure, and without a
             settlement_date when the evaluation date is unset.
+    """
+
+def npv_at_z_spread(leg: Leg, discount_curve: termstructures.YieldTermStructure, z_spread: builtins.float, compounding: time.Compounding, frequency: time.Frequency, settings: itofin.Settings, *, include_settlement_date_flows: typing.Optional[builtins.bool] = None, settlement_date: typing.Optional[time.Date] = None, npv_date: typing.Optional[time.Date] = None) -> builtins.float:
+    r"""
+    Currency NPV of the surviving leg discounted with a parallel zero-rate spread.
+    """
+
+def z_spread(leg: Leg, npv: builtins.float, discount_curve: termstructures.YieldTermStructure, compounding: time.Compounding, frequency: time.Frequency, settings: itofin.Settings, *, include_settlement_date_flows: typing.Optional[builtins.bool] = None, settlement_date: typing.Optional[time.Date] = None, npv_date: typing.Optional[time.Date] = None, accuracy: builtins.float = 1e-10, max_evaluations: builtins.int = 100, guess: builtins.float = 0.0) -> builtins.float:
+    r"""
+    Solve the parallel zero-rate spread repricing a leg's currency NPV.
     """

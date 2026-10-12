@@ -2,17 +2,19 @@
 
 use crate::cashflows::{CashFlowGuard, PyLeg};
 use crate::curve::PyYieldTermStructure;
+use crate::helpers::PyBondPriceType;
 use crate::settings::PySettings;
 use crate::time::{
-    PyBusinessDayConvention, PyCalendar, PyDate, PyDayCounter, PyFrequency, PyPeriod, PySchedule,
+    PyBusinessDayConvention, PyCalendar, PyCompounding, PyDate, PyDayCounter, PyFrequency,
+    PyPeriod, PySchedule,
 };
 use crate::{ItofinError, PyQlError};
 use libitofin::cashflows::CashFlows;
 use libitofin::handle::Handle;
 use libitofin::instrument::Instrument;
-use libitofin::instruments::{Bond, FixedRateBond, ZeroCouponBond};
+use libitofin::instruments::{Bond, BondPrice, FixedRateBond, ZeroCouponBond};
 use libitofin::pricingengine::PricingEngine;
-use libitofin::pricingengines::bond::DiscountingBondEngine;
+use libitofin::pricingengines::bond::{BondFunctions, DiscountingBondEngine};
 use libitofin::settings::Settings;
 use libitofin::shared::{Shared, SharedMut, shared_mut};
 use libitofin::termstructures::yieldtermstructure::YieldTermStructure;
@@ -30,6 +32,33 @@ pub(crate) fn finite(value: f64) -> PyResult<f64> {
         Ok(value)
     } else {
         Err(ItofinError::new_err("bond amount must be finite"))
+    }
+}
+pub(crate) fn analytical_date(date: Option<&PyDate>) -> PyResult<Option<Date>> {
+    date.map(|date| {
+        let value = date.inner();
+        if value == Date::null() {
+            Err(ItofinError::new_err("null analytical date"))
+        } else {
+            Ok(value)
+        }
+    })
+    .transpose()
+}
+pub(crate) fn analytical_solver(accuracy: f64, max_evaluations: usize, guess: f64) -> PyResult<()> {
+    finite(accuracy)?;
+    finite(guess)?;
+    if accuracy <= 0.0 || max_evaluations == 0 {
+        return Err(ItofinError::new_err(
+            "accuracy and maximum evaluations must be positive",
+        ));
+    }
+    Ok(())
+}
+fn analytical_price(price: f64, price_type: PyBondPriceType) -> BondPrice {
+    match price_type {
+        PyBondPriceType::Clean => BondPrice::Clean(price),
+        PyBondPriceType::Dirty => BondPrice::Dirty(price),
     }
 }
 pub(crate) fn positive(value: f64) -> PyResult<()> {
@@ -193,6 +222,59 @@ impl PyBond {
         base.guard = Some(guard);
         base
     }
+    fn analytical_settlement(&self, settlement: Option<&PyDate>, clean: bool) -> PyResult<Date> {
+        let settlement = analytical_date(settlement)?
+            .map_or_else(|| self.settlement_date(None).map(|date| date.inner()), Ok)?;
+        if let Some(guard) = &self.guard {
+            let bond = self.inner.borrow();
+            for (i, flow) in bond.cashflows().iter().enumerate() {
+                if !flow
+                    .has_occurred(bond.settings(), Some(settlement), Some(false))
+                    .map_err(PyQlError::from)?
+                    && !flow
+                        .trading_ex_coupon(bond.settings(), Some(settlement))
+                        .map_err(PyQlError::from)?
+                {
+                    guard(Some(i))?;
+                }
+            }
+        }
+        if clean {
+            self.guard_accrued(settlement)?;
+        }
+        Ok(settlement)
+    }
+    fn guard_accrued(&self, date: Date) -> PyResult<()> {
+        if let Some(guard) = &self.guard {
+            let bond = self.inner.borrow();
+            if bond.notional(Some(date)).map_err(PyQlError::from)? != 0.0
+                && let Some(index) = CashFlows::next_cash_flow(
+                    bond.cashflows(),
+                    bond.settings(),
+                    Some(false),
+                    Some(date),
+                )
+                .map_err(PyQlError::from)?
+            {
+                let payment = bond.cashflows()[index].date();
+                for (i, flow) in bond
+                    .cashflows()
+                    .iter()
+                    .enumerate()
+                    .skip(index)
+                    .take_while(|(_, flow)| flow.date() == payment)
+                {
+                    if let Some(coupon) = flow.as_coupon()
+                        && date > coupon.accrual_start_date()
+                        && date <= payment
+                    {
+                        guard(Some(i))?;
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
     fn prepare(&mut self, force: bool) -> PyResult<()> {
         let settlement = self.settlement_date(None)?.inner();
         let flags = {
@@ -272,6 +354,204 @@ impl PyBond {
             .set_pricing_engine(SharedMut::clone(&engine.inner) as SharedMut<dyn PricingEngine>);
         Ok(())
     }
+    /// Clean analytical quote per 100 using an explicit discount curve.
+    #[pyo3(signature=(discount_curve, *, settlement=None))]
+    fn clean_price_from_curve(
+        &self,
+        discount_curve: &PyYieldTermStructure,
+        settlement: Option<&PyDate>,
+    ) -> PyResult<f64> {
+        let settlement = self.analytical_settlement(settlement, true)?;
+        let curve = discount_curve
+            .handle()
+            .current_link()
+            .map_err(PyQlError::from)?;
+        finite(
+            BondFunctions::clean_price(&self.inner.borrow(), &*curve, Some(settlement))
+                .map_err(PyQlError::from)?,
+        )
+    }
+    /// Clean analytical quote per 100 from a flat yield with supplied conventions.
+    #[pyo3(signature=(yield_rate, day_counter, compounding, frequency, *, settlement=None))]
+    fn clean_price_from_yield(
+        &self,
+        yield_rate: f64,
+        day_counter: &PyDayCounter,
+        compounding: PyCompounding,
+        frequency: &PyFrequency,
+        settlement: Option<&PyDate>,
+    ) -> PyResult<f64> {
+        finite(yield_rate)?;
+        let settlement = self.analytical_settlement(settlement, true)?;
+        finite(
+            BondFunctions::clean_price_from_yield(
+                &self.inner.borrow(),
+                yield_rate,
+                day_counter.inner(),
+                compounding.inner(),
+                frequency.inner(),
+                Some(settlement),
+            )
+            .map_err(PyQlError::from)?,
+        )
+    }
+    /// Clean analytical quote per 100 using a parallel zero-rate spread.
+    #[pyo3(signature=(discount_curve, z_spread, compounding, frequency, *, settlement=None))]
+    fn clean_price_at_z_spread(
+        &self,
+        discount_curve: &PyYieldTermStructure,
+        z_spread: f64,
+        compounding: PyCompounding,
+        frequency: &PyFrequency,
+        settlement: Option<&PyDate>,
+    ) -> PyResult<f64> {
+        finite(z_spread)?;
+        let settlement = self.analytical_settlement(settlement, true)?;
+        finite(
+            BondFunctions::clean_price_at_z_spread(
+                &self.inner.borrow(),
+                discount_curve.handle(),
+                z_spread,
+                compounding.inner(),
+                frequency.inner(),
+                Some(settlement),
+            )
+            .map_err(PyQlError::from)?,
+        )
+    }
+    /// Dirty analytical quote per 100 using an explicit discount curve.
+    #[pyo3(signature=(discount_curve, *, settlement=None))]
+    fn dirty_price_from_curve(
+        &self,
+        discount_curve: &PyYieldTermStructure,
+        settlement: Option<&PyDate>,
+    ) -> PyResult<f64> {
+        let settlement = self.analytical_settlement(settlement, false)?;
+        let curve = discount_curve
+            .handle()
+            .current_link()
+            .map_err(PyQlError::from)?;
+        finite(
+            BondFunctions::dirty_price(&self.inner.borrow(), &*curve, Some(settlement))
+                .map_err(PyQlError::from)?,
+        )
+    }
+    /// Dirty analytical quote per 100 from a flat yield with supplied conventions.
+    #[pyo3(signature=(yield_rate, day_counter, compounding, frequency, *, settlement=None))]
+    fn dirty_price_from_yield(
+        &self,
+        yield_rate: f64,
+        day_counter: &PyDayCounter,
+        compounding: PyCompounding,
+        frequency: &PyFrequency,
+        settlement: Option<&PyDate>,
+    ) -> PyResult<f64> {
+        finite(yield_rate)?;
+        let settlement = self.analytical_settlement(settlement, false)?;
+        finite(
+            BondFunctions::dirty_price_from_yield(
+                &self.inner.borrow(),
+                yield_rate,
+                day_counter.inner(),
+                compounding.inner(),
+                frequency.inner(),
+                Some(settlement),
+            )
+            .map_err(PyQlError::from)?,
+        )
+    }
+    /// Dirty analytical quote per 100 using a parallel zero-rate spread.
+    #[pyo3(signature=(discount_curve, z_spread, compounding, frequency, *, settlement=None))]
+    fn dirty_price_at_z_spread(
+        &self,
+        discount_curve: &PyYieldTermStructure,
+        z_spread: f64,
+        compounding: PyCompounding,
+        frequency: &PyFrequency,
+        settlement: Option<&PyDate>,
+    ) -> PyResult<f64> {
+        finite(z_spread)?;
+        let settlement = self.analytical_settlement(settlement, false)?;
+        finite(
+            BondFunctions::dirty_price_at_z_spread(
+                &self.inner.borrow(),
+                discount_curve.handle(),
+                z_spread,
+                compounding.inner(),
+                frequency.inner(),
+                Some(settlement),
+            )
+            .map_err(PyQlError::from)?,
+        )
+    }
+    /// Solve the yield repricing a clean or dirty per-100 quote.
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature=(price, day_counter, compounding, frequency, *, price_type=PyBondPriceType::Clean, settlement=None, accuracy=1e-10, max_evaluations=100, guess=0.05))]
+    fn yield_rate(
+        &self,
+        price: f64,
+        day_counter: &PyDayCounter,
+        compounding: PyCompounding,
+        frequency: &PyFrequency,
+        price_type: PyBondPriceType,
+        settlement: Option<&PyDate>,
+        accuracy: f64,
+        max_evaluations: usize,
+        guess: f64,
+    ) -> PyResult<f64> {
+        finite(price)?;
+        analytical_solver(accuracy, max_evaluations, guess)?;
+        let settlement =
+            self.analytical_settlement(settlement, matches!(price_type, PyBondPriceType::Clean))?;
+        finite(
+            BondFunctions::yield_rate(
+                &self.inner.borrow(),
+                analytical_price(price, price_type),
+                day_counter.inner(),
+                compounding.inner(),
+                frequency.inner(),
+                Some(settlement),
+                Some(accuracy),
+                Some(max_evaluations),
+                Some(guess),
+            )
+            .map_err(PyQlError::from)?,
+        )
+    }
+    /// Solve the parallel zero-rate spread repricing a clean or dirty per-100 quote.
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature=(price, discount_curve, compounding, frequency, *, price_type=PyBondPriceType::Clean, settlement=None, accuracy=1e-10, max_evaluations=100, guess=0.0))]
+    fn z_spread(
+        &self,
+        price: f64,
+        discount_curve: &PyYieldTermStructure,
+        compounding: PyCompounding,
+        frequency: &PyFrequency,
+        price_type: PyBondPriceType,
+        settlement: Option<&PyDate>,
+        accuracy: f64,
+        max_evaluations: usize,
+        guess: f64,
+    ) -> PyResult<f64> {
+        finite(price)?;
+        analytical_solver(accuracy, max_evaluations, guess)?;
+        let settlement =
+            self.analytical_settlement(settlement, matches!(price_type, PyBondPriceType::Clean))?;
+        finite(
+            BondFunctions::z_spread(
+                &self.inner.borrow(),
+                analytical_price(price, price_type),
+                discount_curve.handle(),
+                compounding.inner(),
+                frequency.inner(),
+                Some(settlement),
+                Some(accuracy),
+                Some(max_evaluations),
+                Some(guess),
+            )
+            .map_err(PyQlError::from)?,
+        )
+    }
     /// Present value in currency units, discounted to the curve reference date.
     fn npv(&mut self) -> PyResult<f64> {
         self.prepare(false)?;
@@ -327,34 +607,7 @@ impl PyBond {
             }
             None => self.settlement_date(None)?.inner(),
         };
-        if let Some(guard) = &self.guard {
-            let bond = self.inner.borrow();
-            if bond.notional(Some(date)).map_err(PyQlError::from)? != 0.0
-                && let Some(index) = CashFlows::next_cash_flow(
-                    bond.cashflows(),
-                    bond.settings(),
-                    Some(false),
-                    Some(date),
-                )
-                .map_err(PyQlError::from)?
-            {
-                let payment = bond.cashflows()[index].date();
-                for (i, flow) in bond
-                    .cashflows()
-                    .iter()
-                    .enumerate()
-                    .skip(index)
-                    .take_while(|(_, flow)| flow.date() == payment)
-                {
-                    if let Some(coupon) = flow.as_coupon()
-                        && date > coupon.accrual_start_date()
-                        && date <= payment
-                    {
-                        guard(Some(i))?;
-                    }
-                }
-            }
-        }
+        self.guard_accrued(date)?;
         finite(
             self.inner
                 .borrow()
@@ -673,5 +926,98 @@ impl PyDiscountingBondEngine {
             curve: discount_curve.handle(),
             include: include_settlement_date_flows,
         }
+    }
+}
+
+#[cfg(test)]
+mod analytics_tests {
+    use super::*;
+    use libitofin::interestrate::Compounding;
+    use libitofin::shared::shared;
+    use libitofin::termstructures::yields::FlatForward;
+    use libitofin::time::calendars::NullCalendar;
+    use libitofin::time::date::Month;
+    use libitofin::time::daycounters::actual360::Actual360;
+    use libitofin::time::frequency::Frequency;
+
+    #[test]
+    fn pure_analytics_preserve_private_policy_flags_and_freeze_state() {
+        let settings = shared(Settings::<Date>::new());
+        let native = ZeroCouponBond::new(
+            2,
+            NullCalendar::new(),
+            250.0,
+            Date::new(1, Month::January, 2027),
+            Bdc::Unadjusted,
+            102.0,
+            None,
+            Shared::clone(&settings),
+        )
+        .expect("zero bond");
+        let bond = PyBond::from_floating(
+            native.into_bond(),
+            PyCalendar::from_inner(NullCalendar::new()),
+            shared(|_| Ok(())),
+        );
+        let old_flags = bond.flags;
+        bond.freeze();
+        settings.set_using_at_par_coupons(false);
+        settings.set_include_reference_date_events(true);
+        let settlement = PyDate::from_inner(Date::new(1, Month::February, 2026));
+        let dc = PyDayCounter::from_inner(Actual360::new());
+        let curve = shared(FlatForward::with_rate(
+            Date::new(1, Month::January, 2026),
+            0.025,
+            Actual360::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        ));
+        let curve =
+            PyYieldTermStructure::from_inner(Handle::new(curve as Shared<dyn YieldTermStructure>));
+        let mode = PyCompounding::Compounded;
+        let freq = PyFrequency::Semiannual;
+        let clean = bond
+            .clean_price_from_curve(&curve, Some(&settlement))
+            .expect("curve quote");
+        bond.dirty_price_from_curve(&curve, Some(&settlement))
+            .expect("dirty curve quote");
+        let yield_price = bond
+            .clean_price_from_yield(0.03, &dc, mode, &freq, Some(&settlement))
+            .expect("yield quote");
+        bond.dirty_price_from_yield(0.03, &dc, mode, &freq, Some(&settlement))
+            .expect("dirty yield quote");
+        bond.yield_rate(
+            yield_price,
+            &dc,
+            mode,
+            &freq,
+            PyBondPriceType::Clean,
+            Some(&settlement),
+            1e-12,
+            1000,
+            0.05,
+        )
+        .expect("yield solve");
+        let spread_price = bond
+            .clean_price_at_z_spread(&curve, 0.007, mode, &freq, Some(&settlement))
+            .expect("spread quote");
+        bond.dirty_price_at_z_spread(&curve, 0.007, mode, &freq, Some(&settlement))
+            .expect("dirty spread quote");
+        bond.z_spread(
+            spread_price,
+            &curve,
+            mode,
+            &freq,
+            PyBondPriceType::Clean,
+            Some(&settlement),
+            1e-12,
+            1000,
+            0.0,
+        )
+        .expect("spread solve");
+        assert!(clean > 0.0);
+        assert_eq!(bond.flags, old_flags);
+        assert!(bond.frozen.get());
+        assert!(!bond.inner.borrow().base().is_calculated());
     }
 }

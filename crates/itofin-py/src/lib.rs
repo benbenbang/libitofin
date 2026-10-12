@@ -163,8 +163,8 @@ use swaptionvol::{
     PyVolatilityType,
 };
 use time::{
-    PyBusinessDayConvention, PyCalendar, PyDate, PyDateGeneration, PyDayCounter, PyFrequency,
-    PyPeriod, PySchedule,
+    PyBusinessDayConvention, PyCalendar, PyCompounding, PyDate, PyDateGeneration, PyDayCounter,
+    PyFrequency, PyPeriod, PySchedule,
 };
 use treeswaption::{PyBermudanExercise, PyTreeSwaptionEngine};
 use vol::{
@@ -236,6 +236,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     time.add_class::<PyCalendar>()?;
     time.add_class::<PyDayCounter>()?;
     time.add_class::<PyFrequency>()?;
+    time.add_class::<PyCompounding>()?;
     time.add_class::<PyBusinessDayConvention>()?;
     time.add_class::<PyDateGeneration>()?;
     time.add_class::<PySchedule>()?;
@@ -358,6 +359,8 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     cashflows.add_class::<PyLeg>()?;
     cashflows.add_class::<cashflows::PyBlackIborCouponPricer>()?;
     cashflows.add_function(wrap_pyfunction!(cashflows::npv, &cashflows)?)?;
+    cashflows.add_function(wrap_pyfunction!(cashflows::npv_at_z_spread, &cashflows)?)?;
+    cashflows.add_function(wrap_pyfunction!(cashflows::z_spread, &cashflows)?)?;
 
     let instruments = PyModule::new(py, "instruments")?;
     instruments.add_class::<bonds::PyBond>()?;
