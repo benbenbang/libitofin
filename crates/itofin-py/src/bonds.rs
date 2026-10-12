@@ -1,18 +1,21 @@
 //! Fixed and zero-coupon bonds sharing a retained, lazy bond base.
 
-use crate::cashflows::PyLeg;
+use crate::cashflows::{CashFlowGuard, PyLeg};
 use crate::curve::PyYieldTermStructure;
 use crate::settings::PySettings;
 use crate::time::{
     PyBusinessDayConvention, PyCalendar, PyDate, PyDayCounter, PyFrequency, PyPeriod, PySchedule,
 };
 use crate::{ItofinError, PyQlError};
+use libitofin::cashflows::CashFlows;
+use libitofin::handle::Handle;
 use libitofin::instrument::Instrument;
 use libitofin::instruments::{Bond, FixedRateBond, ZeroCouponBond};
 use libitofin::pricingengine::PricingEngine;
 use libitofin::pricingengines::bond::DiscountingBondEngine;
 use libitofin::settings::Settings;
 use libitofin::shared::{Shared, SharedMut, shared_mut};
+use libitofin::termstructures::yieldtermstructure::YieldTermStructure;
 use libitofin::time::businessdayconvention::BusinessDayConvention as Bdc;
 use libitofin::time::date::Date;
 use libitofin::time::period::Period;
@@ -20,15 +23,16 @@ use libitofin::time::timeunit::TimeUnit;
 use pyo3::prelude::*;
 use pyo3_stub_gen::derive::{gen_methods_from_python, gen_stub_pyclass, gen_stub_pymethods};
 use pyo3_stub_gen::inventory::submit;
+use std::cell::Cell;
 
-fn finite(value: f64) -> PyResult<f64> {
+pub(crate) fn finite(value: f64) -> PyResult<f64> {
     if value.is_finite() {
         Ok(value)
     } else {
         Err(ItofinError::new_err("bond amount must be finite"))
     }
 }
-fn positive(value: f64) -> PyResult<()> {
+pub(crate) fn positive(value: f64) -> PyResult<()> {
     finite(value)?;
     if value <= 0.0 {
         return Err(ItofinError::new_err(
@@ -37,7 +41,7 @@ fn positive(value: f64) -> PyResult<()> {
     }
     Ok(())
 }
-fn step(date: Date, days: i64) -> PyResult<Date> {
+pub(crate) fn step(date: Date, days: i64) -> PyResult<Date> {
     let serial = i64::from(date.serial_number()) + days;
     if !(i64::from(Date::min_date().serial_number())..=i64::from(Date::max_date().serial_number()))
         .contains(&serial)
@@ -50,7 +54,7 @@ fn business(calendar: &PyCalendar, date: Date) -> PyResult<bool> {
     calendar.checked(&PyDate::from_inner(date), "price a bond")?;
     Ok(calendar.inner().is_business_day(date))
 }
-fn adjust(calendar: &PyCalendar, date: Date, convention: Bdc) -> PyResult<Date> {
+pub(crate) fn adjust(calendar: &PyCalendar, date: Date, convention: Bdc) -> PyResult<Date> {
     if date == Date::null() {
         return Err(ItofinError::new_err("null bond date"));
     }
@@ -97,7 +101,7 @@ fn adjust(calendar: &PyCalendar, date: Date, convention: Bdc) -> PyResult<Date> 
     }
     Ok(result)
 }
-fn advance(
+pub(crate) fn advance(
     calendar: &PyCalendar,
     date: Date,
     n: i64,
@@ -162,32 +166,76 @@ fn advance(
 pub struct PyBond {
     inner: SharedMut<Bond>,
     calendar: PyCalendar,
-    flags: (bool, Option<bool>),
+    flags: (bool, Option<bool>, Option<bool>),
+    guard: Option<CashFlowGuard>,
+    engine_inputs: Option<(Handle<dyn YieldTermStructure>, Option<bool>)>,
+    frozen: Cell<bool>,
 }
 impl PyBond {
-    fn from_inner(inner: Bond, calendar: PyCalendar) -> Self {
+    pub(crate) fn from_inner(inner: Bond, calendar: PyCalendar) -> Self {
         let flags = (
             inner.settings().include_reference_date_events(),
             inner.settings().include_todays_cash_flows(),
+            None,
         );
         Self {
             inner: shared_mut(inner),
             calendar,
             flags,
+            guard: None,
+            engine_inputs: None,
+            frozen: Cell::new(false),
         }
     }
-    fn prepare(&mut self) -> PyResult<()> {
-        self.settlement_date(None)?;
+    pub(crate) fn from_floating(inner: Bond, calendar: PyCalendar, guard: CashFlowGuard) -> Self {
+        let mut base = Self::from_inner(inner, calendar);
+        base.flags.2 = Some(base.inner.borrow().settings().using_at_par_coupons());
+        base.guard = Some(guard);
+        base
+    }
+    fn prepare(&mut self, force: bool) -> PyResult<()> {
+        let settlement = self.settlement_date(None)?.inner();
         let flags = {
             let bond = self.inner.borrow();
             (
                 bond.settings().include_reference_date_events(),
                 bond.settings().include_todays_cash_flows(),
+                self.guard
+                    .as_ref()
+                    .map(|_| bond.settings().using_at_par_coupons()),
             )
         };
         if flags != self.flags {
             self.inner.borrow().base().observer().borrow_mut().update();
             self.flags = flags;
+        }
+        if let (Some(guard), Some((curve, include))) = (&self.guard, &self.engine_inputs) {
+            let bond = self.inner.borrow();
+            if !(force || !self.frozen.get() && !bond.base().is_calculated())
+                || bond.is_expired().map_err(PyQlError::from)?
+            {
+                return Ok(());
+            }
+            let reference = curve
+                .current_link()
+                .map_err(PyQlError::from)?
+                .reference_date()
+                .map_err(PyQlError::from)?;
+            let include =
+                include.unwrap_or_else(|| bond.settings().include_reference_date_events());
+            for (i, flow) in bond.cashflows().iter().enumerate() {
+                let needed = |date, include| -> PyResult<bool> {
+                    Ok(!flow
+                        .has_occurred(bond.settings(), Some(date), Some(include))
+                        .map_err(PyQlError::from)?
+                        && !flow
+                            .trading_ex_coupon(bond.settings(), Some(date))
+                            .map_err(PyQlError::from)?)
+                };
+                if needed(reference, include)? || needed(settlement, false)? {
+                    guard(Some(i))?;
+                }
+            }
         }
         Ok(())
     }
@@ -217,6 +265,7 @@ impl PyBond {
         if !Shared::ptr_eq(&self.inner.borrow().settings_handle(), &engine.settings) {
             return Err(ItofinError::new_err("bond and engine must share settings"));
         }
+        self.engine_inputs = Some((engine.curve.clone(), engine.include));
         self.inner
             .borrow_mut()
             .base_mut()
@@ -225,12 +274,12 @@ impl PyBond {
     }
     /// Present value in currency units, discounted to the curve reference date.
     fn npv(&mut self) -> PyResult<f64> {
-        self.prepare()?;
+        self.prepare(false)?;
         finite(self.inner.borrow_mut().npv().map_err(PyQlError::from)?)
     }
     /// Dirty currency value at settlement; the today-flow flag can override exclusion.
     fn settlement_value(&mut self) -> PyResult<f64> {
-        self.prepare()?;
+        self.prepare(false)?;
         finite(
             self.inner
                 .borrow_mut()
@@ -240,15 +289,16 @@ impl PyBond {
     }
     /// Settlement price per 100 of current notional.
     fn dirty_price(&mut self) -> PyResult<f64> {
-        self.prepare()?;
+        let settlement = self.settlement_date(None)?.inner();
         let notional = self
             .inner
             .borrow()
-            .notional(None)
+            .notional(Some(settlement))
             .map_err(PyQlError::from)?;
         if notional == 0.0 {
             return Ok(0.0);
         }
+        self.prepare(false)?;
         let value = self
             .inner
             .borrow_mut()
@@ -277,6 +327,34 @@ impl PyBond {
             }
             None => self.settlement_date(None)?.inner(),
         };
+        if let Some(guard) = &self.guard {
+            let bond = self.inner.borrow();
+            if bond.notional(Some(date)).map_err(PyQlError::from)? != 0.0
+                && let Some(index) = CashFlows::next_cash_flow(
+                    bond.cashflows(),
+                    bond.settings(),
+                    Some(false),
+                    Some(date),
+                )
+                .map_err(PyQlError::from)?
+            {
+                let payment = bond.cashflows()[index].date();
+                for (i, flow) in bond
+                    .cashflows()
+                    .iter()
+                    .enumerate()
+                    .skip(index)
+                    .take_while(|(_, flow)| flow.date() == payment)
+                {
+                    if let Some(coupon) = flow.as_coupon()
+                        && date > coupon.accrual_start_date()
+                        && date <= payment
+                    {
+                        guard(Some(i))?;
+                    }
+                }
+            }
+        }
         finite(
             self.inner
                 .borrow()
@@ -340,10 +418,14 @@ impl PyBond {
         self.inner.borrow().issue_date().map(PyDate::from_inner)
     }
     fn cashflows(&self) -> PyLeg {
-        PyLeg::from_inner(self.inner.borrow().cashflows().clone())
+        PyLeg::with_guard(self.inner.borrow().cashflows().clone(), self.guard.clone())
     }
     fn redemptions(&self) -> PyLeg {
-        PyLeg::from_inner(self.inner.borrow().redemptions().clone())
+        let guard = self
+            .guard
+            .as_ref()
+            .map(|_| libitofin::shared::shared(|_: Option<usize>| Ok(())) as CashFlowGuard);
+        PyLeg::with_guard(self.inner.borrow().redemptions().clone(), guard)
     }
     fn is_expired(&self) -> PyResult<bool> {
         Ok(self.inner.borrow().is_expired().map_err(PyQlError::from)?)
@@ -353,13 +435,15 @@ impl PyBond {
     }
     /// Pin cached results while unexpired; native expiry can still bypass freeze.
     fn freeze(&self) {
+        self.frozen.set(true);
         self.inner.borrow_mut().base_mut().freeze();
     }
     fn unfreeze(&self) {
+        self.frozen.set(false);
         self.inner.borrow_mut().base_mut().unfreeze();
     }
     fn recalculate(&mut self) -> PyResult<()> {
-        self.prepare()?;
+        self.prepare(true)?;
         self.inner
             .borrow_mut()
             .recalculate()
@@ -566,6 +650,8 @@ impl PyZeroCouponBond {
 pub struct PyDiscountingBondEngine {
     inner: SharedMut<DiscountingBondEngine>,
     settings: Shared<Settings<Date>>,
+    curve: Handle<dyn YieldTermStructure>,
+    include: Option<bool>,
 }
 #[gen_stub_pymethods]
 #[pymethods]
@@ -584,6 +670,8 @@ impl PyDiscountingBondEngine {
                 settings.inner(),
             )),
             settings: settings.inner(),
+            curve: discount_curve.handle(),
+            include: include_settlement_date_flows,
         }
     }
 }

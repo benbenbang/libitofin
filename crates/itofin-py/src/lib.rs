@@ -33,6 +33,7 @@ mod curve;
 mod discrepancy_statistics;
 mod drawdown;
 mod fdengine;
+mod floating_bonds;
 mod fra;
 mod general_statistics;
 mod geometric_brownian;
@@ -355,10 +356,12 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     cashflows.add_class::<bma::PyAverageBMACoupon>()?;
     cashflows.add_class::<PyCashFlow>()?;
     cashflows.add_class::<PyLeg>()?;
+    cashflows.add_class::<cashflows::PyBlackIborCouponPricer>()?;
     cashflows.add_function(wrap_pyfunction!(cashflows::npv, &cashflows)?)?;
 
     let instruments = PyModule::new(py, "instruments")?;
     instruments.add_class::<bonds::PyBond>()?;
+    instruments.add_class::<floating_bonds::PyFloatingRateBond>()?;
     instruments.add_class::<bonds::PyFixedRateBond>()?;
     instruments.add_class::<bonds::PyZeroCouponBond>()?;
     instruments.add_class::<variance_swap::PyVarianceSwap>()?;

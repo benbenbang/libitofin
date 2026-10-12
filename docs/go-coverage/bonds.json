@@ -410,6 +410,84 @@
       "tests": [
         "TestBondReferenceEventPolicyHonorsFreeze"
       ]
+    },
+    {
+      "c": [
+        "itofin_floating_rate_bond_new"
+      ],
+      "go": [
+        "Session.NewFloatingRateBond"
+      ],
+      "python": "itofin.instruments.FloatingRateBond",
+      "status": "implemented",
+      "tests": [
+        "TestFloatingBondQuantLibOracles"
+      ]
+    },
+    {
+      "c": [
+        "itofin_floating_rate_bond_new"
+      ],
+      "go": [
+        "Session.NewFloatingRateBond"
+      ],
+      "python": "itofin.instruments.FloatingRateBond.__new__",
+      "status": "implemented",
+      "tests": [
+        "TestFloatingBondQuantLibOracles"
+      ]
+    },
+    {
+      "c": [
+        "itofin_floating_bond_index"
+      ],
+      "go": [
+        "FloatingRateBond.Index"
+      ],
+      "python": "itofin.instruments.FloatingRateBond.index",
+      "status": "implemented",
+      "tests": [
+        "TestFloatingBondRetainedViewsPricerReplacementAndFreeze"
+      ]
+    },
+    {
+      "c": [
+        "itofin_floating_bond_set_pricer"
+      ],
+      "go": [
+        "FloatingRateBond.SetCouponPricer"
+      ],
+      "python": "itofin.instruments.FloatingRateBond.set_coupon_pricer",
+      "status": "implemented",
+      "tests": [
+        "TestFloatingBondRetainedViewsPricerReplacementAndFreeze"
+      ]
+    },
+    {
+      "c": [
+        "itofin_black_ibor_coupon_pricer_new"
+      ],
+      "go": [
+        "Session.NewBlackIborCouponPricer"
+      ],
+      "python": "itofin.cashflows.BlackIborCouponPricer",
+      "status": "implemented",
+      "tests": [
+        "TestFloatingBondZeroGearingAndKnownFixingNeedNoForecastVolatility"
+      ]
+    },
+    {
+      "c": [
+        "itofin_black_ibor_coupon_pricer_new"
+      ],
+      "go": [
+        "Session.NewBlackIborCouponPricer"
+      ],
+      "python": "itofin.cashflows.BlackIborCouponPricer.__new__",
+      "status": "implemented",
+      "tests": [
+        "TestFloatingBondZeroGearingAndKnownFixingNeedNoForecastVolatility"
+      ]
     }
   ]
 }

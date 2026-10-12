@@ -624,6 +624,7 @@ impl PyYoYInflationLeg {
     fn build(&self) -> PyResult<PyLeg> {
         Ok(PyLeg {
             inner: self.leg().build().map_err(PyQlError::from)?,
+            guard: None,
         })
     }
 }
@@ -851,6 +852,8 @@ impl PyIborLeg {
 #[pyclass(name = "CashFlow", unsendable, module = "itofin.cashflows")]
 pub struct PyCashFlow {
     inner: Shared<dyn CashFlow>,
+    guard: Option<CashFlowGuard>,
+    position: usize,
 }
 
 #[gen_stub_pymethods]
@@ -866,7 +869,15 @@ impl PyCashFlow {
     ///         resolving its fixing reports - a missing history entry, or a
     ///         forecast off an index with no curve linked.
     fn amount(&self) -> PyResult<f64> {
-        Ok(self.inner.amount().map_err(PyQlError::from)?)
+        if let Some(guard) = &self.guard {
+            guard(Some(self.position))?;
+        }
+        let amount = self.inner.amount().map_err(PyQlError::from)?;
+        if self.guard.is_some() {
+            crate::bonds::finite(amount)
+        } else {
+            Ok(amount)
+        }
     }
 
     /// Return the date the flow pays on.
@@ -886,6 +897,7 @@ impl PyCashFlow {
 #[pyclass(name = "Leg", unsendable, module = "itofin.cashflows")]
 pub struct PyLeg {
     inner: Leg,
+    guard: Option<CashFlowGuard>,
 }
 
 #[gen_stub_pymethods]
@@ -919,6 +931,8 @@ impl PyLeg {
         }
         Ok(PyCashFlow {
             inner: Shared::clone(&self.inner[resolved as usize]),
+            guard: self.guard.clone(),
+            position: resolved as usize,
         })
     }
 }
@@ -960,7 +974,24 @@ pub(crate) fn npv(
         .current_link()
         .map_err(PyQlError::from)?;
     let settings = settings.inner();
-    Ok(CashFlows::npv(
+    if let Some(guard) = &leg.guard {
+        for (i, flow) in leg.inner.iter().enumerate() {
+            if !flow
+                .has_occurred(
+                    &settings,
+                    settlement_date.map(PyDate::inner),
+                    include_settlement_date_flows,
+                )
+                .map_err(PyQlError::from)?
+                && !flow
+                    .trading_ex_coupon(&settings, settlement_date.map(PyDate::inner))
+                    .map_err(PyQlError::from)?
+            {
+                guard(Some(i))?;
+            }
+        }
+    }
+    let value = CashFlows::npv(
         &leg.inner,
         &*curve,
         &settings,
@@ -968,11 +999,51 @@ pub(crate) fn npv(
         settlement_date.map(PyDate::inner),
         npv_date.map(PyDate::inner),
     )
-    .map_err(PyQlError::from)?)
+    .map_err(PyQlError::from)?;
+    if leg.guard.is_some() {
+        crate::bonds::finite(value)
+    } else {
+        Ok(value)
+    }
 }
 
 impl PyLeg {
     pub(crate) fn from_inner(inner: Leg) -> Self {
-        Self { inner }
+        Self { inner, guard: None }
+    }
+    pub(crate) fn with_guard(inner: Leg, guard: Option<CashFlowGuard>) -> Self {
+        let mut leg = Self::from_inner(inner);
+        leg.guard = guard;
+        leg
+    }
+}
+
+pub(crate) type CashFlowGuard = Shared<dyn Fn(Option<usize>) -> PyResult<()>>;
+
+/// Black or normal ibor coupon pricer using an optional retained optionlet surface.
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "BlackIborCouponPricer",
+    unsendable,
+    module = "itofin.cashflows"
+)]
+pub struct PyBlackIborCouponPricer {
+    pub(crate) inner: SharedMut<dyn libitofin::cashflows::FloatingRateCouponPricer>,
+    pub(crate) moving: Option<Shared<crate::optionletvol::MovingOptionletMetadata>>,
+}
+#[gen_stub_pymethods]
+#[pymethods]
+impl PyBlackIborCouponPricer {
+    #[new]
+    #[pyo3(signature=(volatility=None))]
+    fn new(volatility: Option<&crate::optionletvol::PyOptionletVolatilityStructure>) -> Self {
+        let pricer = volatility
+            .map_or_else(libitofin::cashflows::BlackIborCouponPricer::new, |vol| {
+                libitofin::cashflows::BlackIborCouponPricer::with_vol(vol.handle())
+            });
+        Self {
+            inner: shared_mut(pricer),
+            moving: volatility.and_then(|vol| vol.moving_metadata()),
+        }
     }
 }
