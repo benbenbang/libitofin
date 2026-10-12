@@ -22,6 +22,7 @@ __all__ = [
     "CreditDefaultSwap",
     "EuropeanExercise",
     "FixedRateBond",
+    "FloatingRateBond",
     "ForwardRateAgreement",
     "MakeCreditDefaultSwap",
     "MakeOis",
@@ -641,6 +642,21 @@ class FixedRateBond(Bond):
     def frequency(self) -> time.Frequency: ...
     def day_counter(self) -> time.DayCounter: ...
     def first_period_day_counter(self) -> typing.Optional[time.DayCounter]: ...
+
+@typing.final
+class FloatingRateBond(Bond):
+    r"""
+    Scheduled ibor bond with optional gearing, spread, cap and floor vectors.
+    """
+    def __new__(cls, settlement_days: builtins.int, face_amount: builtins.float, schedule: time.Schedule, index: indexes.IborIndex, accrual_day_counter: time.DayCounter, settings: itofin.Settings, *, payment_convention: time.BusinessDayConvention = time.BusinessDayConvention.Following, fixing_days: typing.Optional[builtins.int] = None, gearings: typing.Optional[typing.Sequence[builtins.float]] = None, spreads: typing.Optional[typing.Sequence[builtins.float]] = None, caps: typing.Optional[typing.Sequence[typing.Optional[builtins.float]]] = None, floors: typing.Optional[typing.Sequence[typing.Optional[builtins.float]]] = None, redemption: builtins.float = 100.0, issue_date: typing.Optional[time.Date] = None, ex_coupon_period: typing.Optional[time.Period] = None, ex_coupon_calendar: typing.Optional[time.Calendar] = None, ex_coupon_convention: time.BusinessDayConvention = time.BusinessDayConvention.Unadjusted, ex_coupon_end_of_month: builtins.bool = False, fixing_convention: time.BusinessDayConvention = time.BusinessDayConvention.Preceding) -> FloatingRateBond: ...
+    def index(self) -> indexes.IborIndex:
+        r"""
+        Return the same retained index, including its original calendar bounds.
+        """
+    def set_coupon_pricer(self, pricer: cashflows.BlackIborCouponPricer) -> None:
+        r"""
+        Install or replace one retained pricer on every nonzero-gearing coupon.
+        """
 
 @typing.final
 class ForwardRateAgreement:

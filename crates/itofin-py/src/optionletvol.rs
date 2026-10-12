@@ -55,6 +55,7 @@ use pyo3_stub_gen::derive::{
 )]
 pub struct PyOptionletVolatilityStructure {
     inner: Handle<dyn OptionletVolatilityStructure>,
+    moving: Option<Shared<MovingOptionletMetadata>>,
 }
 
 #[gen_stub_pymethods]
@@ -277,7 +278,28 @@ impl PyOptionletVolatilityStructure {
     /// handle. The named constructor keeps the private field an implementation
     /// detail of this module.
     pub(crate) fn from_handle(inner: Handle<dyn OptionletVolatilityStructure>) -> Self {
-        PyOptionletVolatilityStructure { inner }
+        PyOptionletVolatilityStructure {
+            inner,
+            moving: None,
+        }
+    }
+    pub(crate) fn moving_metadata(&self) -> Option<Shared<MovingOptionletMetadata>> {
+        self.moving.clone()
+    }
+    fn moving_from_handle(
+        inner: Handle<dyn OptionletVolatilityStructure>,
+        settlement_days: u32,
+        calendar: &PyCalendar,
+        settings: &PySettings,
+    ) -> Self {
+        Self {
+            inner,
+            moving: Some(shared(MovingOptionletMetadata {
+                settlement_days,
+                calendar: calendar.clone(),
+                settings: settings.inner(),
+            })),
+        }
     }
 }
 
@@ -438,9 +460,12 @@ impl PyConstantOptionletVolatility {
         )) as Shared<dyn OptionletVolatilityStructure>;
         Py::new(
             py,
-            PyClassInitializer::from(PyOptionletVolatilityStructure::from_handle(Handle::new(
-                surface,
-            )))
+            PyClassInitializer::from(PyOptionletVolatilityStructure::moving_from_handle(
+                Handle::new(surface),
+                settlement_days,
+                calendar,
+                settings,
+            ))
             .add_subclass(PyConstantOptionletVolatility),
         )
     }
@@ -493,9 +518,12 @@ impl PyConstantOptionletVolatility {
         )) as Shared<dyn OptionletVolatilityStructure>;
         Py::new(
             py,
-            PyClassInitializer::from(PyOptionletVolatilityStructure::from_handle(Handle::new(
-                surface,
-            )))
+            PyClassInitializer::from(PyOptionletVolatilityStructure::moving_from_handle(
+                Handle::new(surface),
+                settlement_days,
+                calendar,
+                settings,
+            ))
             .add_subclass(PyConstantOptionletVolatility),
         )
     }
@@ -784,5 +812,27 @@ impl PyOptionletStripper2 {
     /// Return the target ATM cap prices.
     fn atm_cap_floor_prices(&self) -> PyResult<Vec<f64>> {
         Ok(self.inner.atm_cap_floor_prices().map_err(PyQlError::from)?)
+    }
+}
+
+pub(crate) struct MovingOptionletMetadata {
+    settlement_days: u32,
+    calendar: PyCalendar,
+    pub(crate) settings: Shared<libitofin::settings::Settings<libitofin::time::date::Date>>,
+}
+impl MovingOptionletMetadata {
+    pub(crate) fn check(&self) -> PyResult<()> {
+        let date = self.settings.evaluation_date().ok_or_else(|| {
+            crate::ItofinError::new_err("no evaluation date set for moving optionlet surface")
+        })?;
+        crate::bonds::advance(
+            &self.calendar,
+            date,
+            i64::from(self.settlement_days),
+            libitofin::time::timeunit::TimeUnit::Days,
+            libitofin::time::businessdayconvention::BusinessDayConvention::Following,
+            false,
+        )?;
+        Ok(())
     }
 }

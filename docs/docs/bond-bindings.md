@@ -1,9 +1,10 @@
-# Fixed and zero-coupon bond bindings
+# Bond bindings
 
-Go and Python expose the existing Rust fixed-rate and zero-coupon bonds through
-one shared `Bond` interface. This is a foundation slice, not complete bond parity:
-floating/callable bonds, yield inversion, Z-spreads and analytical risk measures
-remain separate work.
+Go and Python expose the existing Rust fixed-rate, zero-coupon and floating
+bonds through one shared `Bond` interface. The foundation below covers fixed and
+zero bonds; [floating controls and coupon pricers](floating-rate-bonds.md) build
+on that same base. Callable bonds, yield inversion, Z-spreads and analytical
+risk measures remain separate work.
 
 ## Python
 

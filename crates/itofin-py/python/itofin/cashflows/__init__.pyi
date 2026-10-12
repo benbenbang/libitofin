@@ -9,6 +9,7 @@ from itofin import time
 import typing
 __all__ = [
     "AverageBMACoupon",
+    "BlackIborCouponPricer",
     "CappedFlooredYoYInflationCoupon",
     "CashFlow",
     "IborLeg",
@@ -44,6 +45,13 @@ class AverageBMACoupon:
         r"""
         Copy of weekly fixing boundaries.
         """
+
+@typing.final
+class BlackIborCouponPricer:
+    r"""
+    Black or normal ibor coupon pricer using an optional retained optionlet surface.
+    """
+    def __new__(cls, volatility: typing.Optional[termstructures.OptionletVolatilityStructure] = None) -> BlackIborCouponPricer: ...
 
 @typing.final
 class CappedFlooredYoYInflationCoupon:

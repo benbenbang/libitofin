@@ -220,6 +220,7 @@ impl PyHullWhite {
 #[pyclass(name = "IborIndex", subclass, unsendable, module = "itofin.indexes")]
 pub struct PyIborIndex {
     inner: Shared<IborIndex>,
+    calendars: [PyCalendar; 3],
 }
 
 #[gen_stub_pymethods]
@@ -289,6 +290,11 @@ impl PyIborIndex {
                     .unwrap_or_else(Handle::empty),
                 settings.inner(),
             )),
+            calendars: [
+                fixing_calendar.clone(),
+                fixing_calendar.clone(),
+                fixing_calendar.clone(),
+            ],
         }
     }
 
@@ -402,7 +408,7 @@ impl PyIborIndex {
     /// Returns:
     ///     Calendar: The fixing calendar.
     fn fixing_calendar(&self) -> PyCalendar {
-        PyCalendar::from_inner(self.inner.fixing_calendar())
+        self.calendars[0].clone()
     }
 
     /// Return the convention applied when rolling the value date to maturity.
@@ -439,6 +445,20 @@ impl PyIborIndex {
 }
 
 impl PyIborIndex {
+    pub(crate) fn from_inner(inner: Shared<IborIndex>) -> Self {
+        let calendars = [
+            PyCalendar::from_inner(inner.fixing_calendar()),
+            PyCalendar::from_inner(inner.value_calendar()),
+            PyCalendar::from_inner(inner.maturity_calendar()),
+        ];
+        Self { inner, calendars }
+    }
+    pub(crate) fn with_calendars(inner: Shared<IborIndex>, calendars: [PyCalendar; 3]) -> Self {
+        Self { inner, calendars }
+    }
+    pub(crate) fn retained_calendars(&self) -> [PyCalendar; 3] {
+        self.calendars.clone()
+    }
     /// A clone of the inner index for the rate-helper facades, which take a
     /// `&IborIndex` and are generic over the family.
     pub(crate) fn inner(&self) -> Shared<IborIndex> {
@@ -535,8 +555,14 @@ impl PyCustomIborIndex {
             settings.inner(),
         )
         .upcast();
+        let base = PyIborIndex::from_inner(Shared::clone(&index));
         let base = PyIborIndex {
-            inner: Shared::clone(&index),
+            inner: base.inner,
+            calendars: [
+                fixing_calendar.clone(),
+                value_calendar.clone(),
+                maturity_calendar.clone(),
+            ],
         };
         PyClassInitializer::from(base).add_subclass(PyCustomIborIndex { inner: index })
     }
@@ -677,9 +703,7 @@ impl PyEuribor {
 /// index object feeds both halves, so the base IborIndex every consumer reads
 /// and the Euribor the subclass holds are the same core index.
 fn init_euribor(index: Shared<IborIndex>) -> PyClassInitializer<PyEuribor> {
-    let base = PyIborIndex {
-        inner: Shared::clone(&index),
-    };
+    let base = PyIborIndex::from_inner(Shared::clone(&index));
     PyClassInitializer::from(base).add_subclass(PyEuribor { inner: index })
 }
 
@@ -725,9 +749,7 @@ impl PyUsdLibor {
         let index =
             UsdLibor::new(tenor.inner(), forwarding, settings.inner()).map_err(PyQlError::from)?;
         let index = shared(index);
-        let base = PyIborIndex {
-            inner: Shared::clone(&index),
-        };
+        let base = PyIborIndex::from_inner(Shared::clone(&index));
         Ok(PyClassInitializer::from(base).add_subclass(PyUsdLibor { inner: index }))
     }
 
@@ -798,9 +820,7 @@ impl PyJpyLibor {
         let index =
             JpyLibor::new(tenor.inner(), forwarding, settings.inner()).map_err(PyQlError::from)?;
         let index = shared(index);
-        let base = PyIborIndex {
-            inner: Shared::clone(&index),
-        };
+        let base = PyIborIndex::from_inner(Shared::clone(&index));
         Ok(PyClassInitializer::from(base).add_subclass(PyJpyLibor { inner: index }))
     }
 
@@ -871,9 +891,7 @@ impl PyGbpLibor {
         let index =
             GbpLibor::new(tenor.inner(), forwarding, settings.inner()).map_err(PyQlError::from)?;
         let index = shared(index);
-        let base = PyIborIndex {
-            inner: Shared::clone(&index),
-        };
+        let base = PyIborIndex::from_inner(Shared::clone(&index));
         Ok(PyClassInitializer::from(base).add_subclass(PyGbpLibor { inner: index }))
     }
 
@@ -948,9 +966,7 @@ impl PyEurLibor {
         let index =
             EurLibor::new(tenor.inner(), forwarding, settings.inner()).map_err(PyQlError::from)?;
         let index = index.upcast();
-        let base = PyIborIndex {
-            inner: Shared::clone(&index),
-        };
+        let base = PyIborIndex::from_inner(Shared::clone(&index));
         Ok(PyClassInitializer::from(base).add_subclass(PyEurLibor { inner: index }))
     }
 
