@@ -125,3 +125,5 @@ links to the language guides and project documentation.
 - [Black callable bonds](black-callable-bonds.md).
 
 - [Callable implied volatility](callable-implied-volatility.md).
+
+- [Callable OAS](callable-oas.md).
