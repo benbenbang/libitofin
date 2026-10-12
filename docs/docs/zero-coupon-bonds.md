@@ -56,4 +56,10 @@ assert_eq!(zero.bond().cashflows().len(), 1);
 Validation uses twelve tracked outputs from compiled QuantLib 1.43, separately
 from source inspection at revision `9863b578af0caa4cecabf697196533e84a8308b6`.
 See `crates/libitofin/tests/fixtures/medium3_zero_coupon/README.md` for provenance
-and scope. This addition does not expose new C, Go or Python bindings.
+and scope. The Rust constructor contract above is unchanged.
+
+[C, Go and Python fixed/zero bond bindings](bond-bindings.md) now provide
+construction, discounting and common bond inspectors. Those public facades
+require positive finite face amounts and redemption percentages, while the Rust
+constructor continues to accept zero amounts. Floating/callable bindings and
+yield/Z-spread analytics are not included in this foundation slice.

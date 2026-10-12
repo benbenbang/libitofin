@@ -219,5 +219,119 @@ class BaselineCoverageTests(unittest.TestCase):
         self.assertIn("UNMAPPED: itofin.fresh", output)
 
 
+    def base_fixture(self):
+        stub = (
+            "class Base:\n"
+            "    def __new__(cls, forbidden: typing.NoReturn) -> Base: ...\n"
+            "    def value(self) -> builtins.float: ...\n"
+            "class Derived(Base):\n"
+            "    def __new__(cls, x: builtins.float) -> Derived: ...\n"
+        )
+        (self.root / "crates/itofin-py/python/itofin/__init__.pyi").write_text(stub)
+        (self.root / "sdk/go/api.go").write_text(
+            "type Base struct {}\nfunc (b *Base) Value() {}\nfunc NewDerived() {}\n"
+        )
+        rows = [
+            {"python": "itofin.Base", "status": "implemented", "go": "Base", "c": "itofin_old"},
+            {"python": "itofin.Base.value", "status": "implemented", "go": "Base.Value", "c": "itofin_old"},
+            {"python": "itofin.Derived.__new__", "status": "implemented", "go": "NewDerived", "c": "itofin_old"},
+            {"python": "itofin.Base.__new__", "status": "language-specific", "go": "Base",
+             "classification": "nonconstructible-base",
+             "reason": "An impossible base constructor has an actual constructible bound subclass."},
+        ]
+        self.write_enum_rows(rows)
+        return stub, rows
+
+    def test_nonconstructible_base_is_classified_not_counted_as_factory(self):
+        self.base_fixture()
+        report_path = self.root / "report.json"
+        status, output = self.run_check("--report", str(report_path))
+        self.assertFalse(status, output)
+        report = json.loads(report_path.read_text())
+        self.assertNotIn("itofin.Base.__new__", report["mappings"])
+        self.assertEqual(report["classified"], 1)
+        self.assertEqual(report["missing"], [])
+
+    def test_base_classification_cannot_replace_a_baseline_implementation(self):
+        self.base_fixture()
+        status, output = self.run_check("--baseline", baseline={"itofin.Base.__new__": "method"})
+        self.assertTrue(status)
+        self.assertIn("UNMAPPED: itofin.Base.__new__", output)
+
+    def test_base_requires_exact_impossible_constructor_and_actual_subclass(self):
+        for old, new in [
+            ("forbidden: typing.NoReturn", "forbidden: builtins.float"),
+            ("forbidden: typing.NoReturn", "forbidden: typing.NoReturn = None"),
+            ("forbidden: typing.NoReturn", "*forbidden: typing.NoReturn"),
+            ("-> Base:", "-> typing.Any:"),
+            ("class Derived(Base):", "class Derived:"),
+            ("def __new__(cls, x: builtins.float) -> Derived", "def __new__(cls, x: typing.NoReturn) -> Derived"),
+            ("    def value", "    def __init__(self) -> None: ...\n    def value"),
+        ]:
+            with self.subTest(replacement=new):
+                stub, _ = self.base_fixture()
+                (self.root / "crates/itofin-py/python/itofin/__init__.pyi").write_text(stub.replace(old, new))
+                status, output = self.run_check()
+                self.assertTrue(status)
+                self.assertIn("unsupported language-specific classification", output)
+
+    def test_base_rejects_overloaded_real_and_impossible_constructor_in_either_order(self):
+        impossible = "    def __new__(cls, forbidden: typing.NoReturn) -> Base: ...\n"
+        real = "    @typing.overload\n    def __new__(cls, value: builtins.float) -> Base: ...\n"
+        for overloads in [real + impossible, impossible + real]:
+            with self.subTest(order=overloads):
+                stub, _ = self.base_fixture()
+                (self.root / "crates/itofin-py/python/itofin/__init__.pyi").write_text(stub.replace(impossible, overloads))
+                status, output = self.run_check()
+                self.assertTrue(status)
+                self.assertIn("unsupported language-specific classification", output)
+        stub, _ = self.base_fixture()
+        (self.root / "crates/itofin-py/python/itofin/__init__.pyi").write_text(
+            stub.replace(impossible, "    @typing.overload\n" + impossible)
+        )
+        status, output = self.run_check()
+        self.assertTrue(status)
+        self.assertIn("unsupported language-specific classification", output)
+
+    def test_base_rejects_async_constructor_variants_and_async_initializer(self):
+        impossible = "    def __new__(cls, forbidden: typing.NoReturn) -> Base: ...\n"
+        async_real = "    async def __new__(cls, value: builtins.float) -> Base: ...\n"
+        for constructors in [async_real + impossible, impossible + async_real,
+                             impossible.replace("def __new__", "async def __new__"),
+                             impossible + "    async def __init__(self) -> None: ...\n"]:
+            with self.subTest(constructors=constructors):
+                stub, _ = self.base_fixture()
+                (self.root / "crates/itofin-py/python/itofin/__init__.pyi").write_text(stub.replace(impossible, constructors))
+                status, output = self.run_check()
+                self.assertTrue(status)
+                self.assertIn("unsupported language-specific classification", output)
+
+    def test_base_requires_real_go_struct_and_mapped_methods_and_constructor(self):
+        for change, message in [
+            ("struct", "missing Go base type"),
+            ("method", "corresponding Go base methods are not mapped"),
+            ("subclass", "constructible subclass constructor is not mapped"),
+            ("native", "constructible subclass constructor is not mapped"),
+            ("base", "corresponding Go type is not mapped"),
+        ]:
+            with self.subTest(change=change):
+                _, rows = self.base_fixture()
+                go = self.root / "sdk/go/api.go"
+                if change == "struct":
+                    go.write_text(go.read_text().replace("type Base struct {}", "type Base int32"))
+                elif change == "method":
+                    go.write_text(go.read_text().replace("func (b *Base) Value() {}", "func Value() {}"))
+                elif change == "subclass":
+                    rows.pop(2)
+                elif change == "native":
+                    rows[2]["c"] = []
+                elif change == "base":
+                    rows.pop(0)
+                self.write_enum_rows(rows)
+                status, output = self.run_check()
+                self.assertTrue(status)
+                self.assertIn(message, output)
+
+
 if __name__ == "__main__":
     unittest.main()

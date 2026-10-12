@@ -970,3 +970,9 @@ pub(crate) fn npv(
     )
     .map_err(PyQlError::from)?)
 }
+
+impl PyLeg {
+    pub(crate) fn from_inner(inner: Leg) -> Self {
+        Self { inner }
+    }
+}

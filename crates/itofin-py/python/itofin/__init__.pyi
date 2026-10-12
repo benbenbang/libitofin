@@ -92,6 +92,14 @@ class Settings:
         r"""
         Return whether Ibor coupons use par forecasting (the default).
         """
+    def set_include_reference_date_events(self, value: builtins.bool) -> None:
+        r"""
+        Set the default inclusion of reference-date events for pricing engines.
+        """
+    def include_reference_date_events(self) -> builtins.bool:
+        r"""
+        Return the default reference-date event policy.
+        """
     def set_include_todays_cash_flows(self, value: typing.Optional[builtins.bool]) -> None:
         r"""
         Set whether cash flows on today's date enter an NPV; None clears.
