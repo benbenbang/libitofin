@@ -9,6 +9,8 @@ mod impliedvolatility;
 
 mod oas;
 
+mod sensitivities;
+
 use std::any::Any;
 use std::cell::Cell;
 

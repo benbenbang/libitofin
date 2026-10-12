@@ -127,3 +127,5 @@ links to the language guides and project documentation.
 - [Callable implied volatility](callable-implied-volatility.md).
 
 - [Callable OAS](callable-oas.md).
+
+- [Callable bond sensitivities](callable-bond-sensitivities.md).
