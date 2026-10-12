@@ -1,0 +1,469 @@
+//! Pure bond and cash-flow yield and zero-spread analytics.
+use crate::bond_api::{NativeBond, optional_date};
+use crate::boundary::*;
+use crate::rates_api::{curve, finite, settings};
+use crate::time_api::{day_counter, frequency};
+use libitofin::cashflow::Leg;
+use libitofin::cashflows::CashFlows;
+use libitofin::instruments::BondPrice;
+use libitofin::interestrate::Compounding;
+use libitofin::pricingengines::bond::BondFunctions;
+use libitofin::time::date::Date;
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct ItofinBondYieldAnalyticsConfig {
+    pub day_counter: u64,
+    /// Simple=0, Compounded=1, Continuous=2, SimpleThenCompounded=3, CompoundedThenSimple=4.
+    pub compounding: i32,
+    /// Annual=0, Semiannual=1, Quarterly=2, Monthly=3.
+    pub frequency: i32,
+    /// Zero uses the bond's checked default settlement. Nonzero is actual settlement.
+    pub settlement: i32,
+}
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct ItofinBondZSpreadAnalyticsConfig {
+    pub discount: u64,
+    pub compounding: i32,
+    pub frequency: i32,
+    pub settlement: i32,
+}
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct ItofinAnalyticsSolverConfig {
+    /// Presence bits: accuracy=1, max_evaluations=2, guess=4. Omitted values use core defaults.
+    pub flags: u32,
+    pub accuracy: f64,
+    pub max_evaluations: u64,
+    pub guess: f64,
+}
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct ItofinCashFlowsZSpreadConfig {
+    pub discount: u64,
+    pub settings: u64,
+    /// -1 unset, 0 false, 1 true.
+    pub include_settlement: i32,
+    /// Zero means omitted; nonzero dates are actual dates without adjustment.
+    pub settlement: i32,
+    pub npv_date: i32,
+    pub compounding: i32,
+    pub frequency: i32,
+}
+pub(crate) fn compounding(value: i32) -> BindingResult<Compounding> {
+    match value {
+        0 => Ok(Compounding::Simple),
+        1 => Ok(Compounding::Compounded),
+        2 => Ok(Compounding::Continuous),
+        3 => Ok(Compounding::SimpleThenCompounded),
+        4 => Ok(Compounding::CompoundedThenSimple),
+        _ => Err(BindingError::invalid("invalid compounding convention")),
+    }
+}
+fn price(value: f64, kind: i32) -> BindingResult<BondPrice> {
+    let value = finite(value)?;
+    match kind {
+        0 => Ok(BondPrice::Clean(value)),
+        1 => Ok(BondPrice::Dirty(value)),
+        _ => Err(BindingError::invalid("invalid bond price type")),
+    }
+}
+struct Solver {
+    accuracy: Option<f64>,
+    evaluations: Option<usize>,
+    guess: Option<f64>,
+}
+fn solver(a: ItofinAnalyticsSolverConfig) -> BindingResult<Solver> {
+    if a.flags & !7 != 0 {
+        return Err(BindingError::invalid("invalid solver presence flags"));
+    }
+    let accuracy = if a.flags & 1 != 0 {
+        if finite(a.accuracy)? <= 0.0 {
+            return Err(BindingError::invalid("accuracy must be positive"));
+        }
+        Some(a.accuracy)
+    } else {
+        None
+    };
+    let evaluations = if a.flags & 2 != 0 {
+        let count = usize::try_from(a.max_evaluations)
+            .map_err(|_| BindingError::invalid("evaluation limit overflow"))?;
+        if count == 0 {
+            return Err(BindingError::invalid("evaluation limit must be positive"));
+        }
+        Some(count)
+    } else {
+        None
+    };
+    let guess = if a.flags & 4 != 0 {
+        Some(finite(a.guess)?)
+    } else {
+        None
+    };
+    Ok(Solver {
+        accuracy,
+        evaluations,
+        guess,
+    })
+}
+fn settlement(bond: &NativeBond, serial: i32, clean: bool) -> BindingResult<Date> {
+    let actual = match optional_date(serial)? {
+        Some(date) => date,
+        None => bond.settlement(None)?,
+    };
+    if let Some(floating) = &bond.floating {
+        let b = bond.bond.borrow();
+        floating.guard_leg(b.cashflows(), b.settings(), Some(false), Some(actual))?;
+        if clean {
+            floating.guard_accrued(&b, actual)?;
+        }
+    }
+    Ok(actual)
+}
+fn include(value: i32) -> BindingResult<Option<bool>> {
+    match value {
+        -1 => Ok(None),
+        0 => Ok(Some(false)),
+        1 => Ok(Some(true)),
+        _ => Err(BindingError::invalid("invalid settlement flag")),
+    }
+}
+#[unsafe(no_mangle)]
+/// # Safety
+/// Pointers and thread ownership must satisfy the crate-level C caller contract.
+pub unsafe extern "C" fn itofin_bond_clean_price_from_curve(
+    ctx: *mut Context,
+    id: u64,
+    discount: u64,
+    serial: i32,
+    out: *mut f64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(out)?;
+            let bond = c.get::<NativeBond>(id)?;
+            let discount = curve(c, discount)?.current_link()?;
+            let actual = settlement(&bond, serial, true)?;
+            let value = BondFunctions::clean_price(&bond.bond.borrow(), &*discount, Some(actual))?;
+            output(out, finite(value)?)
+        })
+    }
+}
+#[unsafe(no_mangle)]
+/// # Safety
+/// Pointers and thread ownership must satisfy the crate-level C caller contract.
+pub unsafe extern "C" fn itofin_bond_dirty_price_from_curve(
+    ctx: *mut Context,
+    id: u64,
+    discount: u64,
+    serial: i32,
+    out: *mut f64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(out)?;
+            let bond = c.get::<NativeBond>(id)?;
+            let discount = curve(c, discount)?.current_link()?;
+            let actual = settlement(&bond, serial, false)?;
+            let value = BondFunctions::dirty_price(&bond.bond.borrow(), &*discount, Some(actual))?;
+            output(out, finite(value)?)
+        })
+    }
+}
+#[unsafe(no_mangle)]
+/// # Safety
+/// Pointers and thread ownership must satisfy the crate-level C caller contract.
+pub unsafe extern "C" fn itofin_bond_clean_price_from_yield(
+    ctx: *mut Context,
+    id: u64,
+    rate: f64,
+    a: ItofinBondYieldAnalyticsConfig,
+    out: *mut f64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(out)?;
+            let rate = finite(rate)?;
+            let dc = day_counter(c, a.day_counter)?;
+            let comp = compounding(a.compounding)?;
+            let freq = frequency(a.frequency)?;
+            let bond = c.get::<NativeBond>(id)?;
+            let actual = settlement(&bond, a.settlement, true)?;
+            let value = BondFunctions::clean_price_from_yield(
+                &bond.bond.borrow(),
+                rate,
+                dc,
+                comp,
+                freq,
+                Some(actual),
+            )?;
+            output(out, finite(value)?)
+        })
+    }
+}
+#[unsafe(no_mangle)]
+/// # Safety
+/// Pointers and thread ownership must satisfy the crate-level C caller contract.
+pub unsafe extern "C" fn itofin_bond_dirty_price_from_yield(
+    ctx: *mut Context,
+    id: u64,
+    rate: f64,
+    a: ItofinBondYieldAnalyticsConfig,
+    out: *mut f64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(out)?;
+            let rate = finite(rate)?;
+            let dc = day_counter(c, a.day_counter)?;
+            let comp = compounding(a.compounding)?;
+            let freq = frequency(a.frequency)?;
+            let bond = c.get::<NativeBond>(id)?;
+            let actual = settlement(&bond, a.settlement, false)?;
+            let value = BondFunctions::dirty_price_from_yield(
+                &bond.bond.borrow(),
+                rate,
+                dc,
+                comp,
+                freq,
+                Some(actual),
+            )?;
+            output(out, finite(value)?)
+        })
+    }
+}
+#[unsafe(no_mangle)]
+/// # Safety
+/// Pointers and thread ownership must satisfy the crate-level C caller contract.
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn itofin_bond_yield_rate(
+    ctx: *mut Context,
+    id: u64,
+    target: f64,
+    price_type: i32,
+    a: ItofinBondYieldAnalyticsConfig,
+    solve: ItofinAnalyticsSolverConfig,
+    out: *mut f64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(out)?;
+            let target = price(target, price_type)?;
+            let dc = day_counter(c, a.day_counter)?;
+            let comp = compounding(a.compounding)?;
+            let freq = frequency(a.frequency)?;
+            let solve = solver(solve)?;
+            let bond = c.get::<NativeBond>(id)?;
+            let actual = settlement(&bond, a.settlement, price_type == 0)?;
+            let value = BondFunctions::yield_rate(
+                &bond.bond.borrow(),
+                target,
+                dc,
+                comp,
+                freq,
+                Some(actual),
+                solve.accuracy,
+                solve.evaluations,
+                solve.guess,
+            )?;
+            output(out, finite(value)?)
+        })
+    }
+}
+#[unsafe(no_mangle)]
+/// # Safety
+/// Pointers and thread ownership must satisfy the crate-level C caller contract.
+pub unsafe extern "C" fn itofin_bond_clean_price_at_z_spread(
+    ctx: *mut Context,
+    id: u64,
+    spread: f64,
+    a: ItofinBondZSpreadAnalyticsConfig,
+    out: *mut f64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(out)?;
+            let spread = finite(spread)?;
+            let discount = curve(c, a.discount)?;
+            let comp = compounding(a.compounding)?;
+            let freq = frequency(a.frequency)?;
+            let bond = c.get::<NativeBond>(id)?;
+            let actual = settlement(&bond, a.settlement, true)?;
+            let value = BondFunctions::clean_price_at_z_spread(
+                &bond.bond.borrow(),
+                discount,
+                spread,
+                comp,
+                freq,
+                Some(actual),
+            )?;
+            output(out, finite(value)?)
+        })
+    }
+}
+#[unsafe(no_mangle)]
+/// # Safety
+/// Pointers and thread ownership must satisfy the crate-level C caller contract.
+pub unsafe extern "C" fn itofin_bond_dirty_price_at_z_spread(
+    ctx: *mut Context,
+    id: u64,
+    spread: f64,
+    a: ItofinBondZSpreadAnalyticsConfig,
+    out: *mut f64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(out)?;
+            let spread = finite(spread)?;
+            let discount = curve(c, a.discount)?;
+            let comp = compounding(a.compounding)?;
+            let freq = frequency(a.frequency)?;
+            let bond = c.get::<NativeBond>(id)?;
+            let actual = settlement(&bond, a.settlement, false)?;
+            let value = BondFunctions::dirty_price_at_z_spread(
+                &bond.bond.borrow(),
+                discount,
+                spread,
+                comp,
+                freq,
+                Some(actual),
+            )?;
+            output(out, finite(value)?)
+        })
+    }
+}
+#[unsafe(no_mangle)]
+/// # Safety
+/// Pointers and thread ownership must satisfy the crate-level C caller contract.
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn itofin_bond_z_spread(
+    ctx: *mut Context,
+    id: u64,
+    target: f64,
+    price_type: i32,
+    a: ItofinBondZSpreadAnalyticsConfig,
+    solve: ItofinAnalyticsSolverConfig,
+    out: *mut f64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(out)?;
+            let target = price(target, price_type)?;
+            let discount = curve(c, a.discount)?;
+            let comp = compounding(a.compounding)?;
+            let freq = frequency(a.frequency)?;
+            let solve = solver(solve)?;
+            let bond = c.get::<NativeBond>(id)?;
+            let actual = settlement(&bond, a.settlement, price_type == 0)?;
+            let value = BondFunctions::z_spread(
+                &bond.bond.borrow(),
+                target,
+                discount,
+                comp,
+                freq,
+                Some(actual),
+                solve.accuracy,
+                solve.evaluations,
+                solve.guess,
+            )?;
+            output(out, finite(value)?)
+        })
+    }
+}
+#[unsafe(no_mangle)]
+/// # Safety
+/// Pointers and thread ownership must satisfy the crate-level C caller contract.
+pub unsafe extern "C" fn itofin_cashflows_npv_at_z_spread(
+    ctx: *mut Context,
+    id: u64,
+    value: f64,
+    a: ItofinCashFlowsZSpreadConfig,
+    out: *mut f64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(out)?;
+            let value = finite(value)?;
+            let discount = curve(c, a.discount)?;
+            let settings = settings(c, a.settings)?;
+            let comp = compounding(a.compounding)?;
+            let freq = frequency(a.frequency)?;
+            let include = include(a.include_settlement)?;
+            let settlement = optional_date(a.settlement)?;
+            let npv_date = optional_date(a.npv_date)?;
+
+            let leg = c.get::<Leg>(id)?;
+            if let Some(floating) =
+                c.optional_metadata::<crate::floating_bond_api::NativeFloating>(id)
+            {
+                floating.guard_leg(&leg, &settings, include, settlement)?;
+            }
+            let result = CashFlows::npv_at_z_spread(
+                &leg, discount, value, comp, freq, &settings, include, settlement, npv_date,
+            )?;
+            output(out, finite(result)?)
+        })
+    }
+}
+#[unsafe(no_mangle)]
+/// # Safety
+/// Pointers and thread ownership must satisfy the crate-level C caller contract.
+pub unsafe extern "C" fn itofin_cashflows_z_spread(
+    ctx: *mut Context,
+    id: u64,
+    value: f64,
+    a: ItofinCashFlowsZSpreadConfig,
+    solve: ItofinAnalyticsSolverConfig,
+    out: *mut f64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(out)?;
+            let value = finite(value)?;
+            let discount = curve(c, a.discount)?;
+            let settings = settings(c, a.settings)?;
+            let comp = compounding(a.compounding)?;
+            let freq = frequency(a.frequency)?;
+            let include = include(a.include_settlement)?;
+            let settlement = optional_date(a.settlement)?;
+            let npv_date = optional_date(a.npv_date)?;
+            let solve = solver(solve)?;
+            let leg = c.get::<Leg>(id)?;
+            if let Some(floating) =
+                c.optional_metadata::<crate::floating_bond_api::NativeFloating>(id)
+            {
+                floating.guard_leg(&leg, &settings, include, settlement)?;
+            }
+            let result = CashFlows::z_spread(
+                &leg,
+                value,
+                discount,
+                comp,
+                freq,
+                &settings,
+                include,
+                settlement,
+                npv_date,
+                solve.accuracy,
+                solve.evaluations,
+                solve.guess,
+            )?;
+            output(out, finite(result)?)
+        })
+    }
+}
+
+#[cfg(test)]
+#[path = "bond_analytics_api_tests.rs"]
+mod tests;
