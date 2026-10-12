@@ -269,3 +269,43 @@ fn near_singular_roots_match_90_digit_decimal_regressions() {
         );
     }
 }
+
+#[test]
+fn finite_cross_moments_survive_correlation_and_loading_underflow() {
+    for (eta, dt, cross, loading) in [
+        (
+            1e154,
+            800.0,
+            4.0000000000000003e-44,
+            2.0748631928110647e-191,
+        ),
+        (1e154, 740.0, 3.7e-44, 2.1917959166182907e-165),
+        (1e-3, 800.0, 4e-201, 0.0),
+    ] {
+        for sign in [-1.0, 1.0] {
+            let p = G2Process::new(-1.0, 1e-200, 1.0, eta, sign * 0.5).unwrap();
+            let c = p.covariance(0.0, &zero(), dt).unwrap();
+            let s = p.std_deviation(0.0, &zero(), dt).unwrap();
+            assert!((c[(0, 1)] / (sign * cross) - 1.0).abs() < 2e-12);
+            assert_eq!(c[(0, 1)], c[(1, 0)]);
+            if loading == 0.0 {
+                assert_eq!(s[(1, 0)], 0.0);
+            } else {
+                assert!((s[(1, 0)] / (sign * loading) - 1.0).abs() < 2e-12);
+            }
+        }
+    }
+}
+
+#[test]
+fn ordinary_singular_covariance_preserves_exact_gram_symmetry_and_psd() {
+    for rho in [-1.0, 1.0] {
+        let p = G2Process::new(0.0, 1.0, 0.0, 1.0, rho).unwrap();
+        let s = p.std_deviation(0.0, &zero(), 0.3).unwrap();
+        let c = p.covariance(0.0, &zero(), 0.3).unwrap();
+        assert_eq!(c, &s * &s.transpose());
+        assert_eq!(c[(0, 0)], c[(0, 1)].abs());
+        assert_eq!(c[(1, 1)], c[(0, 1)].abs());
+        assert_eq!(c[(0, 0)] * c[(1, 1)] - c[(0, 1)] * c[(1, 0)], 0.0);
+    }
+}

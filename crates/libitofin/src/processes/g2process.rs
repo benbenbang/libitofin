@@ -123,7 +123,7 @@ impl G2Process {
         let ly = log_kernel(self.b, dt);
         let sx = scaled_root(self.sigma, lx)?;
         let sy = scaled_root(self.eta, ly)?;
-        let (corr, residual) = if sx == 0.0 || sy == 0.0 || self.rho == 0.0 {
+        let (loading, residual) = if sx == 0.0 || sy == 0.0 || self.rho == 0.0 {
             (0.0, 1.0)
         } else {
             let lc = log_kernel(self.a * 0.5 + self.b * 0.5, dt);
@@ -136,9 +136,17 @@ impl G2Process {
             let c = self.rho * log_corr.exp();
             let residual = (1.0 - self.rho) * (1.0 + self.rho)
                 + self.rho * self.rho * (-(2.0 * log_corr).exp_m1());
-            (c, residual)
+            let loading = if c == 0.0 || c.is_subnormal() {
+                finite(
+                    self.rho.signum()
+                        * (self.eta.ln() + ly * 0.5 + self.rho.abs().ln() + log_corr).exp(),
+                )?
+            } else {
+                sy * c
+            };
+            (loading, residual)
         };
-        Ok(Matrix::from([[sx, 0.0], [sy * corr, sy * residual.sqrt()]]))
+        Ok(Matrix::from([[sx, 0.0], [loading, sy * residual.sqrt()]]))
     }
 }
 
@@ -282,7 +290,21 @@ impl StochasticProcess for G2Process {
         let s = self.std_deviation(t, x, dt)?;
         let xx = finite(s[(0, 0)] * s[(0, 0)])?;
         let yy = finite(s[(1, 0)] * s[(1, 0)] + s[(1, 1)] * s[(1, 1)])?;
-        let xy = finite(s[(0, 0)] * s[(1, 0)])?;
+        let gram_xy = s[(0, 0)] * s[(1, 0)];
+        let xy = if dt == 0.0 || self.rho == 0.0 || self.sigma == 0.0 || self.eta == 0.0 {
+            0.0
+        } else if s[(1, 0)].is_normal() && gram_xy.is_normal() {
+            gram_xy
+        } else {
+            finite(
+                self.rho.signum()
+                    * (self.rho.abs().ln()
+                        + self.sigma.ln()
+                        + self.eta.ln()
+                        + log_kernel(self.a * 0.5 + self.b * 0.5, dt))
+                    .exp(),
+            )?
+        };
         Ok(Matrix::from([[xx, xy], [xy, yy]]))
     }
 
