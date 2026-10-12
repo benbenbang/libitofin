@@ -70,6 +70,7 @@ plugins:
             filters: ["!^_"]
 
 nav:
+  - Bare-factor G2 process: g2-process.md
   - Callable bond sensitivities: callable-bond-sensitivities.md
   - Callable OAS: callable-oas.md
   - Callable implied volatility: callable-implied-volatility.md

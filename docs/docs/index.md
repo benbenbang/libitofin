@@ -129,3 +129,5 @@ links to the language guides and project documentation.
 - [Callable OAS](callable-oas.md).
 
 - [Callable bond sensitivities](callable-bond-sensitivities.md).
+
+- [Bare-factor G2 process](g2-process.md).
