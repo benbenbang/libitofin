@@ -50,6 +50,7 @@ pub struct Context {
     owner: ThreadId,
     poisoned: bool,
     objects: HashMap<u64, Box<dyn Any>>,
+    metadata: HashMap<u64, Box<dyn Any>>,
 }
 static NEXT_HANDLE: AtomicU64 = AtomicU64::new(1);
 
@@ -59,6 +60,7 @@ impl Context {
             owner: thread::current().id(),
             poisoned: false,
             objects: HashMap::new(),
+            metadata: HashMap::new(),
         }
     }
     pub fn insert<T: 'static>(&mut self, value: T) -> BindingResult<u64> {
@@ -70,6 +72,29 @@ impl Context {
             .map_err(|_| BindingError::invalid("handle space exhausted"))?;
         self.objects.insert(id, Box::new(value));
         Ok(id)
+    }
+    pub(crate) fn insert_with_metadata<T: 'static, M: 'static>(
+        &mut self,
+        value: T,
+        metadata: M,
+    ) -> BindingResult<u64> {
+        self.metadata
+            .try_reserve(1)
+            .map_err(|_| BindingError::invalid("metadata allocation failed"))?;
+        let metadata = Box::new(metadata);
+        let id = self.insert(value)?;
+        self.metadata.insert(id, metadata);
+        Ok(id)
+    }
+    pub(crate) fn metadata<T: Clone + 'static>(&self, id: u64) -> BindingResult<T> {
+        self.metadata
+            .get(&id)
+            .and_then(|value| value.downcast_ref::<T>())
+            .cloned()
+            .ok_or_else(|| BindingError {
+                code: INVALID_HANDLE,
+                message: "unknown, released, foreign, or wrong-type metadata".into(),
+            })
     }
     pub fn get<T: Clone + 'static>(&self, id: u64) -> BindingResult<T> {
         self.objects
@@ -264,6 +289,7 @@ pub unsafe extern "C" fn itofin_handle_release(
                 code: INVALID_HANDLE,
                 message: "unknown, released, or foreign handle".into(),
             })?;
+            c.metadata.remove(&handle);
             Ok(())
         })
     }

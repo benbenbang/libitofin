@@ -344,7 +344,11 @@ pub unsafe extern "C" fn itofin_calendar_new(
 }
 // These checked boundary walks follow Calendar::adjust/advance and report range
 // errors instead of allowing Date's assertion to invalidate the whole session.
-fn adjust(cal: &NativeCalendar, d: Date, rule: BusinessDayConvention) -> BindingResult<Date> {
+pub(crate) fn adjust(
+    cal: &NativeCalendar,
+    d: Date,
+    rule: BusinessDayConvention,
+) -> BindingResult<Date> {
     cal.checked(d)?;
     use BusinessDayConvention::*;
     if rule == Unadjusted {
@@ -380,7 +384,7 @@ fn adjust(cal: &NativeCalendar, d: Date, rule: BusinessDayConvention) -> Binding
     }
     Ok(result)
 }
-fn advance(
+pub(crate) fn advance(
     cal: &NativeCalendar,
     d: Date,
     n: i32,
@@ -530,12 +534,15 @@ pub unsafe extern "C" fn itofin_schedule_new(
                 .from(start)
                 .to(end)
                 .with_frequency(frequency(config.frequency)?)
-                .with_calendar(calendar(c, config.calendar)?)
+                .with_calendar(c.get::<NativeCalendar>(config.calendar)?.inner)
                 .with_convention(rule)
                 .with_termination_date_convention(term)
                 .with_rule(generation(config.rule)?)
                 .build();
-            output(out, c.insert(schedule)?)
+            output(
+                out,
+                c.insert_with_metadata(schedule, c.get::<NativeCalendar>(config.calendar)?)?,
+            )
         })
     }
 }
@@ -572,6 +579,10 @@ pub unsafe extern "C" fn itofin_schedule_dates(
         })
     }
 }
+pub(crate) fn schedule_calendar(c: &Context, id: u64) -> BindingResult<NativeCalendar> {
+    c.metadata(id)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

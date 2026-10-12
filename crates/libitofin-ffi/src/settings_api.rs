@@ -95,6 +95,41 @@ pub unsafe extern "C" fn itofin_settings_include_todays_cash_flows(
         })
     }
 }
+#[unsafe(no_mangle)]
+/// # Safety
+/// Pointers and thread ownership must satisfy the crate-level C caller contract.
+pub unsafe extern "C" fn itofin_settings_include_reference_date_events(
+    ctx: *mut Context,
+    id: u64,
+    out: *mut bool,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            output(out, settings(c, id)?.include_reference_date_events())
+        })
+    }
+}
+#[unsafe(no_mangle)]
+/// # Safety
+/// Pointers and thread ownership must satisfy the crate-level C caller contract.
+pub unsafe extern "C" fn itofin_settings_set_include_reference_date_events(
+    ctx: *mut Context,
+    id: u64,
+    value: u8,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            if value > 1 {
+                return Err(BindingError::invalid("invalid reference-date event flag"));
+            }
+            settings(c, id)?.set_include_reference_date_events(value == 1);
+            Ok(())
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
