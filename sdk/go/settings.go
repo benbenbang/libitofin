@@ -48,3 +48,22 @@ func (s *Settings) IncludeTodaysCashFlows() (*bool, error) {
 	value := out != 0
 	return &value, nil
 }
+
+func (s *Settings) IncludeReferenceDateEvents() (bool, error) {
+	var out C.bool
+	err := s.session.invoke(func() error {
+		var e C.ItofinError
+		return ffiError(C.itofin_settings_include_reference_date_events(s.session.ctx, C.uint64_t(s.id), &out, &e), &e)
+	})
+	return bool(out), err
+}
+func (s *Settings) SetIncludeReferenceDateEvents(value bool) error {
+	var v C.uint8_t
+	if value {
+		v = 1
+	}
+	return s.session.invoke(func() error {
+		var e C.ItofinError
+		return ffiError(C.itofin_settings_set_include_reference_date_events(s.session.ctx, C.uint64_t(s.id), v, &e), &e)
+	})
+}

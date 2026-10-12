@@ -12,6 +12,9 @@ pub mod bates_api;
 pub mod bates_calibration_api;
 pub mod bma_api;
 pub mod bma_swap_api;
+pub mod bond_api;
+#[cfg(test)]
+mod bond_api_tests;
 pub mod bootstrap_api;
 pub mod bootstrap_callbacks;
 pub mod bootstrap_variables;
