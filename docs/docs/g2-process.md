@@ -58,6 +58,15 @@ are at most `0.125`; the remaining correlated regime uses a stable hyperbolic
 identity or the logarithmic kernel ratio. Only bounded positive
 log-correlation roundoff is clamped to zero.
 
+If an integrated correlation is subnormal or underflows, the root's first
+second-factor loading is scaled in signed log space so a representable loading
+is not lost. Ordinary covariance keeps the Gram product of the root, preserving
+its singular rounding behavior. When the loading or cross product is zero or
+subnormal, cross covariance is calculated independently from its exact integral.
+In extreme cases a root entry itself can be unrepresentable while the
+cross covariance remains representable; multiplying that rounded root by its
+transpose cannot recover the retained cross moment.
+
 ## Validation and native reference
 
 Constructor parameters, states and noise must be finite. Fallible dynamics
