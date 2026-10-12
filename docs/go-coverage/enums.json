@@ -312,6 +312,91 @@
       "python": "itofin.time.Frequency.__new__",
       "reason": "Python Frequency forbids construction; Go uses typed integer constants and casts. Native APIs validate discriminants.",
       "status": "language-specific"
+    },
+    {
+      "c": [],
+      "go": [
+        "Compounding"
+      ],
+      "python": "itofin.time.Compounding",
+      "status": "implemented",
+      "tests": [
+        "TestBondAnalyticsQuantLibOracles",
+        "TestBondAnalyticsSolverDefaultsErrorsAndRecovery"
+      ]
+    },
+    {
+      "c": [],
+      "go": [
+        "Simple"
+      ],
+      "python": "itofin.time.Compounding.Simple",
+      "status": "implemented",
+      "tests": [
+        "TestBondAnalyticsQuantLibOracles",
+        "TestBondAnalyticsSolverDefaultsErrorsAndRecovery"
+      ]
+    },
+    {
+      "c": [],
+      "go": [
+        "Compounded"
+      ],
+      "python": "itofin.time.Compounding.Compounded",
+      "status": "implemented",
+      "tests": [
+        "TestBondAnalyticsQuantLibOracles",
+        "TestBondAnalyticsSolverDefaultsErrorsAndRecovery"
+      ]
+    },
+    {
+      "c": [],
+      "go": [
+        "Continuous"
+      ],
+      "python": "itofin.time.Compounding.Continuous",
+      "status": "implemented",
+      "tests": [
+        "TestBondAnalyticsQuantLibOracles",
+        "TestBondAnalyticsSolverDefaultsErrorsAndRecovery"
+      ]
+    },
+    {
+      "c": [],
+      "go": [
+        "SimpleThenCompounded"
+      ],
+      "python": "itofin.time.Compounding.SimpleThenCompounded",
+      "status": "implemented",
+      "tests": [
+        "TestBondAnalyticsQuantLibOracles",
+        "TestBondAnalyticsSolverDefaultsErrorsAndRecovery"
+      ]
+    },
+    {
+      "c": [],
+      "go": [
+        "CompoundedThenSimple"
+      ],
+      "python": "itofin.time.Compounding.CompoundedThenSimple",
+      "status": "implemented",
+      "tests": [
+        "TestBondAnalyticsQuantLibOracles",
+        "TestBondAnalyticsSolverDefaultsErrorsAndRecovery"
+      ]
+    },
+    {
+      "go": "Compounding: explicit integer conversion",
+      "python": "itofin.time.Compounding.__int__",
+      "status": "implemented",
+      "tests": "TestBondAnalyticsSolverDefaultsErrorsAndRecovery"
+    },
+    {
+      "classification": "nonconstructible-enum",
+      "go": "Compounding",
+      "python": "itofin.time.Compounding.__new__",
+      "reason": "Python Compounding forbids construction; Go uses typed integer constants and casts. Native APIs validate discriminants.",
+      "status": "language-specific"
     }
   ]
 }

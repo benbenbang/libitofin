@@ -6,6 +6,7 @@ import typing
 __all__ = [
     "BusinessDayConvention",
     "Calendar",
+    "Compounding",
     "Date",
     "DateGeneration",
     "DayCounter",
@@ -1099,6 +1100,20 @@ class BusinessDayConvention:
     HalfMonthModifiedFollowing: typing.ClassVar[BusinessDayConvention]
     Nearest: typing.ClassVar[BusinessDayConvention]
     def __new__(cls, _unconstructible: typing.NoReturn) -> BusinessDayConvention: ...
+    def __int__(self) -> builtins.int: ...
+    __hash__: typing.ClassVar[None]  # type: ignore[assignment]
+
+@typing.final
+class Compounding:
+    r"""
+    Conventions used to compound a rate over time.
+    """
+    Simple: typing.ClassVar[Compounding]
+    Compounded: typing.ClassVar[Compounding]
+    Continuous: typing.ClassVar[Compounding]
+    SimpleThenCompounded: typing.ClassVar[Compounding]
+    CompoundedThenSimple: typing.ClassVar[Compounding]
+    def __new__(cls, _unconstructible: typing.NoReturn) -> Compounding: ...
     def __int__(self) -> builtins.int: ...
     __hash__: typing.ClassVar[None]  # type: ignore[assignment]
 

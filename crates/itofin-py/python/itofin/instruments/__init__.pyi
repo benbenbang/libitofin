@@ -109,6 +109,38 @@ class Bond:
         r"""
         Attach an engine sharing this bond's settings. Dependencies remain live.
         """
+    def clean_price_from_curve(self, discount_curve: termstructures.YieldTermStructure, *, settlement: typing.Optional[time.Date] = None) -> builtins.float:
+        r"""
+        Clean analytical quote per 100 using an explicit discount curve.
+        """
+    def clean_price_from_yield(self, yield_rate: builtins.float, day_counter: time.DayCounter, compounding: time.Compounding, frequency: time.Frequency, *, settlement: typing.Optional[time.Date] = None) -> builtins.float:
+        r"""
+        Clean analytical quote per 100 from a flat yield with supplied conventions.
+        """
+    def clean_price_at_z_spread(self, discount_curve: termstructures.YieldTermStructure, z_spread: builtins.float, compounding: time.Compounding, frequency: time.Frequency, *, settlement: typing.Optional[time.Date] = None) -> builtins.float:
+        r"""
+        Clean analytical quote per 100 using a parallel zero-rate spread.
+        """
+    def dirty_price_from_curve(self, discount_curve: termstructures.YieldTermStructure, *, settlement: typing.Optional[time.Date] = None) -> builtins.float:
+        r"""
+        Dirty analytical quote per 100 using an explicit discount curve.
+        """
+    def dirty_price_from_yield(self, yield_rate: builtins.float, day_counter: time.DayCounter, compounding: time.Compounding, frequency: time.Frequency, *, settlement: typing.Optional[time.Date] = None) -> builtins.float:
+        r"""
+        Dirty analytical quote per 100 from a flat yield with supplied conventions.
+        """
+    def dirty_price_at_z_spread(self, discount_curve: termstructures.YieldTermStructure, z_spread: builtins.float, compounding: time.Compounding, frequency: time.Frequency, *, settlement: typing.Optional[time.Date] = None) -> builtins.float:
+        r"""
+        Dirty analytical quote per 100 using a parallel zero-rate spread.
+        """
+    def yield_rate(self, price: builtins.float, day_counter: time.DayCounter, compounding: time.Compounding, frequency: time.Frequency, *, price_type: termstructures.BondPriceType = termstructures.BondPriceType.Clean, settlement: typing.Optional[time.Date] = None, accuracy: builtins.float = 1e-10, max_evaluations: builtins.int = 100, guess: builtins.float = 0.05) -> builtins.float:
+        r"""
+        Solve the yield repricing a clean or dirty per-100 quote.
+        """
+    def z_spread(self, price: builtins.float, discount_curve: termstructures.YieldTermStructure, compounding: time.Compounding, frequency: time.Frequency, *, price_type: termstructures.BondPriceType = termstructures.BondPriceType.Clean, settlement: typing.Optional[time.Date] = None, accuracy: builtins.float = 1e-10, max_evaluations: builtins.int = 100, guess: builtins.float = 0.0) -> builtins.float:
+        r"""
+        Solve the parallel zero-rate spread repricing a clean or dirty per-100 quote.
+        """
     def npv(self) -> builtins.float:
         r"""
         Present value in currency units, discounted to the curve reference date.

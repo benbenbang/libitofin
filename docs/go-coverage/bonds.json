@@ -488,6 +488,126 @@
       "tests": [
         "TestFloatingBondZeroGearingAndKnownFixingNeedNoForecastVolatility"
       ]
+    },
+    {
+      "c": [
+        "itofin_bond_clean_price_from_curve"
+      ],
+      "go": [
+        "Bond.CleanPriceFromCurve"
+      ],
+      "python": "itofin.instruments.Bond.clean_price_from_curve",
+      "status": "implemented",
+      "tests": [
+        "TestBondAnalyticsQuantLibOracles",
+        "TestBondAnalyticsFrozenFloatingCurrentInputsAndRetainedLeg",
+        "TestBondAnalyticsFloatingSelectedFlowAndCleanAccrualGuards"
+      ]
+    },
+    {
+      "c": [
+        "itofin_bond_dirty_price_from_curve"
+      ],
+      "go": [
+        "Bond.DirtyPriceFromCurve"
+      ],
+      "python": "itofin.instruments.Bond.dirty_price_from_curve",
+      "status": "implemented",
+      "tests": [
+        "TestBondAnalyticsQuantLibOracles",
+        "TestBondAnalyticsFrozenFloatingCurrentInputsAndRetainedLeg",
+        "TestBondAnalyticsFloatingSelectedFlowAndCleanAccrualGuards"
+      ]
+    },
+    {
+      "c": [
+        "itofin_bond_clean_price_from_yield"
+      ],
+      "go": [
+        "Bond.CleanPriceFromYield"
+      ],
+      "python": "itofin.instruments.Bond.clean_price_from_yield",
+      "status": "implemented",
+      "tests": [
+        "TestBondAnalyticsQuantLibOracles",
+        "TestBondAnalyticsFrozenFloatingCurrentInputsAndRetainedLeg",
+        "TestBondAnalyticsFloatingSelectedFlowAndCleanAccrualGuards"
+      ]
+    },
+    {
+      "c": [
+        "itofin_bond_dirty_price_from_yield"
+      ],
+      "go": [
+        "Bond.DirtyPriceFromYield"
+      ],
+      "python": "itofin.instruments.Bond.dirty_price_from_yield",
+      "status": "implemented",
+      "tests": [
+        "TestBondAnalyticsQuantLibOracles",
+        "TestBondAnalyticsFrozenFloatingCurrentInputsAndRetainedLeg",
+        "TestBondAnalyticsFloatingSelectedFlowAndCleanAccrualGuards"
+      ]
+    },
+    {
+      "c": [
+        "itofin_bond_yield_rate"
+      ],
+      "go": [
+        "Bond.YieldRate"
+      ],
+      "python": "itofin.instruments.Bond.yield_rate",
+      "status": "implemented",
+      "tests": [
+        "TestBondAnalyticsSolverDefaultsErrorsAndRecovery",
+        "TestBondAnalyticsFrozenFloatingCurrentInputsAndRetainedLeg",
+        "TestBondAnalyticsFloatingSelectedFlowAndCleanAccrualGuards"
+      ]
+    },
+    {
+      "c": [
+        "itofin_bond_clean_price_at_z_spread"
+      ],
+      "go": [
+        "Bond.CleanPriceAtZSpread"
+      ],
+      "python": "itofin.instruments.Bond.clean_price_at_z_spread",
+      "status": "implemented",
+      "tests": [
+        "TestBondAnalyticsQuantLibOracles",
+        "TestBondAnalyticsFrozenFloatingCurrentInputsAndRetainedLeg",
+        "TestBondAnalyticsFloatingSelectedFlowAndCleanAccrualGuards"
+      ]
+    },
+    {
+      "c": [
+        "itofin_bond_dirty_price_at_z_spread"
+      ],
+      "go": [
+        "Bond.DirtyPriceAtZSpread"
+      ],
+      "python": "itofin.instruments.Bond.dirty_price_at_z_spread",
+      "status": "implemented",
+      "tests": [
+        "TestBondAnalyticsQuantLibOracles",
+        "TestBondAnalyticsFrozenFloatingCurrentInputsAndRetainedLeg",
+        "TestBondAnalyticsFloatingSelectedFlowAndCleanAccrualGuards"
+      ]
+    },
+    {
+      "c": [
+        "itofin_bond_z_spread"
+      ],
+      "go": [
+        "Bond.ZSpread"
+      ],
+      "python": "itofin.instruments.Bond.z_spread",
+      "status": "implemented",
+      "tests": [
+        "TestBondAnalyticsSolverDefaultsErrorsAndRecovery",
+        "TestBondAnalyticsFrozenFloatingCurrentInputsAndRetainedLeg",
+        "TestBondAnalyticsFloatingSelectedFlowAndCleanAccrualGuards"
+      ]
     }
   ]
 }

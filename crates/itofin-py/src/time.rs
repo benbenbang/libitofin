@@ -1912,6 +1912,36 @@ impl PyCalendar {
     }
 }
 
+/// Conventions used to compound a rate over time.
+#[gen_stub_pyclass_enum]
+#[pyclass(
+    name = "Compounding",
+    eq,
+    eq_int,
+    from_py_object,
+    module = "itofin.time"
+)]
+#[derive(Clone, Copy, PartialEq)]
+pub enum PyCompounding {
+    Simple = 0,
+    Compounded = 1,
+    Continuous = 2,
+    SimpleThenCompounded = 3,
+    CompoundedThenSimple = 4,
+}
+impl PyCompounding {
+    pub(crate) fn inner(self) -> libitofin::interestrate::Compounding {
+        use libitofin::interestrate::Compounding;
+        match self {
+            Self::Simple => Compounding::Simple,
+            Self::Compounded => Compounding::Compounded,
+            Self::Continuous => Compounding::Continuous,
+            Self::SimpleThenCompounded => Compounding::SimpleThenCompounded,
+            Self::CompoundedThenSimple => Compounding::CompoundedThenSimple,
+        }
+    }
+}
+
 /// A coupon or fixing frequency.
 ///
 /// Only the variants the ported fixtures use are surfaced; new ones are

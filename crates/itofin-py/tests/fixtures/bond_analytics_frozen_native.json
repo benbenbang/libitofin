@@ -1,0 +1,73 @@
+{
+  "analytics_curve_rate": 0.037,
+  "cached_engine_npv": 261.8823194471096,
+  "cap": 0.055,
+  "current_frozen_analytics": {
+    "accrued": 0.030555555555555558,
+    "clean_curve": 103.6705834754128,
+    "clean_yield": 102.21198406009829,
+    "clean_z_spread": 102.96999638230385,
+    "dirty_curve": 103.70113903096835,
+    "dirty_yield": 102.24253961565384,
+    "dirty_z_spread": 103.0005519378594,
+    "leg_npv": 256.71826834052473,
+    "leg_z_spread": 0.007000000000000127,
+    "yield_rate": 0.03734437033915007,
+    "z_spread": 0.00700000000000046
+  },
+  "end": [
+    24,
+    6,
+    2027
+  ],
+  "engine_curve_rate": 0.025,
+  "eval": [
+    19,
+    6,
+    2026
+  ],
+  "face": 250.0,
+  "frozen_engine_npv_after_analytics": 261.8823194471096,
+  "gearing": 1.2,
+  "initial_forward": 0.045,
+  "initial_frozen_analytics": {
+    "accrued": 0.030554009372476966,
+    "clean_curve": 103.53745184052285,
+    "clean_yield": 102.08037800582846,
+    "clean_z_spread": 102.8375971052005,
+    "dirty_curve": 103.56800584989533,
+    "dirty_yield": 102.11093201520094,
+    "dirty_z_spread": 102.86815111457298,
+    "leg_npv": 256.3882729235928,
+    "leg_z_spread": 0.0070000000000001745,
+    "yield_rate": 0.037344370339149606,
+    "z_spread": 0.007000000000000051
+  },
+  "initial_volatility": 0.2,
+  "notes": [
+    "Analytical coupon queries observe current market quotes while frozen engine NPV remains cached.",
+    "Native at-par choice is sampled by its pricer, unlike live Rust Settings policy; policy-switch tests compare independently constructed native indexed and at-par cases instead of assuming native pricer state changes live."
+  ],
+  "oracle": "QuantLib 1.43",
+  "redemption": 102.0,
+  "reference": [
+    1,
+    6,
+    2026
+  ],
+  "settlement": [
+    26,
+    6,
+    2026
+  ],
+  "settlement_days": 5,
+  "spread": 0.003,
+  "start": [
+    24,
+    6,
+    2026
+  ],
+  "unfrozen_engine_npv": 262.21821772549646,
+  "updated_forward": 0.083,
+  "updated_volatility": 0.42
+}

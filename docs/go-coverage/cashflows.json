@@ -1,0 +1,35 @@
+{
+  "domain": "cashflow-z-spread-analytics",
+  "entries": [
+    {
+      "c": [
+        "itofin_cashflows_npv_at_z_spread"
+      ],
+      "go": [
+        "Leg.NPVAtZSpread"
+      ],
+      "python": "itofin.cashflows.npv_at_z_spread",
+      "status": "implemented",
+      "tests": [
+        "TestBondAnalyticsQuantLibOracles",
+        "TestBondAnalyticsLegTriStateInclusion",
+        "TestBondAnalyticsFrozenFloatingCurrentInputsAndRetainedLeg"
+      ]
+    },
+    {
+      "c": [
+        "itofin_cashflows_z_spread"
+      ],
+      "go": [
+        "Leg.ZSpread"
+      ],
+      "python": "itofin.cashflows.z_spread",
+      "status": "implemented",
+      "tests": [
+        "TestBondAnalyticsQuantLibOracles",
+        "TestBondAnalyticsLegTriStateInclusion",
+        "TestBondAnalyticsFrozenFloatingCurrentInputsAndRetainedLeg"
+      ]
+    }
+  ]
+}

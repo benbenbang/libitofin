@@ -1,0 +1,5303 @@
+{
+  "cases": [
+    {
+      "compounding": "Simple",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        24,
+        3,
+        2028
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 1.227222222222224,
+        "clean_curve": 106.00531135179834,
+        "clean_yield": 102.54162760350806,
+        "clean_z_spread": 104.82136862088895,
+        "dirty_curve": 107.23253357402056,
+        "dirty_yield": 103.76884982573029,
+        "dirty_z_spread": 106.04859084311117,
+        "flows": [
+          {
+            "amount": 6.005555555555542,
+            "date": [
+              24,
+              9,
+              2026
+            ]
+          },
+          {
+            "amount": 7.290277777777798,
+            "date": [
+              24,
+              3,
+              2027
+            ]
+          },
+          {
+            "amount": 7.41111111111109,
+            "date": [
+              24,
+              9,
+              2027
+            ]
+          },
+          {
+            "amount": 7.330555555555563,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          },
+          {
+            "amount": 255.0,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 264.4047276353905,
+        "leg_z_spread": 0.006999999999998028,
+        "notional": 250.0,
+        "schedule": [
+          [
+            24,
+            3,
+            2026
+          ],
+          [
+            24,
+            9,
+            2026
+          ],
+          [
+            24,
+            3,
+            2027
+          ],
+          [
+            24,
+            9,
+            2027
+          ],
+          [
+            24,
+            3,
+            2028
+          ]
+        ],
+        "yield_from_clean": 0.05200000000000938,
+        "yield_from_dirty": 0.05200000000000938,
+        "z_spread_from_clean": 0.0069999999999979376,
+        "z_spread_from_dirty": 0.0069999999999979376
+      },
+      "face": 250.0,
+      "frequency": "Annual",
+      "kind": "fixed",
+      "name": "fixed_Simple_Annual",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": 0.052,
+      "z_spread": 0.007
+    },
+    {
+      "compounding": "Simple",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        24,
+        3,
+        2028
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 1.227222222222224,
+        "clean_curve": 106.00531135179834,
+        "clean_yield": 102.54162760350806,
+        "clean_z_spread": 104.82136862088895,
+        "dirty_curve": 107.23253357402056,
+        "dirty_yield": 103.76884982573029,
+        "dirty_z_spread": 106.04859084311117,
+        "flows": [
+          {
+            "amount": 6.005555555555542,
+            "date": [
+              24,
+              9,
+              2026
+            ]
+          },
+          {
+            "amount": 7.290277777777798,
+            "date": [
+              24,
+              3,
+              2027
+            ]
+          },
+          {
+            "amount": 7.41111111111109,
+            "date": [
+              24,
+              9,
+              2027
+            ]
+          },
+          {
+            "amount": 7.330555555555563,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          },
+          {
+            "amount": 255.0,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 264.4047276353905,
+        "leg_z_spread": 0.006999999999998028,
+        "notional": 250.0,
+        "schedule": [
+          [
+            24,
+            3,
+            2026
+          ],
+          [
+            24,
+            9,
+            2026
+          ],
+          [
+            24,
+            3,
+            2027
+          ],
+          [
+            24,
+            9,
+            2027
+          ],
+          [
+            24,
+            3,
+            2028
+          ]
+        ],
+        "yield_from_clean": 0.05200000000000938,
+        "yield_from_dirty": 0.05200000000000938,
+        "z_spread_from_clean": 0.0069999999999979376,
+        "z_spread_from_dirty": 0.0069999999999979376
+      },
+      "face": 250.0,
+      "frequency": "Semiannual",
+      "kind": "fixed",
+      "name": "fixed_Simple_Semiannual",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": 0.052,
+      "z_spread": 0.007
+    },
+    {
+      "compounding": "Simple",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        24,
+        3,
+        2028
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 1.227222222222224,
+        "clean_curve": 106.00531135179834,
+        "clean_yield": 102.54162760350806,
+        "clean_z_spread": 104.82136862088895,
+        "dirty_curve": 107.23253357402056,
+        "dirty_yield": 103.76884982573029,
+        "dirty_z_spread": 106.04859084311117,
+        "flows": [
+          {
+            "amount": 6.005555555555542,
+            "date": [
+              24,
+              9,
+              2026
+            ]
+          },
+          {
+            "amount": 7.290277777777798,
+            "date": [
+              24,
+              3,
+              2027
+            ]
+          },
+          {
+            "amount": 7.41111111111109,
+            "date": [
+              24,
+              9,
+              2027
+            ]
+          },
+          {
+            "amount": 7.330555555555563,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          },
+          {
+            "amount": 255.0,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 264.4047276353905,
+        "leg_z_spread": 0.006999999999998028,
+        "notional": 250.0,
+        "schedule": [
+          [
+            24,
+            3,
+            2026
+          ],
+          [
+            24,
+            9,
+            2026
+          ],
+          [
+            24,
+            3,
+            2027
+          ],
+          [
+            24,
+            9,
+            2027
+          ],
+          [
+            24,
+            3,
+            2028
+          ]
+        ],
+        "yield_from_clean": 0.05200000000000938,
+        "yield_from_dirty": 0.05200000000000938,
+        "z_spread_from_clean": 0.0069999999999979376,
+        "z_spread_from_dirty": 0.0069999999999979376
+      },
+      "face": 250.0,
+      "frequency": "Quarterly",
+      "kind": "fixed",
+      "name": "fixed_Simple_Quarterly",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": 0.052,
+      "z_spread": 0.007
+    },
+    {
+      "compounding": "Simple",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        24,
+        3,
+        2028
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 1.227222222222224,
+        "clean_curve": 106.00531135179834,
+        "clean_yield": 102.54162760350806,
+        "clean_z_spread": 104.82136862088895,
+        "dirty_curve": 107.23253357402056,
+        "dirty_yield": 103.76884982573029,
+        "dirty_z_spread": 106.04859084311117,
+        "flows": [
+          {
+            "amount": 6.005555555555542,
+            "date": [
+              24,
+              9,
+              2026
+            ]
+          },
+          {
+            "amount": 7.290277777777798,
+            "date": [
+              24,
+              3,
+              2027
+            ]
+          },
+          {
+            "amount": 7.41111111111109,
+            "date": [
+              24,
+              9,
+              2027
+            ]
+          },
+          {
+            "amount": 7.330555555555563,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          },
+          {
+            "amount": 255.0,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 264.4047276353905,
+        "leg_z_spread": 0.006999999999998028,
+        "notional": 250.0,
+        "schedule": [
+          [
+            24,
+            3,
+            2026
+          ],
+          [
+            24,
+            9,
+            2026
+          ],
+          [
+            24,
+            3,
+            2027
+          ],
+          [
+            24,
+            9,
+            2027
+          ],
+          [
+            24,
+            3,
+            2028
+          ]
+        ],
+        "yield_from_clean": 0.05200000000000938,
+        "yield_from_dirty": 0.05200000000000938,
+        "z_spread_from_clean": 0.0069999999999979376,
+        "z_spread_from_dirty": 0.0069999999999979376
+      },
+      "face": 250.0,
+      "frequency": "Monthly",
+      "kind": "fixed",
+      "name": "fixed_Simple_Monthly",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": 0.052,
+      "z_spread": 0.007
+    },
+    {
+      "compounding": "Compounded",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        24,
+        3,
+        2028
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 1.227222222222224,
+        "clean_curve": 106.00531135179834,
+        "clean_yield": 102.66187713107826,
+        "clean_z_spread": 104.7842346785097,
+        "dirty_curve": 107.23253357402056,
+        "dirty_yield": 103.88909935330048,
+        "dirty_z_spread": 106.01145690073193,
+        "flows": [
+          {
+            "amount": 6.005555555555542,
+            "date": [
+              24,
+              9,
+              2026
+            ]
+          },
+          {
+            "amount": 7.290277777777798,
+            "date": [
+              24,
+              3,
+              2027
+            ]
+          },
+          {
+            "amount": 7.41111111111109,
+            "date": [
+              24,
+              9,
+              2027
+            ]
+          },
+          {
+            "amount": 7.330555555555563,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          },
+          {
+            "amount": 255.0,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 264.3162938588467,
+        "leg_z_spread": 0.0069999999999992,
+        "notional": 250.0,
+        "schedule": [
+          [
+            24,
+            3,
+            2026
+          ],
+          [
+            24,
+            9,
+            2026
+          ],
+          [
+            24,
+            3,
+            2027
+          ],
+          [
+            24,
+            9,
+            2027
+          ],
+          [
+            24,
+            3,
+            2028
+          ]
+        ],
+        "yield_from_clean": 0.051999999999999866,
+        "yield_from_dirty": 0.051999999999999866,
+        "z_spread_from_clean": 0.00699999999999927,
+        "z_spread_from_dirty": 0.00699999999999927
+      },
+      "face": 250.0,
+      "frequency": "Annual",
+      "kind": "fixed",
+      "name": "fixed_Compounded_Annual",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": 0.052,
+      "z_spread": 0.007
+    },
+    {
+      "compounding": "Compounded",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        24,
+        3,
+        2028
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 1.227222222222224,
+        "clean_curve": 106.00531135179834,
+        "clean_yield": 102.54890569099001,
+        "clean_z_spread": 104.76260841089737,
+        "dirty_curve": 107.23253357402056,
+        "dirty_yield": 103.77612791321224,
+        "dirty_z_spread": 105.9898306331196,
+        "flows": [
+          {
+            "amount": 6.005555555555542,
+            "date": [
+              24,
+              9,
+              2026
+            ]
+          },
+          {
+            "amount": 7.290277777777798,
+            "date": [
+              24,
+              3,
+              2027
+            ]
+          },
+          {
+            "amount": 7.41111111111109,
+            "date": [
+              24,
+              9,
+              2027
+            ]
+          },
+          {
+            "amount": 7.330555555555563,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          },
+          {
+            "amount": 255.0,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 264.2601642490913,
+        "leg_z_spread": 0.00699999999999972,
+        "notional": 250.0,
+        "schedule": [
+          [
+            24,
+            3,
+            2026
+          ],
+          [
+            24,
+            9,
+            2026
+          ],
+          [
+            24,
+            3,
+            2027
+          ],
+          [
+            24,
+            9,
+            2027
+          ],
+          [
+            24,
+            3,
+            2028
+          ]
+        ],
+        "yield_from_clean": 0.05200000000000007,
+        "yield_from_dirty": 0.05200000000000007,
+        "z_spread_from_clean": 0.007000000000000079,
+        "z_spread_from_dirty": 0.007000000000000079
+      },
+      "face": 250.0,
+      "frequency": "Semiannual",
+      "kind": "fixed",
+      "name": "fixed_Compounded_Semiannual",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": 0.052,
+      "z_spread": 0.007
+    },
+    {
+      "compounding": "Compounded",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        24,
+        3,
+        2028
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 1.227222222222224,
+        "clean_curve": 106.00531135179834,
+        "clean_yield": 102.49102373949435,
+        "clean_z_spread": 104.75162538027301,
+        "dirty_curve": 107.23253357402056,
+        "dirty_yield": 103.71824596171658,
+        "dirty_z_spread": 105.97884760249524,
+        "flows": [
+          {
+            "amount": 6.005555555555542,
+            "date": [
+              24,
+              9,
+              2026
+            ]
+          },
+          {
+            "amount": 7.290277777777798,
+            "date": [
+              24,
+              3,
+              2027
+            ]
+          },
+          {
+            "amount": 7.41111111111109,
+            "date": [
+              24,
+              9,
+              2027
+            ]
+          },
+          {
+            "amount": 7.330555555555563,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          },
+          {
+            "amount": 255.0,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 264.23165866260257,
+        "leg_z_spread": 0.006999999999999712,
+        "notional": 250.0,
+        "schedule": [
+          [
+            24,
+            3,
+            2026
+          ],
+          [
+            24,
+            9,
+            2026
+          ],
+          [
+            24,
+            3,
+            2027
+          ],
+          [
+            24,
+            9,
+            2027
+          ],
+          [
+            24,
+            3,
+            2028
+          ]
+        ],
+        "yield_from_clean": 0.05199999999999916,
+        "yield_from_dirty": 0.05199999999999916,
+        "z_spread_from_clean": 0.0069999999999995986,
+        "z_spread_from_dirty": 0.0069999999999995986
+      },
+      "face": 250.0,
+      "frequency": "Quarterly",
+      "kind": "fixed",
+      "name": "fixed_Compounded_Quarterly",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": 0.052,
+      "z_spread": 0.007
+    },
+    {
+      "compounding": "Compounded",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        24,
+        3,
+        2028
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 1.227222222222224,
+        "clean_curve": 106.00531135179834,
+        "clean_yield": 102.45190079932934,
+        "clean_z_spread": 104.74423935723931,
+        "dirty_curve": 107.23253357402056,
+        "dirty_yield": 103.67912302155156,
+        "dirty_z_spread": 105.97146157946153,
+        "flows": [
+          {
+            "amount": 6.005555555555542,
+            "date": [
+              24,
+              9,
+              2026
+            ]
+          },
+          {
+            "amount": 7.290277777777798,
+            "date": [
+              24,
+              3,
+              2027
+            ]
+          },
+          {
+            "amount": 7.41111111111109,
+            "date": [
+              24,
+              9,
+              2027
+            ]
+          },
+          {
+            "amount": 7.330555555555563,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          },
+          {
+            "amount": 255.0,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 264.2124888907891,
+        "leg_z_spread": 0.0070000000000003,
+        "notional": 250.0,
+        "schedule": [
+          [
+            24,
+            3,
+            2026
+          ],
+          [
+            24,
+            9,
+            2026
+          ],
+          [
+            24,
+            3,
+            2027
+          ],
+          [
+            24,
+            9,
+            2027
+          ],
+          [
+            24,
+            3,
+            2028
+          ]
+        ],
+        "yield_from_clean": 0.052000000000000525,
+        "yield_from_dirty": 0.052000000000000525,
+        "z_spread_from_clean": 0.0069999999999992655,
+        "z_spread_from_dirty": 0.0069999999999992655
+      },
+      "face": 250.0,
+      "frequency": "Monthly",
+      "kind": "fixed",
+      "name": "fixed_Compounded_Monthly",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": 0.052,
+      "z_spread": 0.007
+    },
+    {
+      "compounding": "Continuous",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        24,
+        3,
+        2028
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 1.227222222222224,
+        "clean_curve": 106.00531135179834,
+        "clean_yield": 102.43217579814853,
+        "clean_z_spread": 104.74052696510586,
+        "dirty_curve": 107.23253357402056,
+        "dirty_yield": 103.65939802037076,
+        "dirty_z_spread": 105.96774918732808,
+        "flows": [
+          {
+            "amount": 6.005555555555542,
+            "date": [
+              24,
+              9,
+              2026
+            ]
+          },
+          {
+            "amount": 7.290277777777798,
+            "date": [
+              24,
+              3,
+              2027
+            ]
+          },
+          {
+            "amount": 7.41111111111109,
+            "date": [
+              24,
+              9,
+              2027
+            ]
+          },
+          {
+            "amount": 7.330555555555563,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          },
+          {
+            "amount": 255.0,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 264.2028537243171,
+        "leg_z_spread": 0.0069999999999999125,
+        "notional": 250.0,
+        "schedule": [
+          [
+            24,
+            3,
+            2026
+          ],
+          [
+            24,
+            9,
+            2026
+          ],
+          [
+            24,
+            3,
+            2027
+          ],
+          [
+            24,
+            9,
+            2027
+          ],
+          [
+            24,
+            3,
+            2028
+          ]
+        ],
+        "yield_from_clean": 0.05199999999999985,
+        "yield_from_dirty": 0.05199999999999985,
+        "z_spread_from_clean": 0.006999999999999887,
+        "z_spread_from_dirty": 0.006999999999999887
+      },
+      "face": 250.0,
+      "frequency": "Annual",
+      "kind": "fixed",
+      "name": "fixed_Continuous_Annual",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": 0.052,
+      "z_spread": 0.007
+    },
+    {
+      "compounding": "Continuous",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        24,
+        3,
+        2028
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 1.227222222222224,
+        "clean_curve": 106.00531135179834,
+        "clean_yield": 102.43217579814853,
+        "clean_z_spread": 104.74052696510586,
+        "dirty_curve": 107.23253357402056,
+        "dirty_yield": 103.65939802037076,
+        "dirty_z_spread": 105.96774918732808,
+        "flows": [
+          {
+            "amount": 6.005555555555542,
+            "date": [
+              24,
+              9,
+              2026
+            ]
+          },
+          {
+            "amount": 7.290277777777798,
+            "date": [
+              24,
+              3,
+              2027
+            ]
+          },
+          {
+            "amount": 7.41111111111109,
+            "date": [
+              24,
+              9,
+              2027
+            ]
+          },
+          {
+            "amount": 7.330555555555563,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          },
+          {
+            "amount": 255.0,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 264.2028537243171,
+        "leg_z_spread": 0.0069999999999999125,
+        "notional": 250.0,
+        "schedule": [
+          [
+            24,
+            3,
+            2026
+          ],
+          [
+            24,
+            9,
+            2026
+          ],
+          [
+            24,
+            3,
+            2027
+          ],
+          [
+            24,
+            9,
+            2027
+          ],
+          [
+            24,
+            3,
+            2028
+          ]
+        ],
+        "yield_from_clean": 0.05199999999999985,
+        "yield_from_dirty": 0.05199999999999985,
+        "z_spread_from_clean": 0.006999999999999887,
+        "z_spread_from_dirty": 0.006999999999999887
+      },
+      "face": 250.0,
+      "frequency": "Semiannual",
+      "kind": "fixed",
+      "name": "fixed_Continuous_Semiannual",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": 0.052,
+      "z_spread": 0.007
+    },
+    {
+      "compounding": "Continuous",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        24,
+        3,
+        2028
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 1.227222222222224,
+        "clean_curve": 106.00531135179834,
+        "clean_yield": 102.43217579814853,
+        "clean_z_spread": 104.74052696510586,
+        "dirty_curve": 107.23253357402056,
+        "dirty_yield": 103.65939802037076,
+        "dirty_z_spread": 105.96774918732808,
+        "flows": [
+          {
+            "amount": 6.005555555555542,
+            "date": [
+              24,
+              9,
+              2026
+            ]
+          },
+          {
+            "amount": 7.290277777777798,
+            "date": [
+              24,
+              3,
+              2027
+            ]
+          },
+          {
+            "amount": 7.41111111111109,
+            "date": [
+              24,
+              9,
+              2027
+            ]
+          },
+          {
+            "amount": 7.330555555555563,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          },
+          {
+            "amount": 255.0,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 264.2028537243171,
+        "leg_z_spread": 0.0069999999999999125,
+        "notional": 250.0,
+        "schedule": [
+          [
+            24,
+            3,
+            2026
+          ],
+          [
+            24,
+            9,
+            2026
+          ],
+          [
+            24,
+            3,
+            2027
+          ],
+          [
+            24,
+            9,
+            2027
+          ],
+          [
+            24,
+            3,
+            2028
+          ]
+        ],
+        "yield_from_clean": 0.05199999999999985,
+        "yield_from_dirty": 0.05199999999999985,
+        "z_spread_from_clean": 0.006999999999999887,
+        "z_spread_from_dirty": 0.006999999999999887
+      },
+      "face": 250.0,
+      "frequency": "Quarterly",
+      "kind": "fixed",
+      "name": "fixed_Continuous_Quarterly",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": 0.052,
+      "z_spread": 0.007
+    },
+    {
+      "compounding": "Continuous",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        24,
+        3,
+        2028
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 1.227222222222224,
+        "clean_curve": 106.00531135179834,
+        "clean_yield": 102.43217579814853,
+        "clean_z_spread": 104.74052696510586,
+        "dirty_curve": 107.23253357402056,
+        "dirty_yield": 103.65939802037076,
+        "dirty_z_spread": 105.96774918732808,
+        "flows": [
+          {
+            "amount": 6.005555555555542,
+            "date": [
+              24,
+              9,
+              2026
+            ]
+          },
+          {
+            "amount": 7.290277777777798,
+            "date": [
+              24,
+              3,
+              2027
+            ]
+          },
+          {
+            "amount": 7.41111111111109,
+            "date": [
+              24,
+              9,
+              2027
+            ]
+          },
+          {
+            "amount": 7.330555555555563,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          },
+          {
+            "amount": 255.0,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 264.2028537243171,
+        "leg_z_spread": 0.0069999999999999125,
+        "notional": 250.0,
+        "schedule": [
+          [
+            24,
+            3,
+            2026
+          ],
+          [
+            24,
+            9,
+            2026
+          ],
+          [
+            24,
+            3,
+            2027
+          ],
+          [
+            24,
+            9,
+            2027
+          ],
+          [
+            24,
+            3,
+            2028
+          ]
+        ],
+        "yield_from_clean": 0.05199999999999985,
+        "yield_from_dirty": 0.05199999999999985,
+        "z_spread_from_clean": 0.006999999999999887,
+        "z_spread_from_dirty": 0.006999999999999887
+      },
+      "face": 250.0,
+      "frequency": "Monthly",
+      "kind": "fixed",
+      "name": "fixed_Continuous_Monthly",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": 0.052,
+      "z_spread": 0.007
+    },
+    {
+      "compounding": "SimpleThenCompounded",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        24,
+        3,
+        2028
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 1.227222222222224,
+        "clean_curve": 106.00531135179834,
+        "clean_yield": 102.54162760350806,
+        "clean_z_spread": 104.78567521007763,
+        "dirty_curve": 107.23253357402056,
+        "dirty_yield": 103.76884982573029,
+        "dirty_z_spread": 106.01289743229985,
+        "flows": [
+          {
+            "amount": 6.005555555555542,
+            "date": [
+              24,
+              9,
+              2026
+            ]
+          },
+          {
+            "amount": 7.290277777777798,
+            "date": [
+              24,
+              3,
+              2027
+            ]
+          },
+          {
+            "amount": 7.41111111111109,
+            "date": [
+              24,
+              9,
+              2027
+            ]
+          },
+          {
+            "amount": 7.330555555555563,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          },
+          {
+            "amount": 255.0,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 264.31573534903464,
+        "leg_z_spread": 0.006999999999999028,
+        "notional": 250.0,
+        "schedule": [
+          [
+            24,
+            3,
+            2026
+          ],
+          [
+            24,
+            9,
+            2026
+          ],
+          [
+            24,
+            3,
+            2027
+          ],
+          [
+            24,
+            9,
+            2027
+          ],
+          [
+            24,
+            3,
+            2028
+          ]
+        ],
+        "yield_from_clean": 0.05200000000000458,
+        "yield_from_dirty": 0.05200000000000458,
+        "z_spread_from_clean": 0.006999999999999348,
+        "z_spread_from_dirty": 0.006999999999999348
+      },
+      "face": 250.0,
+      "frequency": "Annual",
+      "kind": "fixed",
+      "name": "fixed_SimpleThenCompounded_Annual",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": 0.052,
+      "z_spread": 0.007
+    },
+    {
+      "compounding": "SimpleThenCompounded",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        24,
+        3,
+        2028
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 1.227222222222224,
+        "clean_curve": 106.00531135179834,
+        "clean_yield": 102.54035988237182,
+        "clean_z_spread": 104.76335300066555,
+        "dirty_curve": 107.23253357402056,
+        "dirty_yield": 103.76758210459404,
+        "dirty_z_spread": 105.99057522288777,
+        "flows": [
+          {
+            "amount": 6.005555555555542,
+            "date": [
+              24,
+              9,
+              2026
+            ]
+          },
+          {
+            "amount": 7.290277777777798,
+            "date": [
+              24,
+              3,
+              2027
+            ]
+          },
+          {
+            "amount": 7.41111111111109,
+            "date": [
+              24,
+              9,
+              2027
+            ]
+          },
+          {
+            "amount": 7.330555555555563,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          },
+          {
+            "amount": 255.0,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 264.2600806943815,
+        "leg_z_spread": 0.007000000000000048,
+        "notional": 250.0,
+        "schedule": [
+          [
+            24,
+            3,
+            2026
+          ],
+          [
+            24,
+            9,
+            2026
+          ],
+          [
+            24,
+            3,
+            2027
+          ],
+          [
+            24,
+            9,
+            2027
+          ],
+          [
+            24,
+            3,
+            2028
+          ]
+        ],
+        "yield_from_clean": 0.05199999999999988,
+        "yield_from_dirty": 0.05199999999999988,
+        "z_spread_from_clean": 0.006999999999999837,
+        "z_spread_from_dirty": 0.006999999999999837
+      },
+      "face": 250.0,
+      "frequency": "Semiannual",
+      "kind": "fixed",
+      "name": "fixed_SimpleThenCompounded_Semiannual",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": 0.052,
+      "z_spread": 0.007
+    },
+    {
+      "compounding": "SimpleThenCompounded",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        24,
+        3,
+        2028
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 1.227222222222224,
+        "clean_curve": 106.00531135179834,
+        "clean_yield": 102.49102373949435,
+        "clean_z_spread": 104.7519533693276,
+        "dirty_curve": 107.23253357402056,
+        "dirty_yield": 103.71824596171658,
+        "dirty_z_spread": 105.97917559154982,
+        "flows": [
+          {
+            "amount": 6.005555555555542,
+            "date": [
+              24,
+              9,
+              2026
+            ]
+          },
+          {
+            "amount": 7.290277777777798,
+            "date": [
+              24,
+              3,
+              2027
+            ]
+          },
+          {
+            "amount": 7.41111111111109,
+            "date": [
+              24,
+              9,
+              2027
+            ]
+          },
+          {
+            "amount": 7.330555555555563,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          },
+          {
+            "amount": 255.0,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 264.23165866260257,
+        "leg_z_spread": 0.006999999999999712,
+        "notional": 250.0,
+        "schedule": [
+          [
+            24,
+            3,
+            2026
+          ],
+          [
+            24,
+            9,
+            2026
+          ],
+          [
+            24,
+            3,
+            2027
+          ],
+          [
+            24,
+            9,
+            2027
+          ],
+          [
+            24,
+            3,
+            2028
+          ]
+        ],
+        "yield_from_clean": 0.05199999999999928,
+        "yield_from_dirty": 0.05199999999999928,
+        "z_spread_from_clean": 0.0069999999999997,
+        "z_spread_from_dirty": 0.0069999999999997
+      },
+      "face": 250.0,
+      "frequency": "Quarterly",
+      "kind": "fixed",
+      "name": "fixed_SimpleThenCompounded_Quarterly",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": 0.052,
+      "z_spread": 0.007
+    },
+    {
+      "compounding": "SimpleThenCompounded",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        24,
+        3,
+        2028
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 1.227222222222224,
+        "clean_curve": 106.00531135179834,
+        "clean_yield": 102.45190079932934,
+        "clean_z_spread": 104.74426467440227,
+        "dirty_curve": 107.23253357402056,
+        "dirty_yield": 103.67912302155156,
+        "dirty_z_spread": 105.9714868966245,
+        "flows": [
+          {
+            "amount": 6.005555555555542,
+            "date": [
+              24,
+              9,
+              2026
+            ]
+          },
+          {
+            "amount": 7.290277777777798,
+            "date": [
+              24,
+              3,
+              2027
+            ]
+          },
+          {
+            "amount": 7.41111111111109,
+            "date": [
+              24,
+              9,
+              2027
+            ]
+          },
+          {
+            "amount": 7.330555555555563,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          },
+          {
+            "amount": 255.0,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 264.2124888907891,
+        "leg_z_spread": 0.0070000000000003,
+        "notional": 250.0,
+        "schedule": [
+          [
+            24,
+            3,
+            2026
+          ],
+          [
+            24,
+            9,
+            2026
+          ],
+          [
+            24,
+            3,
+            2027
+          ],
+          [
+            24,
+            9,
+            2027
+          ],
+          [
+            24,
+            3,
+            2028
+          ]
+        ],
+        "yield_from_clean": 0.052000000000000525,
+        "yield_from_dirty": 0.052000000000000525,
+        "z_spread_from_clean": 0.006999999999998929,
+        "z_spread_from_dirty": 0.006999999999998929
+      },
+      "face": 250.0,
+      "frequency": "Monthly",
+      "kind": "fixed",
+      "name": "fixed_SimpleThenCompounded_Monthly",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": 0.052,
+      "z_spread": 0.007
+    },
+    {
+      "compounding": "CompoundedThenSimple",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        24,
+        3,
+        2028
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 1.227222222222224,
+        "clean_curve": 106.00531135179834,
+        "clean_yield": 102.66187713107826,
+        "clean_z_spread": 104.81992752888898,
+        "dirty_curve": 107.23253357402056,
+        "dirty_yield": 103.88909935330048,
+        "dirty_z_spread": 106.0471497511112,
+        "flows": [
+          {
+            "amount": 6.005555555555542,
+            "date": [
+              24,
+              9,
+              2026
+            ]
+          },
+          {
+            "amount": 7.290277777777798,
+            "date": [
+              24,
+              3,
+              2027
+            ]
+          },
+          {
+            "amount": 7.41111111111109,
+            "date": [
+              24,
+              9,
+              2027
+            ]
+          },
+          {
+            "amount": 7.330555555555563,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          },
+          {
+            "amount": 255.0,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 264.4052861452025,
+        "leg_z_spread": 0.0069999999999979905,
+        "notional": 250.0,
+        "schedule": [
+          [
+            24,
+            3,
+            2026
+          ],
+          [
+            24,
+            9,
+            2026
+          ],
+          [
+            24,
+            3,
+            2027
+          ],
+          [
+            24,
+            9,
+            2027
+          ],
+          [
+            24,
+            3,
+            2028
+          ]
+        ],
+        "yield_from_clean": 0.05199999999999808,
+        "yield_from_dirty": 0.05199999999999808,
+        "z_spread_from_clean": 0.006999999999998037,
+        "z_spread_from_dirty": 0.006999999999998037
+      },
+      "face": 250.0,
+      "frequency": "Annual",
+      "kind": "fixed",
+      "name": "fixed_CompoundedThenSimple_Annual",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": 0.052,
+      "z_spread": 0.007
+    },
+    {
+      "compounding": "CompoundedThenSimple",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        24,
+        3,
+        2028
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 1.227222222222224,
+        "clean_curve": 106.00531135179834,
+        "clean_yield": 102.55017351652978,
+        "clean_z_spread": 104.82062360521431,
+        "dirty_curve": 107.23253357402056,
+        "dirty_yield": 103.777395738752,
+        "dirty_z_spread": 106.04784582743653,
+        "flows": [
+          {
+            "amount": 6.005555555555542,
+            "date": [
+              24,
+              9,
+              2026
+            ]
+          },
+          {
+            "amount": 7.290277777777798,
+            "date": [
+              24,
+              3,
+              2027
+            ]
+          },
+          {
+            "amount": 7.41111111111109,
+            "date": [
+              24,
+              9,
+              2027
+            ]
+          },
+          {
+            "amount": 7.330555555555563,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          },
+          {
+            "amount": 255.0,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 264.40481119010025,
+        "leg_z_spread": 0.006999999999997985,
+        "notional": 250.0,
+        "schedule": [
+          [
+            24,
+            3,
+            2026
+          ],
+          [
+            24,
+            9,
+            2026
+          ],
+          [
+            24,
+            3,
+            2027
+          ],
+          [
+            24,
+            9,
+            2027
+          ],
+          [
+            24,
+            3,
+            2028
+          ]
+        ],
+        "yield_from_clean": 0.052000000000007485,
+        "yield_from_dirty": 0.052000000000007485,
+        "z_spread_from_clean": 0.006999999999998235,
+        "z_spread_from_dirty": 0.006999999999998235
+      },
+      "face": 250.0,
+      "frequency": "Semiannual",
+      "kind": "fixed",
+      "name": "fixed_CompoundedThenSimple_Semiannual",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": 0.052,
+      "z_spread": 0.007
+    },
+    {
+      "compounding": "CompoundedThenSimple",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        24,
+        3,
+        2028
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 1.227222222222224,
+        "clean_curve": 106.00531135179834,
+        "clean_yield": 102.54162760350806,
+        "clean_z_spread": 104.82104041700498,
+        "dirty_curve": 107.23253357402056,
+        "dirty_yield": 103.76884982573029,
+        "dirty_z_spread": 106.0482626392272,
+        "flows": [
+          {
+            "amount": 6.005555555555542,
+            "date": [
+              24,
+              9,
+              2026
+            ]
+          },
+          {
+            "amount": 7.290277777777798,
+            "date": [
+              24,
+              3,
+              2027
+            ]
+          },
+          {
+            "amount": 7.41111111111109,
+            "date": [
+              24,
+              9,
+              2027
+            ]
+          },
+          {
+            "amount": 7.330555555555563,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          },
+          {
+            "amount": 255.0,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 264.4047276353905,
+        "leg_z_spread": 0.006999999999998028,
+        "notional": 250.0,
+        "schedule": [
+          [
+            24,
+            3,
+            2026
+          ],
+          [
+            24,
+            9,
+            2026
+          ],
+          [
+            24,
+            3,
+            2027
+          ],
+          [
+            24,
+            9,
+            2027
+          ],
+          [
+            24,
+            3,
+            2028
+          ]
+        ],
+        "yield_from_clean": 0.05200000000000938,
+        "yield_from_dirty": 0.05200000000000938,
+        "z_spread_from_clean": 0.006999999999998097,
+        "z_spread_from_dirty": 0.006999999999998097
+      },
+      "face": 250.0,
+      "frequency": "Quarterly",
+      "kind": "fixed",
+      "name": "fixed_CompoundedThenSimple_Quarterly",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": 0.052,
+      "z_spread": 0.007
+    },
+    {
+      "compounding": "CompoundedThenSimple",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        24,
+        3,
+        2028
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 1.227222222222224,
+        "clean_curve": 106.00531135179834,
+        "clean_yield": 102.54162760350806,
+        "clean_z_spread": 104.82134328530545,
+        "dirty_curve": 107.23253357402056,
+        "dirty_yield": 103.76884982573029,
+        "dirty_z_spread": 106.04856550752767,
+        "flows": [
+          {
+            "amount": 6.005555555555542,
+            "date": [
+              24,
+              9,
+              2026
+            ]
+          },
+          {
+            "amount": 7.290277777777798,
+            "date": [
+              24,
+              3,
+              2027
+            ]
+          },
+          {
+            "amount": 7.41111111111109,
+            "date": [
+              24,
+              9,
+              2027
+            ]
+          },
+          {
+            "amount": 7.330555555555563,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          },
+          {
+            "amount": 255.0,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 264.4047276353905,
+        "leg_z_spread": 0.006999999999998028,
+        "notional": 250.0,
+        "schedule": [
+          [
+            24,
+            3,
+            2026
+          ],
+          [
+            24,
+            9,
+            2026
+          ],
+          [
+            24,
+            3,
+            2027
+          ],
+          [
+            24,
+            9,
+            2027
+          ],
+          [
+            24,
+            3,
+            2028
+          ]
+        ],
+        "yield_from_clean": 0.05200000000000938,
+        "yield_from_dirty": 0.05200000000000938,
+        "z_spread_from_clean": 0.006999999999998111,
+        "z_spread_from_dirty": 0.006999999999998111
+      },
+      "face": 250.0,
+      "frequency": "Monthly",
+      "kind": "fixed",
+      "name": "fixed_CompoundedThenSimple_Monthly",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": 0.052,
+      "z_spread": 0.007
+    },
+    {
+      "compounding": "Simple",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        24,
+        3,
+        2028
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 1.227222222222224,
+        "clean_curve": 106.00531135179834,
+        "clean_yield": 113.93137113074062,
+        "clean_z_spread": 106.86847076034876,
+        "dirty_curve": 107.23253357402056,
+        "dirty_yield": 115.15859335296284,
+        "dirty_z_spread": 108.09569298257098,
+        "flows": [
+          {
+            "amount": 0.8888222222222202,
+            "date": [
+              24,
+              9,
+              2026
+            ]
+          },
+          {
+            "amount": 1.0789611111111141,
+            "date": [
+              24,
+              3,
+              2027
+            ]
+          },
+          {
+            "amount": 1.0968444444444414,
+            "date": [
+              24,
+              9,
+              2027
+            ]
+          },
+          {
+            "amount": 1.0849222222222232,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          },
+          {
+            "amount": 37.74,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 39.920456904770745,
+        "leg_z_spread": -0.005,
+        "notional": 37.0,
+        "schedule": [
+          [
+            24,
+            3,
+            2026
+          ],
+          [
+            24,
+            9,
+            2026
+          ],
+          [
+            24,
+            3,
+            2027
+          ],
+          [
+            24,
+            9,
+            2027
+          ],
+          [
+            24,
+            3,
+            2028
+          ]
+        ],
+        "yield_from_clean": -0.010000000000003867,
+        "yield_from_dirty": -0.010000000000003867,
+        "z_spread_from_clean": -0.005,
+        "z_spread_from_dirty": -0.005
+      },
+      "face": 37.0,
+      "frequency": "Semiannual",
+      "kind": "fixed",
+      "name": "negative_yield_Simple",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": -0.01,
+      "z_spread": -0.005
+    },
+    {
+      "compounding": "Compounded",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        24,
+        3,
+        2028
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 1.227222222222224,
+        "clean_curve": 106.00531135179834,
+        "clean_yield": 113.93167838941359,
+        "clean_z_spread": 106.90477971255115,
+        "dirty_curve": 107.23253357402056,
+        "dirty_yield": 115.15890061163581,
+        "dirty_z_spread": 108.13200193477337,
+        "flows": [
+          {
+            "amount": 0.8888222222222202,
+            "date": [
+              24,
+              9,
+              2026
+            ]
+          },
+          {
+            "amount": 1.0789611111111141,
+            "date": [
+              24,
+              3,
+              2027
+            ]
+          },
+          {
+            "amount": 1.0968444444444414,
+            "date": [
+              24,
+              9,
+              2027
+            ]
+          },
+          {
+            "amount": 1.0849222222222232,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          },
+          {
+            "amount": 37.74,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 39.933691148736564,
+        "leg_z_spread": -0.005,
+        "notional": 37.0,
+        "schedule": [
+          [
+            24,
+            3,
+            2026
+          ],
+          [
+            24,
+            9,
+            2026
+          ],
+          [
+            24,
+            3,
+            2027
+          ],
+          [
+            24,
+            9,
+            2027
+          ],
+          [
+            24,
+            3,
+            2028
+          ]
+        ],
+        "yield_from_clean": -0.010000000000000103,
+        "yield_from_dirty": -0.010000000000000103,
+        "z_spread_from_clean": -0.005,
+        "z_spread_from_dirty": -0.005
+      },
+      "face": 37.0,
+      "frequency": "Semiannual",
+      "kind": "fixed",
+      "name": "negative_yield_Compounded",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": -0.01,
+      "z_spread": -0.005
+    },
+    {
+      "compounding": "Continuous",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        24,
+        3,
+        2028
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 1.227222222222224,
+        "clean_curve": 106.00531135179834,
+        "clean_yield": 113.9267720575304,
+        "clean_z_spread": 106.91822054267315,
+        "dirty_curve": 107.23253357402056,
+        "dirty_yield": 115.15399427975262,
+        "dirty_z_spread": 108.14544276489538,
+        "flows": [
+          {
+            "amount": 0.8888222222222202,
+            "date": [
+              24,
+              9,
+              2026
+            ]
+          },
+          {
+            "amount": 1.0789611111111141,
+            "date": [
+              24,
+              3,
+              2027
+            ]
+          },
+          {
+            "amount": 1.0968444444444414,
+            "date": [
+              24,
+              9,
+              2027
+            ]
+          },
+          {
+            "amount": 1.0849222222222232,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          },
+          {
+            "amount": 37.74,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 39.938858214935365,
+        "leg_z_spread": -0.005,
+        "notional": 37.0,
+        "schedule": [
+          [
+            24,
+            3,
+            2026
+          ],
+          [
+            24,
+            9,
+            2026
+          ],
+          [
+            24,
+            3,
+            2027
+          ],
+          [
+            24,
+            9,
+            2027
+          ],
+          [
+            24,
+            3,
+            2028
+          ]
+        ],
+        "yield_from_clean": -0.010000000000000194,
+        "yield_from_dirty": -0.010000000000000194,
+        "z_spread_from_clean": -0.005,
+        "z_spread_from_dirty": -0.005
+      },
+      "face": 37.0,
+      "frequency": "Semiannual",
+      "kind": "fixed",
+      "name": "negative_yield_Continuous",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": -0.01,
+      "z_spread": -0.005
+    },
+    {
+      "compounding": "SimpleThenCompounded",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        24,
+        3,
+        2028
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 1.227222222222224,
+        "clean_curve": 106.00531135179834,
+        "clean_yield": 113.93131671115323,
+        "clean_z_spread": 106.90432623718199,
+        "dirty_curve": 107.23253357402056,
+        "dirty_yield": 115.15853893337545,
+        "dirty_z_spread": 108.13154845940421,
+        "flows": [
+          {
+            "amount": 0.8888222222222202,
+            "date": [
+              24,
+              9,
+              2026
+            ]
+          },
+          {
+            "amount": 1.0789611111111141,
+            "date": [
+              24,
+              3,
+              2027
+            ]
+          },
+          {
+            "amount": 1.0968444444444414,
+            "date": [
+              24,
+              9,
+              2027
+            ]
+          },
+          {
+            "amount": 1.0849222222222232,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          },
+          {
+            "amount": 37.74,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 39.93369857035637,
+        "leg_z_spread": -0.005,
+        "notional": 37.0,
+        "schedule": [
+          [
+            24,
+            3,
+            2026
+          ],
+          [
+            24,
+            9,
+            2026
+          ],
+          [
+            24,
+            3,
+            2027
+          ],
+          [
+            24,
+            9,
+            2027
+          ],
+          [
+            24,
+            3,
+            2028
+          ]
+        ],
+        "yield_from_clean": -0.010000000000000092,
+        "yield_from_dirty": -0.010000000000000092,
+        "z_spread_from_clean": -0.005,
+        "z_spread_from_dirty": -0.005
+      },
+      "face": 37.0,
+      "frequency": "Semiannual",
+      "kind": "fixed",
+      "name": "negative_yield_SimpleThenCompounded",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": -0.01,
+      "z_spread": -0.005
+    },
+    {
+      "compounding": "CompoundedThenSimple",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        24,
+        3,
+        2028
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 1.227222222222224,
+        "clean_curve": 106.00531135179834,
+        "clean_yield": 113.93173280917186,
+        "clean_z_spread": 106.8689240786857,
+        "dirty_curve": 107.23253357402056,
+        "dirty_yield": 115.15895503139409,
+        "dirty_z_spread": 108.09614630090792,
+        "flows": [
+          {
+            "amount": 0.8888222222222202,
+            "date": [
+              24,
+              9,
+              2026
+            ]
+          },
+          {
+            "amount": 1.0789611111111141,
+            "date": [
+              24,
+              3,
+              2027
+            ]
+          },
+          {
+            "amount": 1.0968444444444414,
+            "date": [
+              24,
+              9,
+              2027
+            ]
+          },
+          {
+            "amount": 1.0849222222222232,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          },
+          {
+            "amount": 37.74,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 39.92044948315094,
+        "leg_z_spread": -0.005,
+        "notional": 37.0,
+        "schedule": [
+          [
+            24,
+            3,
+            2026
+          ],
+          [
+            24,
+            9,
+            2026
+          ],
+          [
+            24,
+            3,
+            2027
+          ],
+          [
+            24,
+            9,
+            2027
+          ],
+          [
+            24,
+            3,
+            2028
+          ]
+        ],
+        "yield_from_clean": -0.010000000000003435,
+        "yield_from_dirty": -0.010000000000003435,
+        "z_spread_from_clean": -0.005,
+        "z_spread_from_dirty": -0.005
+      },
+      "face": 37.0,
+      "frequency": "Semiannual",
+      "kind": "fixed",
+      "name": "negative_yield_CompoundedThenSimple",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": -0.01,
+      "z_spread": -0.005
+    },
+    {
+      "compounding": "SimpleThenCompounded",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        20,
+        6,
+        2027
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 0.0,
+        "clean_curve": 98.79645288870618,
+        "clean_yield": 96.97148953700868,
+        "clean_z_spread": 98.13455074500455,
+        "dirty_curve": 98.79645288870618,
+        "dirty_yield": 96.97148953700868,
+        "dirty_z_spread": 98.13455074500455,
+        "flows": [
+          {
+            "amount": 255.0,
+            "date": [
+              20,
+              6,
+              2027
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 244.67311592796935,
+        "leg_z_spread": 0.006999999999999632,
+        "notional": 250.0,
+        "schedule": [],
+        "yield_from_clean": 0.051999999999999956,
+        "yield_from_dirty": 0.051999999999999956,
+        "z_spread_from_clean": 0.006999999999999838,
+        "z_spread_from_dirty": 0.006999999999999838
+      },
+      "face": 250.0,
+      "frequency": "Annual",
+      "kind": "zero",
+      "name": "hybrid_SimpleThenCompounded_Annual_-1",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": 0.052,
+      "z_spread": 0.007
+    },
+    {
+      "compounding": "SimpleThenCompounded",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        21,
+        6,
+        2027
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 0.0,
+        "clean_curve": 98.78767137207815,
+        "clean_yield": 96.95817490494296,
+        "clean_z_spread": 98.1239864019256,
+        "dirty_curve": 98.78767137207815,
+        "dirty_yield": 96.95817490494296,
+        "dirty_z_spread": 98.1239864019256,
+        "flows": [
+          {
+            "amount": 255.0,
+            "date": [
+              21,
+              6,
+              2027
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 244.6467764713842,
+        "leg_z_spread": 0.006999999999999755,
+        "notional": 250.0,
+        "schedule": [],
+        "yield_from_clean": 0.05200000000000003,
+        "yield_from_dirty": 0.05200000000000003,
+        "z_spread_from_clean": 0.007000000000000007,
+        "z_spread_from_dirty": 0.007000000000000007
+      },
+      "face": 250.0,
+      "frequency": "Annual",
+      "kind": "zero",
+      "name": "hybrid_SimpleThenCompounded_Annual_0",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": 0.052,
+      "z_spread": 0.007
+    },
+    {
+      "compounding": "SimpleThenCompounded",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        22,
+        6,
+        2027
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 0.0,
+        "clean_curve": 98.77889063599468,
+        "clean_yield": 96.94452277771592,
+        "clean_z_spread": 98.11342319611528,
+        "dirty_curve": 98.77889063599468,
+        "dirty_yield": 96.94452277771592,
+        "dirty_z_spread": 98.11342319611528,
+        "flows": [
+          {
+            "amount": 255.0,
+            "date": [
+              22,
+              6,
+              2027
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 244.62043985028407,
+        "leg_z_spread": 0.006999999999999725,
+        "notional": 250.0,
+        "schedule": [],
+        "yield_from_clean": 0.05200000000000005,
+        "yield_from_dirty": 0.05200000000000005,
+        "z_spread_from_clean": 0.006999999999999745,
+        "z_spread_from_dirty": 0.006999999999999745
+      },
+      "face": 250.0,
+      "frequency": "Annual",
+      "kind": "zero",
+      "name": "hybrid_SimpleThenCompounded_Annual_1",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": 0.052,
+      "z_spread": 0.007
+    },
+    {
+      "compounding": "SimpleThenCompounded",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        22,
+        12,
+        2026
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 0.0,
+        "clean_curve": 100.3899097965862,
+        "clean_yield": 99.42920272509666,
+        "clean_z_spread": 100.04795482204138,
+        "dirty_curve": 100.3899097965862,
+        "dirty_yield": 99.42920272509666,
+        "dirty_z_spread": 100.04795482204138,
+        "flows": [
+          {
+            "amount": 255.0,
+            "date": [
+              22,
+              12,
+              2026
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 249.44369401696838,
+        "leg_z_spread": 0.007000000000000171,
+        "notional": 250.0,
+        "schedule": [],
+        "yield_from_clean": 0.05200000000000022,
+        "yield_from_dirty": 0.05200000000000022,
+        "z_spread_from_clean": 0.006999999999999872,
+        "z_spread_from_dirty": 0.006999999999999872
+      },
+      "face": 250.0,
+      "frequency": "Semiannual",
+      "kind": "zero",
+      "name": "hybrid_SimpleThenCompounded_Semiannual_-1",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": 0.052,
+      "z_spread": 0.007
+    },
+    {
+      "compounding": "SimpleThenCompounded",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        23,
+        12,
+        2026
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 0.0,
+        "clean_curve": 100.38098664563908,
+        "clean_yield": 99.41520467836257,
+        "clean_z_spread": 100.03715104495876,
+        "dirty_curve": 100.38098664563908,
+        "dirty_yield": 99.41520467836257,
+        "dirty_z_spread": 100.03715104495876,
+        "flows": [
+          {
+            "amount": 255.0,
+            "date": [
+              23,
+              12,
+              2026
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 249.41675759363403,
+        "leg_z_spread": 0.006999999999999778,
+        "notional": 250.0,
+        "schedule": [],
+        "yield_from_clean": 0.052000000000000435,
+        "yield_from_dirty": 0.052000000000000435,
+        "z_spread_from_clean": 0.0069999999999997295,
+        "z_spread_from_dirty": 0.0069999999999997295
+      },
+      "face": 250.0,
+      "frequency": "Semiannual",
+      "kind": "zero",
+      "name": "hybrid_SimpleThenCompounded_Semiannual_0",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": 0.052,
+      "z_spread": 0.007
+    },
+    {
+      "compounding": "SimpleThenCompounded",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        24,
+        12,
+        2026
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 0.0,
+        "clean_curve": 100.37206428782571,
+        "clean_yield": 99.40102922077206,
+        "clean_z_spread": 100.02634843453262,
+        "dirty_curve": 100.37206428782571,
+        "dirty_yield": 99.40102922077206,
+        "dirty_z_spread": 100.02634843453262,
+        "flows": [
+          {
+            "amount": 255.0,
+            "date": [
+              24,
+              12,
+              2026
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 249.3898240790558,
+        "leg_z_spread": 0.0070000000000001415,
+        "notional": 250.0,
+        "schedule": [],
+        "yield_from_clean": 0.05199999999999996,
+        "yield_from_dirty": 0.05199999999999996,
+        "z_spread_from_clean": 0.007000000000000078,
+        "z_spread_from_dirty": 0.007000000000000078
+      },
+      "face": 250.0,
+      "frequency": "Semiannual",
+      "kind": "zero",
+      "name": "hybrid_SimpleThenCompounded_Semiannual_1",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": 0.052,
+      "z_spread": 0.007
+    },
+    {
+      "compounding": "SimpleThenCompounded",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        23,
+        9,
+        2026
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 0.0,
+        "clean_curve": 101.19625013583868,
+        "clean_yield": 100.70537643845233,
+        "clean_z_spread": 101.02313188266452,
+        "dirty_curve": 101.19625013583868,
+        "dirty_yield": 100.70537643845233,
+        "dirty_z_spread": 101.02313188266452,
+        "flows": [
+          {
+            "amount": 255.0,
+            "date": [
+              23,
+              9,
+              2026
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 251.8750457497962,
+        "leg_z_spread": 0.007000000000000313,
+        "notional": 250.0,
+        "schedule": [],
+        "yield_from_clean": 0.05200000000000007,
+        "yield_from_dirty": 0.05200000000000007,
+        "z_spread_from_clean": 0.007000000000000128,
+        "z_spread_from_dirty": 0.007000000000000128
+      },
+      "face": 250.0,
+      "frequency": "Quarterly",
+      "kind": "zero",
+      "name": "hybrid_SimpleThenCompounded_Quarterly_-1",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": 0.052,
+      "z_spread": 0.007
+    },
+    {
+      "compounding": "SimpleThenCompounded",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        24,
+        9,
+        2026
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 0.0,
+        "clean_curve": 101.18725531338019,
+        "clean_yield": 100.69101678183614,
+        "clean_z_spread": 101.0122056425319,
+        "dirty_curve": 101.18725531338019,
+        "dirty_yield": 100.69101678183614,
+        "dirty_z_spread": 101.0122056425319,
+        "flows": [
+          {
+            "amount": 255.0,
+            "date": [
+              24,
+              9,
+              2026
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 251.84780399652652,
+        "leg_z_spread": 0.006999999999999673,
+        "notional": 250.0,
+        "schedule": [],
+        "yield_from_clean": 0.05199999999999919,
+        "yield_from_dirty": 0.05199999999999919,
+        "z_spread_from_clean": 0.0069999999999992004,
+        "z_spread_from_dirty": 0.0069999999999992004
+      },
+      "face": 250.0,
+      "frequency": "Quarterly",
+      "kind": "zero",
+      "name": "hybrid_SimpleThenCompounded_Quarterly_0",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": 0.052,
+      "z_spread": 0.007
+    },
+    {
+      "compounding": "SimpleThenCompounded",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        25,
+        9,
+        2026
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 0.0,
+        "clean_curve": 101.17826129042597,
+        "clean_yield": 100.67656728698753,
+        "clean_z_spread": 101.00128058413578,
+        "dirty_curve": 101.17826129042597,
+        "dirty_yield": 100.67656728698753,
+        "dirty_z_spread": 101.00128058413578,
+        "flows": [
+          {
+            "amount": 255.0,
+            "date": [
+              25,
+              9,
+              2026
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 251.82056518961113,
+        "leg_z_spread": 0.006999999999998704,
+        "notional": 250.0,
+        "schedule": [],
+        "yield_from_clean": 0.05200000000000011,
+        "yield_from_dirty": 0.05200000000000011,
+        "z_spread_from_clean": 0.006999999999999914,
+        "z_spread_from_dirty": 0.006999999999999914
+      },
+      "face": 250.0,
+      "frequency": "Quarterly",
+      "kind": "zero",
+      "name": "hybrid_SimpleThenCompounded_Quarterly_1",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": 0.052,
+      "z_spread": 0.007
+    },
+    {
+      "compounding": "SimpleThenCompounded",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        25,
+        7,
+        2026
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 0.0,
+        "clean_curve": 101.73740526751013,
+        "clean_yield": 101.57451564004117,
+        "clean_z_spread": 101.68024645957816,
+        "dirty_curve": 101.73740526751013,
+        "dirty_yield": 101.57451564004117,
+        "dirty_z_spread": 101.68024645957816,
+        "flows": [
+          {
+            "amount": 255.0,
+            "date": [
+              25,
+              7,
+              2026
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 253.51339095884413,
+        "leg_z_spread": 0.00700000000000023,
+        "notional": 250.0,
+        "schedule": [],
+        "yield_from_clean": 0.05199999999999876,
+        "yield_from_dirty": 0.05199999999999876,
+        "z_spread_from_clean": 0.007000000000001329,
+        "z_spread_from_dirty": 0.007000000000001329
+      },
+      "face": 250.0,
+      "frequency": "Monthly",
+      "kind": "zero",
+      "name": "hybrid_SimpleThenCompounded_Monthly_-1",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": 0.052,
+      "z_spread": 0.007
+    },
+    {
+      "compounding": "SimpleThenCompounded",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        26,
+        7,
+        2026
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 0.0,
+        "clean_curve": 101.7283623445111,
+        "clean_yield": 101.55990706936608,
+        "clean_z_spread": 101.66923753421118,
+        "dirty_curve": 101.7283623445111,
+        "dirty_yield": 101.55990706936608,
+        "dirty_z_spread": 101.66923753421118,
+        "flows": [
+          {
+            "amount": 255.0,
+            "date": [
+              26,
+              7,
+              2026
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 253.48594305133236,
+        "leg_z_spread": 0.00700000000000234,
+        "notional": 250.0,
+        "schedule": [],
+        "yield_from_clean": 0.052000000000002225,
+        "yield_from_dirty": 0.052000000000002225,
+        "z_spread_from_clean": 0.007000000000002725,
+        "z_spread_from_dirty": 0.007000000000002725
+      },
+      "face": 250.0,
+      "frequency": "Monthly",
+      "kind": "zero",
+      "name": "hybrid_SimpleThenCompounded_Monthly_0",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": 0.052,
+      "z_spread": 0.007
+    },
+    {
+      "compounding": "SimpleThenCompounded",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        27,
+        7,
+        2026
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 0.0,
+        "clean_curve": 101.71932022529172,
+        "clean_yield": 101.54527005283597,
+        "clean_z_spread": 101.65822980078106,
+        "dirty_curve": 101.71932022529172,
+        "dirty_yield": 101.54527005283597,
+        "dirty_z_spread": 101.65822980078106,
+        "flows": [
+          {
+            "amount": 255.0,
+            "date": [
+              27,
+              7,
+              2026
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 253.45849811560683,
+        "leg_z_spread": 0.007000000000002324,
+        "notional": 250.0,
+        "schedule": [],
+        "yield_from_clean": 0.052000000000000365,
+        "yield_from_dirty": 0.052000000000000365,
+        "z_spread_from_clean": 0.007000000000004868,
+        "z_spread_from_dirty": 0.007000000000004868
+      },
+      "face": 250.0,
+      "frequency": "Monthly",
+      "kind": "zero",
+      "name": "hybrid_SimpleThenCompounded_Monthly_1",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": 0.052,
+      "z_spread": 0.007
+    },
+    {
+      "compounding": "CompoundedThenSimple",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        20,
+        6,
+        2027
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 0.0,
+        "clean_curve": 98.79645288870618,
+        "clean_yield": 96.97182895471882,
+        "clean_z_spread": 98.13467026646991,
+        "dirty_curve": 98.79645288870618,
+        "dirty_yield": 96.97182895471882,
+        "dirty_z_spread": 98.13467026646991,
+        "flows": [
+          {
+            "amount": 255.0,
+            "date": [
+              20,
+              6,
+              2027
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 244.67725566852576,
+        "leg_z_spread": 0.006999999999999725,
+        "notional": 250.0,
+        "schedule": [],
+        "yield_from_clean": 0.052000000000000206,
+        "yield_from_dirty": 0.052000000000000206,
+        "z_spread_from_clean": 0.00699999999999968,
+        "z_spread_from_dirty": 0.00699999999999968
+      },
+      "face": 250.0,
+      "frequency": "Annual",
+      "kind": "zero",
+      "name": "hybrid_CompoundedThenSimple_Annual_-1",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": 0.052,
+      "z_spread": 0.007
+    },
+    {
+      "compounding": "CompoundedThenSimple",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        21,
+        6,
+        2027
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 0.0,
+        "clean_curve": 98.78767137207815,
+        "clean_yield": 96.95817490494296,
+        "clean_z_spread": 98.12417948836644,
+        "dirty_curve": 98.78767137207815,
+        "dirty_yield": 96.95817490494296,
+        "dirty_z_spread": 98.12417948836644,
+        "flows": [
+          {
+            "amount": 255.0,
+            "date": [
+              21,
+              6,
+              2027
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 244.65109921648678,
+        "leg_z_spread": 0.0069999999999997495,
+        "notional": 250.0,
+        "schedule": [],
+        "yield_from_clean": 0.05200000000000003,
+        "yield_from_dirty": 0.05200000000000003,
+        "z_spread_from_clean": 0.006999999999999953,
+        "z_spread_from_dirty": 0.006999999999999953
+      },
+      "face": 250.0,
+      "frequency": "Annual",
+      "kind": "zero",
+      "name": "hybrid_CompoundedThenSimple_Annual_0",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": 0.052,
+      "z_spread": 0.007
+    },
+    {
+      "compounding": "CompoundedThenSimple",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        22,
+        6,
+        2027
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 0.0,
+        "clean_curve": 98.77889063599468,
+        "clean_yield": 96.94486392869588,
+        "clean_z_spread": 98.11369018342126,
+        "dirty_curve": 98.77889063599468,
+        "dirty_yield": 96.94486392869588,
+        "dirty_z_spread": 98.11369018342126,
+        "flows": [
+          {
+            "amount": 255.0,
+            "date": [
+              22,
+              6,
+              2027
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 244.6249464374446,
+        "leg_z_spread": 0.006999999999999896,
+        "notional": 250.0,
+        "schedule": [],
+        "yield_from_clean": 0.052000000000000136,
+        "yield_from_dirty": 0.052000000000000136,
+        "z_spread_from_clean": 0.006999999999999857,
+        "z_spread_from_dirty": 0.006999999999999857
+      },
+      "face": 250.0,
+      "frequency": "Annual",
+      "kind": "zero",
+      "name": "hybrid_CompoundedThenSimple_Annual_1",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": 0.052,
+      "z_spread": 0.007
+    },
+    {
+      "compounding": "CompoundedThenSimple",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        22,
+        12,
+        2026
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 0.0,
+        "clean_curve": 100.3899097965862,
+        "clean_yield": 99.42938215749753,
+        "clean_z_spread": 100.04813865849631,
+        "dirty_curve": 100.3899097965862,
+        "dirty_yield": 99.42938215749753,
+        "dirty_z_spread": 100.04813865849631,
+        "flows": [
+          {
+            "amount": 255.0,
+            "date": [
+              22,
+              12,
+              2026
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 249.4459836078703,
+        "leg_z_spread": 0.007000000000000151,
+        "notional": 250.0,
+        "schedule": [],
+        "yield_from_clean": 0.05199999999999944,
+        "yield_from_dirty": 0.05199999999999944,
+        "z_spread_from_clean": 0.007000000000000083,
+        "z_spread_from_dirty": 0.007000000000000083
+      },
+      "face": 250.0,
+      "frequency": "Semiannual",
+      "kind": "zero",
+      "name": "hybrid_CompoundedThenSimple_Semiannual_-1",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": 0.052,
+      "z_spread": 0.007
+    },
+    {
+      "compounding": "CompoundedThenSimple",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        23,
+        12,
+        2026
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 0.0,
+        "clean_curve": 100.38098664563908,
+        "clean_yield": 99.41520467836257,
+        "clean_z_spread": 100.03737775312477,
+        "dirty_curve": 100.38098664563908,
+        "dirty_yield": 99.41520467836257,
+        "dirty_z_spread": 100.03737775312477,
+        "flows": [
+          {
+            "amount": 255.0,
+            "date": [
+              23,
+              12,
+              2026
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 249.4191538770936,
+        "leg_z_spread": 0.006999999999999767,
+        "notional": 250.0,
+        "schedule": [],
+        "yield_from_clean": 0.052000000000000435,
+        "yield_from_dirty": 0.052000000000000435,
+        "z_spread_from_clean": 0.00699999999999984,
+        "z_spread_from_dirty": 0.00699999999999984
+      },
+      "face": 250.0,
+      "frequency": "Semiannual",
+      "kind": "zero",
+      "name": "hybrid_CompoundedThenSimple_Semiannual_0",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": 0.052,
+      "z_spread": 0.007
+    },
+    {
+      "compounding": "CompoundedThenSimple",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        24,
+        12,
+        2026
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 0.0,
+        "clean_curve": 100.37206428782571,
+        "clean_yield": 99.40121057247732,
+        "clean_z_spread": 100.02661837516392,
+        "dirty_curve": 100.37206428782571,
+        "dirty_yield": 99.40121057247732,
+        "dirty_z_spread": 100.02661837516392,
+        "flows": [
+          {
+            "amount": 255.0,
+            "date": [
+              24,
+              12,
+              2026
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 249.3923279545483,
+        "leg_z_spread": 0.007000000000000081,
+        "notional": 250.0,
+        "schedule": [],
+        "yield_from_clean": 0.05200000000000056,
+        "yield_from_dirty": 0.05200000000000056,
+        "z_spread_from_clean": 0.006999999999999522,
+        "z_spread_from_dirty": 0.006999999999999522
+      },
+      "face": 250.0,
+      "frequency": "Semiannual",
+      "kind": "zero",
+      "name": "hybrid_CompoundedThenSimple_Semiannual_1",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": 0.052,
+      "z_spread": 0.007
+    },
+    {
+      "compounding": "CompoundedThenSimple",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        23,
+        9,
+        2026
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 0.0,
+        "clean_curve": 101.19625013583868,
+        "clean_yield": 100.70546835053277,
+        "clean_z_spread": 101.02334289675476,
+        "dirty_curve": 101.19625013583868,
+        "dirty_yield": 100.70546835053277,
+        "dirty_z_spread": 101.02334289675476,
+        "flows": [
+          {
+            "amount": 255.0,
+            "date": [
+              23,
+              9,
+              2026
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 251.8763513769503,
+        "leg_z_spread": 0.007000000000000676,
+        "notional": 250.0,
+        "schedule": [],
+        "yield_from_clean": 0.05199999999999978,
+        "yield_from_dirty": 0.05199999999999978,
+        "z_spread_from_clean": 0.007000000000000846,
+        "z_spread_from_dirty": 0.007000000000000846
+      },
+      "face": 250.0,
+      "frequency": "Quarterly",
+      "kind": "zero",
+      "name": "hybrid_CompoundedThenSimple_Quarterly_-1",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": 0.052,
+      "z_spread": 0.007
+    },
+    {
+      "compounding": "CompoundedThenSimple",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        24,
+        9,
+        2026
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 0.0,
+        "clean_curve": 101.18725531338019,
+        "clean_yield": 100.69101678183614,
+        "clean_z_spread": 101.01244320308314,
+        "dirty_curve": 101.18725531338019,
+        "dirty_yield": 100.69101678183614,
+        "dirty_z_spread": 101.01244320308314,
+        "flows": [
+          {
+            "amount": 255.0,
+            "date": [
+              24,
+              9,
+              2026
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 251.84917572630945,
+        "leg_z_spread": 0.006999999999999822,
+        "notional": 250.0,
+        "schedule": [],
+        "yield_from_clean": 0.05199999999999919,
+        "yield_from_dirty": 0.05199999999999919,
+        "z_spread_from_clean": 0.00699999999999965,
+        "z_spread_from_dirty": 0.00699999999999965
+      },
+      "face": 250.0,
+      "frequency": "Quarterly",
+      "kind": "zero",
+      "name": "hybrid_CompoundedThenSimple_Quarterly_0",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": 0.052,
+      "z_spread": 0.007
+    },
+    {
+      "compounding": "CompoundedThenSimple",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        25,
+        9,
+        2026
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 0.0,
+        "clean_curve": 101.17826129042597,
+        "clean_yield": 100.67666121974491,
+        "clean_z_spread": 101.00154506496669,
+        "dirty_curve": 101.17826129042597,
+        "dirty_yield": 100.67666121974491,
+        "dirty_z_spread": 101.00154506496669,
+        "flows": [
+          {
+            "amount": 255.0,
+            "date": [
+              25,
+              9,
+              2026
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 251.822003954055,
+        "leg_z_spread": 0.0070000000000003185,
+        "notional": 250.0,
+        "schedule": [],
+        "yield_from_clean": 0.052000000000000095,
+        "yield_from_dirty": 0.052000000000000095,
+        "z_spread_from_clean": 0.006999999999998641,
+        "z_spread_from_dirty": 0.006999999999998641
+      },
+      "face": 250.0,
+      "frequency": "Quarterly",
+      "kind": "zero",
+      "name": "hybrid_CompoundedThenSimple_Quarterly_1",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": 0.052,
+      "z_spread": 0.007
+    },
+    {
+      "compounding": "CompoundedThenSimple",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        25,
+        7,
+        2026
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 0.0,
+        "clean_curve": 101.73740526751013,
+        "clean_yield": 101.57454619571631,
+        "clean_z_spread": 101.68047359807122,
+        "dirty_curve": 101.73740526751013,
+        "dirty_yield": 101.57454619571631,
+        "dirty_z_spread": 101.68047359807122,
+        "flows": [
+          {
+            "amount": 255.0,
+            "date": [
+              25,
+              7,
+              2026
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 253.51401783579206,
+        "leg_z_spread": 0.007000000000000184,
+        "notional": 250.0,
+        "schedule": [],
+        "yield_from_clean": 0.05200000000000058,
+        "yield_from_dirty": 0.05200000000000058,
+        "z_spread_from_clean": 0.006999999999999225,
+        "z_spread_from_dirty": 0.006999999999999225
+      },
+      "face": 250.0,
+      "frequency": "Monthly",
+      "kind": "zero",
+      "name": "hybrid_CompoundedThenSimple_Monthly_-1",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": 0.052,
+      "z_spread": 0.007
+    },
+    {
+      "compounding": "CompoundedThenSimple",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        26,
+        7,
+        2026
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 0.0,
+        "clean_curve": 101.7283623445111,
+        "clean_yield": 101.55990706936608,
+        "clean_z_spread": 101.66947995720172,
+        "dirty_curve": 101.7283623445111,
+        "dirty_yield": 101.55990706936608,
+        "dirty_z_spread": 101.66947995720172,
+        "flows": [
+          {
+            "amount": 255.0,
+            "date": [
+              26,
+              7,
+              2026
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 253.48660802967248,
+        "leg_z_spread": 0.006999999999999724,
+        "notional": 250.0,
+        "schedule": [],
+        "yield_from_clean": 0.052000000000002225,
+        "yield_from_dirty": 0.052000000000002225,
+        "z_spread_from_clean": 0.006999999999997094,
+        "z_spread_from_dirty": 0.006999999999997094
+      },
+      "face": 250.0,
+      "frequency": "Monthly",
+      "kind": "zero",
+      "name": "hybrid_CompoundedThenSimple_Monthly_0",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": 0.052,
+      "z_spread": 0.007
+    },
+    {
+      "compounding": "CompoundedThenSimple",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        27,
+        7,
+        2026
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 0.0,
+        "clean_curve": 101.71932022529172,
+        "clean_yield": 101.54530270013163,
+        "clean_z_spread": 101.65848789104194,
+        "dirty_curve": 101.71932022529172,
+        "dirty_yield": 101.54530270013163,
+        "dirty_z_spread": 101.65848789104194,
+        "flows": [
+          {
+            "amount": 255.0,
+            "date": [
+              27,
+              7,
+              2026
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 253.45920214968515,
+        "leg_z_spread": 0.006999999999999812,
+        "notional": 250.0,
+        "schedule": [],
+        "yield_from_clean": 0.05199999999999985,
+        "yield_from_dirty": 0.05199999999999985,
+        "z_spread_from_clean": 0.006999999999998918,
+        "z_spread_from_dirty": 0.006999999999998918
+      },
+      "face": 250.0,
+      "frequency": "Monthly",
+      "kind": "zero",
+      "name": "hybrid_CompoundedThenSimple_Monthly_1",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": 0.052,
+      "z_spread": 0.007
+    },
+    {
+      "compounding": "Simple",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        24,
+        3,
+        2027
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 7,
+      "expected": {
+        "accrued": -0.026111111111104535,
+        "clean_curve": 103.24939249065619,
+        "clean_yield": 102.23960681693647,
+        "clean_z_spread": 102.89722498338557,
+        "dirty_curve": 103.22328137954509,
+        "dirty_yield": 102.21349570582537,
+        "dirty_z_spread": 102.87111387227446,
+        "flows": [
+          {
+            "amount": 6.005555555555542,
+            "date": [
+              24,
+              9,
+              2026
+            ]
+          },
+          {
+            "amount": 7.290277777777798,
+            "date": [
+              24,
+              3,
+              2027
+            ]
+          },
+          {
+            "amount": 255.0,
+            "date": [
+              24,
+              3,
+              2027
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 254.0548707131179,
+        "leg_z_spread": 0.007000000000000046,
+        "notional": 250.0,
+        "schedule": [
+          [
+            24,
+            3,
+            2026
+          ],
+          [
+            24,
+            9,
+            2026
+          ],
+          [
+            24,
+            3,
+            2027
+          ]
+        ],
+        "yield_from_clean": 0.0520000000000003,
+        "yield_from_dirty": 0.0520000000000003,
+        "z_spread_from_clean": 0.007000000000000011,
+        "z_spread_from_dirty": 0.007000000000000011
+      },
+      "face": 250.0,
+      "frequency": "Semiannual",
+      "kind": "fixed",
+      "name": "negative_ex_coupon",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        22,
+        9,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": 0.052,
+      "z_spread": 0.007
+    },
+    {
+      "compounding": "SimpleThenCompounded",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        7,
+        5,
+        2028
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 0.8055555555555483,
+        "clean_curve": 106.56396400901819,
+        "clean_yield": 102.81132828931305,
+        "clean_z_spread": 105.22458540770192,
+        "dirty_curve": 107.36951956457374,
+        "dirty_yield": 103.6168838448686,
+        "dirty_z_spread": 106.03014096325747,
+        "flows": [
+          {
+            "amount": 0.7833333333333581,
+            "date": [
+              7,
+              5,
+              2026
+            ]
+          },
+          {
+            "amount": 7.41111111111109,
+            "date": [
+              7,
+              11,
+              2026
+            ]
+          },
+          {
+            "amount": 7.290277777777798,
+            "date": [
+              7,
+              5,
+              2027
+            ]
+          },
+          {
+            "amount": 7.41111111111109,
+            "date": [
+              7,
+              11,
+              2027
+            ]
+          },
+          {
+            "amount": 7.330555555555563,
+            "date": [
+              7,
+              5,
+              2028
+            ]
+          },
+          {
+            "amount": 255.0,
+            "date": [
+              7,
+              5,
+              2028
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 264.3587276327611,
+        "leg_z_spread": 0.006999999999999233,
+        "notional": 250.0,
+        "schedule": [
+          [
+            13,
+            4,
+            2026
+          ],
+          [
+            7,
+            5,
+            2026
+          ],
+          [
+            7,
+            11,
+            2026
+          ],
+          [
+            7,
+            5,
+            2027
+          ],
+          [
+            7,
+            11,
+            2027
+          ],
+          [
+            7,
+            5,
+            2028
+          ]
+        ],
+        "yield_from_clean": 0.05200000000000004,
+        "yield_from_dirty": 0.05200000000000004,
+        "z_spread_from_clean": 0.006999999999999337,
+        "z_spread_from_dirty": 0.006999999999999337
+      },
+      "face": 250.0,
+      "frequency": "Quarterly",
+      "kind": "fixed",
+      "name": "stub_first_period",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        13,
+        4,
+        2026
+      ],
+      "yield_rate": 0.052,
+      "z_spread": 0.007
+    },
+    {
+      "compounding": "Compounded",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        24,
+        3,
+        2028
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 1.227222222222224,
+        "clean_curve": 106.00531135179834,
+        "clean_yield": 102.54890569099001,
+        "clean_z_spread": 104.76260841089737,
+        "dirty_curve": 107.23253357402056,
+        "dirty_yield": 103.77612791321224,
+        "dirty_z_spread": 105.9898306331196,
+        "flows": [
+          {
+            "amount": 24.02222222222217,
+            "date": [
+              24,
+              9,
+              2026
+            ]
+          },
+          {
+            "amount": 29.161111111111193,
+            "date": [
+              24,
+              3,
+              2027
+            ]
+          },
+          {
+            "amount": 29.64444444444436,
+            "date": [
+              24,
+              9,
+              2027
+            ]
+          },
+          {
+            "amount": 29.32222222222225,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          },
+          {
+            "amount": 1020.0,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 1057.0406569963652,
+        "leg_z_spread": 0.00699999999999972,
+        "notional": 1000.0,
+        "schedule": [
+          [
+            24,
+            3,
+            2026
+          ],
+          [
+            24,
+            9,
+            2026
+          ],
+          [
+            24,
+            3,
+            2027
+          ],
+          [
+            24,
+            9,
+            2027
+          ],
+          [
+            24,
+            3,
+            2028
+          ]
+        ],
+        "yield_from_clean": 0.05200000000000007,
+        "yield_from_dirty": 0.05200000000000007,
+        "z_spread_from_clean": 0.007000000000000079,
+        "z_spread_from_dirty": 0.007000000000000079
+      },
+      "face": 1000.0,
+      "frequency": "Semiannual",
+      "kind": "fixed",
+      "name": "face_1000",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": 0.052,
+      "z_spread": 0.007
+    },
+    {
+      "compounding": "Continuous",
+      "coupons": [
+        0.047,
+        0.058
+      ],
+      "curve_rate": 0.032,
+      "end": [
+        24,
+        3,
+        2028
+      ],
+      "eval": [
+        19,
+        6,
+        2026
+      ],
+      "ex_days": 0,
+      "expected": {
+        "accrued": 0.0,
+        "clean_curve": 96.38500030963627,
+        "clean_yield": 93.0336915401726,
+        "clean_z_spread": 95.19852804360406,
+        "dirty_curve": 96.38500030963627,
+        "dirty_yield": 93.0336915401726,
+        "dirty_z_spread": 95.19852804360406,
+        "flows": [
+          {
+            "amount": 255.0,
+            "date": [
+              24,
+              3,
+              2028
+            ]
+          }
+        ],
+        "leg_npv_distinct_npv_date": 237.35261881435088,
+        "leg_z_spread": 0.006999999999999835,
+        "notional": 250.0,
+        "schedule": [],
+        "yield_from_clean": 0.052000000000000116,
+        "yield_from_dirty": 0.052000000000000116,
+        "z_spread_from_clean": 0.006999999999999968,
+        "z_spread_from_dirty": 0.006999999999999968
+      },
+      "face": 250.0,
+      "frequency": "Monthly",
+      "kind": "zero",
+      "name": "zero_reference_settlement_distinct",
+      "redemption": 102.0,
+      "reference": [
+        1,
+        6,
+        2026
+      ],
+      "settlement": [
+        26,
+        6,
+        2026
+      ],
+      "settlement_days": 5,
+      "start": [
+        24,
+        3,
+        2026
+      ],
+      "yield_rate": 0.052,
+      "z_spread": 0.007
+    }
+  ],
+  "conventions": {
+    "compounding": {
+      "Compounded": 1,
+      "CompoundedThenSimple": 4,
+      "Continuous": 2,
+      "Simple": 0,
+      "SimpleThenCompounded": 3
+    },
+    "frequency_facade": {
+      "Annual": 0,
+      "Monthly": 3,
+      "Quarterly": 2,
+      "Semiannual": 1
+    },
+    "frequency_native": {
+      "Annual": 1,
+      "Monthly": 12,
+      "Quarterly": 4,
+      "Semiannual": 2
+    }
+  },
+  "notes": [
+    "Dirty-yield price equals native clean yield price plus native accrued because SWIG exposes clean-yield overload, not dirty-yield overload.",
+    "Each fixture pins all eight bond routes, both quote types and two leg spread functions against external native implementation.",
+    "Hybrid zero-coupon cases use Actual360 times immediately below, at and above 1/f.",
+    "Yield pricing uses native stepwise cashflow discounting, not terminal-factor replacement."
+  ],
+  "oracle": "QuantLib 1.43",
+  "solver_fixture_accuracy": 1e-12,
+  "solver_fixture_max_evaluations": 1000,
+  "source_generator_sha256": "782e283e7bb9a18e4cadbdccd0241824ec445077ed93b3180da8e60cd12574cd"
+}
