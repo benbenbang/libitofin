@@ -21,6 +21,7 @@ pub mod bootstrap_variables;
 pub mod boundary;
 pub mod chart_adx_api;
 pub mod chart_api;
+pub mod floating_bond_api;
 pub mod merton_paths_api;
 pub mod ou_paths_api;
 pub mod simulation_api;

@@ -20,6 +20,7 @@ pub(crate) struct NativeBond {
     pub calendar: NativeCalendar,
     fixed: Option<(Frequency, DayCounter, Option<DayCounter>)>,
     flags: Shared<Cell<(bool, Option<bool>)>>,
+    pub(crate) floating: Option<crate::floating_bond_api::NativeFloating>,
 }
 impl NativeBond {
     pub(crate) fn new(
@@ -30,16 +31,24 @@ impl NativeBond {
         for flow in bond.cashflows() {
             finite(flow.amount()?)?;
         }
+        Ok(Self::new_unpriced(bond, calendar, fixed))
+    }
+    pub(crate) fn new_unpriced(
+        bond: Bond,
+        calendar: NativeCalendar,
+        fixed: Option<(Frequency, DayCounter, Option<DayCounter>)>,
+    ) -> Self {
         let flags = (
             bond.settings().include_reference_date_events(),
             bond.settings().include_todays_cash_flows(),
         );
-        Ok(Self {
+        Self {
             bond: shared_mut(bond),
             calendar,
             fixed,
             flags: shared(Cell::new(flags)),
-        })
+            floating: None,
+        }
     }
     pub(crate) fn settlement(&self, supplied: Option<Date>) -> BindingResult<Date> {
         let bond = self.bond.borrow();
@@ -60,7 +69,22 @@ impl NativeBond {
             .issue_date()
             .map_or(settlement, |issue| issue.max(settlement)))
     }
+    pub(crate) fn preflight(&self, field: i32, settlement: Date, force: bool) -> BindingResult<()> {
+        if let Some(floating) = &self.floating {
+            let bond = self.bond.borrow();
+            if field <= 3 {
+                floating.guard_bond(&bond, settlement, force)?;
+            }
+            if field == 2 || field == 4 {
+                floating.guard_accrued(&bond, settlement)?;
+            }
+        }
+        Ok(())
+    }
     pub(crate) fn refresh(&self) {
+        if let Some(floating) = &self.floating {
+            floating.refresh(&self.bond);
+        }
         let bond = self.bond.borrow();
         let flags = (
             bond.settings().include_reference_date_events(),
@@ -75,6 +99,10 @@ impl NativeBond {
 pub(crate) struct NativeBondEngine {
     engine: SharedMut<DiscountingBondEngine>,
     settings: Shared<Settings<Date>>,
+    discount: libitofin::handle::Handle<
+        dyn libitofin::termstructures::yieldtermstructure::YieldTermStructure,
+    >,
+    include: Option<bool>,
 }
 #[repr(C)]
 pub struct ItofinBondConfig {
@@ -102,7 +130,7 @@ pub struct ItofinFixedBondConfig {
     pub has_ex_coupon: u8,
     pub ex_coupon_end_of_month: u8,
 }
-fn money(a: &ItofinBondConfig) -> BindingResult<()> {
+pub(crate) fn money(a: &ItofinBondConfig) -> BindingResult<()> {
     if finite(a.face_amount)? <= 0.0
         || finite(a.redemption)? <= 0.0
         || i32::try_from(a.settlement_days).is_err()
@@ -117,7 +145,7 @@ fn money(a: &ItofinBondConfig) -> BindingResult<()> {
     }
     Ok(())
 }
-fn optional_date(serial: i32) -> BindingResult<Option<Date>> {
+pub(crate) fn optional_date(serial: i32) -> BindingResult<Option<Date>> {
     if serial == 0 {
         Ok(None)
     } else {
@@ -299,12 +327,21 @@ pub unsafe extern "C" fn itofin_discounting_bond_engine_new(
                 _ => return Err(BindingError::invalid("invalid include-flows flag")),
             };
             let settings = settings(c, settings_id)?;
+            let discount = curve(c, discount)?;
             let engine = shared_mut(DiscountingBondEngine::new(
-                curve(c, discount)?,
+                discount.clone(),
                 include,
                 settings.clone(),
             ));
-            output(out, c.insert(NativeBondEngine { engine, settings })?)
+            output(
+                out,
+                c.insert(NativeBondEngine {
+                    engine,
+                    settings,
+                    discount,
+                    include,
+                })?,
+            )
         })
     }
 }
@@ -323,6 +360,9 @@ pub unsafe extern "C" fn itofin_bond_set_engine(
             let engine = c.get::<NativeBondEngine>(engine)?;
             if !Shared::ptr_eq(&bond.bond.borrow().settings_handle(), &engine.settings) {
                 return Err(BindingError::invalid("bond and engine settings differ"));
+            }
+            if let Some(floating) = &bond.floating {
+                floating.set_engine_guard(engine.discount, engine.include);
             }
             bond.bond
                 .borrow_mut()
@@ -355,6 +395,9 @@ pub unsafe extern "C" fn itofin_bond_real(
                 native.settlement(None)?
             };
             native.refresh();
+            if field != 3 || native.bond.borrow().notional(Some(settlement))? != 0.0 {
+                native.preflight(field, settlement, false)?;
+            }
             let mut bond = native.bond.borrow_mut();
             let value = match field {
                 0 => bond.npv()?,
@@ -452,7 +495,14 @@ pub unsafe extern "C" fn itofin_bond_handle(
             let native = c.get::<NativeBond>(id)?;
             let result = match field {
                 0 => c.insert(native.calendar)?,
-                1 => c.insert(native.bond.borrow().cashflows().clone())?,
+                1 => {
+                    let leg = native.bond.borrow().cashflows().clone();
+                    if let Some(floating) = native.floating {
+                        c.insert_with_metadata(leg, floating)?
+                    } else {
+                        c.insert(leg)?
+                    }
+                }
                 2 => c.insert(native.bond.borrow().redemptions().clone())?,
                 3 | 4 => {
                     let fixed = native
@@ -485,7 +535,15 @@ pub unsafe extern "C" fn itofin_bond_action(
             let native = c.get::<NativeBond>(id)?;
             native.refresh();
             if action == 0 {
-                native.settlement(None)?;
+                let settlement = native.settlement(None)?;
+                native.preflight(0, settlement, true)?;
+            }
+            if let Some(floating) = &native.floating {
+                if action == 1 {
+                    floating.freeze(true);
+                } else if action == 2 {
+                    floating.freeze(false);
+                }
             }
             let mut bond = native.bond.borrow_mut();
             match action {

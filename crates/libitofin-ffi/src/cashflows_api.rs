@@ -189,7 +189,15 @@ pub unsafe extern "C" fn itofin_leg_item(
             let i = resolved
                 .filter(|i| *i >= 0 && *i < n)
                 .ok_or_else(|| BindingError::invalid("cashflow index out of range"))?;
-            output(out, c.insert(leg[i as usize].clone())?)
+            let flow = leg[i as usize].clone();
+            let id = if let Some(floating) =
+                c.optional_metadata::<crate::floating_bond_api::NativeFloating>(id)
+            {
+                c.insert_with_metadata(flow, floating.cashflow(i as usize))?
+            } else {
+                c.insert(flow)?
+            };
+            output(out, id)
         })
     }
 }
@@ -207,7 +215,16 @@ pub unsafe extern "C" fn itofin_cashflow_amount(
 ) -> i32 {
     unsafe {
         with_context(ctx, error, |c| {
-            output(out, c.get::<Shared<dyn CashFlow>>(id)?.amount()?)
+            let flow = c.get::<Shared<dyn CashFlow>>(id)?;
+            let amount = if let Some(floating) =
+                c.optional_metadata::<crate::floating_bond_api::NativeFloatingCashflow>(id)
+            {
+                floating.guard()?;
+                finite(flow.amount()?)?
+            } else {
+                flow.amount()?
+            };
+            output(out, amount)
         })
     }
 }
@@ -269,17 +286,27 @@ pub unsafe extern "C" fn itofin_leg_npv(
             } else {
                 Some(date(npv_date)?)
             };
+            let leg = c.get::<Leg>(id)?;
+            let floating = c.optional_metadata::<crate::floating_bond_api::NativeFloating>(id);
+            if let Some(floating) = &floating {
+                floating.guard_leg(&leg, &*settings(c, settings_id)?, include, settlement)?;
+            }
             let curve = curve(c, discount)?.current_link()?;
+            let value = CashFlows::npv(
+                &leg,
+                &*curve,
+                &*settings(c, settings_id)?,
+                include,
+                settlement,
+                npv_date,
+            )?;
             output(
                 out,
-                CashFlows::npv(
-                    &c.get::<Leg>(id)?,
-                    &*curve,
-                    &*settings(c, settings_id)?,
-                    include,
-                    settlement,
-                    npv_date,
-                )?,
+                if floating.is_some() {
+                    finite(value)?
+                } else {
+                    value
+                },
             )
         })
     }

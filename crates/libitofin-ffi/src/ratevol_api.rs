@@ -11,6 +11,29 @@ use libitofin::termstructures::volatility::{
     SwaptionVolatilityStructure,
 };
 use libitofin::time::period::Period;
+#[derive(Clone)]
+pub(crate) struct NativeOptionletGuard {
+    pub settings: Shared<libitofin::settings::Settings<libitofin::time::date::Date>>,
+    calendar: crate::calendar_api::NativeCalendar,
+    settlement_days: u32,
+}
+impl NativeOptionletGuard {
+    pub(crate) fn check(&self) -> BindingResult<()> {
+        if let Some(today) = self.settings.evaluation_date() {
+            let days = i32::try_from(self.settlement_days)
+                .map_err(|_| BindingError::invalid("volatility settlement days overflow"))?;
+            crate::floating_bond_api::advance(
+                &self.calendar,
+                today,
+                days,
+                libitofin::time::timeunit::TimeUnit::Days,
+                libitofin::time::businessdayconvention::BusinessDayConvention::Following,
+                false,
+            )?;
+        }
+        Ok(())
+    }
+}
 /// quote/settings zero select scalar volatility/fixed date respectively.
 #[repr(C)]
 pub struct ItofinConstantRateVolConfig {
@@ -127,7 +150,8 @@ pub unsafe extern "C" fn itofin_constant_optionlet_vol_new(
                     "shift must be finite and volatility finite and nonnegative",
                 ));
             }
-            let cal = calendar(c, x.calendar)?;
+            let native_calendar = c.get::<crate::calendar_api::NativeCalendar>(x.calendar)?;
+            let cal = native_calendar.inner.clone();
             let dc = day_counter(c, x.day_counter)?;
             let bdc = convention(x.convention)?;
             let kind = volatility_type(x.volatility_type)?;
@@ -171,12 +195,20 @@ pub unsafe extern "C" fn itofin_constant_optionlet_vol_new(
                     settings(c, x.settings)?,
                 ),
             };
-            output(
-                out,
-                c.insert(Handle::new(
-                    shared(v) as Shared<dyn OptionletVolatilityStructure>
-                ))?,
-            )
+            let handle = Handle::new(shared(v) as Shared<dyn OptionletVolatilityStructure>);
+            let id = if x.settings == 0 {
+                c.insert(handle)?
+            } else {
+                c.insert_with_metadata(
+                    handle,
+                    NativeOptionletGuard {
+                        settings: settings(c, x.settings)?,
+                        calendar: native_calendar,
+                        settlement_days: x.settlement_days,
+                    },
+                )?
+            };
+            output(out, id)
         })
     }
 }
