@@ -1,0 +1,746 @@
+{
+  "calendar_arithmetic": {
+    "amount": 5.252229531231246,
+    "dirty": 101.77445967155677,
+    "npv": 381.6542237683379
+  },
+  "cases": [
+    {
+      "caps": [],
+      "end": 46218,
+      "ex_coupon": false,
+      "fixing_days": null,
+      "floors": [],
+      "gearings": [],
+      "historical": false,
+      "indexed": false,
+      "initial": {
+        "accrued": 0.0,
+        "cashflows": [
+          15.23822325659352,
+          14.987921404410631,
+          15.238223256593741,
+          14.987921404410631,
+          1000.0
+        ],
+        "clean": 98.06346687154358,
+        "dirty": 98.06346687154358,
+        "npv": 961.2694721302722,
+        "settlement_value": 980.6346687154359
+      },
+      "name": "plain",
+      "normal": false,
+      "spreads": [],
+      "start": 45488,
+      "today": 45306,
+      "updated": {
+        "accrued": 0.0,
+        "cashflows": [
+          18.827090936158754,
+          18.517302955365356,
+          18.82709093615853,
+          18.51730295536558,
+          1000.0
+        ],
+        "clean": 98.45569780521255,
+        "dirty": 98.45569780521255,
+        "npv": 962.7111467563794,
+        "settlement_value": 984.5569780521255
+      }
+    },
+    {
+      "caps": [],
+      "end": 46218,
+      "ex_coupon": false,
+      "fixing_days": null,
+      "floors": [],
+      "gearings": [],
+      "historical": false,
+      "indexed": false,
+      "initial": {
+        "accrued": 0.0,
+        "cashflows": [
+          15.74933436770463,
+          15.99347695996619,
+          14.72711214548263,
+          14.485143626632853,
+          1000.0
+        ],
+        "clean": 98.11563143753818,
+        "dirty": 98.11563143753818,
+        "npv": 961.7808165321911,
+        "settlement_value": 981.1563143753817
+      },
+      "name": "varying",
+      "normal": false,
+      "spreads": [
+        0.001,
+        0.002,
+        -0.001
+      ],
+      "start": 45488,
+      "today": 45306,
+      "updated": {
+        "accrued": 0.0,
+        "cashflows": [
+          19.338202047269863,
+          19.522858510920912,
+          18.315979825047418,
+          18.0145251775878,
+          1000.0
+        ],
+        "clean": 98.50807680718388,
+        "dirty": 98.50807680718388,
+        "npv": 963.223314667205,
+        "settlement_value": 985.0807680718389
+      }
+    },
+    {
+      "caps": [],
+      "end": 46218,
+      "ex_coupon": false,
+      "fixing_days": null,
+      "floors": [],
+      "gearings": [
+        1.5
+      ],
+      "historical": false,
+      "indexed": false,
+      "initial": {
+        "accrued": 0.0,
+        "cashflows": [
+          23.8795571071125,
+          23.4874376621715,
+          23.87955710711283,
+          23.4874376621715,
+          1000.0
+        ],
+        "clean": 101.3252552375521,
+        "dirty": 101.3252552375521,
+        "npv": 993.2432303587153,
+        "settlement_value": 1013.2525523755211
+      },
+      "name": "positive_gearing",
+      "normal": false,
+      "spreads": [
+        0.002
+      ],
+      "start": 45488,
+      "today": 45306,
+      "updated": {
+        "accrued": 0.0,
+        "cashflows": [
+          29.262858626460353,
+          28.781509988603588,
+          29.262858626460016,
+          28.781509988603922,
+          1000.0
+        ],
+        "clean": 102.37048085887882,
+        "dirty": 102.37048085887882,
+        "npv": 1000.9903461009801,
+        "settlement_value": 1023.7048085887882
+      }
+    },
+    {
+      "caps": [
+        0.04
+      ],
+      "end": 46218,
+      "ex_coupon": false,
+      "fixing_days": null,
+      "floors": [
+        0.005
+      ],
+      "gearings": [
+        -1.0
+      ],
+      "historical": false,
+      "indexed": false,
+      "initial": {
+        "accrued": 0.0,
+        "cashflows": [
+          19.635384236444388,
+          18.962226843157065,
+          19.005954087414057,
+          18.474026483293912,
+          1000.0
+        ],
+        "clean": 99.55283349331108,
+        "dirty": 99.55283349331108,
+        "npv": 975.8690239510365,
+        "settlement_value": 995.528334933111
+      },
+      "name": "negative_gearing",
+      "normal": false,
+      "spreads": [
+        0.07
+      ],
+      "start": 45488,
+      "today": 45306,
+      "updated": {
+        "accrued": 0.0,
+        "cashflows": [
+          16.64432722402704,
+          16.029168162389574,
+          16.07690224470918,
+          15.685265835678301,
+          1000.0
+        ],
+        "clean": 97.48860328868345,
+        "dirty": 97.48860328868345,
+        "npv": 953.2547852477593,
+        "settlement_value": 974.8860328868344
+      }
+    },
+    {
+      "caps": [
+        0.008
+      ],
+      "end": 46218,
+      "ex_coupon": false,
+      "fixing_days": null,
+      "floors": [
+        0.005
+      ],
+      "gearings": [
+        0.0
+      ],
+      "historical": false,
+      "indexed": false,
+      "initial": {
+        "accrued": 0.0,
+        "cashflows": [
+          4.088888888888809,
+          4.022222222222149,
+          4.088888888888809,
+          4.022222222222149,
+          1000.0
+        ],
+        "clean": 93.85512363693759,
+        "dirty": 93.85512363693759,
+        "npv": 920.0170872337457,
+        "settlement_value": 938.5512363693759
+      },
+      "name": "zero_gearing",
+      "normal": false,
+      "spreads": [
+        0.01
+      ],
+      "start": 45488,
+      "today": 45306,
+      "updated": {
+        "accrued": 0.0,
+        "cashflows": [
+          4.088888888888809,
+          4.022222222222149,
+          4.088888888888809,
+          4.022222222222149,
+          1000.0
+        ],
+        "clean": 92.92709218560846,
+        "dirty": 92.92709218560846,
+        "npv": 908.6518045886677,
+        "settlement_value": 929.2709218560847
+      }
+    },
+    {
+      "caps": [
+        0.032
+      ],
+      "end": 46218,
+      "ex_coupon": false,
+      "fixing_days": null,
+      "floors": [],
+      "gearings": [],
+      "historical": false,
+      "indexed": false,
+      "initial": {
+        "accrued": 0.0,
+        "cashflows": [
+          14.802807833867492,
+          14.225631862987555,
+          14.196960806744142,
+          13.737861760496754,
+          1000.0
+        ],
+        "clean": 97.73411321554042,
+        "dirty": 97.73411321554042,
+        "npv": 958.0409750645398,
+        "settlement_value": 977.3411321554042
+      },
+      "name": "cap",
+      "normal": false,
+      "spreads": [],
+      "start": 45488,
+      "today": 45306,
+      "updated": {
+        "accrued": 0.0,
+        "cashflows": [
+          15.799842040789137,
+          15.022126852763243,
+          14.849221057850878,
+          14.242651050061347,
+          1000.0
+        ],
+        "clean": 97.06319741009426,
+        "dirty": 97.06319741009426,
+        "npv": 949.0951175967947,
+        "settlement_value": 970.6319741009427
+      }
+    },
+    {
+      "caps": [],
+      "end": 46218,
+      "ex_coupon": false,
+      "fixing_days": null,
+      "floors": [
+        0.034
+      ],
+      "gearings": [],
+      "historical": false,
+      "indexed": false,
+      "initial": {
+        "accrued": 0.0,
+        "cashflows": [
+          17.592445508342525,
+          17.582880584333157,
+          18.116359755441554,
+          18.034068514429087,
+          1000.0
+        ],
+        "clean": 99.09571338558747,
+        "dirty": 99.09571338558747,
+        "npv": 971.3880931959854,
+        "settlement_value": 990.9571338558746
+      },
+      "name": "floor",
+      "normal": false,
+      "spreads": [],
+      "start": 45488,
+      "today": 45306,
+      "updated": {
+        "accrued": 0.0,
+        "cashflows": [
+          19.729079228352145,
+          20.00052258976795,
+          20.796954237540202,
+          20.84734113792544,
+          1000.0
+        ],
+        "clean": 99.08271292877596,
+        "dirty": 99.08271292877596,
+        "npv": 968.8421728127238,
+        "settlement_value": 990.8271292877596
+      }
+    },
+    {
+      "caps": [
+        0.04
+      ],
+      "end": 46218,
+      "ex_coupon": false,
+      "fixing_days": null,
+      "floors": [
+        0.032
+      ],
+      "gearings": [],
+      "historical": false,
+      "indexed": false,
+      "initial": {
+        "accrued": 0.0,
+        "cashflows": [
+          16.774637422894063,
+          16.743316389859437,
+          17.157316142328643,
+          16.962916161689556,
+          1000.0
+        ],
+        "clean": 98.74571637560062,
+        "dirty": 98.74571637560062,
+        "npv": 967.9572391606295,
+        "settlement_value": 987.4571637560061
+      },
+      "name": "collar",
+      "normal": false,
+      "spreads": [],
+      "start": 45488,
+      "today": 45306,
+      "updated": {
+        "accrued": 0.0,
+        "cashflows": [
+          18.420291796169288,
+          17.995080825751337,
+          18.215441493292555,
+          17.8575875248875,
+          1000.0
+        ],
+        "clean": 98.24855057236988,
+        "dirty": 98.24855057236988,
+        "npv": 960.6856372681228,
+        "settlement_value": 982.4855057236988
+      }
+    },
+    {
+      "caps": [
+        null,
+        0.035,
+        null
+      ],
+      "end": 46218,
+      "ex_coupon": false,
+      "fixing_days": null,
+      "floors": [
+        null,
+        null,
+        0.028
+      ],
+      "gearings": [],
+      "historical": false,
+      "indexed": false,
+      "initial": {
+        "accrued": 0.0,
+        "cashflows": [
+          15.23822325659352,
+          14.601613540927458,
+          16.258462958681296,
+          16.205817155773744,
+          1000.0
+        ],
+        "clean": 98.23484353124506,
+        "dirty": 98.23484353124506,
+        "npv": 962.9493959231204,
+        "settlement_value": 982.3484353124505
+      },
+      "name": "mixed_absent",
+      "normal": false,
+      "spreads": [],
+      "start": 45488,
+      "today": 45306,
+      "updated": {
+        "accrued": 0.0,
+        "cashflows": [
+          18.827090936158754,
+          15.876330436706189,
+          19.611248231991514,
+          19.57388259874247,
+          1000.0
+        ],
+        "clean": 98.37306940848678,
+        "dirty": 98.37306940848678,
+        "npv": 961.9031967815199,
+        "settlement_value": 983.7306940848679
+      }
+    },
+    {
+      "caps": [
+        null
+      ],
+      "end": 46218,
+      "ex_coupon": false,
+      "fixing_days": null,
+      "floors": [],
+      "gearings": [],
+      "historical": false,
+      "indexed": false,
+      "initial": {
+        "accrued": 0.0,
+        "cashflows": [
+          15.23822325659352,
+          14.987921404410631,
+          15.238223256593741,
+          14.987921404410631,
+          1000.0
+        ],
+        "clean": 98.06346687154358,
+        "dirty": 98.06346687154358,
+        "npv": 961.2694721302722,
+        "settlement_value": 980.6346687154359
+      },
+      "name": "all_absent",
+      "normal": false,
+      "spreads": [],
+      "start": 45488,
+      "today": 45306,
+      "updated": {
+        "accrued": 0.0,
+        "cashflows": [
+          18.827090936158754,
+          18.517302955365356,
+          18.82709093615853,
+          18.51730295536558,
+          1000.0
+        ],
+        "clean": 98.45569780521255,
+        "dirty": 98.45569780521255,
+        "npv": 962.7111467563794,
+        "settlement_value": 984.5569780521255
+      }
+    },
+    {
+      "caps": [
+        0.032
+      ],
+      "end": 46218,
+      "ex_coupon": false,
+      "fixing_days": null,
+      "floors": [],
+      "gearings": [],
+      "historical": false,
+      "indexed": false,
+      "initial": {
+        "accrued": 0.0,
+        "cashflows": [
+          14.296155153847257,
+          13.487397778758423,
+          13.265528929522812,
+          12.66976882927253,
+          1000.0
+        ],
+        "clean": 97.42722866203678,
+        "dirty": 97.42722866203678,
+        "npv": 955.0327319117883,
+        "settlement_value": 974.2722866203678
+      },
+      "name": "normal_cap",
+      "normal": true,
+      "spreads": [],
+      "start": 45488,
+      "today": 45306,
+      "updated": {
+        "accrued": 0.0,
+        "cashflows": [
+          15.221035949026431,
+          14.143679580988742,
+          13.724618537220083,
+          12.941189053334348,
+          1000.0
+        ],
+        "clean": 96.69859075227336,
+        "dirty": 96.69859075227336,
+        "npv": 945.5299517253361,
+        "settlement_value": 966.9859075227336
+      }
+    },
+    {
+      "caps": [],
+      "end": 46310,
+      "ex_coupon": false,
+      "fixing_days": null,
+      "floors": [],
+      "gearings": [],
+      "historical": false,
+      "indexed": false,
+      "initial": {
+        "accrued": 0.0,
+        "cashflows": [
+          7.590305261316876,
+          15.071348497647241,
+          15.15478244818702,
+          15.071348497647241,
+          15.15478244818702,
+          1000.0
+        ],
+        "clean": 97.83115830202549,
+        "dirty": 97.83115830202549,
+        "npv": 958.9922618386504,
+        "settlement_value": 978.311583020255
+      },
+      "name": "stub_at_par",
+      "normal": false,
+      "spreads": [],
+      "start": 45488,
+      "today": 45306,
+      "updated": {
+        "accrued": 0.0,
+        "cashflows": [
+          9.369650294756449,
+          18.620555148084918,
+          18.723817807995367,
+          18.62055514808514,
+          18.72381780799559,
+          1000.0
+        ],
+        "clean": 98.27167694478113,
+        "dirty": 98.27167694478113,
+        "npv": 960.9117695997264,
+        "settlement_value": 982.7167694478113
+      }
+    },
+    {
+      "caps": [],
+      "end": 46310,
+      "ex_coupon": false,
+      "fixing_days": null,
+      "floors": [],
+      "gearings": [],
+      "historical": false,
+      "indexed": true,
+      "initial": {
+        "accrued": 0.0,
+        "cashflows": [
+          7.61911162829676,
+          15.071348497647241,
+          15.15478244818702,
+          15.071348497647241,
+          15.15478244818702,
+          1000.0
+        ],
+        "clean": 97.83401004151025,
+        "dirty": 97.83401004151025,
+        "npv": 959.0202160829436,
+        "settlement_value": 978.3401004151025
+      },
+      "name": "stub_indexed",
+      "normal": false,
+      "spreads": [],
+      "start": 45488,
+      "today": 45306,
+      "updated": {
+        "accrued": 0.0,
+        "cashflows": [
+          9.413545468079377,
+          18.620555148084918,
+          18.723817807995367,
+          18.62055514808514,
+          18.72381780799559,
+          1000.0
+        ],
+        "clean": 98.27601695545793,
+        "dirty": 98.27601695545793,
+        "npv": 960.9542067237196,
+        "settlement_value": 982.7601695545793
+      }
+    },
+    {
+      "caps": [],
+      "end": 46218,
+      "ex_coupon": false,
+      "fixing_days": 0,
+      "floors": [],
+      "gearings": [],
+      "historical": false,
+      "indexed": false,
+      "initial": {
+        "accrued": 0.0,
+        "cashflows": [
+          15.23822325659352,
+          14.987921404410631,
+          15.23822325659352,
+          14.987921404410631,
+          1000.0
+        ],
+        "clean": 98.06346687154357,
+        "dirty": 98.06346687154357,
+        "npv": 961.269472130272,
+        "settlement_value": 980.6346687154356
+      },
+      "name": "explicit_zero_fixing_days",
+      "normal": false,
+      "spreads": [],
+      "start": 45488,
+      "today": 45306,
+      "updated": {
+        "accrued": 0.0,
+        "cashflows": [
+          18.827090936158754,
+          18.517302955365356,
+          18.827090936158754,
+          18.517302955365356,
+          1000.0
+        ],
+        "clean": 98.45569780521255,
+        "dirty": 98.45569780521255,
+        "npv": 962.7111467563794,
+        "settlement_value": 984.5569780521255
+      }
+    },
+    {
+      "caps": [],
+      "end": 46218,
+      "ex_coupon": false,
+      "fixing_days": null,
+      "floors": [],
+      "gearings": [],
+      "historical": true,
+      "indexed": false,
+      "initial": {
+        "accrued": 0.2520833333333333,
+        "cashflows": [
+          14.055555555555554,
+          14.987921404410631,
+          15.238223256593741,
+          14.987921404410631,
+          1000.0
+        ],
+        "clean": 98.05034026071783,
+        "dirty": 98.30242359405116,
+        "npv": 960.133302011705,
+        "settlement_value": 983.0242359405116
+      },
+      "name": "historical",
+      "normal": false,
+      "spreads": [],
+      "start": 45488,
+      "today": 45519,
+      "updated": {
+        "accrued": 0.2520833333333333,
+        "cashflows": [
+          14.055555555555554,
+          18.517302955365356,
+          18.82709093615853,
+          18.51730295536558,
+          1000.0
+        ],
+        "clean": 98.1366439490386,
+        "dirty": 98.38872728237193,
+        "npv": 958.1501332994376,
+        "settlement_value": 983.8872728237193
+      }
+    },
+    {
+      "caps": [],
+      "end": 46218,
+      "ex_coupon": true,
+      "fixing_days": null,
+      "floors": [],
+      "gearings": [],
+      "historical": false,
+      "indexed": false,
+      "initial": {
+        "accrued": -0.022916666666666665,
+        "cashflows": [
+          14.055555555555554,
+          14.987921404410631,
+          15.238223256593741,
+          14.987921404410631,
+          1000.0
+        ],
+        "clean": 98.52763123499209,
+        "dirty": 98.50471456832543,
+        "npv": 960.133302011705,
+        "settlement_value": 985.0471456832543
+      },
+      "name": "ex_coupon",
+      "normal": false,
+      "spreads": [],
+      "start": 45488,
+      "today": 45667,
+      "updated": {
+        "accrued": -0.022916666666666665,
+        "cashflows": [
+          14.055555555555554,
+          18.517302955365356,
+          18.82709093615853,
+          18.51730295536558,
+          1000.0
+        ],
+        "clean": 98.81834420876847,
+        "dirty": 98.7954275421018,
+        "npv": 958.1501332994376,
+        "settlement_value": 987.9542754210181
+      }
+    }
+  ],
+  "quantlib_version": "1.43"
+}

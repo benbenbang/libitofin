@@ -189,6 +189,39 @@ typedef struct ItofinBootstrapCallbacks {
   void (*release)(size_t);
 } ItofinBootstrapCallbacks;
 
+typedef struct ItofinFloatingBondConfig {
+  struct ItofinBondConfig bond;
+  uint64_t schedule;
+  uint64_t index;
+  uint64_t day_counter;
+  uint32_t fixing_days;
+  uint8_t has_fixing_days;
+  int32_t fixing_convention;
+  /**
+   * Zero selects NullCalendar when an ex-coupon period is present.
+   */
+  uint64_t ex_coupon_calendar;
+  int32_t ex_coupon_length;
+  int32_t ex_coupon_unit;
+  int32_t ex_coupon_convention;
+  uint8_t has_ex_coupon;
+  uint8_t ex_coupon_end_of_month;
+} ItofinFloatingBondConfig;
+
+/**
+ * Each vector has its own length. Caps/floors use f32::MAX promoted to double for absence.
+ */
+typedef struct ItofinFloatingBondVectors {
+  const double *gearings;
+  size_t gearings_count;
+  const double *spreads;
+  size_t spreads_count;
+  const double *caps;
+  size_t caps_count;
+  const double *floors;
+  size_t floors_count;
+} ItofinFloatingBondVectors;
+
 /**
  * Scalar annualized Merton parameters and seeded path dimensions.
  * Drift includes jumps; risk-neutral callers supply risk-free minus dividend.
@@ -2121,6 +2154,48 @@ int32_t itofin_chart_volume_bars(const ItofinReal *open,
                                  int8_t *out_direction,
                                  size_t capacity,
                                  struct ItofinError *error);
+
+/**
+ * Construct without requiring coupon histories or a cap/floor pricer.
+ * The common calendar field must be zero: floating bonds use their schedule calendar.
+ * # Safety
+ * Pointers and thread ownership must satisfy the crate-level C caller contract.
+ */
+int32_t itofin_floating_rate_bond_new(struct ItofinContext *ctx,
+                                      struct ItofinFloatingBondConfig a,
+                                      struct ItofinFloatingBondVectors v,
+                                      uint64_t *out,
+                                      struct ItofinError *error);
+
+/**
+ * Volatility zero creates the existing no-volatility Black coupon pricer.
+ * # Safety
+ * Pointers and thread ownership must satisfy the crate-level C caller contract.
+ */
+int32_t itofin_black_ibor_coupon_pricer_new(struct ItofinContext *ctx,
+                                            uint64_t volatility,
+                                            uint64_t *out,
+                                            struct ItofinError *error);
+
+/**
+ * Install/replace one retained pricer on every nonzero-gearing coupon.
+ * # Safety
+ * Pointers and thread ownership must satisfy the crate-level C caller contract.
+ */
+int32_t itofin_floating_bond_set_pricer(struct ItofinContext *ctx,
+                                        uint64_t id,
+                                        uint64_t pricer,
+                                        struct ItofinError *error);
+
+/**
+ * Return an independent handle retaining the original index and calendar metadata.
+ * # Safety
+ * Pointers and thread ownership must satisfy the crate-level C caller contract.
+ */
+int32_t itofin_floating_bond_index(struct ItofinContext *ctx,
+                                   uint64_t id,
+                                   uint64_t *out,
+                                   struct ItofinError *error);
 
 /**
  * Generate exact constant-parameter paths, preserving outputs on any error.

@@ -86,6 +86,12 @@ impl Context {
         self.metadata.insert(id, metadata);
         Ok(id)
     }
+    pub(crate) fn optional_metadata<T: Clone + 'static>(&self, id: u64) -> Option<T> {
+        self.metadata
+            .get(&id)
+            .and_then(|value| value.downcast_ref::<T>())
+            .cloned()
+    }
     pub(crate) fn metadata<T: Clone + 'static>(&self, id: u64) -> BindingResult<T> {
         self.metadata
             .get(&id)

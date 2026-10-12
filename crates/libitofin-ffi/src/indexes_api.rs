@@ -2,7 +2,7 @@
 use crate::boundary::*;
 use crate::curves_api::optional_curve;
 use crate::settings_api::settings;
-use crate::time_api::{calendar, convention, date, day_counter};
+use crate::time_api::{convention, date, day_counter};
 use libitofin::currency::Currency;
 use libitofin::indexes::ibor::{CustomIborIndex, EurLibor, GbpLibor, JpyLibor};
 use libitofin::indexes::{
@@ -15,8 +15,10 @@ use libitofin::time::{
 
 #[derive(Clone)]
 pub(crate) struct NativeIbor {
-    inner: Shared<IborIndex>,
-    fixing_calendar: crate::calendar_api::NativeCalendar,
+    pub(crate) inner: Shared<IborIndex>,
+    pub(crate) fixing_calendar: crate::calendar_api::NativeCalendar,
+    pub(crate) value_calendar: crate::calendar_api::NativeCalendar,
+    pub(crate) maturity_calendar: crate::calendar_api::NativeCalendar,
 }
 impl NativeIbor {
     pub(crate) fn builtin(inner: Shared<IborIndex>) -> Self {
@@ -26,6 +28,16 @@ impl NativeIbor {
             first_year: 1901,
         };
         Self {
+            value_calendar: crate::calendar_api::NativeCalendar {
+                inner: inner.value_calendar(),
+                horizon: None,
+                first_year: 1901,
+            },
+            maturity_calendar: crate::calendar_api::NativeCalendar {
+                inner: inner.maturity_calendar(),
+                horizon: None,
+                first_year: 1901,
+            },
             inner,
             fixing_calendar,
         }
@@ -184,6 +196,16 @@ pub unsafe extern "C" fn itofin_ibor_new(
             let dc = day_counter(c, a.day_counter)?;
             let f = optional_curve(c, a.forwarding)?;
             let s = settings(c, a.settings)?;
+            let value_calendar = if custom {
+                c.get::<crate::calendar_api::NativeCalendar>(a.value_calendar)?
+            } else {
+                fixing_calendar.clone()
+            };
+            let maturity_calendar = if custom {
+                c.get::<crate::calendar_api::NativeCalendar>(a.maturity_calendar)?
+            } else {
+                fixing_calendar.clone()
+            };
             let v = if custom {
                 CustomIborIndex::new(
                     name,
@@ -191,8 +213,8 @@ pub unsafe extern "C" fn itofin_ibor_new(
                     a.settlement_days,
                     cur,
                     cal,
-                    calendar(c, a.value_calendar)?,
-                    calendar(c, a.maturity_calendar)?,
+                    value_calendar.inner.clone(),
+                    maturity_calendar.inner.clone(),
                     bdc,
                     a.end_of_month,
                     dc,
@@ -219,6 +241,8 @@ pub unsafe extern "C" fn itofin_ibor_new(
                 c.insert(NativeIbor {
                     inner: v,
                     fixing_calendar,
+                    value_calendar,
+                    maturity_calendar,
                 })?,
             )
         })
