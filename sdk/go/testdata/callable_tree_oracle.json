@@ -1,0 +1,1898 @@
+{
+  "cases": [
+    {
+      "a": 0.1,
+      "calendar": "null",
+      "coupons": [
+        0.05
+      ],
+      "currency_tolerance": 1e-10,
+      "curve_dates": [],
+      "curve_rates": [],
+      "evaluation": 46210,
+      "events": [],
+      "ex_eom": false,
+      "ex_length": 0,
+      "ex_unit": 0,
+      "expected": {
+        "accrued": 0.02739726027396472,
+        "clean": 109.1075059355635,
+        "dirty": 109.13490319583745,
+        "npv": 1091.1696468618893,
+        "redemption_date": 48036,
+        "settlement": 46212,
+        "settlement_discount": 0.9998356299485937,
+        "settlement_value": 1091.3490319583746
+      },
+      "face": 1000.0,
+      "issue": 46210,
+      "kind": "fixed",
+      "maturity": 48036,
+      "name": "fixed_empty",
+      "payment_convention": 2,
+      "price_tolerance": 1e-11,
+      "rate": 0.03,
+      "redemption": 100.0,
+      "reference": 46210,
+      "schedule_rule": 0,
+      "settlement_days": 2,
+      "sigma": 0.01,
+      "start": 46210,
+      "steps": 100
+    },
+    {
+      "a": 0.1,
+      "calendar": "null",
+      "coupons": [
+        0.05
+      ],
+      "currency_tolerance": 1e-10,
+      "curve_dates": [],
+      "curve_rates": [],
+      "evaluation": 46210,
+      "events": [
+        [
+          100.0,
+          0,
+          0,
+          46941
+        ]
+      ],
+      "ex_eom": false,
+      "ex_length": 0,
+      "ex_unit": 0,
+      "expected": {
+        "accrued": 0.02739726027396472,
+        "clean": 103.75249200869519,
+        "dirty": 103.77988926896914,
+        "npv": 1037.6283096323507,
+        "redemption_date": 48036,
+        "settlement": 46212,
+        "settlement_discount": 0.9998356299485937,
+        "settlement_value": 1037.7988926896915
+      },
+      "face": 1000.0,
+      "issue": 46210,
+      "kind": "fixed",
+      "maturity": 48036,
+      "name": "fixed_call_clean",
+      "payment_convention": 2,
+      "price_tolerance": 1e-11,
+      "rate": 0.03,
+      "redemption": 100.0,
+      "reference": 46210,
+      "schedule_rule": 0,
+      "settlement_days": 2,
+      "sigma": 0.01,
+      "start": 46210,
+      "steps": 100,
+      "update_rate": 0.045,
+      "updated_evaluation": {
+        "accrued": 0.04109589041096928,
+        "clean": 100.17093705831793,
+        "dirty": 100.2120329487289,
+        "npv": 1001.7497507780398,
+        "redemption_date": 48036,
+        "settlement": 46213,
+        "settlement_discount": 0.9996302053771937,
+        "settlement_value": 1002.120329487289
+      },
+      "updated_rate": {
+        "accrued": 0.02739726027396472,
+        "clean": 100.1722815418558,
+        "dirty": 100.19967880212975,
+        "npv": 1001.7497507780398,
+        "redemption_date": 48036,
+        "settlement": 46212,
+        "settlement_discount": 0.9997534550547357,
+        "settlement_value": 1001.9967880212976
+      }
+    },
+    {
+      "a": 0.1,
+      "calendar": "null",
+      "coupons": [
+        0.05
+      ],
+      "currency_tolerance": 1e-10,
+      "curve_dates": [],
+      "curve_rates": [],
+      "evaluation": 46210,
+      "events": [
+        [
+          100,
+          1,
+          0,
+          46972
+        ]
+      ],
+      "ex_eom": false,
+      "ex_length": 0,
+      "ex_unit": 0,
+      "expected": {
+        "accrued": 0.02739726027396472,
+        "clean": 103.52480528747083,
+        "dirty": 103.5522025477448,
+        "npv": 1035.351816668888,
+        "redemption_date": 48036,
+        "settlement": 46212,
+        "settlement_discount": 0.9998356299485937,
+        "settlement_value": 1035.522025477448
+      },
+      "face": 1000.0,
+      "issue": 46210,
+      "kind": "fixed",
+      "maturity": 48036,
+      "name": "fixed_call_dirty",
+      "payment_convention": 2,
+      "price_tolerance": 1e-11,
+      "rate": 0.03,
+      "redemption": 100.0,
+      "reference": 46210,
+      "schedule_rule": 0,
+      "settlement_days": 2,
+      "sigma": 0.01,
+      "start": 46210,
+      "steps": 100
+    },
+    {
+      "a": 0.1,
+      "calendar": "null",
+      "coupons": [
+        0.05
+      ],
+      "currency_tolerance": 1e-10,
+      "curve_dates": [],
+      "curve_rates": [],
+      "evaluation": 46210,
+      "events": [
+        [
+          101.0,
+          0,
+          1,
+          47306
+        ]
+      ],
+      "ex_eom": false,
+      "ex_length": 0,
+      "ex_unit": 0,
+      "expected": {
+        "accrued": 0.02739726027396472,
+        "clean": 109.29610192703171,
+        "dirty": 109.32349918730567,
+        "npv": 1093.0552967812434,
+        "redemption_date": 48036,
+        "settlement": 46212,
+        "settlement_discount": 0.9998356299485937,
+        "settlement_value": 1093.2349918730567
+      },
+      "face": 1000.0,
+      "issue": 46210,
+      "kind": "fixed",
+      "maturity": 48036,
+      "name": "fixed_put_clean",
+      "payment_convention": 2,
+      "price_tolerance": 1e-11,
+      "rate": 0.03,
+      "redemption": 100.0,
+      "reference": 46210,
+      "schedule_rule": 0,
+      "settlement_days": 2,
+      "sigma": 0.01,
+      "start": 46210,
+      "steps": 100
+    },
+    {
+      "a": 0.1,
+      "calendar": "null",
+      "coupons": [
+        0.05
+      ],
+      "currency_tolerance": 1e-10,
+      "curve_dates": [],
+      "curve_rates": [],
+      "evaluation": 46210,
+      "events": [
+        [
+          101,
+          1,
+          1,
+          46972
+        ]
+      ],
+      "ex_eom": false,
+      "ex_length": 0,
+      "ex_unit": 0,
+      "expected": {
+        "accrued": 0.02739726027396472,
+        "clean": 109.19437599293693,
+        "dirty": 109.22177325321088,
+        "npv": 1092.0382046472655,
+        "redemption_date": 48036,
+        "settlement": 46212,
+        "settlement_discount": 0.9998356299485937,
+        "settlement_value": 1092.2177325321088
+      },
+      "face": 1000.0,
+      "issue": 46210,
+      "kind": "fixed",
+      "maturity": 48036,
+      "name": "fixed_put_dirty",
+      "payment_convention": 2,
+      "price_tolerance": 1e-11,
+      "rate": 0.03,
+      "redemption": 100.0,
+      "reference": 46210,
+      "schedule_rule": 0,
+      "settlement_days": 2,
+      "sigma": 0.01,
+      "start": 46210,
+      "steps": 100
+    },
+    {
+      "a": 0.1,
+      "calendar": "null",
+      "coupons": [
+        0.05
+      ],
+      "currency_tolerance": 1e-10,
+      "curve_dates": [],
+      "curve_rates": [],
+      "evaluation": 46210,
+      "events": [
+        [
+          101.0,
+          0,
+          1,
+          47306
+        ],
+        [
+          100.0,
+          0,
+          0,
+          46941
+        ]
+      ],
+      "ex_eom": false,
+      "ex_length": 0,
+      "ex_unit": 0,
+      "expected": {
+        "accrued": 0.02739726027396472,
+        "clean": 103.8013364352658,
+        "dirty": 103.82873369553975,
+        "npv": 1038.1166736124476,
+        "redemption_date": 48036,
+        "settlement": 46212,
+        "settlement_discount": 0.9998356299485937,
+        "settlement_value": 1038.2873369553974
+      },
+      "face": 1000.0,
+      "issue": 46210,
+      "kind": "fixed",
+      "maturity": 48036,
+      "name": "fixed_mixed_unsorted",
+      "payment_convention": 2,
+      "price_tolerance": 1e-11,
+      "rate": 0.03,
+      "redemption": 100.0,
+      "reference": 46210,
+      "schedule_rule": 0,
+      "settlement_days": 2,
+      "sigma": 0.01,
+      "start": 46210,
+      "steps": 100
+    },
+    {
+      "a": 0.1,
+      "calendar": "null",
+      "coupons": [
+        0.05
+      ],
+      "currency_tolerance": 1e-10,
+      "curve_dates": [],
+      "curve_rates": [],
+      "evaluation": 46210,
+      "events": [
+        [
+          100.0,
+          0,
+          0,
+          46941
+        ],
+        [
+          101,
+          1,
+          1,
+          46941
+        ]
+      ],
+      "ex_eom": false,
+      "ex_length": 0,
+      "ex_unit": 0,
+      "expected": {
+        "accrued": 0.02739726027396472,
+        "clean": 104.74622194770896,
+        "dirty": 104.77361920798293,
+        "npv": 1047.5639756280768,
+        "redemption_date": 48036,
+        "settlement": 46212,
+        "settlement_discount": 0.9998356299485937,
+        "settlement_value": 1047.7361920798294
+      },
+      "face": 1000.0,
+      "issue": 46210,
+      "kind": "fixed",
+      "maturity": 48036,
+      "name": "fixed_tie_call_put",
+      "payment_convention": 2,
+      "price_tolerance": 1e-11,
+      "rate": 0.03,
+      "redemption": 100.0,
+      "reference": 46210,
+      "schedule_rule": 0,
+      "settlement_days": 2,
+      "sigma": 0.01,
+      "start": 46210,
+      "steps": 100
+    },
+    {
+      "a": 0.1,
+      "calendar": "null",
+      "coupons": [
+        0.05
+      ],
+      "currency_tolerance": 1e-10,
+      "curve_dates": [],
+      "curve_rates": [],
+      "evaluation": 46210,
+      "events": [
+        [
+          101,
+          1,
+          1,
+          46941
+        ],
+        [
+          100.0,
+          0,
+          0,
+          46941
+        ]
+      ],
+      "ex_eom": false,
+      "ex_length": 0,
+      "ex_unit": 0,
+      "expected": {
+        "accrued": 0.02739726027396472,
+        "clean": 103.80438000563947,
+        "dirty": 103.83177726591343,
+        "npv": 1038.1471043134661,
+        "redemption_date": 48036,
+        "settlement": 46212,
+        "settlement_discount": 0.9998356299485937,
+        "settlement_value": 1038.3177726591343
+      },
+      "face": 1000.0,
+      "issue": 46210,
+      "kind": "fixed",
+      "maturity": 48036,
+      "name": "fixed_tie_put_call",
+      "payment_convention": 2,
+      "price_tolerance": 1e-11,
+      "rate": 0.03,
+      "redemption": 100.0,
+      "reference": 46210,
+      "schedule_rule": 0,
+      "settlement_days": 2,
+      "sigma": 0.01,
+      "start": 46210,
+      "steps": 100
+    },
+    {
+      "a": 0.1,
+      "calendar": "null",
+      "coupons": [
+        0.05
+      ],
+      "currency_tolerance": 1e-10,
+      "curve_dates": [],
+      "curve_rates": [],
+      "evaluation": 46210,
+      "events": [
+        [
+          100.0,
+          0,
+          0,
+          48036
+        ]
+      ],
+      "ex_eom": false,
+      "ex_length": 0,
+      "ex_unit": 0,
+      "expected": {
+        "accrued": 0.02739726027396472,
+        "clean": 109.1075059355635,
+        "dirty": 109.13490319583745,
+        "npv": 1091.1696468618893,
+        "redemption_date": 48036,
+        "settlement": 46212,
+        "settlement_discount": 0.9998356299485937,
+        "settlement_value": 1091.3490319583746
+      },
+      "face": 1000.0,
+      "issue": 46210,
+      "kind": "fixed",
+      "maturity": 48036,
+      "name": "fixed_maturity_call",
+      "payment_convention": 2,
+      "price_tolerance": 1e-11,
+      "rate": 0.03,
+      "redemption": 100.0,
+      "reference": 46210,
+      "schedule_rule": 0,
+      "settlement_days": 2,
+      "sigma": 0.01,
+      "start": 46210,
+      "steps": 100
+    },
+    {
+      "a": 0.1,
+      "calendar": "null",
+      "coupons": [
+        0.05
+      ],
+      "currency_tolerance": 1e-10,
+      "curve_dates": [],
+      "curve_rates": [],
+      "evaluation": 46210,
+      "events": [
+        [
+          100.0,
+          0,
+          0,
+          46939
+        ]
+      ],
+      "ex_eom": false,
+      "ex_length": 7,
+      "ex_unit": 0,
+      "expected": {
+        "accrued": 0.02739726027396472,
+        "clean": 103.74302463627785,
+        "dirty": 103.77042189655182,
+        "npv": 1037.5336514697024,
+        "redemption_date": 48036,
+        "settlement": 46212,
+        "settlement_discount": 0.9998356299485937,
+        "settlement_value": 1037.7042189655183
+      },
+      "face": 1000.0,
+      "issue": 46210,
+      "kind": "fixed",
+      "maturity": 48036,
+      "name": "fixed_snap_close_coupon",
+      "payment_convention": 2,
+      "price_tolerance": 1e-11,
+      "rate": 0.03,
+      "redemption": 100.0,
+      "reference": 46210,
+      "schedule_rule": 0,
+      "settlement_days": 2,
+      "sigma": 0.01,
+      "start": 46210,
+      "steps": 100
+    },
+    {
+      "a": 0.1,
+      "calendar": "null",
+      "coupons": [
+        0.05
+      ],
+      "currency_tolerance": 1e-10,
+      "curve_dates": [],
+      "curve_rates": [],
+      "evaluation": 46937,
+      "events": [
+        [
+          100.0,
+          0,
+          0,
+          46972
+        ]
+      ],
+      "ex_eom": false,
+      "ex_length": 7,
+      "ex_unit": 0,
+      "expected": {
+        "accrued": -0.02739726027396472,
+        "clean": 100.18003917162349,
+        "dirty": 100.15264191134953,
+        "npv": 1001.3617981645008,
+        "redemption_date": 48036,
+        "settlement": 46939,
+        "settlement_discount": 0.9998356299485937,
+        "settlement_value": 1001.5264191134953
+      },
+      "face": 1000.0,
+      "issue": 46210,
+      "kind": "fixed",
+      "maturity": 48036,
+      "name": "fixed_ex_settlement_clean",
+      "payment_convention": 2,
+      "price_tolerance": 1e-11,
+      "rate": 0.03,
+      "redemption": 100.0,
+      "reference": 46937,
+      "schedule_rule": 0,
+      "settlement_days": 2,
+      "sigma": 0.01,
+      "start": 46210,
+      "steps": 100
+    },
+    {
+      "a": 0.1,
+      "calendar": "null",
+      "coupons": [
+        0.05
+      ],
+      "currency_tolerance": 1e-10,
+      "curve_dates": [],
+      "curve_rates": [],
+      "evaluation": 46937,
+      "events": [
+        [
+          100,
+          1,
+          0,
+          46972
+        ]
+      ],
+      "ex_eom": false,
+      "ex_length": 7,
+      "ex_unit": 0,
+      "expected": {
+        "accrued": -0.02739726027396472,
+        "clean": 99.75653188758969,
+        "dirty": 99.72913462731572,
+        "npv": 997.127421443303,
+        "redemption_date": 48036,
+        "settlement": 46939,
+        "settlement_discount": 0.9998356299485937,
+        "settlement_value": 997.291346273157
+      },
+      "face": 1000.0,
+      "issue": 46210,
+      "kind": "fixed",
+      "maturity": 48036,
+      "name": "fixed_ex_settlement_dirty",
+      "payment_convention": 2,
+      "price_tolerance": 1e-11,
+      "rate": 0.03,
+      "redemption": 100.0,
+      "reference": 46937,
+      "schedule_rule": 0,
+      "settlement_days": 2,
+      "sigma": 0.01,
+      "start": 46210,
+      "steps": 100
+    },
+    {
+      "a": 0.1,
+      "calendar": "null",
+      "coupons": [
+        0.05
+      ],
+      "currency_tolerance": 1e-10,
+      "curve_dates": [],
+      "curve_rates": [],
+      "evaluation": 46210,
+      "events": [
+        [
+          100.0,
+          0,
+          0,
+          46941
+        ]
+      ],
+      "ex_eom": true,
+      "ex_length": 1,
+      "ex_unit": 2,
+      "expected": {
+        "accrued": 0.02739726027396472,
+        "clean": 103.75249200869519,
+        "dirty": 103.77988926896914,
+        "npv": 1037.6283096323507,
+        "redemption_date": 48036,
+        "settlement": 46212,
+        "settlement_discount": 0.9998356299485937,
+        "settlement_value": 1037.7988926896915
+      },
+      "face": 1000.0,
+      "issue": 46210,
+      "kind": "fixed",
+      "maturity": 48036,
+      "name": "fixed_ex_month_eom",
+      "payment_convention": 2,
+      "price_tolerance": 1e-11,
+      "rate": 0.03,
+      "redemption": 100.0,
+      "reference": 46210,
+      "schedule_rule": 0,
+      "settlement_days": 2,
+      "sigma": 0.01,
+      "start": 46210,
+      "steps": 100
+    },
+    {
+      "a": 0.1,
+      "calendar": "null",
+      "coupons": [
+        0.05
+      ],
+      "currency_tolerance": 1e-10,
+      "curve_dates": [],
+      "curve_rates": [],
+      "evaluation": 46210,
+      "events": [
+        [
+          100.0,
+          0,
+          0,
+          46941
+        ]
+      ],
+      "ex_eom": false,
+      "ex_length": 0,
+      "ex_unit": 0,
+      "expected": {
+        "accrued": 0.0,
+        "clean": 103.76283096323507,
+        "dirty": 103.76283096323507,
+        "npv": 1037.6283096323507,
+        "redemption_date": 48036,
+        "settlement": 46210,
+        "settlement_discount": 1.0,
+        "settlement_value": 1037.6283096323507
+      },
+      "face": 1000.0,
+      "issue": 46210,
+      "kind": "fixed",
+      "maturity": 48036,
+      "name": "fixed_lag0",
+      "payment_convention": 2,
+      "price_tolerance": 1e-11,
+      "rate": 0.03,
+      "redemption": 100.0,
+      "reference": 46210,
+      "schedule_rule": 0,
+      "settlement_days": 0,
+      "sigma": 0.01,
+      "start": 46210,
+      "steps": 100
+    },
+    {
+      "a": 0.1,
+      "calendar": "null",
+      "coupons": [
+        0.05
+      ],
+      "currency_tolerance": 1e-10,
+      "curve_dates": [],
+      "curve_rates": [],
+      "evaluation": 46210,
+      "events": [
+        [
+          100.0,
+          0,
+          0,
+          46941
+        ]
+      ],
+      "ex_eom": false,
+      "ex_length": 0,
+      "ex_unit": 0,
+      "expected": {
+        "accrued": 0.13698630136986797,
+        "clean": 103.71116423850171,
+        "dirty": 103.84815053987158,
+        "npv": 1037.6283096323507,
+        "redemption_date": 48036,
+        "settlement": 46220,
+        "settlement_discount": 0.9991784198737006,
+        "settlement_value": 1038.4815053987159
+      },
+      "face": 1000.0,
+      "issue": 46210,
+      "kind": "fixed",
+      "maturity": 48036,
+      "name": "fixed_lag10",
+      "payment_convention": 2,
+      "price_tolerance": 1e-11,
+      "rate": 0.03,
+      "redemption": 100.0,
+      "reference": 46210,
+      "schedule_rule": 0,
+      "settlement_days": 10,
+      "sigma": 0.01,
+      "start": 46210,
+      "steps": 100
+    },
+    {
+      "a": 0.1,
+      "calendar": "null",
+      "coupons": [
+        0.05
+      ],
+      "currency_tolerance": 1e-10,
+      "curve_dates": [],
+      "curve_rates": [],
+      "evaluation": 46211,
+      "events": [
+        [
+          100.0,
+          0,
+          0,
+          46941
+        ]
+      ],
+      "ex_eom": false,
+      "ex_length": 0,
+      "ex_unit": 0,
+      "expected": {
+        "accrued": 0.04109589041096928,
+        "clean": 103.74732358302224,
+        "dirty": 103.78841947343321,
+        "npv": 1037.6283096323507,
+        "redemption_date": 48036,
+        "settlement": 46213,
+        "settlement_discount": 0.9997534550547357,
+        "settlement_value": 1037.8841947343321
+      },
+      "face": 1000.0,
+      "issue": 46210,
+      "kind": "fixed",
+      "maturity": 48036,
+      "name": "fixed_distinct_reference_evaluation",
+      "payment_convention": 2,
+      "price_tolerance": 1e-11,
+      "rate": 0.03,
+      "redemption": 100.0,
+      "reference": 46210,
+      "schedule_rule": 0,
+      "settlement_days": 2,
+      "sigma": 0.01,
+      "start": 46210,
+      "steps": 100
+    },
+    {
+      "a": 0.1,
+      "calendar": "null",
+      "coupons": [
+        0.05
+      ],
+      "currency_tolerance": 1e-10,
+      "curve_dates": [],
+      "curve_rates": [],
+      "evaluation": 46210,
+      "events": [
+        [
+          100.0,
+          0,
+          0,
+          46941
+        ]
+      ],
+      "ex_eom": false,
+      "ex_length": 0,
+      "ex_unit": 0,
+      "expected": {
+        "accrued": 0.02739726027396472,
+        "clean": 103.35953177158729,
+        "dirty": 103.38692903186124,
+        "npv": 1033.6993531702153,
+        "redemption_date": 48036,
+        "settlement": 46212,
+        "settlement_discount": 0.9998356299485937,
+        "settlement_value": 1033.8692903186125
+      },
+      "face": 1000.0,
+      "issue": 46210,
+      "kind": "fixed",
+      "maturity": 48036,
+      "name": "fixed_native_once",
+      "payment_convention": 2,
+      "price_tolerance": 1e-11,
+      "rate": 0.03,
+      "redemption": 100.0,
+      "reference": 46210,
+      "schedule_rule": 2,
+      "settlement_days": 2,
+      "sigma": 0.01,
+      "start": 46210,
+      "steps": 100
+    },
+    {
+      "a": 0.1,
+      "calendar": "null",
+      "corrected_filter": true,
+      "coupons": [
+        0.05
+      ],
+      "currency_tolerance": 1e-10,
+      "curve_dates": [],
+      "curve_rates": [],
+      "evaluation": 46210,
+      "events": [
+        [
+          120,
+          0,
+          0,
+          46210
+        ],
+        [
+          101.0,
+          0,
+          1,
+          47306
+        ]
+      ],
+      "ex_eom": false,
+      "ex_length": 0,
+      "ex_unit": 0,
+      "expected": {
+        "accrued": 0.02739726027396472,
+        "clean": 109.29610192703171,
+        "dirty": 109.32349918730567,
+        "npv": 1093.0552967812434,
+        "redemption_date": 48036,
+        "settlement": 46212,
+        "settlement_discount": 0.9998356299485937,
+        "settlement_value": 1093.2349918730567
+      },
+      "face": 1000.0,
+      "issue": 46210,
+      "kind": "fixed",
+      "maturity": 48036,
+      "name": "fixed_filtered_call_put",
+      "payment_convention": 2,
+      "price_tolerance": 1e-11,
+      "rate": 0.03,
+      "redemption": 100.0,
+      "reference": 46210,
+      "schedule_rule": 0,
+      "settlement_days": 2,
+      "sigma": 0.01,
+      "start": 46210,
+      "steps": 100
+    },
+    {
+      "a": 0.1,
+      "calendar": "null",
+      "corrected_filter": true,
+      "coupons": [
+        0.05
+      ],
+      "currency_tolerance": 1e-10,
+      "curve_dates": [],
+      "curve_rates": [],
+      "evaluation": 46210,
+      "events": [
+        [
+          120,
+          0,
+          1,
+          46210
+        ],
+        [
+          100.0,
+          0,
+          0,
+          46941
+        ]
+      ],
+      "ex_eom": false,
+      "ex_length": 0,
+      "ex_unit": 0,
+      "expected": {
+        "accrued": 0.02739726027396472,
+        "clean": 103.75249200869519,
+        "dirty": 103.77988926896914,
+        "npv": 1037.6283096323507,
+        "redemption_date": 48036,
+        "settlement": 46212,
+        "settlement_discount": 0.9998356299485937,
+        "settlement_value": 1037.7988926896915
+      },
+      "face": 1000.0,
+      "issue": 46210,
+      "kind": "fixed",
+      "maturity": 48036,
+      "name": "fixed_filtered_put_call",
+      "payment_convention": 2,
+      "price_tolerance": 1e-11,
+      "rate": 0.03,
+      "redemption": 100.0,
+      "reference": 46210,
+      "schedule_rule": 0,
+      "settlement_days": 2,
+      "sigma": 0.01,
+      "start": 46210,
+      "steps": 100
+    },
+    {
+      "a": 0.1,
+      "calendar": "null",
+      "coupons": [
+        0.05
+      ],
+      "currency_tolerance": 1e-10,
+      "curve_dates": [],
+      "curve_rates": [],
+      "evaluation": 46210,
+      "events": [
+        [
+          100.0,
+          0,
+          0,
+          46941
+        ]
+      ],
+      "ex_eom": false,
+      "ex_length": 0,
+      "ex_unit": 0,
+      "expected": {
+        "accrued": 0.02739726027396472,
+        "clean": 103.75249200869516,
+        "dirty": 103.77988926896913,
+        "npv": 103.76283096323505,
+        "redemption_date": 48036,
+        "settlement": 46212,
+        "settlement_discount": 0.9998356299485937,
+        "settlement_value": 103.77988926896913
+      },
+      "face": 100,
+      "issue": 46210,
+      "kind": "fixed",
+      "maturity": 48036,
+      "name": "fixed_small_face",
+      "payment_convention": 2,
+      "price_tolerance": 1e-11,
+      "rate": 0.03,
+      "redemption": 100.0,
+      "reference": 46210,
+      "schedule_rule": 0,
+      "settlement_days": 2,
+      "sigma": 0.01,
+      "start": 46210,
+      "steps": 100
+    },
+    {
+      "a": 0.073,
+      "calendar": "target",
+      "coupons": [],
+      "currency_tolerance": 2e-08,
+      "curve_dates": [
+        46307,
+        46672,
+        47768,
+        49594
+      ],
+      "curve_rates": [
+        0.015,
+        0.031,
+        0.024,
+        0.04
+      ],
+      "evaluation": 46307,
+      "events": [],
+      "ex_eom": false,
+      "ex_length": 0,
+      "ex_unit": 0,
+      "expected": {
+        "accrued": 0.0,
+        "clean": 93.82106374135729,
+        "dirty": 93.82106374135729,
+        "npv": 1158188.973052199,
+        "redemption_date": 48134,
+        "settlement": 46309,
+        "settlement_discount": 0.9999173312461107,
+        "settlement_value": 1158284.7270072296
+      },
+      "face": 1234567.89,
+      "issue": 46304,
+      "kind": "zero",
+      "maturity": 48133,
+      "name": "zero_empty",
+      "payment_convention": 1,
+      "price_tolerance": 2e-12,
+      "rate": 0.03,
+      "redemption": 107.5,
+      "reference": 46307,
+      "schedule_rule": 0,
+      "settlement_days": 2,
+      "sigma": 0.014,
+      "start": 46304,
+      "steps": 120
+    },
+    {
+      "a": 0.073,
+      "calendar": "target",
+      "coupons": [],
+      "currency_tolerance": 2e-08,
+      "curve_dates": [
+        46307,
+        46672,
+        47768,
+        49594
+      ],
+      "curve_rates": [
+        0.015,
+        0.031,
+        0.024,
+        0.04
+      ],
+      "evaluation": 46307,
+      "events": [
+        [
+          98.75,
+          0,
+          0,
+          46921
+        ]
+      ],
+      "ex_eom": false,
+      "ex_length": 0,
+      "ex_unit": 0,
+      "expected": {
+        "accrued": 0.0,
+        "clean": 92.01012109319785,
+        "dirty": 92.01012109319785,
+        "npv": 1135833.5048631974,
+        "redemption_date": 48134,
+        "settlement": 46309,
+        "settlement_discount": 0.9999173312461107,
+        "settlement_value": 1135927.4105667376
+      },
+      "face": 1234567.89,
+      "issue": 46304,
+      "kind": "zero",
+      "maturity": 48133,
+      "name": "zero_call_clean",
+      "payment_convention": 1,
+      "price_tolerance": 2e-12,
+      "rate": 0.03,
+      "redemption": 107.5,
+      "reference": 46307,
+      "schedule_rule": 0,
+      "settlement_days": 2,
+      "sigma": 0.014,
+      "start": 46304,
+      "steps": 120
+    },
+    {
+      "a": 0.073,
+      "calendar": "target",
+      "coupons": [],
+      "currency_tolerance": 2e-08,
+      "curve_dates": [
+        46307,
+        46672,
+        47768,
+        49594
+      ],
+      "curve_rates": [
+        0.015,
+        0.031,
+        0.024,
+        0.04
+      ],
+      "evaluation": 46307,
+      "events": [
+        [
+          98.75,
+          1,
+          0,
+          46921
+        ]
+      ],
+      "ex_eom": false,
+      "ex_length": 0,
+      "ex_unit": 0,
+      "expected": {
+        "accrued": 0.0,
+        "clean": 92.01012109319785,
+        "dirty": 92.01012109319785,
+        "npv": 1135833.5048631974,
+        "redemption_date": 48134,
+        "settlement": 46309,
+        "settlement_discount": 0.9999173312461107,
+        "settlement_value": 1135927.4105667376
+      },
+      "face": 1234567.89,
+      "issue": 46304,
+      "kind": "zero",
+      "maturity": 48133,
+      "name": "zero_call_dirty",
+      "payment_convention": 1,
+      "price_tolerance": 2e-12,
+      "rate": 0.03,
+      "redemption": 107.5,
+      "reference": 46307,
+      "schedule_rule": 0,
+      "settlement_days": 2,
+      "sigma": 0.014,
+      "start": 46304,
+      "steps": 120
+    },
+    {
+      "a": 0.073,
+      "calendar": "target",
+      "coupons": [],
+      "currency_tolerance": 2e-08,
+      "curve_dates": [
+        46307,
+        46672,
+        47768,
+        49594
+      ],
+      "curve_rates": [
+        0.015,
+        0.031,
+        0.024,
+        0.04
+      ],
+      "evaluation": 46307,
+      "events": [
+        [
+          95.25,
+          0,
+          1,
+          47160
+        ]
+      ],
+      "ex_eom": false,
+      "ex_length": 0,
+      "ex_unit": 0,
+      "expected": {
+        "accrued": 0.0,
+        "clean": 94.15141769142056,
+        "dirty": 94.15141769142056,
+        "npv": 1162267.0796831609,
+        "redemption_date": 48134,
+        "settlement": 46309,
+        "settlement_discount": 0.9999173312461107,
+        "settlement_value": 1162363.1707980575
+      },
+      "face": 1234567.89,
+      "issue": 46304,
+      "kind": "zero",
+      "maturity": 48133,
+      "name": "zero_put",
+      "payment_convention": 1,
+      "price_tolerance": 2e-12,
+      "rate": 0.03,
+      "redemption": 107.5,
+      "reference": 46307,
+      "schedule_rule": 0,
+      "settlement_days": 2,
+      "sigma": 0.014,
+      "start": 46304,
+      "steps": 120
+    },
+    {
+      "a": 0.073,
+      "calendar": "target",
+      "coupons": [],
+      "currency_tolerance": 2e-08,
+      "curve_dates": [
+        46307,
+        46672,
+        47768,
+        49594
+      ],
+      "curve_rates": [
+        0.015,
+        0.031,
+        0.024,
+        0.04
+      ],
+      "evaluation": 46307,
+      "events": [
+        [
+          96,
+          1,
+          1,
+          47160
+        ],
+        [
+          93,
+          0,
+          0,
+          46921
+        ]
+      ],
+      "ex_eom": false,
+      "ex_length": 0,
+      "ex_unit": 0,
+      "expected": {
+        "accrued": 0.0,
+        "clean": 88.49403130337026,
+        "dirty": 88.49403130337026,
+        "npv": 1092428.5778623044,
+        "redemption_date": 48134,
+        "settlement": 46309,
+        "settlement_discount": 0.9999173312461107,
+        "settlement_value": 1092518.8950379577
+      },
+      "face": 1234567.89,
+      "issue": 46304,
+      "kind": "zero",
+      "maturity": 48133,
+      "name": "zero_mixed_unsorted",
+      "payment_convention": 1,
+      "price_tolerance": 2e-12,
+      "rate": 0.03,
+      "redemption": 107.5,
+      "reference": 46307,
+      "schedule_rule": 0,
+      "settlement_days": 2,
+      "sigma": 0.014,
+      "start": 46304,
+      "steps": 120
+    },
+    {
+      "a": 0.073,
+      "calendar": "target",
+      "coupons": [],
+      "currency_tolerance": 2e-08,
+      "curve_dates": [
+        46307,
+        46672,
+        47768,
+        49594
+      ],
+      "curve_rates": [
+        0.015,
+        0.031,
+        0.024,
+        0.04
+      ],
+      "evaluation": 46307,
+      "events": [
+        [
+          90,
+          0,
+          0,
+          47160
+        ],
+        [
+          100,
+          1,
+          1,
+          47160
+        ]
+      ],
+      "ex_eom": false,
+      "ex_length": 0,
+      "ex_unit": 0,
+      "expected": {
+        "accrued": 0.0,
+        "clean": 93.69924901467793,
+        "dirty": 93.69924901467793,
+        "npv": 1156685.2118756645,
+        "redemption_date": 48134,
+        "settlement": 46309,
+        "settlement_discount": 0.9999173312461107,
+        "settlement_value": 1156780.841506355
+      },
+      "face": 1234567.89,
+      "issue": 46304,
+      "kind": "zero",
+      "maturity": 48133,
+      "name": "zero_tie_call_put",
+      "payment_convention": 1,
+      "price_tolerance": 2e-12,
+      "rate": 0.03,
+      "redemption": 107.5,
+      "reference": 46307,
+      "schedule_rule": 0,
+      "settlement_days": 2,
+      "sigma": 0.014,
+      "start": 46304,
+      "steps": 120
+    },
+    {
+      "a": 0.073,
+      "calendar": "target",
+      "coupons": [],
+      "currency_tolerance": 2e-08,
+      "curve_dates": [
+        46307,
+        46672,
+        47768,
+        49594
+      ],
+      "curve_rates": [
+        0.015,
+        0.031,
+        0.024,
+        0.04
+      ],
+      "evaluation": 46307,
+      "events": [
+        [
+          100,
+          1,
+          1,
+          47160
+        ],
+        [
+          90,
+          0,
+          0,
+          47160
+        ]
+      ],
+      "ex_eom": false,
+      "ex_length": 0,
+      "ex_unit": 0,
+      "expected": {
+        "accrued": 0.0,
+        "clean": 84.32932411321012,
+        "dirty": 84.32932411321012,
+        "npv": 1041016.6906880981,
+        "redemption_date": 48134,
+        "settlement": 46309,
+        "settlement_discount": 0.9999173312461107,
+        "settlement_value": 1041102.7573557193
+      },
+      "face": 1234567.89,
+      "issue": 46304,
+      "kind": "zero",
+      "maturity": 48133,
+      "name": "zero_tie_put_call",
+      "payment_convention": 1,
+      "price_tolerance": 2e-12,
+      "rate": 0.03,
+      "redemption": 107.5,
+      "reference": 46307,
+      "schedule_rule": 0,
+      "settlement_days": 2,
+      "sigma": 0.014,
+      "start": 46304,
+      "steps": 120
+    },
+    {
+      "a": 0.073,
+      "calendar": "target",
+      "coupons": [],
+      "currency_tolerance": 2e-08,
+      "curve_dates": [
+        46307,
+        46672,
+        47768,
+        49594
+      ],
+      "curve_rates": [
+        0.015,
+        0.031,
+        0.024,
+        0.04
+      ],
+      "evaluation": 46307,
+      "events": [
+        [
+          70,
+          0,
+          0,
+          48133
+        ]
+      ],
+      "ex_eom": false,
+      "ex_length": 0,
+      "ex_unit": 0,
+      "expected": {
+        "accrued": 0.0,
+        "clean": 61.100018001180246,
+        "dirty": 61.100018001180246,
+        "npv": 754258.8442329046,
+        "redemption_date": 48134,
+        "settlement": 46309,
+        "settlement_discount": 0.9999173312461107,
+        "settlement_value": 754321.2030267911
+      },
+      "face": 1234567.89,
+      "issue": 46304,
+      "kind": "zero",
+      "maturity": 48133,
+      "name": "zero_maturity_call",
+      "payment_convention": 1,
+      "price_tolerance": 2e-12,
+      "rate": 0.03,
+      "redemption": 107.5,
+      "reference": 46307,
+      "schedule_rule": 0,
+      "settlement_days": 2,
+      "sigma": 0.014,
+      "start": 46304,
+      "steps": 120
+    },
+    {
+      "a": 0.073,
+      "calendar": "target",
+      "coupons": [],
+      "currency_tolerance": 2e-08,
+      "curve_dates": [
+        46307,
+        46672,
+        47768,
+        49594
+      ],
+      "curve_rates": [
+        0.015,
+        0.031,
+        0.024,
+        0.04
+      ],
+      "evaluation": 46307,
+      "events": [
+        [
+          120,
+          1,
+          1,
+          48131
+        ]
+      ],
+      "ex_eom": false,
+      "ex_length": 0,
+      "ex_unit": 0,
+      "expected": {
+        "accrued": 0.0,
+        "clean": 104.7676738033108,
+        "dirty": 104.7676738033108,
+        "npv": 1293321.1337896613,
+        "redemption_date": 48131,
+        "settlement": 46309,
+        "settlement_discount": 0.9999173312461107,
+        "settlement_value": 1293428.0598756168
+      },
+      "face": 1234567.89,
+      "issue": 46304,
+      "kind": "zero",
+      "maturity": 48133,
+      "name": "zero_preceding_put",
+      "payment_convention": 3,
+      "price_tolerance": 2e-12,
+      "rate": 0.03,
+      "redemption": 107.5,
+      "reference": 46307,
+      "schedule_rule": 0,
+      "settlement_days": 2,
+      "sigma": 0.014,
+      "start": 46304,
+      "steps": 120
+    },
+    {
+      "a": 0.073,
+      "calendar": "target",
+      "coupons": [],
+      "currency_tolerance": 2e-08,
+      "curve_dates": [
+        46307,
+        46672,
+        47768,
+        49594
+      ],
+      "curve_rates": [
+        0.015,
+        0.031,
+        0.024,
+        0.04
+      ],
+      "evaluation": 46307,
+      "events": [
+        [
+          120,
+          0,
+          0,
+          46308
+        ],
+        [
+          50,
+          1,
+          0,
+          46309
+        ],
+        [
+          85,
+          0,
+          0,
+          46310
+        ]
+      ],
+      "ex_eom": false,
+      "ex_length": 0,
+      "ex_unit": 0,
+      "expected": {
+        "accrued": 0.0,
+        "clean": 84.99645588173283,
+        "dirty": 84.99645588173283,
+        "npv": 1049252.2044103243,
+        "redemption_date": 48134,
+        "settlement": 46309,
+        "settlement_discount": 0.9999173312461107,
+        "settlement_value": 1049338.9519538898
+      },
+      "face": 1234567.89,
+      "issue": 46304,
+      "kind": "zero",
+      "maturity": 48133,
+      "name": "zero_settlement_filter",
+      "payment_convention": 1,
+      "price_tolerance": 2e-12,
+      "rate": 0.03,
+      "redemption": 107.5,
+      "reference": 46307,
+      "schedule_rule": 0,
+      "settlement_days": 2,
+      "sigma": 0.014,
+      "start": 46304,
+      "steps": 120
+    },
+    {
+      "a": 0.073,
+      "calendar": "target",
+      "coupons": [],
+      "currency_tolerance": 2e-08,
+      "curve_dates": [
+        46307,
+        46672,
+        47768,
+        49594
+      ],
+      "curve_rates": [
+        0.015,
+        0.031,
+        0.024,
+        0.04
+      ],
+      "evaluation": 46307,
+      "events": [
+        [
+          95.25,
+          0,
+          1,
+          47160
+        ]
+      ],
+      "ex_eom": false,
+      "ex_length": 0,
+      "ex_unit": 0,
+      "expected": {
+        "accrued": 0.0,
+        "clean": 89.24853468648074,
+        "dirty": 89.24853468648074,
+        "npv": 1101742.6643115708,
+        "redemption_date": 48134,
+        "settlement": 46309,
+        "settlement_discount": 0.9999173312461107,
+        "settlement_value": 1101833.7515348033
+      },
+      "face": 1234567.89,
+      "issue": 46304,
+      "kind": "zero",
+      "maturity": 48133,
+      "name": "zero_zero_redemption_put",
+      "payment_convention": 1,
+      "price_tolerance": 2e-12,
+      "rate": 0.03,
+      "redemption": 0,
+      "reference": 46307,
+      "schedule_rule": 0,
+      "settlement_days": 2,
+      "sigma": 0.014,
+      "start": 46304,
+      "steps": 120
+    },
+    {
+      "a": 0.073,
+      "calendar": "target",
+      "coupons": [],
+      "currency_tolerance": 2e-08,
+      "curve_dates": [],
+      "curve_rates": [],
+      "evaluation": 46307,
+      "events": [
+        [
+          98.75,
+          0,
+          0,
+          46921
+        ]
+      ],
+      "ex_eom": false,
+      "ex_length": 0,
+      "ex_unit": 0,
+      "expected": {
+        "accrued": 0.0,
+        "clean": 100.74488128172224,
+        "dirty": 100.74488128172224,
+        "npv": 1243845.739551052,
+        "redemption_date": 48134,
+        "settlement": 46309,
+        "settlement_discount": 1.0000657555864614,
+        "settlement_value": 1243763.9551227633
+      },
+      "face": 1234567.89,
+      "issue": 46304,
+      "kind": "zero",
+      "maturity": 48133,
+      "name": "zero_negative_rates",
+      "payment_convention": 1,
+      "price_tolerance": 2e-12,
+      "rate": -0.012,
+      "redemption": 107.5,
+      "reference": 46307,
+      "schedule_rule": 0,
+      "settlement_days": 2,
+      "sigma": 0.014,
+      "start": 46304,
+      "steps": 120
+    },
+    {
+      "a": 0.073,
+      "calendar": "target",
+      "coupons": [],
+      "currency_tolerance": 2e-08,
+      "curve_dates": [
+        46307,
+        46672,
+        47768,
+        49594
+      ],
+      "curve_rates": [
+        0.015,
+        0.031,
+        0.024,
+        0.04
+      ],
+      "evaluation": 46307,
+      "events": [
+        [
+          98.75,
+          0,
+          0,
+          46921
+        ]
+      ],
+      "ex_eom": false,
+      "ex_length": 0,
+      "ex_unit": 0,
+      "expected": {
+        "accrued": 0.0,
+        "clean": 92.00251473114189,
+        "dirty": 92.00251473114189,
+        "npv": 1135833.5048631974,
+        "redemption_date": 48134,
+        "settlement": 46307,
+        "settlement_discount": 1.0,
+        "settlement_value": 1135833.5048631974
+      },
+      "face": 1234567.89,
+      "issue": 46304,
+      "kind": "zero",
+      "maturity": 48133,
+      "name": "zero_lag0",
+      "payment_convention": 1,
+      "price_tolerance": 2e-12,
+      "rate": 0.03,
+      "redemption": 107.5,
+      "reference": 46307,
+      "schedule_rule": 0,
+      "settlement_days": 0,
+      "sigma": 0.014,
+      "start": 46304,
+      "steps": 120
+    },
+    {
+      "a": 0.073,
+      "calendar": "target",
+      "coupons": [],
+      "currency_tolerance": 2e-08,
+      "curve_dates": [
+        46307,
+        46672,
+        47768,
+        49594
+      ],
+      "curve_rates": [
+        0.015,
+        0.031,
+        0.024,
+        0.04
+      ],
+      "evaluation": 46307,
+      "events": [
+        [
+          98.75,
+          0,
+          0,
+          46921
+        ]
+      ],
+      "ex_eom": false,
+      "ex_length": 0,
+      "ex_unit": 0,
+      "expected": {
+        "accrued": 0.0,
+        "clean": 92.05762984563346,
+        "dirty": 92.05762984563346,
+        "npv": 1135833.5048631974,
+        "redemption_date": 48134,
+        "settlement": 46321,
+        "settlement_discount": 0.9994012977024935,
+        "settlement_value": 1136513.9383692471
+      },
+      "face": 1234567.89,
+      "issue": 46304,
+      "kind": "zero",
+      "maturity": 48133,
+      "name": "zero_lag10",
+      "payment_convention": 1,
+      "price_tolerance": 2e-12,
+      "rate": 0.03,
+      "redemption": 107.5,
+      "reference": 46307,
+      "schedule_rule": 0,
+      "settlement_days": 10,
+      "sigma": 0.014,
+      "start": 46304,
+      "steps": 120
+    },
+    {
+      "a": 0.073,
+      "calendar": "target",
+      "corrected_filter": true,
+      "coupons": [],
+      "currency_tolerance": 2e-08,
+      "curve_dates": [
+        46307,
+        46672,
+        47768,
+        49594
+      ],
+      "curve_rates": [
+        0.015,
+        0.031,
+        0.024,
+        0.04
+      ],
+      "evaluation": 46307,
+      "events": [
+        [
+          120,
+          0,
+          0,
+          46307
+        ],
+        [
+          95.25,
+          0,
+          1,
+          47160
+        ]
+      ],
+      "ex_eom": false,
+      "ex_length": 0,
+      "ex_unit": 0,
+      "expected": {
+        "accrued": 0.0,
+        "clean": 94.15141769142056,
+        "dirty": 94.15141769142056,
+        "npv": 1162267.0796831609,
+        "redemption_date": 48134,
+        "settlement": 46309,
+        "settlement_discount": 0.9999173312461107,
+        "settlement_value": 1162363.1707980575
+      },
+      "face": 1234567.89,
+      "issue": 46304,
+      "kind": "zero",
+      "maturity": 48133,
+      "name": "zero_filtered_call_put",
+      "payment_convention": 1,
+      "price_tolerance": 2e-12,
+      "rate": 0.03,
+      "redemption": 107.5,
+      "reference": 46307,
+      "schedule_rule": 0,
+      "settlement_days": 2,
+      "sigma": 0.014,
+      "start": 46304,
+      "steps": 120
+    },
+    {
+      "a": 0.073,
+      "calendar": "target",
+      "corrected_filter": true,
+      "coupons": [],
+      "currency_tolerance": 2e-08,
+      "curve_dates": [
+        46307,
+        46672,
+        47768,
+        49594
+      ],
+      "curve_rates": [
+        0.015,
+        0.031,
+        0.024,
+        0.04
+      ],
+      "evaluation": 46307,
+      "events": [
+        [
+          120,
+          0,
+          1,
+          46307
+        ],
+        [
+          98.75,
+          0,
+          0,
+          46921
+        ]
+      ],
+      "ex_eom": false,
+      "ex_length": 0,
+      "ex_unit": 0,
+      "expected": {
+        "accrued": 0.0,
+        "clean": 92.01012109319785,
+        "dirty": 92.01012109319785,
+        "npv": 1135833.5048631974,
+        "redemption_date": 48134,
+        "settlement": 46309,
+        "settlement_discount": 0.9999173312461107,
+        "settlement_value": 1135927.4105667376
+      },
+      "face": 1234567.89,
+      "issue": 46304,
+      "kind": "zero",
+      "maturity": 48133,
+      "name": "zero_filtered_put_call",
+      "payment_convention": 1,
+      "price_tolerance": 2e-12,
+      "rate": 0.03,
+      "redemption": 107.5,
+      "reference": 46307,
+      "schedule_rule": 0,
+      "settlement_days": 2,
+      "sigma": 0.014,
+      "start": 46304,
+      "steps": 120
+    }
+  ],
+  "quantlib_version": "1.43"
+}
