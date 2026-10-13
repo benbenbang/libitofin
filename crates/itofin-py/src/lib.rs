@@ -11,6 +11,7 @@ mod bma;
 mod bonds;
 mod bootstrap;
 mod calibration;
+mod callable_bonds;
 mod capfloor;
 mod capfloorengine;
 mod capfloortermvol;
@@ -364,6 +365,10 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     let instruments = PyModule::new(py, "instruments")?;
     instruments.add_class::<bonds::PyBond>()?;
+    instruments.add_class::<callable_bonds::PyCallabilityType>()?;
+    instruments.add_class::<callable_bonds::PyCallability>()?;
+    instruments.add_class::<callable_bonds::PyCallableFixedRateBond>()?;
+    instruments.add_class::<callable_bonds::PyCallableZeroCouponBond>()?;
     instruments.add_class::<floating_bonds::PyFloatingRateBond>()?;
     instruments.add_class::<bonds::PyFixedRateBond>()?;
     instruments.add_class::<bonds::PyZeroCouponBond>()?;

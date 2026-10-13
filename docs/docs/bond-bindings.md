@@ -4,8 +4,9 @@ Go and Python expose the existing Rust fixed-rate, zero-coupon and floating
 bonds through one shared `Bond` interface. The foundation below covers fixed and
 zero bonds; [floating controls and coupon pricers](floating-rate-bonds.md) build
 on that same base. [Yield and Z-spread analytics](bond-analytics.md) also use
-this interface without an engine. Callable bonds and analytical risk measures
-remain separate work.
+this interface without an engine. [Callable construction](callable-bond-bindings.md)
+also inherits this interface, with explicit distinctions between contractual
+cash-flow analytics and option-adjusted pricing.
 
 ## Python
 
