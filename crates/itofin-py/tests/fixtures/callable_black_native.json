@@ -1,0 +1,571 @@
+{
+  "black": [
+    {
+      "lag": 0,
+      "npv": 1027.777759282764,
+      "put": false,
+      "settlement": 1027.777759282764,
+      "vol": 0.0,
+      "zero": false
+    },
+    {
+      "lag": 0,
+      "npv": 1027.7517903917785,
+      "put": false,
+      "settlement": 1027.7517903917785,
+      "vol": 0.1,
+      "zero": false
+    },
+    {
+      "lag": 0,
+      "npv": 1020.6885811590882,
+      "put": false,
+      "settlement": 1020.6885811590882,
+      "vol": 0.35,
+      "zero": false
+    },
+    {
+      "lag": 3,
+      "npv": 1027.7777592827642,
+      "put": false,
+      "settlement": 1028.1157143712796,
+      "vol": 0.0,
+      "zero": false
+    },
+    {
+      "lag": 3,
+      "npv": 1027.7517903917787,
+      "put": false,
+      "settlement": 1028.089736941173,
+      "vol": 0.1,
+      "zero": false
+    },
+    {
+      "lag": 3,
+      "npv": 1020.6885811590885,
+      "put": false,
+      "settlement": 1021.0242051757368,
+      "vol": 0.35,
+      "zero": false
+    },
+    {
+      "lag": 15,
+      "npv": 1027.777759282764,
+      "put": false,
+      "settlement": 1029.4686463586968,
+      "vol": 0.0,
+      "zero": false
+    },
+    {
+      "lag": 15,
+      "npv": 1027.7517903917785,
+      "put": false,
+      "settlement": 1029.4426347440176,
+      "vol": 0.1,
+      "zero": false
+    },
+    {
+      "lag": 15,
+      "npv": 1020.6885811590882,
+      "put": false,
+      "settlement": 1022.3678052081067,
+      "vol": 0.35,
+      "zero": false
+    },
+    {
+      "lag": 0,
+      "npv": 1065.5229224770223,
+      "put": true,
+      "settlement": 1065.5229224770223,
+      "vol": 0.0,
+      "zero": false
+    },
+    {
+      "lag": 0,
+      "npv": 1065.5488913680076,
+      "put": true,
+      "settlement": 1065.5488913680076,
+      "vol": 0.1,
+      "zero": false
+    },
+    {
+      "lag": 0,
+      "npv": 1072.612100600698,
+      "put": true,
+      "settlement": 1072.612100600698,
+      "vol": 0.35,
+      "zero": false
+    },
+    {
+      "lag": 3,
+      "npv": 1065.5229224770223,
+      "put": true,
+      "settlement": 1065.873288974379,
+      "vol": 0.0,
+      "zero": false
+    },
+    {
+      "lag": 3,
+      "npv": 1065.5488913680076,
+      "put": true,
+      "settlement": 1065.8992664044856,
+      "vol": 0.1,
+      "zero": false
+    },
+    {
+      "lag": 3,
+      "npv": 1072.612100600698,
+      "put": true,
+      "settlement": 1072.964798169922,
+      "vol": 0.35,
+      "zero": false
+    },
+    {
+      "lag": 15,
+      "npv": 1065.5229224770223,
+      "put": true,
+      "settlement": 1067.275907421923,
+      "vol": 0.0,
+      "zero": false
+    },
+    {
+      "lag": 15,
+      "npv": 1065.5488913680076,
+      "put": true,
+      "settlement": 1067.301919036602,
+      "vol": 0.1,
+      "zero": false
+    },
+    {
+      "lag": 15,
+      "npv": 1072.612100600698,
+      "put": true,
+      "settlement": 1074.376748572513,
+      "vol": 0.35,
+      "zero": false
+    },
+    {
+      "lag": 0,
+      "npv": 818.6410340760358,
+      "put": false,
+      "settlement": 818.6410340760358,
+      "vol": 0.0,
+      "zero": true
+    },
+    {
+      "lag": 0,
+      "npv": 818.6410340760352,
+      "put": false,
+      "settlement": 818.6410340760352,
+      "vol": 0.1,
+      "zero": true
+    },
+    {
+      "lag": 0,
+      "npv": 818.2764043131963,
+      "put": false,
+      "settlement": 818.2764043131963,
+      "vol": 0.35,
+      "zero": true
+    },
+    {
+      "lag": 3,
+      "npv": 818.6410340760358,
+      "put": false,
+      "settlement": 818.910220581226,
+      "vol": 0.0,
+      "zero": true
+    },
+    {
+      "lag": 3,
+      "npv": 818.6410340760352,
+      "put": false,
+      "settlement": 818.9102205812254,
+      "vol": 0.1,
+      "zero": true
+    },
+    {
+      "lag": 3,
+      "npv": 818.2764043131963,
+      "put": false,
+      "settlement": 818.5454709204,
+      "vol": 0.35,
+      "zero": true
+    },
+    {
+      "lag": 15,
+      "npv": 818.6410340760358,
+      "put": false,
+      "settlement": 819.9878520353126,
+      "vol": 0.0,
+      "zero": true
+    },
+    {
+      "lag": 15,
+      "npv": 818.6410340760352,
+      "put": false,
+      "settlement": 819.987852035312,
+      "vol": 0.1,
+      "zero": true
+    },
+    {
+      "lag": 15,
+      "npv": 818.2764043131963,
+      "put": false,
+      "settlement": 819.6226223881615,
+      "vol": 0.35,
+      "zero": true
+    },
+    {
+      "lag": 0,
+      "npv": 923.1163463866358,
+      "put": true,
+      "settlement": 923.1163463866358,
+      "vol": 0.0,
+      "zero": true
+    },
+    {
+      "lag": 0,
+      "npv": 923.1163463866363,
+      "put": true,
+      "settlement": 923.1163463866363,
+      "vol": 0.1,
+      "zero": true
+    },
+    {
+      "lag": 0,
+      "npv": 923.4809761494753,
+      "put": true,
+      "settlement": 923.4809761494753,
+      "vol": 0.35,
+      "zero": true
+    },
+    {
+      "lag": 3,
+      "npv": 923.1163463866358,
+      "put": true,
+      "settlement": 923.4198865865822,
+      "vol": 0.0,
+      "zero": true
+    },
+    {
+      "lag": 3,
+      "npv": 923.1163463866363,
+      "put": true,
+      "settlement": 923.4198865865827,
+      "vol": 0.1,
+      "zero": true
+    },
+    {
+      "lag": 3,
+      "npv": 923.4809761494753,
+      "put": true,
+      "settlement": 923.7846362474081,
+      "vol": 0.35,
+      "zero": true
+    },
+    {
+      "lag": 15,
+      "npv": 923.1163463866358,
+      "put": true,
+      "settlement": 924.6350458190661,
+      "vol": 0.0,
+      "zero": true
+    },
+    {
+      "lag": 15,
+      "npv": 923.1163463866363,
+      "put": true,
+      "settlement": 924.6350458190667,
+      "vol": 0.1,
+      "zero": true
+    },
+    {
+      "lag": 15,
+      "npv": 923.4809761494753,
+      "put": true,
+      "settlement": 925.0002754662172,
+      "vol": 0.35,
+      "zero": true
+    }
+  ],
+  "iv": [
+    {
+      "clean": 102.92621460614717,
+      "corrected_clean": 102.92621460614714,
+      "corrected_dirty": 104.14539268833893,
+      "corrected_iv_clean": 0.30000000000000754,
+      "corrected_iv_dirty": 0.30000000000000754,
+      "curve": "flat",
+      "direction": "call",
+      "dirty": 104.14539268833896,
+      "face": 100.0,
+      "lag": 0,
+      "native_iv_clean": 0.3000000000000019,
+      "native_iv_dirty": 0.3000000000000019,
+      "npv": 104.14539268833896,
+      "product": "fixed",
+      "vol": 0.3
+    },
+    {
+      "clean": 103.46117552891837,
+      "corrected_clean": 103.47959578050701,
+      "corrected_dirty": 104.72617112297276,
+      "corrected_iv_clean": 0.12000000000133602,
+      "corrected_iv_dirty": 0.12000000000133602,
+      "curve": "flat",
+      "direction": "call",
+      "dirty": 104.70775087138412,
+      "face": 100.0,
+      "lag": 2,
+      "native_iv_clean": 0.12000000000139546,
+      "native_iv_dirty": 0.12000000000139546,
+      "npv": 104.6876718583072,
+      "product": "fixed",
+      "vol": 0.12
+    },
+    {
+      "clean": 104.7417650670145,
+      "corrected_clean": 104.8047004286743,
+      "corrected_dirty": 106.25675522319484,
+      "corrected_iv_clean": 0.30000000000000243,
+      "corrected_iv_dirty": 0.30000000000000243,
+      "curve": "nonflat",
+      "direction": "call",
+      "dirty": 106.19381986153505,
+      "face": 1234567.89,
+      "lag": 17,
+      "native_iv_clean": 0.3000000000000055,
+      "native_iv_dirty": 0.3000000000000055,
+      "npv": 1310073.721534932,
+      "product": "fixed",
+      "vol": 0.3
+    },
+    {
+      "clean": 102.65694403429441,
+      "corrected_clean": 102.67732214297575,
+      "corrected_dirty": 103.99239063612644,
+      "corrected_iv_clean": 0.6999999999981377,
+      "corrected_iv_dirty": 0.6999999999981377,
+      "curve": "nonflat",
+      "direction": "call",
+      "dirty": 103.9720125274451,
+      "face": 1000.0,
+      "lag": 7,
+      "native_iv_clean": 0.6999999999979841,
+      "native_iv_dirty": 0.6999999999979841,
+      "npv": 1039.4149539731548,
+      "product": "fixed",
+      "vol": 0.7
+    },
+    {
+      "clean": 108.76018615242954,
+      "corrected_clean": 108.76018615242954,
+      "corrected_dirty": 109.97936423462133,
+      "corrected_iv_clean": 0.3000000000000001,
+      "corrected_iv_dirty": 0.3000000000000001,
+      "curve": "flat",
+      "direction": "put",
+      "dirty": 109.97936423462133,
+      "face": 100.0,
+      "lag": 0,
+      "native_iv_clean": 0.3000000000000001,
+      "native_iv_dirty": 0.3000000000000001,
+      "npv": 109.97936423462133,
+      "product": "fixed",
+      "vol": 0.3
+    },
+    {
+      "clean": 108.19281287376933,
+      "corrected_clean": 108.19307941739099,
+      "corrected_dirty": 109.43965475985674,
+      "corrected_iv_clean": 0.12000000000132316,
+      "corrected_iv_dirty": 0.12000000000132316,
+      "curve": "flat",
+      "direction": "put",
+      "dirty": 109.43938821623507,
+      "face": 100.0,
+      "lag": 2,
+      "native_iv_clean": 0.120000000001406,
+      "native_iv_dirty": 0.120000000001406,
+      "npv": 109.41840185286812,
+      "product": "fixed",
+      "vol": 0.12
+    },
+    {
+      "clean": 111.0283168253956,
+      "corrected_clean": 111.03872788049998,
+      "corrected_dirty": 112.49078267502053,
+      "corrected_iv_clean": 0.30000000000000443,
+      "corrected_iv_dirty": 0.30000000000000443,
+      "curve": "nonflat",
+      "direction": "put",
+      "dirty": 112.48037161991616,
+      "face": 1234567.89,
+      "lag": 17,
+      "native_iv_clean": 0.29999999999999616,
+      "native_iv_dirty": 0.29999999999999616,
+      "npv": 1387628.5761249913,
+      "product": "fixed",
+      "vol": 0.3
+    },
+    {
+      "clean": 113.33493545211445,
+      "corrected_clean": 113.34389861925573,
+      "corrected_dirty": 114.65896711240642,
+      "corrected_iv_clean": 0.6999999999981302,
+      "corrected_iv_dirty": 0.6999999999981302,
+      "curve": "nonflat",
+      "direction": "put",
+      "dirty": 114.65000394526514,
+      "face": 1000.0,
+      "lag": 7,
+      "native_iv_clean": 0.6999999999979836,
+      "native_iv_dirty": 0.6999999999979836,
+      "npv": 1146.1635268657824,
+      "product": "fixed",
+      "vol": 0.7
+    },
+    {
+      "clean": 76.90104184226928,
+      "corrected_clean": 76.90104184226928,
+      "corrected_dirty": 76.90104184226928,
+      "corrected_iv_clean": 0.2999999999998954,
+      "corrected_iv_dirty": 0.2999999999998954,
+      "curve": "flat",
+      "direction": "call",
+      "dirty": 76.90104184226928,
+      "face": 100.0,
+      "lag": 0,
+      "native_iv_clean": 0.2999999999998954,
+      "native_iv_dirty": 0.2999999999998954,
+      "npv": 76.90104184226928,
+      "product": "zero",
+      "vol": 0.3
+    },
+    {
+      "clean": 77.75821142469022,
+      "corrected_clean": 77.77207419611995,
+      "corrected_dirty": 77.77207419611995,
+      "corrected_iv_clean": 0.11999999999999315,
+      "corrected_iv_dirty": 0.11999999999999315,
+      "curve": "flat",
+      "direction": "call",
+      "dirty": 77.75821142469022,
+      "face": 100.0,
+      "lag": 2,
+      "native_iv_clean": 0.11999999998194275,
+      "native_iv_dirty": 0.11999999998194275,
+      "npv": 77.74330032086989,
+      "product": "zero",
+      "vol": 0.12
+    },
+    {
+      "clean": 78.54641912119796,
+      "corrected_clean": 78.59101151590923,
+      "corrected_dirty": 78.59101151590923,
+      "corrected_iv_clean": 0.30000000000000093,
+      "corrected_iv_dirty": 0.30000000000000093,
+      "curve": "nonflat",
+      "direction": "call",
+      "dirty": 78.54641912119796,
+      "face": 1234567.89,
+      "lag": 17,
+      "native_iv_clean": 0.30000000000000143,
+      "native_iv_dirty": 0.30000000000000143,
+      "npv": 968998.0052089905,
+      "product": "zero",
+      "vol": 0.3
+    },
+    {
+      "clean": 76.18800282847941,
+      "corrected_clean": 76.20318871284789,
+      "corrected_dirty": 76.20318871284789,
+      "corrected_iv_clean": 0.7000000000000016,
+      "corrected_iv_dirty": 0.7000000000000016,
+      "curve": "nonflat",
+      "direction": "call",
+      "dirty": 76.18800282847941,
+      "face": 1000.0,
+      "lag": 7,
+      "native_iv_clean": 0.6999999999999961,
+      "native_iv_dirty": 0.6999999999999961,
+      "npv": 761.6564066446899,
+      "product": "zero",
+      "vol": 0.7
+    },
+    {
+      "clean": 81.25939506131311,
+      "corrected_clean": 81.25939506131311,
+      "corrected_dirty": 81.25939506131311,
+      "corrected_iv_clean": 0.2999999999998934,
+      "corrected_iv_dirty": 0.2999999999998934,
+      "curve": "flat",
+      "direction": "put",
+      "dirty": 81.25939506131311,
+      "face": 100.0,
+      "lag": 0,
+      "native_iv_clean": 0.2999999999998934,
+      "native_iv_dirty": 0.2999999999998934,
+      "npv": 81.25939506131311,
+      "product": "zero",
+      "vol": 0.3
+    },
+    {
+      "clean": 80.41715456730479,
+      "corrected_clean": 80.41869775479391,
+      "corrected_dirty": 80.41869775479391,
+      "corrected_iv_clean": 0.12000000000000037,
+      "corrected_iv_dirty": 0.12000000000000037,
+      "curve": "flat",
+      "direction": "put",
+      "dirty": 80.41715456730479,
+      "face": 100.0,
+      "lag": 2,
+      "native_iv_clean": 0.11999999998194448,
+      "native_iv_dirty": 0.11999999998194448,
+      "npv": 80.40173357807784,
+      "product": "zero",
+      "vol": 0.12
+    },
+    {
+      "clean": 83.0708526942605,
+      "corrected_clean": 83.08662439750401,
+      "corrected_dirty": 83.08662439750401,
+      "corrected_iv_clean": 0.29999999999999927,
+      "corrected_iv_dirty": 0.29999999999999927,
+      "curve": "nonflat",
+      "direction": "put",
+      "dirty": 83.0708526942605,
+      "face": 1234567.89,
+      "lag": 17,
+      "native_iv_clean": 0.3000000000000024,
+      "native_iv_dirty": 0.3000000000000024,
+      "npv": 1024814.2620931314,
+      "product": "zero",
+      "vol": 0.3
+    },
+    {
+      "clean": 85.3943978824495,
+      "corrected_clean": 85.40335986686607,
+      "corrected_dirty": 85.40335986686607,
+      "corrected_iv_clean": 0.6999999999999997,
+      "corrected_iv_dirty": 0.6999999999999997,
+      "curve": "nonflat",
+      "direction": "put",
+      "dirty": 85.3943978824495,
+      "face": 1000.0,
+      "lag": 7,
+      "native_iv_clean": 0.699999999999998,
+      "native_iv_dirty": 0.699999999999998,
+      "npv": 853.6933352244366,
+      "product": "zero",
+      "vol": 0.7
+    }
+  ],
+  "provenance": {
+    "crates/libitofin/src/pricingengines/bond/black_callable_oracle.csv": "64cf8c09e2984a5a848fd29daf85a9d65ffa937e6d07cf061c05e3fdf6098f59",
+    "crates/libitofin/tests/fixtures/medium6_callable_iv/reference.tsv": "86bdc5af9076435d8d262e5058ed54f09a9d8e913af1098bfdaaf906e1924414"
+  },
+  "quantlib_version": "1.43"
+}

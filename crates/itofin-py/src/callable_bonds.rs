@@ -1,8 +1,10 @@
 //! Retained hard call/put schedules and native callable bond owners.
 
 use crate::bonds::{BondBacking, PyBond, adjust, advance, finite, positive};
+use crate::curve::PyYieldTermStructure;
 use crate::helpers::PyBondPriceType;
 use crate::hullwhite::PyHullWhite;
+use crate::market::PySimpleQuote;
 use crate::settings::PySettings;
 use crate::time::{
     PyBusinessDayConvention, PyCalendar, PyDate, PyDayCounter, PyFrequency, PyPeriod, PySchedule,
@@ -13,7 +15,9 @@ use libitofin::instruments::{
     BondPrice, Callability, CallabilityType, CallableFixedRateBond, CallableZeroCouponBond,
 };
 use libitofin::pricingengine::PricingEngine;
-use libitofin::pricingengines::bond::TreeCallableFixedRateBondEngine;
+use libitofin::pricingengines::bond::{
+    BlackCallableFixedRateBondEngine, TreeCallableFixedRateBondEngine,
+};
 use libitofin::settings::Settings;
 use libitofin::shared::{Shared, SharedMut, shared_mut};
 use libitofin::time::date::Date;
@@ -243,6 +247,43 @@ impl PyCallableFixedRateBond {
             .set_pricing_engine(engine.engine());
         Ok(())
     }
+    /// Attach a retained single-European Black engine sharing this bond's settings.
+    fn set_black_engine(&mut self, engine: &PyBlackCallableFixedRateBondEngine) -> PyResult<()> {
+        if !Shared::ptr_eq(
+            &self.inner.borrow().bond().settings_handle(),
+            &engine.settings,
+        ) {
+            return Err(ItofinError::new_err("bond and engine must share settings"));
+        }
+        self.inner
+            .borrow_mut()
+            .base_mut()
+            .set_pricing_engine(engine.engine());
+        Ok(())
+    }
+    /// Solve relative forward-yield volatility without changing installed pricing state.
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature=(target_price, discount_curve, *, price_type=PyBondPriceType::Clean, accuracy=1e-10, max_evaluations=100, min_vol=0.0, max_vol=1.0))]
+    fn implied_volatility(
+        self_: PyRef<'_, Self>,
+        target_price: f64,
+        discount_curve: &PyYieldTermStructure,
+        price_type: PyBondPriceType,
+        accuracy: f64,
+        max_evaluations: usize,
+        min_vol: f64,
+        max_vol: f64,
+    ) -> PyResult<f64> {
+        self_.as_super().callable_implied_volatility(
+            target_price,
+            discount_curve,
+            price_type,
+            accuracy,
+            max_evaluations,
+            min_vol,
+            max_vol,
+        )
+    }
     fn callability(&self) -> Vec<PyCallability> {
         self.inner
             .borrow()
@@ -322,6 +363,43 @@ impl PyCallableZeroCouponBond {
             .set_pricing_engine(engine.engine());
         Ok(())
     }
+    /// Attach a retained single-European Black engine sharing this bond's settings.
+    fn set_black_engine(&mut self, engine: &PyBlackCallableFixedRateBondEngine) -> PyResult<()> {
+        if !Shared::ptr_eq(
+            &self.inner.borrow().bond().settings_handle(),
+            &engine.settings,
+        ) {
+            return Err(ItofinError::new_err("bond and engine must share settings"));
+        }
+        self.inner
+            .borrow_mut()
+            .base_mut()
+            .set_pricing_engine(engine.engine());
+        Ok(())
+    }
+    /// Solve relative forward-yield volatility without changing installed pricing state.
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature=(target_price, discount_curve, *, price_type=PyBondPriceType::Clean, accuracy=1e-10, max_evaluations=100, min_vol=0.0, max_vol=1.0))]
+    fn implied_volatility(
+        self_: PyRef<'_, Self>,
+        target_price: f64,
+        discount_curve: &PyYieldTermStructure,
+        price_type: PyBondPriceType,
+        accuracy: f64,
+        max_evaluations: usize,
+        min_vol: f64,
+        max_vol: f64,
+    ) -> PyResult<f64> {
+        self_.as_super().callable_implied_volatility(
+            target_price,
+            discount_curve,
+            price_type,
+            accuracy,
+            max_evaluations,
+            min_vol,
+            max_vol,
+        )
+    }
     fn callability(&self) -> Vec<PyCallability> {
         self.inner
             .borrow()
@@ -363,6 +441,43 @@ impl PyTreeCallableFixedRateBondEngine {
     }
 }
 impl PyTreeCallableFixedRateBondEngine {
+    fn engine(&self) -> SharedMut<dyn PricingEngine> {
+        SharedMut::clone(&self.inner) as SharedMut<dyn PricingEngine>
+    }
+}
+
+/// Single-European constant relative forward-yield volatility pricing.
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "BlackCallableFixedRateBondEngine",
+    unsendable,
+    module = "itofin.pricingengines"
+)]
+pub struct PyBlackCallableFixedRateBondEngine {
+    inner: SharedMut<BlackCallableFixedRateBondEngine>,
+    settings: Shared<Settings<Date>>,
+}
+#[gen_stub_pymethods]
+#[pymethods]
+impl PyBlackCallableFixedRateBondEngine {
+    /// Retain the live volatility quote, discount curve and exact settings allocation.
+    #[new]
+    fn new(
+        yield_volatility: &PySimpleQuote,
+        discount_curve: &PyYieldTermStructure,
+        settings: &PySettings,
+    ) -> Self {
+        Self {
+            inner: shared_mut(BlackCallableFixedRateBondEngine::new(
+                yield_volatility.handle(),
+                discount_curve.handle(),
+                settings.inner(),
+            )),
+            settings: settings.inner(),
+        }
+    }
+}
+impl PyBlackCallableFixedRateBondEngine {
     fn engine(&self) -> SharedMut<dyn PricingEngine> {
         SharedMut::clone(&self.inner) as SharedMut<dyn PricingEngine>
     }
@@ -526,5 +641,64 @@ mod tree_tests {
         assert_eq!(notifications.get(), 0);
         assert!(!borrowed.base().is_calculated());
         assert_eq!(notifications.get(), 0);
+    }
+    #[test]
+    fn black_live_relink_reset_replacement_and_weak_graph_release() {
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(reference());
+        let quote = shared(SimpleQuote::new(0.3));
+        let weak_quote = Shared::downgrade(&quote);
+        let curve = RelinkableHandle::new(flat(0.03));
+        let original = PyBlackCallableFixedRateBondEngine {
+            inner: shared_mut(BlackCallableFixedRateBondEngine::new(
+                Handle::new(quote.clone() as Shared<dyn Quote>),
+                curve.handle(),
+                settings.clone(),
+            )),
+            settings: settings.clone(),
+        };
+        let weak_engine = SharedMut::downgrade(&original.inner);
+        let mut bond = product(settings.clone());
+        bond.set_black_engine(&original).unwrap();
+        let first = bond.inner.borrow_mut().npv().unwrap();
+        curve.link_to(flat(0.04));
+        assert!(!bond.inner.borrow().bond().base().is_calculated());
+        assert_ne!(bond.inner.borrow_mut().npv().unwrap(), first);
+        curve.reset();
+        assert!(bond.inner.borrow_mut().npv().is_err());
+        curve.link_to(flat(0.03));
+        assert!((bond.inner.borrow_mut().npv().unwrap() - first).abs() < 1e-8);
+        let wrong = PyBlackCallableFixedRateBondEngine {
+            inner: shared_mut(BlackCallableFixedRateBondEngine::new(
+                Handle::new(quote.clone() as Shared<dyn Quote>),
+                curve.handle(),
+                shared(Settings::new()),
+            )),
+            settings: shared(Settings::new()),
+        };
+        settings.set_include_reference_date_events(true);
+        assert!(bond.set_black_engine(&wrong).is_err());
+        assert!(bond.inner.borrow().bond().base().is_calculated());
+        assert!(SharedMut::ptr_eq(
+            bond.inner.borrow().bond().base().pricing_engine().unwrap(),
+            &original.engine()
+        ));
+        let replacement = engine(
+            HullWhite::new(Handle::new(flat(0.05)), 0.1, 0.01).unwrap(),
+            settings,
+        );
+        bond.set_tree_engine(&replacement).unwrap();
+        let tree_value = bond.inner.borrow_mut().npv().unwrap();
+        quote.set_value(0.8);
+        curve.reset();
+        assert!(bond.inner.borrow().bond().base().is_calculated());
+        assert_eq!(bond.inner.borrow_mut().npv().unwrap(), tree_value);
+        drop(wrong);
+        drop(original);
+        drop(quote);
+        assert!(weak_engine.upgrade().is_none());
+        assert!(weak_quote.upgrade().is_none());
+        drop(bond);
+        drop(replacement);
     }
 }

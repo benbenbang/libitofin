@@ -118,7 +118,8 @@ unchanged.
 The generic `DiscountingBondEngine` is the wrong engine contract for either
 callable product. `Bond.set_engine` / `Bond.SetEngine` reject it before mutating
 attachment or cache state. Use the additive `set_tree_engine` / `SetTreeEngine`
-methods for the typed callable tree engine. Existing base signatures are unchanged.
+methods for the typed callable tree engine, or `set_black_engine` / `SetBlackEngine`
+for the typed single-European Black engine. Existing base signatures are unchanged.
 
 ## Hull-White tree engine
 
@@ -154,6 +155,99 @@ concrete callable products expose `SetTreeEngine`.
 This is the existing Hull-White tree engine only. No generic/G2 model, alternate
 model-fitting curve, public continuous-spread pricing shortcut or new model
 calibration/mutation API is added.
+
+## Single-European Black engine and pure IV
+
+`BlackCallableFixedRateBondEngine(yield_volatility, discount_curve, settings)`
+retains the actual live `SimpleQuote`, `YieldTermStructure` and Settings graph.
+Both concrete products add `set_black_engine(engine)` without widening the base
+`set_engine` or changing `set_tree_engine`. Exact Settings allocation equality
+is checked before attachment. Constructor and attachment do not price eagerly.
+
+```python
+from itofin.pricingengines import BlackCallableFixedRateBondEngine
+from itofin.quotes import SimpleQuote
+
+relative_yield_volatility = SimpleQuote(0.30)
+black_engine = BlackCallableFixedRateBondEngine(relative_yield_volatility, curve, settings)
+fixed.set_black_engine(black_engine)
+target = fixed.clean_price()
+print(fixed.implied_volatility(target, curve))
+```
+
+- Volatility is **relative forward compounded-yield volatility**, not absolute
+  yield volatility, Hull-White sigma, price volatility or an option-vol surface.
+  Modified duration converts it to forward price volatility. The volatility clock
+  is Actual/365 Fixed from evaluation, not the discount curve reference date.
+- Actual Black use requires **one original and one still-active hard right**.
+  Two supplied rights with one remaining still reject. Empty, past,
+  settlement-day or redemption-date rights reject while the bond is unexpired.
+  Whole-instrument expired quotes may return native zero before these checks;
+  IV always rejects expiry. This is not a multiple-exercise approximation.
+- Once/NoFrequency payment conventions use Annual compounded forward yield
+  internally without adding common facade enum constants.
+- Clean strikes include indenture accrued, including full ex-coupon coupon
+  entitlement where required. Settlement-date coupon ownership and exercise-date
+  yield ownership are distinct. Corrected forward units include the settlement
+  discount factor absent from raw QuantLib 1.43 positive-lag Black prices.
+- Exact zero forward yield produces intrinsic option pricing. Tiny nonzero yields
+  are not epsilon-clamped: negative forward yield with positive relative vol
+  rejects, while zero vol retains native intrinsic/signed-zero behavior.
+- Live volatility/curve quotes and evaluation changes invalidate the same cache.
+  Freeze, unfreeze, recalculate and expiry retain native behavior. Black-to-Black,
+  tree-to-Black and Black-to-tree replacement detach former input notifications.
+  Releasing Python wrappers does not release dependencies still held natively.
+
+Both callable products expose:
+
+```python
+bond.implied_volatility(
+    target_price, discount_curve, price_type=BondPriceType.Clean,
+    accuracy=1e-10, max_evaluations=100, min_vol=0.0, max_vol=1.0,
+)
+```
+
+| IV input | Contract |
+| --- | --- |
+| Target | Clean default or Dirty, per 100 settlement quote |
+| Explicit curve | May differ from installed engine's curve |
+| Accuracy | Finite and positive |
+| Maximum evaluations | Positive, strict actual Black pricing-probe budget |
+| Bracket | Finite `0 <= min_vol < max_vol` |
+| Lower/upper endpoint | Lower may need one probe; upper generally needs two |
+
+A negative clean target is valid when adding settlement accrued gives finite
+nonnegative dirty price. Dirty negative, nonfinite targets, unsupported rights,
+expiry, failed curves, exhausted budgets or targets outside the bracket report
+errors, never a clamped root. A near-intrinsic or exact-zero-yield price may not
+uniquely identify the original quoted volatility: the returned root is a bracketed
+repricing solution, not a promise to recover an unidentifiable input. There is no
+guess or settlement override input.
+
+The original Black price matrix's six zero-coupon Call/Put cases with strike100,
+volatility0.1 and settlement lags0/3/15 are specifically near-intrinsic at floating
+price precision. Their independent prices are retained; IV is qualified by
+bracket, repricing and unchanged-state contracts rather than an unknowable
+original-volatility assertion. Separate strike85 counterparts and all16 historical
+IV cases retain the strict `2e-8` known-volatility tolerance. This qualification
+is not a blanket relaxation of IV checks or pricing tolerances.
+
+IV reads the actual immutable callable and performs only checked default
+settlement preflight. It does not require, attach, prepare or refresh an installed
+engine, consume pending policy flags, calculate/unfreeze the bond or mutate
+cached prices, engine arguments/results, original quote or observer registrations.
+The same purity holds with no engine, cached/frozen tree or Black, on success
+and failure. Stateless inherited straight-cashflow analytics remain unchanged.
+
+Go uses `Session.NewBlackCallableFixedRateBondEngine(yieldVolatility,
+discountCurve, settings)`, concrete `SetBlackEngine` and
+`ImpliedVolatility(targetPrice, discountCurve, options)`.
+`CallableImpliedVolatilityOptions` has `PriceType` and optional pointer controls
+`Accuracy`, `MaxEvaluations`, `MinVol`, `MaxVol` with the same defaults. C exposes
+`itofin_black_callable_bond_engine_new`,
+`itofin_callable_bond_set_black_engine` and
+`itofin_callable_bond_implied_volatility`; optional control presence bits are
+1, 2, 4 and 8 respectively. Existing session/thread/output contracts apply.
 
 ## Scope and evidence
 
