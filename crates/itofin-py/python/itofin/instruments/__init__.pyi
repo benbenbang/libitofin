@@ -17,6 +17,10 @@ __all__ = [
     "BMASwap",
     "BermudanExercise",
     "Bond",
+    "Callability",
+    "CallabilityType",
+    "CallableFixedRateBond",
+    "CallableZeroCouponBond",
     "CapFloor",
     "CapFloorType",
     "CreditDefaultSwap",
@@ -183,6 +187,36 @@ class Bond:
         """
     def unfreeze(self) -> None: ...
     def recalculate(self) -> None: ...
+
+@typing.final
+class Callability:
+    r"""
+    Immutable hard exercise right with a clean or dirty per-100 price.
+    """
+    def __new__(cls, price: builtins.float, call_type: CallabilityType, date: time.Date, price_type: termstructures.BondPriceType = termstructures.BondPriceType.Clean) -> Callability: ...
+    def price(self) -> builtins.float: ...
+    def price_type(self) -> termstructures.BondPriceType: ...
+    def call_type(self) -> CallabilityType: ...
+    def date(self) -> time.Date: ...
+
+@typing.final
+class CallableFixedRateBond(Bond):
+    r"""
+    Callable fixed bond sharing its actual native lazy base with Bond methods.
+    """
+    def __new__(cls, settlement_days: builtins.int, face_amount: builtins.float, schedule: time.Schedule, coupons: typing.Sequence[builtins.float], accrual_day_counter: time.DayCounter, callability: typing.Sequence[Callability], settings: itofin.Settings, *, payment_convention: time.BusinessDayConvention = time.BusinessDayConvention.Following, redemption: builtins.float = 100.0, issue_date: typing.Optional[time.Date] = None, ex_coupon_period: typing.Optional[time.Period] = None, ex_coupon_calendar: typing.Optional[time.Calendar] = None, ex_coupon_convention: time.BusinessDayConvention = time.BusinessDayConvention.Unadjusted, ex_coupon_end_of_month: builtins.bool = False) -> CallableFixedRateBond: ...
+    def callability(self) -> builtins.list[Callability]: ...
+    def frequency(self) -> time.Frequency: ...
+    def day_counter(self) -> time.DayCounter: ...
+
+@typing.final
+class CallableZeroCouponBond(Bond):
+    r"""
+    Callable single-redemption bond retaining its native day counter and base.
+    """
+    def __new__(cls, settlement_days: builtins.int, calendar: time.Calendar, face_amount: builtins.float, maturity_date: time.Date, day_counter: time.DayCounter, callability: typing.Sequence[Callability], settings: itofin.Settings, *, payment_convention: time.BusinessDayConvention = time.BusinessDayConvention.Following, redemption: builtins.float = 100.0, issue_date: typing.Optional[time.Date] = None) -> CallableZeroCouponBond: ...
+    def callability(self) -> builtins.list[Callability]: ...
+    def day_counter(self) -> time.DayCounter: ...
 
 @typing.final
 class CapFloor:
@@ -2506,6 +2540,17 @@ class ZeroCouponInflationSwap:
         Returns:
             Date: The same date as obs_date.
         """
+
+@typing.final
+class CallabilityType:
+    r"""
+    Issuer redemption right or holder sale right.
+    """
+    Call: typing.ClassVar[CallabilityType]
+    Put: typing.ClassVar[CallabilityType]
+    def __new__(cls, _unconstructible: typing.NoReturn) -> CallabilityType: ...
+    def __int__(self) -> builtins.int: ...
+    __hash__: typing.ClassVar[None]  # type: ignore[assignment]
 
 @typing.final
 class CapFloorType:

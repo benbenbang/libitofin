@@ -12,7 +12,9 @@ use crate::{ItofinError, PyQlError};
 use libitofin::cashflows::CashFlows;
 use libitofin::handle::Handle;
 use libitofin::instrument::Instrument;
-use libitofin::instruments::{Bond, BondPrice, FixedRateBond, ZeroCouponBond};
+use libitofin::instruments::{
+    Bond, BondPrice, CallableFixedRateBond, CallableZeroCouponBond, FixedRateBond, ZeroCouponBond,
+};
 use libitofin::pricingengine::PricingEngine;
 use libitofin::pricingengines::bond::{BondFunctions, DiscountingBondEngine};
 use libitofin::settings::Settings;
@@ -25,7 +27,7 @@ use libitofin::time::timeunit::TimeUnit;
 use pyo3::prelude::*;
 use pyo3_stub_gen::derive::{gen_methods_from_python, gen_stub_pyclass, gen_stub_pymethods};
 use pyo3_stub_gen::inventory::submit;
-use std::cell::Cell;
+use std::cell::{Cell, Ref};
 
 pub(crate) fn finite(value: f64) -> PyResult<f64> {
     if value.is_finite() {
@@ -189,11 +191,70 @@ pub(crate) fn advance(
     adjust(calendar, shifted, convention)
 }
 
+pub(crate) enum BondBacking {
+    Plain(SharedMut<Bond>),
+    CallableFixed(SharedMut<CallableFixedRateBond>),
+    CallableZero(SharedMut<CallableZeroCouponBond>),
+}
+impl BondBacking {
+    fn borrow(&self) -> Ref<'_, Bond> {
+        match self {
+            Self::Plain(bond) => bond.borrow(),
+            Self::CallableFixed(bond) => Ref::map(bond.borrow(), |bond| bond.bond()),
+            Self::CallableZero(bond) => Ref::map(bond.borrow(), |bond| bond.bond()),
+        }
+    }
+    fn instrument(&self) -> Ref<'_, dyn Instrument> {
+        match self {
+            Self::Plain(bond) => Ref::map(bond.borrow(), |bond| bond as &dyn Instrument),
+            Self::CallableFixed(bond) => Ref::map(bond.borrow(), |bond| bond as &dyn Instrument),
+            Self::CallableZero(bond) => Ref::map(bond.borrow(), |bond| bond as &dyn Instrument),
+        }
+    }
+    fn with_mut<T>(&self, operation: impl FnOnce(&mut dyn Instrument) -> T) -> T {
+        match self {
+            Self::Plain(bond) => operation(&mut *bond.borrow_mut()),
+            Self::CallableFixed(bond) => operation(&mut *bond.borrow_mut()),
+            Self::CallableZero(bond) => operation(&mut *bond.borrow_mut()),
+        }
+    }
+    fn settlement_value(&self) -> PyResult<f64> {
+        Ok(match self {
+            Self::Plain(bond) => bond.borrow_mut().settlement_value(),
+            Self::CallableFixed(bond) => bond.borrow_mut().settlement_value(),
+            Self::CallableZero(bond) => bond.borrow_mut().settlement_value(),
+        }
+        .map_err(PyQlError::from)?)
+    }
+    fn callable_price(&self, clean: bool) -> PyResult<f64> {
+        let value = match self {
+            Self::Plain(_) => return Err(ItofinError::new_err("callable bond required")),
+            Self::CallableFixed(bond) => {
+                let mut bond = bond.borrow_mut();
+                if clean {
+                    bond.clean_price()
+                } else {
+                    bond.dirty_price()
+                }
+            }
+            Self::CallableZero(bond) => {
+                let mut bond = bond.borrow_mut();
+                if clean {
+                    bond.clean_price()
+                } else {
+                    bond.dirty_price()
+                }
+            }
+        };
+        finite(value.map_err(PyQlError::from)?)
+    }
+}
+
 /// Shared bond interface, constructed only through concrete bond classes.
 #[gen_stub_pyclass]
 #[pyclass(name = "Bond", subclass, unsendable, module = "itofin.instruments")]
 pub struct PyBond {
-    inner: SharedMut<Bond>,
+    inner: BondBacking,
     calendar: PyCalendar,
     flags: (bool, Option<bool>, Option<bool>),
     guard: Option<CashFlowGuard>,
@@ -202,13 +263,18 @@ pub struct PyBond {
 }
 impl PyBond {
     pub(crate) fn from_inner(inner: Bond, calendar: PyCalendar) -> Self {
+        Self::from_backing(BondBacking::Plain(shared_mut(inner)), calendar)
+    }
+    pub(crate) fn from_backing(inner: BondBacking, calendar: PyCalendar) -> Self {
+        let bond = inner.borrow();
         let flags = (
-            inner.settings().include_reference_date_events(),
-            inner.settings().include_todays_cash_flows(),
+            bond.settings().include_reference_date_events(),
+            bond.settings().include_todays_cash_flows(),
             None,
         );
+        drop(bond);
         Self {
-            inner: shared_mut(inner),
+            inner,
             calendar,
             flags,
             guard: None,
@@ -288,7 +354,19 @@ impl PyBond {
             )
         };
         if flags != self.flags {
-            self.inner.borrow().base().observer().borrow_mut().update();
+            match &self.inner {
+                BondBacking::CallableZero(_) => {
+                    self.inner.instrument().base();
+                }
+                BondBacking::Plain(_) | BondBacking::CallableFixed(_) => {
+                    self.inner
+                        .instrument()
+                        .base()
+                        .observer()
+                        .borrow_mut()
+                        .update();
+                }
+            }
             self.flags = flags;
         }
         if let (Some(guard), Some((curve, include))) = (&self.guard, &self.engine_inputs) {
@@ -344,14 +422,20 @@ impl PyBond {
     }
     /// Attach an engine sharing this bond's settings. Dependencies remain live.
     fn set_engine(&mut self, engine: &PyDiscountingBondEngine) -> PyResult<()> {
+        if !matches!(self.inner, BondBacking::Plain(_)) {
+            return Err(ItofinError::new_err(
+                "discounting engine requires a noncallable bond",
+            ));
+        }
         if !Shared::ptr_eq(&self.inner.borrow().settings_handle(), &engine.settings) {
             return Err(ItofinError::new_err("bond and engine must share settings"));
         }
         self.engine_inputs = Some((engine.curve.clone(), engine.include));
-        self.inner
-            .borrow_mut()
-            .base_mut()
-            .set_pricing_engine(SharedMut::clone(&engine.inner) as SharedMut<dyn PricingEngine>);
+        self.inner.with_mut(|bond| {
+            bond.base_mut().set_pricing_engine(
+                SharedMut::clone(&engine.inner) as SharedMut<dyn PricingEngine>,
+            );
+        });
         Ok(())
     }
     /// Clean analytical quote per 100 using an explicit discount curve.
@@ -555,20 +639,23 @@ impl PyBond {
     /// Present value in currency units, discounted to the curve reference date.
     fn npv(&mut self) -> PyResult<f64> {
         self.prepare(false)?;
-        finite(self.inner.borrow_mut().npv().map_err(PyQlError::from)?)
+        finite(
+            self.inner
+                .with_mut(|bond| bond.npv())
+                .map_err(PyQlError::from)?,
+        )
     }
     /// Dirty currency value at settlement; the today-flow flag can override exclusion.
     fn settlement_value(&mut self) -> PyResult<f64> {
         self.prepare(false)?;
-        finite(
-            self.inner
-                .borrow_mut()
-                .settlement_value()
-                .map_err(PyQlError::from)?,
-        )
+        finite(self.inner.settlement_value()?)
     }
     /// Settlement price per 100 of current notional.
     fn dirty_price(&mut self) -> PyResult<f64> {
+        if !matches!(self.inner, BondBacking::Plain(_)) {
+            self.prepare(false)?;
+            return self.inner.callable_price(false);
+        }
         let settlement = self.settlement_date(None)?.inner();
         let notional = self
             .inner
@@ -579,11 +666,7 @@ impl PyBond {
             return Ok(0.0);
         }
         self.prepare(false)?;
-        let value = self
-            .inner
-            .borrow_mut()
-            .settlement_value()
-            .map_err(PyQlError::from)?;
+        let value = self.inner.settlement_value()?;
         let scaled = value * 100.0;
         finite(if scaled.is_finite() {
             scaled / notional
@@ -593,6 +676,10 @@ impl PyBond {
     }
     /// Dirty quote less accrued interest, per 100 of current notional.
     fn clean_price(&mut self) -> PyResult<f64> {
+        if !matches!(self.inner, BondBacking::Plain(_)) {
+            self.prepare(false)?;
+            return self.inner.callable_price(true);
+        }
         finite(self.dirty_price()? - self.accrued_amount(None)?)
     }
     /// Accrued interest per 100; omitted date uses settlement.
@@ -681,25 +768,28 @@ impl PyBond {
         PyLeg::with_guard(self.inner.borrow().redemptions().clone(), guard)
     }
     fn is_expired(&self) -> PyResult<bool> {
-        Ok(self.inner.borrow().is_expired().map_err(PyQlError::from)?)
+        Ok(self
+            .inner
+            .instrument()
+            .is_expired()
+            .map_err(PyQlError::from)?)
     }
     fn is_calculated(&self) -> bool {
-        self.inner.borrow().base().is_calculated()
+        self.inner.instrument().base().is_calculated()
     }
     /// Pin cached results while unexpired; native expiry can still bypass freeze.
     fn freeze(&self) {
         self.frozen.set(true);
-        self.inner.borrow_mut().base_mut().freeze();
+        self.inner.with_mut(|bond| bond.base_mut().freeze());
     }
     fn unfreeze(&self) {
         self.frozen.set(false);
-        self.inner.borrow_mut().base_mut().unfreeze();
+        self.inner.with_mut(|bond| bond.base_mut().unfreeze());
     }
     fn recalculate(&mut self) -> PyResult<()> {
         self.prepare(true)?;
         self.inner
-            .borrow_mut()
-            .recalculate()
+            .with_mut(|bond| bond.recalculate())
             .map_err(PyQlError::from)?;
         Ok(())
     }
@@ -1019,5 +1109,217 @@ mod analytics_tests {
         assert_eq!(bond.flags, old_flags);
         assert!(bond.frozen.get());
         assert!(!bond.inner.borrow().base().is_calculated());
+    }
+}
+
+#[cfg(test)]
+mod callable_tests {
+    use super::*;
+    use libitofin::errors::QlResult;
+    use libitofin::instruments::{
+        BondResults, Callability, CallabilityType, CallableBondArguments,
+    };
+    use libitofin::patterns::observable::{AsObservable, Observable, Observer};
+    use libitofin::pricingengine::{Arguments, GenericEngine, Results};
+    use libitofin::shared::shared;
+    use libitofin::time::calendars::NullCalendar;
+    use libitofin::time::date::Month;
+    use libitofin::time::daycounters::actual360::Actual360;
+    use libitofin::time::frequency::Frequency;
+    use libitofin::time::schedule::MakeSchedule;
+
+    struct CountingEngine {
+        base: GenericEngine<CallableBondArguments, BondResults>,
+        calls: Shared<Cell<usize>>,
+    }
+    impl AsObservable for CountingEngine {
+        fn observable(&self) -> &Observable {
+            self.base.observable()
+        }
+    }
+    impl PricingEngine for CountingEngine {
+        fn arguments_mut(&mut self) -> &mut dyn Arguments {
+            self.base.arguments_mut()
+        }
+        fn results(&self) -> &dyn Results {
+            self.base.results()
+        }
+        fn reset(&mut self) {
+            self.base.reset();
+        }
+        fn calculate(&mut self) -> QlResult<()> {
+            let args = self.base.arguments();
+            assert_eq!(args.callability_types, vec![CallabilityType::Put]);
+            assert_eq!(args.callability_prices, vec![97.0]);
+            assert_eq!(args.face_amount, 250.0);
+            self.calls.set(self.calls.get() + 1);
+            let result = self.base.results_mut();
+            result.instrument.value = Some(200.0 + self.calls.get() as f64);
+            result.settlement_value = Some(210.0 + self.calls.get() as f64);
+            Ok(())
+        }
+    }
+    struct Notifications(Shared<Cell<usize>>);
+    impl Observer for Notifications {
+        fn update(&mut self) {
+            self.0.set(self.0.get() + 1);
+        }
+    }
+    fn retained(zero: bool, settings: Shared<Settings<Date>>) -> PyBond {
+        let calendar = PyCalendar::from_inner(NullCalendar::new());
+        let maturity = Date::new(1, Month::January, 2028);
+        let event = Callability::new(
+            BondPrice::Dirty(97.0),
+            CallabilityType::Put,
+            Date::new(1, Month::January, 2027),
+        )
+        .unwrap();
+        let backing = if zero {
+            BondBacking::CallableZero(shared_mut(
+                CallableZeroCouponBond::new(
+                    0,
+                    250.0,
+                    calendar.inner(),
+                    maturity,
+                    Actual360::new(),
+                    Bdc::Unadjusted,
+                    100.0,
+                    None,
+                    vec![event],
+                    settings,
+                )
+                .unwrap(),
+            ))
+        } else {
+            let schedule = MakeSchedule::new()
+                .from(Date::new(1, Month::January, 2026))
+                .to(maturity)
+                .with_frequency(Frequency::Annual)
+                .with_calendar(calendar.inner())
+                .with_convention(Bdc::Unadjusted)
+                .build();
+            BondBacking::CallableFixed(shared_mut(
+                CallableFixedRateBond::new(
+                    0,
+                    250.0,
+                    schedule,
+                    vec![0.04],
+                    Actual360::new(),
+                    Bdc::Unadjusted,
+                    100.0,
+                    None,
+                    vec![event],
+                    settings,
+                )
+                .unwrap(),
+            ))
+        };
+        PyBond::from_backing(backing, calendar)
+    }
+    #[test]
+    fn typed_callable_dispatch_reuses_single_engine_arguments_results_and_cache() {
+        for zero in [false, true] {
+            let settings = shared(Settings::new());
+            settings.set_evaluation_date(Date::new(1, Month::February, 2026));
+            let mut bond = retained(zero, Shared::clone(&settings));
+            let calls = shared(Cell::new(0));
+            let engine = shared_mut(CountingEngine {
+                base: GenericEngine::new(CallableBondArguments::default(), BondResults::default()),
+                calls: Shared::clone(&calls),
+            });
+            bond.inner
+                .with_mut(|bond| bond.base_mut().set_pricing_engine(engine));
+            assert!(!bond.is_calculated());
+            assert_eq!(bond.npv().unwrap(), 201.0);
+            assert_eq!(bond.settlement_value().unwrap(), 211.0);
+            assert_eq!(bond.dirty_price().unwrap(), (211.0 / 250.0) * 100.0);
+            assert_eq!(calls.get(), 1);
+            assert!(bond.is_calculated());
+            let curve: Shared<dyn YieldTermStructure> =
+                shared(libitofin::termstructures::yields::FlatForward::with_rate(
+                    Date::new(1, Month::February, 2026),
+                    0.03,
+                    Actual360::new(),
+                    libitofin::interestrate::Compounding::Continuous,
+                    Frequency::Annual,
+                ));
+            let curve = Handle::new(curve);
+            let wrong = PyDiscountingBondEngine {
+                inner: shared_mut(DiscountingBondEngine::new(
+                    curve.clone(),
+                    None,
+                    Shared::clone(&settings),
+                )),
+                settings: Shared::clone(&settings),
+                curve,
+                include: None,
+            };
+            assert!(bond.set_engine(&wrong).is_err());
+            assert!(bond.engine_inputs.is_none());
+            assert!(bond.is_calculated());
+            assert_eq!(bond.npv().unwrap(), 201.0);
+            assert_eq!(calls.get(), 1);
+            bond.freeze();
+            bond.inner
+                .instrument()
+                .base()
+                .observer()
+                .borrow_mut()
+                .update();
+            assert_eq!(bond.npv().unwrap(), 201.0);
+            bond.recalculate().unwrap();
+            assert_eq!(bond.npv().unwrap(), 202.0);
+            assert_eq!(calls.get(), 2);
+            assert!(bond.frozen.get());
+            let cached = bond.npv().unwrap();
+            let flags = bond.flags;
+            settings.set_include_reference_date_events(true);
+            let dc = PyDayCounter::from_inner(Actual360::new());
+            let settlement = PyDate::from_inner(Date::new(1, Month::March, 2026));
+            assert!(
+                bond.clean_price_from_yield(
+                    0.03,
+                    &dc,
+                    PyCompounding::Continuous,
+                    &PyFrequency::Annual,
+                    Some(&settlement)
+                )
+                .unwrap()
+                    > 0.0
+            );
+            assert_eq!(bond.flags, flags);
+            assert_eq!(bond.npv().unwrap(), cached);
+            assert_eq!(calls.get(), 2);
+            bond.unfreeze();
+            assert_eq!(bond.npv().unwrap(), 203.0);
+            settings.set_evaluation_date(Date::new(2, Month::January, 2028));
+            bond.freeze();
+            assert_eq!(bond.npv().unwrap(), 0.0);
+            assert_eq!(bond.settlement_value().unwrap(), 0.0);
+            assert_eq!(bond.dirty_price().unwrap(), 0.0);
+            assert_eq!(calls.get(), 3);
+        }
+    }
+    #[test]
+    fn callable_zero_typed_base_refreshes_silent_flags_without_wrapper_notification() {
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(Date::new(2, Month::January, 2028));
+        let mut bond = retained(true, Shared::clone(&settings));
+        assert_eq!(bond.npv().unwrap(), 0.0);
+        assert!(bond.is_calculated());
+        let notifications = shared(Cell::new(0));
+        let observer =
+            shared_mut(Notifications(Shared::clone(&notifications))) as SharedMut<dyn Observer>;
+        bond.inner.instrument().base().register_observer(&observer);
+        bond.freeze();
+        settings.set_include_reference_date_events(true);
+        assert!(!bond.is_calculated());
+        assert!(bond.frozen.get());
+        assert_eq!(bond.npv().unwrap(), 0.0);
+        assert!(bond.is_calculated());
+        assert_eq!(notifications.get(), 0);
+        assert!(
+            Callability::new(BondPrice::Clean(100.0), CallabilityType::Call, Date::null()).is_err()
+        );
     }
 }

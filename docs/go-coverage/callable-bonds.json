@@ -1,0 +1,264 @@
+{
+  "domain": "callable-bond-foundation",
+  "entries": [
+    {
+      "c": [
+        "itofin_callability_new"
+      ],
+      "go": [
+        "NewCallability"
+      ],
+      "python": "itofin.instruments.Callability",
+      "status": "implemented",
+      "tests": [
+        "TestCallableBondFoundationQuantLibOracleAndLifetime",
+        "TestCallableBondFoundationValidationAndSessions"
+      ]
+    },
+    {
+      "c": [
+        "itofin_callability_new"
+      ],
+      "go": [
+        "NewCallability"
+      ],
+      "python": "itofin.instruments.Callability.__new__",
+      "status": "implemented",
+      "tests": [
+        "TestCallableBondFoundationQuantLibOracleAndLifetime",
+        "TestCallableBondFoundationValidationAndSessions"
+      ]
+    },
+    {
+      "c": [
+        "itofin_callability_new"
+      ],
+      "go": [
+        "Callability.Price"
+      ],
+      "python": "itofin.instruments.Callability.price",
+      "status": "implemented",
+      "tests": [
+        "TestCallableBondFoundationQuantLibOracleAndLifetime",
+        "TestCallableBondFoundationValidationAndSessions"
+      ]
+    },
+    {
+      "c": [
+        "itofin_callability_new"
+      ],
+      "go": [
+        "Callability.PriceType"
+      ],
+      "python": "itofin.instruments.Callability.price_type",
+      "status": "implemented",
+      "tests": [
+        "TestCallableBondFoundationQuantLibOracleAndLifetime",
+        "TestCallableBondFoundationValidationAndSessions"
+      ]
+    },
+    {
+      "c": [
+        "itofin_callability_new"
+      ],
+      "go": [
+        "Callability.Type"
+      ],
+      "python": "itofin.instruments.Callability.call_type",
+      "status": "implemented",
+      "tests": [
+        "TestCallableBondFoundationQuantLibOracleAndLifetime",
+        "TestCallableBondFoundationValidationAndSessions"
+      ]
+    },
+    {
+      "c": [
+        "itofin_callability_new"
+      ],
+      "go": [
+        "Callability.Date"
+      ],
+      "python": "itofin.instruments.Callability.date",
+      "status": "implemented",
+      "tests": [
+        "TestCallableBondFoundationQuantLibOracleAndLifetime",
+        "TestCallableBondFoundationValidationAndSessions"
+      ]
+    },
+    {
+      "c": [
+        "itofin_callable_fixed_rate_bond_new"
+      ],
+      "go": [
+        "Session.NewCallableFixedRateBond"
+      ],
+      "python": "itofin.instruments.CallableFixedRateBond",
+      "status": "implemented",
+      "tests": [
+        "TestCallableBondFoundationQuantLibOracleAndLifetime",
+        "TestCallableBondFoundationValidationAndSessions"
+      ]
+    },
+    {
+      "c": [
+        "itofin_callable_fixed_rate_bond_new"
+      ],
+      "go": [
+        "Session.NewCallableFixedRateBond"
+      ],
+      "python": "itofin.instruments.CallableFixedRateBond.__new__",
+      "status": "implemented",
+      "tests": [
+        "TestCallableBondFoundationQuantLibOracleAndLifetime",
+        "TestCallableBondFoundationValidationAndSessions"
+      ]
+    },
+    {
+      "c": [
+        "itofin_callable_bond_callability"
+      ],
+      "go": [
+        "CallableFixedRateBond.Callability"
+      ],
+      "python": "itofin.instruments.CallableFixedRateBond.callability",
+      "status": "implemented",
+      "tests": [
+        "TestCallableBondFoundationQuantLibOracleAndLifetime",
+        "TestCallableBondFoundationValidationAndSessions"
+      ]
+    },
+    {
+      "c": [
+        "itofin_bond_handle"
+      ],
+      "go": [
+        "CallableFixedRateBond.DayCounter"
+      ],
+      "python": "itofin.instruments.CallableFixedRateBond.day_counter",
+      "status": "implemented",
+      "tests": [
+        "TestCallableBondFoundationQuantLibOracleAndLifetime",
+        "TestCallableBondFoundationValidationAndSessions"
+      ]
+    },
+    {
+      "c": [
+        "itofin_callable_zero_coupon_bond_new"
+      ],
+      "go": [
+        "Session.NewCallableZeroCouponBond"
+      ],
+      "python": "itofin.instruments.CallableZeroCouponBond",
+      "status": "implemented",
+      "tests": [
+        "TestCallableBondFoundationQuantLibOracleAndLifetime",
+        "TestCallableBondFoundationValidationAndSessions"
+      ]
+    },
+    {
+      "c": [
+        "itofin_callable_zero_coupon_bond_new"
+      ],
+      "go": [
+        "Session.NewCallableZeroCouponBond"
+      ],
+      "python": "itofin.instruments.CallableZeroCouponBond.__new__",
+      "status": "implemented",
+      "tests": [
+        "TestCallableBondFoundationQuantLibOracleAndLifetime",
+        "TestCallableBondFoundationValidationAndSessions"
+      ]
+    },
+    {
+      "c": [
+        "itofin_callable_bond_callability"
+      ],
+      "go": [
+        "CallableZeroCouponBond.Callability"
+      ],
+      "python": "itofin.instruments.CallableZeroCouponBond.callability",
+      "status": "implemented",
+      "tests": [
+        "TestCallableBondFoundationQuantLibOracleAndLifetime",
+        "TestCallableBondFoundationValidationAndSessions"
+      ]
+    },
+    {
+      "c": [
+        "itofin_callable_zero_bond_day_counter"
+      ],
+      "go": [
+        "CallableZeroCouponBond.DayCounter"
+      ],
+      "python": "itofin.instruments.CallableZeroCouponBond.day_counter",
+      "status": "implemented",
+      "tests": [
+        "TestCallableBondFoundationQuantLibOracleAndLifetime",
+        "TestCallableBondFoundationValidationAndSessions"
+      ]
+    },
+    {
+      "c": [
+        "itofin_bond_integer"
+      ],
+      "go": [
+        "CallableFixedRateBond.Frequency"
+      ],
+      "python": "itofin.instruments.CallableFixedRateBond.frequency",
+      "status": "implemented",
+      "tests": [
+        "TestCallableBondFoundationQuantLibOracleAndLifetime",
+        "TestCallableBondFoundationValidationAndSessions"
+      ]
+    },
+    {
+      "c": [
+        "itofin_callability_new"
+      ],
+      "go": [
+        "CallabilityCall"
+      ],
+      "python": "itofin.instruments.CallabilityType.Call",
+      "status": "implemented",
+      "tests": [
+        "TestCallableBondFoundationQuantLibOracleAndLifetime",
+        "TestCallableBondFoundationValidationAndSessions"
+      ]
+    },
+    {
+      "c": [
+        "itofin_callability_new"
+      ],
+      "go": [
+        "CallabilityPut"
+      ],
+      "python": "itofin.instruments.CallabilityType.Put",
+      "status": "implemented",
+      "tests": [
+        "TestCallableBondFoundationQuantLibOracleAndLifetime",
+        "TestCallableBondFoundationValidationAndSessions"
+      ]
+    },
+    {
+      "c": [
+        "itofin_callability_new"
+      ],
+      "go": [
+        "CallabilityType: explicit integer conversion"
+      ],
+      "python": "itofin.instruments.CallabilityType.__int__",
+      "status": "implemented",
+      "tests": [
+        "TestCallableBondFoundationQuantLibOracleAndLifetime",
+        "TestCallableBondFoundationValidationAndSessions"
+      ]
+    },
+    {
+      "classification": "nonconstructible-enum",
+      "go": "CallabilityType",
+      "python": "itofin.instruments.CallabilityType.__new__",
+      "reason": "Python CallabilityType forbids construction; Go uses typed integer constants and casts. Callability APIs revalidate discriminants.",
+      "status": "language-specific"
+    }
+  ]
+}

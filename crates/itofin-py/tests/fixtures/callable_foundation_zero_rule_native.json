@@ -1,0 +1,17 @@
+{
+  "clean_yield": 100.77028329235857,
+  "flows": [
+    [
+      47498,
+      45.65625000000001
+    ],
+    [
+      47498,
+      250.0
+    ]
+  ],
+  "frequency": 0,
+  "provenance": "QuantLib 1.43 release wheel; evaluation 15 March 2026; Null-calendar Unadjusted Zero-rule schedule 15 January 2026-2030; face250 coupon0.045 Actual360; settlement2; yield0.04 Compounded Annual. Raw regeneration output archived in binding-wave2 evidence.",
+  "quantlib": "1.43",
+  "settlement": 46098
+}
