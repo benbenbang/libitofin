@@ -238,6 +238,17 @@ typedef struct ItofinBootstrapCallbacks {
   void (*release)(size_t);
 } ItofinBootstrapCallbacks;
 
+typedef struct ItofinCallableImpliedVolatilityConfig {
+  /**
+   * Presence bits: accuracy=1, max_evaluations=2, min_vol=4, max_vol=8.
+   */
+  uint32_t flags;
+  double accuracy;
+  uint64_t max_evaluations;
+  double min_vol;
+  double max_vol;
+} ItofinCallableImpliedVolatilityConfig;
+
 /**
  * An immutable exercise quote per 100. Clean=0/dirty=1; call=0/put=1.
  */
@@ -2091,6 +2102,43 @@ int32_t itofin_context_free(struct ItofinContext *ctx, struct ItofinError *error
 int32_t itofin_handle_release(struct ItofinContext *ctx,
                               uint64_t handle,
                               struct ItofinError *error);
+
+/**
+ * Construct with live quote/curve graphs, without eager market valuation.
+ * # Safety
+ * Pointers and thread ownership must satisfy the crate-level C caller contract.
+ */
+int32_t itofin_black_callable_bond_engine_new(struct ItofinContext *ctx,
+                                              uint64_t yield_volatility,
+                                              uint64_t discount,
+                                              uint64_t settings_id,
+                                              uint64_t *out,
+                                              struct ItofinError *error);
+
+/**
+ * Install only on actual callable products sharing the original Settings.
+ * # Safety
+ * Pointers and thread ownership must satisfy the crate-level C caller contract.
+ */
+int32_t itofin_callable_bond_set_black_engine(struct ItofinContext *ctx,
+                                              uint64_t id,
+                                              uint64_t engine,
+                                              struct ItofinError *error);
+
+/**
+ * Invert a settlement quote per 100 without changing the installed engine or cache.
+ * Price types are Clean=0 and Dirty=1; absent controls use 1e-10, 100, 0, 1.
+ * # Safety
+ * Pointers and thread ownership must satisfy the crate-level C caller contract.
+ */
+int32_t itofin_callable_bond_implied_volatility(struct ItofinContext *ctx,
+                                                uint64_t id,
+                                                double target,
+                                                int32_t price_type,
+                                                uint64_t discount,
+                                                struct ItofinCallableImpliedVolatilityConfig a,
+                                                double *out,
+                                                struct ItofinError *error);
 
 /**
  * Validate and copy a callability value. Every bond constructor also validates all records.
