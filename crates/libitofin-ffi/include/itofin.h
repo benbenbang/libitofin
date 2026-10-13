@@ -2151,6 +2151,28 @@ int32_t itofin_callable_zero_bond_day_counter(struct ItofinContext *ctx,
                                               struct ItofinError *error);
 
 /**
+ * Construct without eager valuation. Time steps must be positive and fit usize.
+ * # Safety
+ * Pointers and thread ownership must satisfy the crate-level C caller contract.
+ */
+int32_t itofin_tree_callable_bond_engine_new(struct ItofinContext *ctx,
+                                             uint64_t model,
+                                             uint64_t time_steps,
+                                             uint64_t settings_id,
+                                             uint64_t *out,
+                                             struct ItofinError *error);
+
+/**
+ * Install only on an actual callable product sharing the exact engine Settings.
+ * # Safety
+ * Pointers and thread ownership must satisfy the crate-level C caller contract.
+ */
+int32_t itofin_callable_bond_set_tree_engine(struct ItofinContext *ctx,
+                                             uint64_t id,
+                                             uint64_t engine,
+                                             struct ItofinError *error);
+
+/**
  * Compute Wilder +DI, -DI, DX and ADX in channel-major order.
  * Each channel holds `len` values, with zero warmup placeholders. Four
  * corresponding validity indices are written. DI/DX start at `period`;
