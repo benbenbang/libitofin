@@ -16,10 +16,12 @@ pub mod bond_analytics_api;
 pub mod bond_api;
 #[cfg(test)]
 mod bond_api_tests;
+mod bond_backing;
 pub mod bootstrap_api;
 pub mod bootstrap_callbacks;
 pub mod bootstrap_variables;
 pub mod boundary;
+pub mod callable_bond_api;
 pub mod chart_adx_api;
 pub mod chart_api;
 pub mod floating_bond_api;
