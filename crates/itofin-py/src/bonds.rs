@@ -288,6 +288,45 @@ impl PyBond {
         base.guard = Some(guard);
         base
     }
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn callable_implied_volatility(
+        &self,
+        target_price: f64,
+        discount_curve: &PyYieldTermStructure,
+        price_type: PyBondPriceType,
+        accuracy: f64,
+        max_evaluations: usize,
+        min_vol: f64,
+        max_vol: f64,
+    ) -> PyResult<f64> {
+        self.settlement_date(None)?;
+        let target = analytical_price(target_price, price_type);
+        let curve = discount_curve.handle();
+        match &self.inner {
+            BondBacking::CallableFixed(bond) => bond.borrow().implied_volatility(
+                target,
+                curve,
+                accuracy,
+                max_evaluations,
+                min_vol,
+                max_vol,
+            ),
+            BondBacking::CallableZero(bond) => bond.borrow().implied_volatility(
+                target,
+                curve,
+                accuracy,
+                max_evaluations,
+                min_vol,
+                max_vol,
+            ),
+            BondBacking::Plain(_) => {
+                return Err(ItofinError::new_err(
+                    "implied volatility requires a callable bond",
+                ));
+            }
+        }
+        .map_err(|error| PyQlError::from(error).into())
+    }
     fn analytical_settlement(&self, settlement: Option<&PyDate>, clean: bool) -> PyResult<Date> {
         let settlement = analytical_date(settlement)?
             .map_or_else(|| self.settlement_date(None).map(|date| date.inner()), Ok)?;
@@ -1321,5 +1360,245 @@ mod callable_tests {
         assert!(
             Callability::new(BondPrice::Clean(100.0), CallabilityType::Call, Date::null()).is_err()
         );
+    }
+}
+
+#[cfg(test)]
+mod callable_black_iv_tests {
+    use super::*;
+    use libitofin::instruments::{Callability, CallabilityType};
+    use libitofin::patterns::observable::Observer;
+    use libitofin::pricingengines::bond::{
+        BlackCallableBondArguments, BlackCallableFixedRateBondEngine,
+    };
+    use libitofin::quotes::{Quote, SimpleQuote};
+    use libitofin::shared::shared;
+    use libitofin::termstructures::yields::FlatForward;
+    use libitofin::time::calendars::NullCalendar;
+    use libitofin::time::date::Month;
+    use libitofin::time::daycounters::actual365fixed::Actual365Fixed;
+    use libitofin::time::frequency::Frequency;
+    use libitofin::time::schedule::MakeSchedule;
+    use std::any::Any;
+
+    struct Notifications(Shared<Cell<usize>>);
+    impl Observer for Notifications {
+        fn update(&mut self) {
+            self.0.set(self.0.get() + 1);
+        }
+    }
+    fn day(year: i32) -> Date {
+        Date::new(15, Month::January, year)
+    }
+    fn curve() -> PyYieldTermStructure {
+        PyYieldTermStructure::from_inner(Handle::new(shared(FlatForward::with_rate(
+            day(2026),
+            0.04,
+            Actual365Fixed::new(),
+            libitofin::interestrate::Compounding::Continuous,
+            Frequency::Annual,
+        )) as Shared<dyn YieldTermStructure>))
+    }
+    fn product(zero: bool, settings: Shared<Settings<Date>>) -> PyBond {
+        let calendar = PyCalendar::from_inner(NullCalendar::new());
+        let rights = vec![
+            Callability::new(BondPrice::Clean(100.0), CallabilityType::Call, day(2028)).unwrap(),
+        ];
+        let backing = if zero {
+            BondBacking::CallableZero(shared_mut(
+                CallableZeroCouponBond::new(
+                    3,
+                    1000.0,
+                    calendar.inner(),
+                    day(2031),
+                    Actual365Fixed::new(),
+                    Bdc::Unadjusted,
+                    100.0,
+                    Some(day(2026)),
+                    rights,
+                    settings,
+                )
+                .unwrap(),
+            ))
+        } else {
+            let schedule = MakeSchedule::new()
+                .from(day(2026))
+                .to(day(2031))
+                .with_frequency(Frequency::Semiannual)
+                .with_calendar(calendar.inner())
+                .with_convention(Bdc::Unadjusted)
+                .build();
+            BondBacking::CallableFixed(shared_mut(
+                CallableFixedRateBond::new(
+                    3,
+                    1000.0,
+                    schedule,
+                    vec![0.055],
+                    Actual365Fixed::new(),
+                    Bdc::Unadjusted,
+                    100.0,
+                    Some(day(2026)),
+                    rights,
+                    settings,
+                )
+                .unwrap(),
+            ))
+        };
+        PyBond::from_backing(backing, calendar)
+    }
+    #[derive(Debug, PartialEq)]
+    struct ArgumentSnapshot {
+        settlement: Option<Date>,
+        coupon_dates: Vec<Date>,
+        coupon_amounts: Vec<f64>,
+        exercise_dates: Vec<Date>,
+        exercise_prices: Vec<f64>,
+        original_count: usize,
+        cashflows: Vec<(Date, f64)>,
+        frequency: Frequency,
+    }
+    fn arguments(engine: &mut BlackCallableFixedRateBondEngine) -> ArgumentSnapshot {
+        let args = (engine.arguments_mut() as &mut dyn Any)
+            .downcast_ref::<BlackCallableBondArguments>()
+            .unwrap();
+        ArgumentSnapshot {
+            settlement: args.bond.settlement_date,
+            coupon_dates: args.bond.coupon_dates.clone(),
+            coupon_amounts: args.bond.coupon_amounts.clone(),
+            exercise_dates: args.bond.callability_dates.clone(),
+            exercise_prices: args.bond.callability_prices.clone(),
+            original_count: args.callability_count,
+            cashflows: args
+                .cashflows
+                .iter()
+                .map(|flow| (flow.date(), flow.amount().unwrap()))
+                .collect(),
+            frequency: args.frequency,
+        }
+    }
+    #[test]
+    fn pure_iv_preserves_actual_engine_arguments_results_flags_freeze_and_notifications() {
+        for zero in [false, true] {
+            let settings = shared(Settings::new());
+            settings.set_evaluation_date(day(2026));
+            let term = curve();
+            let quote = shared(SimpleQuote::new(0.35));
+            let engine = shared_mut(BlackCallableFixedRateBondEngine::new(
+                Handle::new(quote.clone() as Shared<dyn Quote>),
+                term.handle(),
+                settings.clone(),
+            ));
+            let mut bond = product(zero, settings.clone());
+            bond.inner
+                .with_mut(|bond| bond.base_mut().set_pricing_engine(engine.clone()));
+            let cached = bond.npv().unwrap();
+            let target = bond.clean_price().unwrap();
+            let stored = bond.inner.borrow().base().results().value;
+            let saved_arguments = arguments(&mut engine.borrow_mut());
+            let saved_results = engine
+                .borrow()
+                .results()
+                .as_instrument_results()
+                .unwrap()
+                .value;
+            let installed = bond.inner.borrow().base().pricing_engine().unwrap().clone();
+            let notifications = shared(Cell::new(0));
+            let observer =
+                shared_mut(Notifications(notifications.clone())) as SharedMut<dyn Observer>;
+            bond.inner.borrow().base().register_observer(&observer);
+            bond.freeze();
+            let flags = bond.flags;
+            settings.set_include_reference_date_events(true);
+            settings.set_include_todays_cash_flows(Some(true));
+            assert!(bond.inner.borrow().base().is_calculated());
+            assert!(
+                (bond
+                    .callable_implied_volatility(
+                        target,
+                        &term,
+                        PyBondPriceType::Clean,
+                        1e-10,
+                        100,
+                        0.0,
+                        1.0
+                    )
+                    .unwrap()
+                    - 0.35)
+                    .abs()
+                    < 2e-8
+            );
+            for (target, budget) in [(f64::NAN, 100), (-1e10, 100), (1e10, 100), (target, 1)] {
+                assert!(
+                    bond.callable_implied_volatility(
+                        target,
+                        &term,
+                        PyBondPriceType::Clean,
+                        1e-10,
+                        budget,
+                        0.0,
+                        1.0
+                    )
+                    .is_err()
+                );
+            }
+            assert_eq!(bond.flags, flags);
+            assert!(bond.frozen.get());
+            assert!(bond.engine_inputs.is_none());
+            assert!(bond.inner.borrow().base().is_calculated());
+            assert_eq!(bond.inner.borrow().base().results().value, stored);
+            assert!(SharedMut::ptr_eq(
+                &installed,
+                bond.inner.borrow().base().pricing_engine().unwrap()
+            ));
+            assert_eq!(arguments(&mut engine.borrow_mut()), saved_arguments);
+            assert_eq!(
+                engine
+                    .borrow()
+                    .results()
+                    .as_instrument_results()
+                    .unwrap()
+                    .value,
+                saved_results
+            );
+            assert_eq!(quote.value().unwrap(), 0.35);
+            assert_eq!(notifications.get(), 0);
+            quote.set_value(0.7);
+            assert_eq!(notifications.get(), 0);
+            assert_eq!(bond.npv().unwrap(), cached);
+            bond.unfreeze();
+            assert_ne!(bond.npv().unwrap(), cached);
+        }
+    }
+    #[test]
+    fn pure_iv_without_engine_preserves_pending_policy_and_uncalculated_state() {
+        for zero in [false, true] {
+            let settings = shared(Settings::new());
+            settings.set_evaluation_date(day(2026));
+            let bond = product(zero, settings.clone());
+            let flags = bond.flags;
+            settings.set_include_reference_date_events(true);
+            let target = if zero {
+                81.85454709204
+            } else {
+                102.10242051757368
+            };
+            let root = bond
+                .callable_implied_volatility(
+                    target,
+                    &curve(),
+                    PyBondPriceType::Dirty,
+                    1e-10,
+                    100,
+                    0.0,
+                    1.0,
+                )
+                .unwrap();
+            assert!((root - 0.35).abs() < 2e-8);
+            assert_eq!(bond.flags, flags);
+            assert!(!bond.frozen.get());
+            assert!(!bond.inner.borrow().base().is_calculated());
+            assert!(bond.inner.borrow().base().pricing_engine().is_none());
+            assert!(bond.inner.borrow().base().results().value.is_none());
+        }
     }
 }

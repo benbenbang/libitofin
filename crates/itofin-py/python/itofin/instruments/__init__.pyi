@@ -209,6 +209,14 @@ class CallableFixedRateBond(Bond):
         r"""
         Attach a retained Hull-White tree engine sharing this bond's settings.
         """
+    def set_black_engine(self, engine: pricingengines.BlackCallableFixedRateBondEngine) -> None:
+        r"""
+        Attach a retained single-European Black engine sharing this bond's settings.
+        """
+    def implied_volatility(self, target_price: builtins.float, discount_curve: termstructures.YieldTermStructure, *, price_type: termstructures.BondPriceType = termstructures.BondPriceType.Clean, accuracy: builtins.float = 1e-10, max_evaluations: builtins.int = 100, min_vol: builtins.float = 0.0, max_vol: builtins.float = 1.0) -> builtins.float:
+        r"""
+        Solve relative forward-yield volatility without changing installed pricing state.
+        """
     def callability(self) -> builtins.list[Callability]: ...
     def frequency(self) -> time.Frequency: ...
     def day_counter(self) -> time.DayCounter: ...
@@ -222,6 +230,14 @@ class CallableZeroCouponBond(Bond):
     def set_tree_engine(self, engine: pricingengines.TreeCallableFixedRateBondEngine) -> None:
         r"""
         Attach a retained Hull-White tree engine sharing this bond's settings.
+        """
+    def set_black_engine(self, engine: pricingengines.BlackCallableFixedRateBondEngine) -> None:
+        r"""
+        Attach a retained single-European Black engine sharing this bond's settings.
+        """
+    def implied_volatility(self, target_price: builtins.float, discount_curve: termstructures.YieldTermStructure, *, price_type: termstructures.BondPriceType = termstructures.BondPriceType.Clean, accuracy: builtins.float = 1e-10, max_evaluations: builtins.int = 100, min_vol: builtins.float = 0.0, max_vol: builtins.float = 1.0) -> builtins.float:
+        r"""
+        Solve relative forward-yield volatility without changing installed pricing state.
         """
     def callability(self) -> builtins.list[Callability]: ...
     def day_counter(self) -> time.DayCounter: ...

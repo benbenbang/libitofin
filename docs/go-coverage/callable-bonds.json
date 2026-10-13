@@ -319,6 +319,102 @@
         "TestCallableTreeRetainedLifecycleAndReplacement",
         "TestCallableTreeValidationAndSessions"
       ]
+    },
+    {
+      "c": [
+        "itofin_black_callable_bond_engine_new"
+      ],
+      "go": [
+        "Session.NewBlackCallableFixedRateBondEngine"
+      ],
+      "python": "itofin.pricingengines.BlackCallableFixedRateBondEngine",
+      "status": "implemented",
+      "tests": [
+        "TestCallableBlackQuantLibOracles",
+        "TestCallableBlackRetainedLifecycleAndReplacement",
+        "TestCallableBlackValidationAndSessions",
+        "TestCallableBlackConcurrentCallers"
+      ]
+    },
+    {
+      "c": [
+        "itofin_black_callable_bond_engine_new"
+      ],
+      "go": [
+        "Session.NewBlackCallableFixedRateBondEngine"
+      ],
+      "python": "itofin.pricingengines.BlackCallableFixedRateBondEngine.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestCallableBlackQuantLibOracles",
+        "TestCallableBlackRetainedLifecycleAndReplacement",
+        "TestCallableBlackValidationAndSessions",
+        "TestCallableBlackConcurrentCallers"
+      ]
+    },
+    {
+      "c": [
+        "itofin_callable_bond_set_black_engine"
+      ],
+      "go": [
+        "CallableFixedRateBond.SetBlackEngine"
+      ],
+      "python": "itofin.instruments.CallableFixedRateBond.set_black_engine",
+      "status": "implemented",
+      "tests": [
+        "TestCallableBlackQuantLibOracles",
+        "TestCallableBlackRetainedLifecycleAndReplacement",
+        "TestCallableBlackValidationAndSessions",
+        "TestCallableBlackConcurrentCallers"
+      ]
+    },
+    {
+      "c": [
+        "itofin_callable_bond_implied_volatility"
+      ],
+      "go": [
+        "CallableFixedRateBond.ImpliedVolatility"
+      ],
+      "python": "itofin.instruments.CallableFixedRateBond.implied_volatility",
+      "status": "implemented",
+      "tests": [
+        "TestCallableBlackValidationAndSessions",
+        "TestCallableBlackImpliedVolatilityRoundTripsAndBounds",
+        "TestCallableBlackImpliedVolatilityPreservesInstalledState",
+        "TestCallableBlackConcurrentCallers"
+      ]
+    },
+    {
+      "c": [
+        "itofin_callable_bond_set_black_engine"
+      ],
+      "go": [
+        "CallableZeroCouponBond.SetBlackEngine"
+      ],
+      "python": "itofin.instruments.CallableZeroCouponBond.set_black_engine",
+      "status": "implemented",
+      "tests": [
+        "TestCallableBlackQuantLibOracles",
+        "TestCallableBlackRetainedLifecycleAndReplacement",
+        "TestCallableBlackValidationAndSessions",
+        "TestCallableBlackConcurrentCallers"
+      ]
+    },
+    {
+      "c": [
+        "itofin_callable_bond_implied_volatility"
+      ],
+      "go": [
+        "CallableZeroCouponBond.ImpliedVolatility"
+      ],
+      "python": "itofin.instruments.CallableZeroCouponBond.implied_volatility",
+      "status": "implemented",
+      "tests": [
+        "TestCallableBlackValidationAndSessions",
+        "TestCallableBlackImpliedVolatilityRoundTripsAndBounds",
+        "TestCallableBlackImpliedVolatilityPreservesInstalledState",
+        "TestCallableBlackConcurrentCallers"
+      ]
     }
   ]
 }

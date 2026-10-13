@@ -1,0 +1,1895 @@
+{
+  "quantlib_version": "1.43",
+  "rows": [
+    {
+      "components": {
+        "clock": 2.5095890410958903,
+        "direct_forward": 850.9114173647278,
+        "duration": 3.4625295511940926,
+        "exercise_discount": 0.9337256666010078,
+        "exercise_pv": 850.9114173647278,
+        "flows": [
+          {
+            "amount": 14.706250000000058,
+            "date": "2026-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 16.818749999999934,
+            "date": "2027-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.38281249999995,
+            "date": "2027-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.6875,
+            "date": "2028-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.484374999999968,
+            "date": "2028-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.6875,
+            "date": "2029-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.38281249999995,
+            "date": "2029-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.6875,
+            "date": "2030-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.38281249999995,
+            "date": "2030-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.6875,
+            "date": "2031-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.38281249999995,
+            "date": "2031-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.6875,
+            "date": "2032-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.484374999999968,
+            "date": "2032-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.6875,
+            "date": "2033-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 786.09375,
+            "date": "2033-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          }
+        ],
+        "forward": 850.9114173647278,
+        "forward_yield": 0.026808217542432466,
+        "income_reference": 87.90994211485908,
+        "indenture_accrued": 9.140624999999968,
+        "option": 130.63081262071626,
+        "reference_pv": 882.4277725121478,
+        "settlement_date": "2026-10-22",
+        "settlement_discount": 0.9984477812820228,
+        "settlement_pv": 883.7996228296452,
+        "standard_deviation": 0.044114766716016246,
+        "strike_currency": 720.28125
+      },
+      "expected": {
+        "clean": 102.91794021796935,
+        "dirty": 104.15544021796934,
+        "npv": 760.4544299192382,
+        "settlement": 761.6366565939009
+      },
+      "inputs": {
+        "counter": "Actual360",
+        "coupons": [
+          0.04,
+          0.045,
+          0.05
+        ],
+        "direction": "call",
+        "evaluation": "2026-10-12",
+        "ex_days": 0,
+        "exercise": "2029-04-15",
+        "face": 731.25,
+        "issue": "2026-01-15",
+        "lag": 10,
+        "maturity": "2033-01-15",
+        "name": "fixed-call-different_clock",
+        "once": false,
+        "price_type": "Clean",
+        "product": "fixed",
+        "rate": 0.027,
+        "redemption": 107.5,
+        "reference": "2026-10-01",
+        "strike": 97.25,
+        "vol": 0.3
+      }
+    },
+    {
+      "components": {
+        "clock": 2.5095890410958903,
+        "direct_forward": 850.9114173647278,
+        "duration": 3.4625295511940926,
+        "exercise_discount": 0.9337256666010078,
+        "exercise_pv": 850.9114173647278,
+        "flows": [
+          {
+            "amount": 14.706250000000058,
+            "date": "2026-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 16.818749999999934,
+            "date": "2027-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.38281249999995,
+            "date": "2027-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.6875,
+            "date": "2028-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.484374999999968,
+            "date": "2028-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.6875,
+            "date": "2029-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.38281249999995,
+            "date": "2029-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.6875,
+            "date": "2030-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.38281249999995,
+            "date": "2030-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.6875,
+            "date": "2031-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.38281249999995,
+            "date": "2031-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.6875,
+            "date": "2032-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.484374999999968,
+            "date": "2032-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.6875,
+            "date": "2033-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 786.09375,
+            "date": "2033-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          }
+        ],
+        "forward": 850.9114173647278,
+        "forward_yield": 0.026808217542432466,
+        "income_reference": 87.90994211485908,
+        "indenture_accrued": 0.0,
+        "option": 139.77097372187143,
+        "reference_pv": 882.4277725121478,
+        "settlement_date": "2026-10-22",
+        "settlement_discount": 0.9984477812820228,
+        "settlement_pv": 883.7996228296452,
+        "standard_deviation": 0.044114766716016246,
+        "strike_currency": 711.140625
+      },
+      "expected": {
+        "clean": 101.74902796200504,
+        "dirty": 102.98652796200504,
+        "npv": 751.9200269022215,
+        "settlement": 753.0889857221619
+      },
+      "inputs": {
+        "counter": "Actual360",
+        "coupons": [
+          0.04,
+          0.045,
+          0.05
+        ],
+        "direction": "call",
+        "evaluation": "2026-10-12",
+        "ex_days": 0,
+        "exercise": "2029-04-15",
+        "face": 731.25,
+        "issue": "2026-01-15",
+        "lag": 10,
+        "maturity": "2033-01-15",
+        "name": "fixed-call-dirty_strike",
+        "once": false,
+        "price_type": "Dirty",
+        "product": "fixed",
+        "rate": 0.027,
+        "redemption": 107.5,
+        "reference": "2026-10-01",
+        "strike": 97.25,
+        "vol": 0.3
+      }
+    },
+    {
+      "components": {
+        "clock": 2.5095890410958903,
+        "direct_forward": 850.9114173647278,
+        "duration": 3.4625295511940926,
+        "exercise_discount": 0.9337256666010078,
+        "exercise_pv": 850.9114173647278,
+        "flows": [
+          {
+            "amount": 6.093749999999979,
+            "date": "2027-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 16.544531249999924,
+            "date": "2027-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.6875,
+            "date": "2028-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.484374999999968,
+            "date": "2028-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.6875,
+            "date": "2029-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.38281249999995,
+            "date": "2029-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.6875,
+            "date": "2030-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.38281249999995,
+            "date": "2030-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.6875,
+            "date": "2031-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.38281249999995,
+            "date": "2031-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.6875,
+            "date": "2032-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.484374999999968,
+            "date": "2032-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.6875,
+            "date": "2033-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 786.09375,
+            "date": "2033-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          }
+        ],
+        "forward": 850.9114173647278,
+        "forward_yield": 0.026808217542432466,
+        "income_reference": 75.469043381981,
+        "indenture_accrued": 9.140624999999968,
+        "option": 130.63081262071626,
+        "reference_pv": 869.9868737792698,
+        "settlement_date": "2026-11-01",
+        "settlement_discount": 0.9977094765764812,
+        "settlement_pv": 871.9841739546506,
+        "standard_deviation": 0.044114766716016246,
+        "strike_currency": 720.28125
+      },
+      "expected": {
+        "clean": 102.52728986823894,
+        "dirty": 102.52728986823894,
+        "npv": 748.0135311863602,
+        "settlement": 749.7308071614973
+      },
+      "inputs": {
+        "counter": "Actual360",
+        "coupons": [
+          0.04,
+          0.045,
+          0.05
+        ],
+        "direction": "call",
+        "evaluation": "2026-10-12",
+        "ex_days": 0,
+        "exercise": "2029-04-15",
+        "face": 731.25,
+        "issue": "2026-11-01",
+        "lag": 10,
+        "maturity": "2033-01-15",
+        "name": "fixed-call-future_issue",
+        "once": false,
+        "price_type": "Clean",
+        "product": "fixed",
+        "rate": 0.027,
+        "redemption": 107.5,
+        "reference": "2026-10-01",
+        "strike": 97.25,
+        "vol": 0.3
+      }
+    },
+    {
+      "components": {
+        "clock": 2.5095890410958903,
+        "direct_forward": 850.9114173647278,
+        "duration": 3.4625295511940926,
+        "exercise_discount": 0.9337256666010078,
+        "exercise_pv": 850.9114173647278,
+        "flows": [
+          {
+            "amount": 14.706250000000058,
+            "date": "2026-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 16.818749999999934,
+            "date": "2027-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.38281249999995,
+            "date": "2027-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.6875,
+            "date": "2028-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.484374999999968,
+            "date": "2028-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.6875,
+            "date": "2029-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.38281249999995,
+            "date": "2029-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.6875,
+            "date": "2030-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.38281249999995,
+            "date": "2030-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.6875,
+            "date": "2031-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.38281249999995,
+            "date": "2031-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.6875,
+            "date": "2032-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.484374999999968,
+            "date": "2032-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.6875,
+            "date": "2033-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 786.09375,
+            "date": "2033-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          }
+        ],
+        "forward": 850.9114173647278,
+        "forward_yield": 0.026808217542432466,
+        "income_reference": 87.90994211485908,
+        "indenture_accrued": 9.140624999999968,
+        "option": 0.0006452559884215087,
+        "reference_pv": 882.4277725121478,
+        "settlement_date": "2026-10-22",
+        "settlement_discount": 0.9984477812820228,
+        "settlement_pv": 883.7996228296452,
+        "standard_deviation": 0.044114766716016246,
+        "strike_currency": 720.28125
+      },
+      "expected": {
+        "clean": 119.62406940285491,
+        "dirty": 120.86156940285491,
+        "npv": 882.4283750042258,
+        "settlement": 883.8002262583765
+      },
+      "inputs": {
+        "counter": "Actual360",
+        "coupons": [
+          0.04,
+          0.045,
+          0.05
+        ],
+        "direction": "put",
+        "evaluation": "2026-10-12",
+        "ex_days": 0,
+        "exercise": "2029-04-15",
+        "face": 731.25,
+        "issue": "2026-01-15",
+        "lag": 10,
+        "maturity": "2033-01-15",
+        "name": "fixed-put-different_clock",
+        "once": false,
+        "price_type": "Clean",
+        "product": "fixed",
+        "rate": 0.027,
+        "redemption": 107.5,
+        "reference": "2026-10-01",
+        "strike": 97.25,
+        "vol": 0.3
+      }
+    },
+    {
+      "components": {
+        "clock": 2.5095890410958903,
+        "direct_forward": 850.9114173647278,
+        "duration": 3.4625295511940926,
+        "exercise_discount": 0.9337256666010078,
+        "exercise_pv": 850.9114173647278,
+        "flows": [
+          {
+            "amount": 14.706250000000058,
+            "date": "2026-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 16.818749999999934,
+            "date": "2027-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.38281249999995,
+            "date": "2027-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.6875,
+            "date": "2028-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.484374999999968,
+            "date": "2028-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.6875,
+            "date": "2029-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.38281249999995,
+            "date": "2029-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.6875,
+            "date": "2030-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.38281249999995,
+            "date": "2030-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.6875,
+            "date": "2031-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.38281249999995,
+            "date": "2031-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.6875,
+            "date": "2032-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.484374999999968,
+            "date": "2032-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.6875,
+            "date": "2033-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 786.09375,
+            "date": "2033-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          }
+        ],
+        "forward": 850.9114173647278,
+        "forward_yield": 0.026808217542432466,
+        "income_reference": 87.90994211485908,
+        "indenture_accrued": 0.0,
+        "option": 0.00018135714369122563,
+        "reference_pv": 882.4277725121478,
+        "settlement_date": "2026-10-22",
+        "settlement_discount": 0.9984477812820228,
+        "settlement_pv": 883.7996228296452,
+        "standard_deviation": 0.044114766716016246,
+        "strike_currency": 711.140625
+      },
+      "expected": {
+        "clean": 119.62401007599631,
+        "dirty": 120.8615100759963,
+        "npv": 882.4279418499677,
+        "settlement": 883.799792430723
+      },
+      "inputs": {
+        "counter": "Actual360",
+        "coupons": [
+          0.04,
+          0.045,
+          0.05
+        ],
+        "direction": "put",
+        "evaluation": "2026-10-12",
+        "ex_days": 0,
+        "exercise": "2029-04-15",
+        "face": 731.25,
+        "issue": "2026-01-15",
+        "lag": 10,
+        "maturity": "2033-01-15",
+        "name": "fixed-put-dirty_strike",
+        "once": false,
+        "price_type": "Dirty",
+        "product": "fixed",
+        "rate": 0.027,
+        "redemption": 107.5,
+        "reference": "2026-10-01",
+        "strike": 97.25,
+        "vol": 0.3
+      }
+    },
+    {
+      "components": {
+        "clock": 2.5095890410958903,
+        "direct_forward": 850.9114173647278,
+        "duration": 3.4625295511940926,
+        "exercise_discount": 0.9337256666010078,
+        "exercise_pv": 850.9114173647278,
+        "flows": [
+          {
+            "amount": 6.093749999999979,
+            "date": "2027-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 16.544531249999924,
+            "date": "2027-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.6875,
+            "date": "2028-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.484374999999968,
+            "date": "2028-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.6875,
+            "date": "2029-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.38281249999995,
+            "date": "2029-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.6875,
+            "date": "2030-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.38281249999995,
+            "date": "2030-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.6875,
+            "date": "2031-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.38281249999995,
+            "date": "2031-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.6875,
+            "date": "2032-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.484374999999968,
+            "date": "2032-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.6875,
+            "date": "2033-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 786.09375,
+            "date": "2033-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          }
+        ],
+        "forward": 850.9114173647278,
+        "forward_yield": 0.026808217542432466,
+        "income_reference": 75.469043381981,
+        "indenture_accrued": 9.140624999999968,
+        "option": 0.0006452559884215087,
+        "reference_pv": 869.9868737792698,
+        "settlement_date": "2026-11-01",
+        "settlement_discount": 0.9977094765764812,
+        "settlement_pv": 871.9841739546506,
+        "standard_deviation": 0.044114766716016246,
+        "strike_currency": 720.28125
+      },
+      "expected": {
+        "clean": 119.24578158357866,
+        "dirty": 119.24578158357866,
+        "npv": 869.9874762713478,
+        "settlement": 871.9847778299189
+      },
+      "inputs": {
+        "counter": "Actual360",
+        "coupons": [
+          0.04,
+          0.045,
+          0.05
+        ],
+        "direction": "put",
+        "evaluation": "2026-10-12",
+        "ex_days": 0,
+        "exercise": "2029-04-15",
+        "face": 731.25,
+        "issue": "2026-11-01",
+        "lag": 10,
+        "maturity": "2033-01-15",
+        "name": "fixed-put-future_issue",
+        "once": false,
+        "price_type": "Clean",
+        "product": "fixed",
+        "rate": 0.027,
+        "redemption": 107.5,
+        "reference": "2026-10-01",
+        "strike": 97.25,
+        "vol": 0.3
+      }
+    },
+    {
+      "components": {
+        "clock": 2.5095890410958903,
+        "direct_forward": 710.2802580297798,
+        "duration": 3.7082553543618846,
+        "exercise_discount": 0.9337256666010078,
+        "exercise_pv": 710.2802580297798,
+        "flows": [
+          {
+            "amount": 786.09375,
+            "date": "2033-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          }
+        ],
+        "forward": 710.2802580297798,
+        "forward_yield": 0.026987887674383274,
+        "income_reference": 0,
+        "indenture_accrued": 0.0,
+        "option": 13.058312633346475,
+        "reference_pv": 663.206907402392,
+        "settlement_date": "2026-10-22",
+        "settlement_discount": 0.9984477812820228,
+        "settlement_pv": 664.237949981544,
+        "standard_deviation": 0.04756210701278231,
+        "strike_currency": 711.140625
+      },
+      "expected": {
+        "clean": 89.16596415331892,
+        "dirty": 89.16596415331892,
+        "npv": 651.0140257341361,
+        "settlement": 652.0261128711446
+      },
+      "inputs": {
+        "counter": "Actual360",
+        "coupons": [
+          0.04,
+          0.045,
+          0.05
+        ],
+        "direction": "call",
+        "evaluation": "2026-10-12",
+        "ex_days": 0,
+        "exercise": "2029-04-15",
+        "face": 731.25,
+        "issue": "2026-01-15",
+        "lag": 10,
+        "maturity": "2033-01-15",
+        "name": "zero-call-different_clock",
+        "once": false,
+        "price_type": "Clean",
+        "product": "zero",
+        "rate": 0.027,
+        "redemption": 107.5,
+        "reference": "2026-10-01",
+        "strike": 97.25,
+        "vol": 0.3
+      }
+    },
+    {
+      "components": {
+        "clock": 2.5095890410958903,
+        "direct_forward": 710.2802580297798,
+        "duration": 3.7082553543618846,
+        "exercise_discount": 0.9337256666010078,
+        "exercise_pv": 710.2802580297798,
+        "flows": [
+          {
+            "amount": 786.09375,
+            "date": "2033-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          }
+        ],
+        "forward": 710.2802580297798,
+        "forward_yield": 0.026987887674383274,
+        "income_reference": 0,
+        "indenture_accrued": 0.0,
+        "option": 13.058312633346475,
+        "reference_pv": 663.206907402392,
+        "settlement_date": "2026-10-22",
+        "settlement_discount": 0.9984477812820228,
+        "settlement_pv": 664.237949981544,
+        "standard_deviation": 0.04756210701278231,
+        "strike_currency": 711.140625
+      },
+      "expected": {
+        "clean": 89.16596415331892,
+        "dirty": 89.16596415331892,
+        "npv": 651.0140257341361,
+        "settlement": 652.0261128711446
+      },
+      "inputs": {
+        "counter": "Actual360",
+        "coupons": [
+          0.04,
+          0.045,
+          0.05
+        ],
+        "direction": "call",
+        "evaluation": "2026-10-12",
+        "ex_days": 0,
+        "exercise": "2029-04-15",
+        "face": 731.25,
+        "issue": "2026-01-15",
+        "lag": 10,
+        "maturity": "2033-01-15",
+        "name": "zero-call-dirty_strike",
+        "once": false,
+        "price_type": "Dirty",
+        "product": "zero",
+        "rate": 0.027,
+        "redemption": 107.5,
+        "reference": "2026-10-01",
+        "strike": 97.25,
+        "vol": 0.3
+      }
+    },
+    {
+      "components": {
+        "clock": 2.5095890410958903,
+        "direct_forward": 710.2802580297798,
+        "duration": 3.7082553543618846,
+        "exercise_discount": 0.9337256666010078,
+        "exercise_pv": 710.2802580297798,
+        "flows": [
+          {
+            "amount": 786.09375,
+            "date": "2033-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          }
+        ],
+        "forward": 710.2802580297798,
+        "forward_yield": 0.026987887674383274,
+        "income_reference": 0,
+        "indenture_accrued": 0.0,
+        "option": 13.058312633346475,
+        "reference_pv": 663.206907402392,
+        "settlement_date": "2026-11-01",
+        "settlement_discount": 0.9977094765764812,
+        "settlement_pv": 664.729485860058,
+        "standard_deviation": 0.04756210701278231,
+        "strike_currency": 711.140625
+      },
+      "expected": {
+        "clean": 89.23194693934443,
+        "dirty": 89.23194693934443,
+        "npv": 651.0140257341361,
+        "settlement": 652.508611993956
+      },
+      "inputs": {
+        "counter": "Actual360",
+        "coupons": [
+          0.04,
+          0.045,
+          0.05
+        ],
+        "direction": "call",
+        "evaluation": "2026-10-12",
+        "ex_days": 0,
+        "exercise": "2029-04-15",
+        "face": 731.25,
+        "issue": "2026-11-01",
+        "lag": 10,
+        "maturity": "2033-01-15",
+        "name": "zero-call-future_issue",
+        "once": false,
+        "price_type": "Clean",
+        "product": "zero",
+        "rate": 0.027,
+        "redemption": 107.5,
+        "reference": "2026-10-01",
+        "strike": 97.25,
+        "vol": 0.3
+      }
+    },
+    {
+      "components": {
+        "clock": 2.5095890410958903,
+        "direct_forward": 710.2802580297798,
+        "duration": 3.7082553543618846,
+        "exercise_discount": 0.9337256666010078,
+        "exercise_pv": 710.2802580297798,
+        "flows": [
+          {
+            "amount": 786.09375,
+            "date": "2033-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          }
+        ],
+        "forward": 710.2802580297798,
+        "forward_yield": 0.026987887674383274,
+        "income_reference": 0,
+        "indenture_accrued": 0.0,
+        "option": 13.918679603566716,
+        "reference_pv": 663.206907402392,
+        "settlement_date": "2026-10-22",
+        "settlement_discount": 0.9984477812820228,
+        "settlement_pv": 664.237949981544,
+        "standard_deviation": 0.04756210701278231,
+        "strike_currency": 711.140625
+      },
+      "expected": {
+        "clean": 92.61598396213783,
+        "dirty": 92.61598396213783,
+        "npv": 676.2031357934382,
+        "settlement": 677.254382723133
+      },
+      "inputs": {
+        "counter": "Actual360",
+        "coupons": [
+          0.04,
+          0.045,
+          0.05
+        ],
+        "direction": "put",
+        "evaluation": "2026-10-12",
+        "ex_days": 0,
+        "exercise": "2029-04-15",
+        "face": 731.25,
+        "issue": "2026-01-15",
+        "lag": 10,
+        "maturity": "2033-01-15",
+        "name": "zero-put-different_clock",
+        "once": false,
+        "price_type": "Clean",
+        "product": "zero",
+        "rate": 0.027,
+        "redemption": 107.5,
+        "reference": "2026-10-01",
+        "strike": 97.25,
+        "vol": 0.3
+      }
+    },
+    {
+      "components": {
+        "clock": 2.5095890410958903,
+        "direct_forward": 710.2802580297798,
+        "duration": 3.7082553543618846,
+        "exercise_discount": 0.9337256666010078,
+        "exercise_pv": 710.2802580297798,
+        "flows": [
+          {
+            "amount": 786.09375,
+            "date": "2033-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          }
+        ],
+        "forward": 710.2802580297798,
+        "forward_yield": 0.026987887674383274,
+        "income_reference": 0,
+        "indenture_accrued": 0.0,
+        "option": 13.918679603566716,
+        "reference_pv": 663.206907402392,
+        "settlement_date": "2026-10-22",
+        "settlement_discount": 0.9984477812820228,
+        "settlement_pv": 664.237949981544,
+        "standard_deviation": 0.04756210701278231,
+        "strike_currency": 711.140625
+      },
+      "expected": {
+        "clean": 92.61598396213783,
+        "dirty": 92.61598396213783,
+        "npv": 676.2031357934382,
+        "settlement": 677.254382723133
+      },
+      "inputs": {
+        "counter": "Actual360",
+        "coupons": [
+          0.04,
+          0.045,
+          0.05
+        ],
+        "direction": "put",
+        "evaluation": "2026-10-12",
+        "ex_days": 0,
+        "exercise": "2029-04-15",
+        "face": 731.25,
+        "issue": "2026-01-15",
+        "lag": 10,
+        "maturity": "2033-01-15",
+        "name": "zero-put-dirty_strike",
+        "once": false,
+        "price_type": "Dirty",
+        "product": "zero",
+        "rate": 0.027,
+        "redemption": 107.5,
+        "reference": "2026-10-01",
+        "strike": 97.25,
+        "vol": 0.3
+      }
+    },
+    {
+      "components": {
+        "clock": 2.5095890410958903,
+        "direct_forward": 710.2802580297798,
+        "duration": 3.7082553543618846,
+        "exercise_discount": 0.9337256666010078,
+        "exercise_pv": 710.2802580297798,
+        "flows": [
+          {
+            "amount": 786.09375,
+            "date": "2033-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          }
+        ],
+        "forward": 710.2802580297798,
+        "forward_yield": 0.026987887674383274,
+        "income_reference": 0,
+        "indenture_accrued": 0.0,
+        "option": 13.918679603566716,
+        "reference_pv": 663.206907402392,
+        "settlement_date": "2026-11-01",
+        "settlement_discount": 0.9977094765764812,
+        "settlement_pv": 664.729485860058,
+        "standard_deviation": 0.04756210701278231,
+        "strike_currency": 711.140625
+      },
+      "expected": {
+        "clean": 92.68451976175986,
+        "dirty": 92.68451976175986,
+        "npv": 676.2031357934382,
+        "settlement": 677.755550757869
+      },
+      "inputs": {
+        "counter": "Actual360",
+        "coupons": [
+          0.04,
+          0.045,
+          0.05
+        ],
+        "direction": "put",
+        "evaluation": "2026-10-12",
+        "ex_days": 0,
+        "exercise": "2029-04-15",
+        "face": 731.25,
+        "issue": "2026-11-01",
+        "lag": 10,
+        "maturity": "2033-01-15",
+        "name": "zero-put-future_issue",
+        "once": false,
+        "price_type": "Clean",
+        "product": "zero",
+        "rate": 0.027,
+        "redemption": 107.5,
+        "reference": "2026-10-01",
+        "strike": 97.25,
+        "vol": 0.3
+      }
+    },
+    {
+      "components": {
+        "clock": 2.254794520547945,
+        "direct_forward": 861.5918727081736,
+        "duration": 3.6691828691408617,
+        "exercise_discount": 0.940171333463714,
+        "exercise_pv": 843.1644556846412,
+        "flows": [
+          {
+            "amount": 18.13099315068491,
+            "date": "2026-07-15",
+            "detached_at_exercise": true,
+            "detached_at_settlement": true
+          },
+          {
+            "amount": 18.431506849315124,
+            "date": "2027-01-15",
+            "detached_at_exercise": true,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.13099315068491,
+            "date": "2027-07-15",
+            "detached_at_exercise": true,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.431506849315124,
+            "date": "2028-01-15",
+            "detached_at_exercise": true,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.231164383561595,
+            "date": "2028-07-15",
+            "detached_at_exercise": true,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.431506849315124,
+            "date": "2029-01-15",
+            "detached_at_exercise": true,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.13099315068491,
+            "date": "2029-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.431506849315124,
+            "date": "2030-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.13099315068491,
+            "date": "2030-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.431506849315124,
+            "date": "2031-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.13099315068491,
+            "date": "2031-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.431506849315124,
+            "date": "2032-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.231164383561595,
+            "date": "2032-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.431506849315124,
+            "date": "2033-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 786.09375,
+            "date": "2033-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          }
+        ],
+        "forward": 861.5918727081736,
+        "forward_yield": 0.027183072900412237,
+        "income_reference": 71.20952197404159,
+        "indenture_accrued": 18.130993150684912,
+        "option": 132.3211364025865,
+        "reference_pv": 881.2535018395836,
+        "settlement_date": "2026-10-14",
+        "settlement_discount": 0.9990388183956378,
+        "settlement_pv": 882.1013614413839,
+        "standard_deviation": 0.04493064437710252,
+        "strike_currency": 729.271618150685
+      },
+      "expected": {
+        "clean": 102.35371618375477,
+        "dirty": 103.60029152622052,
+        "npv": 756.8489625825298,
+        "settlement": 757.5771317854876
+      },
+      "inputs": {
+        "counter": "Actual365Fixed",
+        "coupons": [
+          0.05
+        ],
+        "direction": "call",
+        "evaluation": "2026-10-12",
+        "ex_days": 7,
+        "exercise": "2029-01-12",
+        "face": 731.25,
+        "issue": "2026-01-15",
+        "lag": 2,
+        "maturity": "2033-01-15",
+        "name": "fixed-call-ex_at_exercise",
+        "once": false,
+        "price_type": "Clean",
+        "product": "fixed",
+        "rate": 0.027,
+        "redemption": 107.5,
+        "reference": "2026-10-01",
+        "strike": 97.25,
+        "vol": 0.3
+      }
+    },
+    {
+      "components": {
+        "clock": 0.0136986301369863,
+        "direct_forward": 875.9890115940796,
+        "duration": 5.673876730173762,
+        "exercise_discount": 0.9996302053771937,
+        "exercise_pv": 875.9890115940796,
+        "flows": [
+          {
+            "amount": 18.13099315068491,
+            "date": "2026-07-15",
+            "detached_at_exercise": true,
+            "detached_at_settlement": true
+          },
+          {
+            "amount": 18.431506849315124,
+            "date": "2027-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.13099315068491,
+            "date": "2027-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.431506849315124,
+            "date": "2028-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.231164383561595,
+            "date": "2028-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.431506849315124,
+            "date": "2029-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.13099315068491,
+            "date": "2029-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.431506849315124,
+            "date": "2030-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.13099315068491,
+            "date": "2030-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.431506849315124,
+            "date": "2031-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.13099315068491,
+            "date": "2031-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.431506849315124,
+            "date": "2032-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.231164383561595,
+            "date": "2032-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.431506849315124,
+            "date": "2033-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 786.09375,
+            "date": "2033-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          }
+        ],
+        "forward": 875.9890115940796,
+        "forward_yield": 0.027183072900412147,
+        "income_reference": 0,
+        "indenture_accrued": 17.830479452054696,
+        "option": 147.0179071420249,
+        "reference_pv": 893.7853423187626,
+        "settlement_date": "2026-07-09",
+        "settlement_discount": 0.9998520657378728,
+        "settlement_pv": 875.7946356011473,
+        "standard_deviation": 0.00541549638957468,
+        "strike_currency": 728.9711044520546
+      },
+      "expected": {
+        "clean": 99.74842777822074,
+        "dirty": 99.66623599739883,
+        "npv": 746.821801608255,
+        "settlement": 728.809350730979
+      },
+      "inputs": {
+        "counter": "Actual365Fixed",
+        "coupons": [
+          0.05
+        ],
+        "direction": "call",
+        "evaluation": "2026-07-07",
+        "ex_days": 7,
+        "exercise": "2026-07-12",
+        "face": 731.25,
+        "issue": "2026-01-15",
+        "lag": 2,
+        "maturity": "2033-01-15",
+        "name": "fixed-call-ex_at_settlement",
+        "once": false,
+        "price_type": "Clean",
+        "product": "fixed",
+        "rate": 0.027,
+        "redemption": 107.5,
+        "reference": "2026-07-07",
+        "strike": 97.25,
+        "vol": 0.3
+      }
+    },
+    {
+      "components": {
+        "clock": 2.254794520547945,
+        "direct_forward": 935.2590641345242,
+        "duration": 3.9041119386072034,
+        "exercise_discount": 0.940171333463714,
+        "exercise_pv": 935.2590641345242,
+        "flows": [
+          {
+            "amount": 256.1378424657534,
+            "date": "2033-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 786.09375,
+            "date": "2033-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          }
+        ],
+        "forward": 935.2590641345242,
+        "forward_yield": 0.027367802763489383,
+        "income_reference": 0,
+        "indenture_accrued": 109.48715753424656,
+        "option": 114.67361271580387,
+        "reference_pv": 879.3037614613809,
+        "settlement_date": "2026-10-14",
+        "settlement_discount": 0.9990388183956378,
+        "settlement_pv": 880.1497452055565,
+        "standard_deviation": 0.04813233521186086,
+        "strike_currency": 820.6277825342465
+      },
+      "expected": {
+        "clean": 101.87850927320487,
+        "dirty": 105.60453667046514,
+        "npv": 771.4909180812621,
+        "settlement": 772.2331744027763
+      },
+      "inputs": {
+        "counter": "Actual365Fixed",
+        "coupons": [
+          0.05
+        ],
+        "direction": "call",
+        "evaluation": "2026-10-12",
+        "ex_days": 0,
+        "exercise": "2029-01-12",
+        "face": 731.25,
+        "issue": "2026-01-15",
+        "lag": 2,
+        "maturity": "2033-01-15",
+        "name": "fixed-call-once",
+        "once": true,
+        "price_type": "Clean",
+        "product": "fixed",
+        "rate": 0.027,
+        "redemption": 107.5,
+        "reference": "2026-10-01",
+        "strike": 97.25,
+        "vol": 0.3
+      }
+    },
+    {
+      "components": {
+        "clock": 2.254794520547945,
+        "direct_forward": 861.5918727081736,
+        "duration": 3.6691828691408617,
+        "exercise_discount": 0.940171333463714,
+        "exercise_pv": 843.1644556846412,
+        "flows": [
+          {
+            "amount": 18.13099315068491,
+            "date": "2026-07-15",
+            "detached_at_exercise": true,
+            "detached_at_settlement": true
+          },
+          {
+            "amount": 18.431506849315124,
+            "date": "2027-01-15",
+            "detached_at_exercise": true,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.13099315068491,
+            "date": "2027-07-15",
+            "detached_at_exercise": true,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.431506849315124,
+            "date": "2028-01-15",
+            "detached_at_exercise": true,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.231164383561595,
+            "date": "2028-07-15",
+            "detached_at_exercise": true,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.431506849315124,
+            "date": "2029-01-15",
+            "detached_at_exercise": true,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.13099315068491,
+            "date": "2029-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.431506849315124,
+            "date": "2030-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.13099315068491,
+            "date": "2030-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.431506849315124,
+            "date": "2031-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.13099315068491,
+            "date": "2031-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.431506849315124,
+            "date": "2032-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.231164383561595,
+            "date": "2032-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.431506849315124,
+            "date": "2033-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 786.09375,
+            "date": "2033-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          }
+        ],
+        "forward": 861.5918727081736,
+        "forward_yield": 0.027183072900412237,
+        "income_reference": 71.20952197404159,
+        "indenture_accrued": 18.130993150684912,
+        "option": 0.000881845097863862,
+        "reference_pv": 881.2535018395836,
+        "settlement_date": "2026-10-14",
+        "settlement_discount": 0.9990388183956378,
+        "settlement_pv": 882.1013614413839,
+        "standard_deviation": 0.04493064437710252,
+        "strike_currency": 729.271618150685
+      },
+      "expected": {
+        "clean": 119.38278415490642,
+        "dirty": 120.62935949737216,
+        "npv": 881.2543309250651,
+        "settlement": 882.1021913245339
+      },
+      "inputs": {
+        "counter": "Actual365Fixed",
+        "coupons": [
+          0.05
+        ],
+        "direction": "put",
+        "evaluation": "2026-10-12",
+        "ex_days": 7,
+        "exercise": "2029-01-12",
+        "face": 731.25,
+        "issue": "2026-01-15",
+        "lag": 2,
+        "maturity": "2033-01-15",
+        "name": "fixed-put-ex_at_exercise",
+        "once": false,
+        "price_type": "Clean",
+        "product": "fixed",
+        "rate": 0.027,
+        "redemption": 107.5,
+        "reference": "2026-10-01",
+        "strike": 97.25,
+        "vol": 0.3
+      }
+    },
+    {
+      "components": {
+        "clock": 0.0136986301369863,
+        "direct_forward": 875.9890115940796,
+        "duration": 5.673876730173762,
+        "exercise_discount": 0.9996302053771937,
+        "exercise_pv": 875.9890115940796,
+        "flows": [
+          {
+            "amount": 18.13099315068491,
+            "date": "2026-07-15",
+            "detached_at_exercise": true,
+            "detached_at_settlement": true
+          },
+          {
+            "amount": 18.431506849315124,
+            "date": "2027-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.13099315068491,
+            "date": "2027-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.431506849315124,
+            "date": "2028-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.231164383561595,
+            "date": "2028-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.431506849315124,
+            "date": "2029-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.13099315068491,
+            "date": "2029-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.431506849315124,
+            "date": "2030-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.13099315068491,
+            "date": "2030-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.431506849315124,
+            "date": "2031-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.13099315068491,
+            "date": "2031-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.431506849315124,
+            "date": "2032-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.231164383561595,
+            "date": "2032-07-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 18.431506849315124,
+            "date": "2033-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 786.09375,
+            "date": "2033-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          }
+        ],
+        "forward": 875.9890115940796,
+        "forward_yield": 0.027183072900412147,
+        "income_reference": 0,
+        "indenture_accrued": 17.830479452054696,
+        "option": -0.0,
+        "reference_pv": 893.7853423187626,
+        "settlement_date": "2026-07-09",
+        "settlement_discount": 0.9998520657378728,
+        "settlement_pv": 875.7946356011473,
+        "standard_deviation": 0.00541549638957468,
+        "strike_currency": 728.9711044520546
+      },
+      "expected": {
+        "clean": 119.84897955533779,
+        "dirty": 119.76678777451588,
+        "npv": 893.7853423187626,
+        "settlement": 875.7946356011473
+      },
+      "inputs": {
+        "counter": "Actual365Fixed",
+        "coupons": [
+          0.05
+        ],
+        "direction": "put",
+        "evaluation": "2026-07-07",
+        "ex_days": 7,
+        "exercise": "2026-07-12",
+        "face": 731.25,
+        "issue": "2026-01-15",
+        "lag": 2,
+        "maturity": "2033-01-15",
+        "name": "fixed-put-ex_at_settlement",
+        "once": false,
+        "price_type": "Clean",
+        "product": "fixed",
+        "rate": 0.027,
+        "redemption": 107.5,
+        "reference": "2026-07-07",
+        "strike": 97.25,
+        "vol": 0.3
+      }
+    },
+    {
+      "components": {
+        "clock": 2.254794520547945,
+        "direct_forward": 935.2590641345242,
+        "duration": 3.9041119386072034,
+        "exercise_discount": 0.940171333463714,
+        "exercise_pv": 935.2590641345242,
+        "flows": [
+          {
+            "amount": 256.1378424657534,
+            "date": "2033-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          },
+          {
+            "amount": 786.09375,
+            "date": "2033-01-15",
+            "detached_at_exercise": false,
+            "detached_at_settlement": false
+          }
+        ],
+        "forward": 935.2590641345242,
+        "forward_yield": 0.027367802763489383,
+        "income_reference": 0,
+        "indenture_accrued": 109.48715753424656,
+        "option": 0.04233111552613256,
+        "reference_pv": 879.3037614613809,
+        "settlement_date": "2026-10-14",
+        "settlement_discount": 0.9990388183956378,
+        "settlement_pv": 880.1497452055565,
+        "standard_deviation": 0.04813233521186086,
+        "strike_currency": 820.6277825342465
+      },
+      "expected": {
+        "clean": 116.64177868783774,
+        "dirty": 120.36780608509801,
+        "npv": 879.3435599627121,
+        "settlement": 880.1895819972791
+      },
+      "inputs": {
+        "counter": "Actual365Fixed",
+        "coupons": [
+          0.05
+        ],
+        "direction": "put",
+        "evaluation": "2026-10-12",
+        "ex_days": 0,
+        "exercise": "2029-01-12",
+        "face": 731.25,
+        "issue": "2026-01-15",
+        "lag": 2,
+        "maturity": "2033-01-15",
+        "name": "fixed-put-once",
+        "once": true,
+        "price_type": "Clean",
+        "product": "fixed",
+        "rate": 0.027,
+        "redemption": 107.5,
+        "reference": "2026-10-01",
+        "strike": 97.25,
+        "vol": 0.3
+      }
+    }
+  ]
+}

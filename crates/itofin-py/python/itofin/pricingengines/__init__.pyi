@@ -16,6 +16,7 @@ __all__ = [
     "BachelierCapFloorEngine",
     "BachelierSwaptionEngine",
     "BatesEngine",
+    "BlackCallableFixedRateBondEngine",
     "BlackCapFloorEngine",
     "BlackSwaptionEngine",
     "CashAnnuityModel",
@@ -128,6 +129,16 @@ class BatesEngine:
         Retain the live model with an integration order from 1 through 192.
 
         Only NPV is supplied. Unsupported exercises and Greeks raise ItofinError.
+        """
+
+@typing.final
+class BlackCallableFixedRateBondEngine:
+    r"""
+    Single-European constant relative forward-yield volatility pricing.
+    """
+    def __init__(self, yield_volatility: quotes.SimpleQuote, discount_curve: termstructures.YieldTermStructure, settings: itofin.Settings) -> None:
+        r"""
+        Retain the live volatility quote, discount curve and exact settings allocation.
         """
 
 @typing.final
