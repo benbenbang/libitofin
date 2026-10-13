@@ -1,4 +1,5 @@
 //! Shared bond instruments and retained discounting engines.
+use crate::bond_backing::BondBacking;
 use crate::boundary::*;
 use crate::calendar_api::NativeCalendar;
 use crate::rates_api::{curve, finite, settings};
@@ -16,10 +17,10 @@ use std::cell::Cell;
 
 #[derive(Clone)]
 pub(crate) struct NativeBond {
-    pub bond: SharedMut<Bond>,
+    pub bond: BondBacking,
     pub calendar: NativeCalendar,
-    fixed: Option<(Frequency, DayCounter, Option<DayCounter>)>,
-    flags: Shared<Cell<(bool, Option<bool>)>>,
+    pub(crate) fixed: Option<(Frequency, DayCounter, Option<DayCounter>)>,
+    pub(crate) flags: Shared<Cell<(bool, Option<bool>)>>,
     pub(crate) floating: Option<crate::floating_bond_api::NativeFloating>,
 }
 impl NativeBond {
@@ -43,7 +44,7 @@ impl NativeBond {
             bond.settings().include_todays_cash_flows(),
         );
         Self {
-            bond: shared_mut(bond),
+            bond: BondBacking::Plain(shared_mut(bond)),
             calendar,
             fixed,
             flags: shared(Cell::new(flags)),
@@ -82,8 +83,16 @@ impl NativeBond {
         Ok(())
     }
     pub(crate) fn refresh(&self) {
-        if let Some(floating) = &self.floating {
-            floating.refresh(&self.bond);
+        if let Some(floating) = &self.floating
+            && let BondBacking::Plain(bond) = &self.bond
+        {
+            floating.refresh(bond);
+        }
+        if let BondBacking::CallableZero(_) = &self.bond {
+            self.bond.with_instrument(|bond| {
+                bond.base();
+            });
+            return;
         }
         let bond = self.bond.borrow();
         let flags = (
@@ -358,13 +367,14 @@ pub unsafe extern "C" fn itofin_bond_set_engine(
         with_context(ctx, error, |c| {
             let bond = c.get::<NativeBond>(id)?;
             let engine = c.get::<NativeBondEngine>(engine)?;
+            let plain = bond.bond.plain()?;
             if !Shared::ptr_eq(&bond.bond.borrow().settings_handle(), &engine.settings) {
                 return Err(BindingError::invalid("bond and engine settings differ"));
             }
             if let Some(floating) = &bond.floating {
                 floating.set_engine_guard(engine.discount, engine.include);
             }
-            bond.bond
+            plain
                 .borrow_mut()
                 .base_mut()
                 .set_pricing_engine(engine.engine);
@@ -398,33 +408,7 @@ pub unsafe extern "C" fn itofin_bond_real(
             if field != 3 || native.bond.borrow().notional(Some(settlement))? != 0.0 {
                 native.preflight(field, settlement, false)?;
             }
-            let mut bond = native.bond.borrow_mut();
-            let value = match field {
-                0 => bond.npv()?,
-                1 => bond.settlement_value()?,
-                2 | 3 => {
-                    let notional = bond.notional(Some(settlement))?;
-                    let dirty = if notional == 0.0 {
-                        0.0
-                    } else {
-                        let value = bond.settlement_value()?;
-                        let scaled = value * 100.0;
-                        if scaled.is_finite() {
-                            scaled / notional
-                        } else {
-                            value / notional * 100.0
-                        }
-                    };
-                    if field == 2 {
-                        dirty - bond.accrued_amount(Some(settlement))?
-                    } else {
-                        dirty
-                    }
-                }
-                4 => bond.accrued_amount(Some(settlement))?,
-                5 => bond.notional(Some(settlement))?,
-                _ => return Err(BindingError::invalid("invalid bond real field")),
-            };
+            let value = native.bond.real(field, settlement)?;
             output(out, finite(value)?)
         })
     }
@@ -457,8 +441,12 @@ pub unsafe extern "C" fn itofin_bond_integer(
                     .borrow()
                     .issue_date()
                     .map_or(0, |d| d.serial_number()),
-                4 => i32::from(native.bond.borrow().is_expired()?),
-                5 => i32::from(native.bond.borrow().base().is_calculated()),
+                4 => i32::from(native.bond.with_instrument(|bond| bond.is_expired())?),
+                5 => i32::from(
+                    native
+                        .bond
+                        .with_instrument(|bond| bond.base().is_calculated()),
+                ),
                 6 => match native
                     .fixed
                     .as_ref()
@@ -545,14 +533,15 @@ pub unsafe extern "C" fn itofin_bond_action(
                     floating.freeze(false);
                 }
             }
-            let mut bond = native.bond.borrow_mut();
-            match action {
-                0 => bond.recalculate()?,
-                1 => bond.base_mut().freeze(),
-                2 => bond.base_mut().unfreeze(),
-                _ => return Err(BindingError::invalid("invalid bond action")),
-            };
-            Ok(())
+            native.bond.with_instrument_mut(|bond| {
+                match action {
+                    0 => bond.recalculate()?,
+                    1 => bond.base_mut().freeze(),
+                    2 => bond.base_mut().unfreeze(),
+                    _ => return Err(BindingError::invalid("invalid bond action")),
+                };
+                Ok(())
+            })
         })
     }
 }

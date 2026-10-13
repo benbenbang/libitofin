@@ -238,6 +238,16 @@ typedef struct ItofinBootstrapCallbacks {
   void (*release)(size_t);
 } ItofinBootstrapCallbacks;
 
+/**
+ * An immutable exercise quote per 100. Clean=0/dirty=1; call=0/put=1.
+ */
+typedef struct ItofinCallability {
+  double price;
+  int32_t price_type;
+  int32_t call_type;
+  int32_t date;
+} ItofinCallability;
+
 typedef struct ItofinFloatingBondConfig {
   struct ItofinBondConfig bond;
   uint64_t schedule;
@@ -2081,6 +2091,64 @@ int32_t itofin_context_free(struct ItofinContext *ctx, struct ItofinError *error
 int32_t itofin_handle_release(struct ItofinContext *ctx,
                               uint64_t handle,
                               struct ItofinError *error);
+
+/**
+ * Validate and copy a callability value. Every bond constructor also validates all records.
+ * # Safety
+ * Pointers must satisfy the crate-level C caller contract.
+ */
+int32_t itofin_callability_new(struct ItofinCallability a,
+                               struct ItofinCallability *out,
+                               struct ItofinError *error);
+
+/**
+ * The common calendar and first-period day-counter fields must be zero.
+ * Zero ex-coupon calendar selects NullCalendar when an ex-coupon period is present.
+ * # Safety
+ * Pointers and thread ownership must satisfy the crate-level C caller contract.
+ */
+int32_t itofin_callable_fixed_rate_bond_new(struct ItofinContext *ctx,
+                                            struct ItofinFixedBondConfig a,
+                                            const double *coupons,
+                                            size_t count,
+                                            const struct ItofinCallability *calls,
+                                            size_t call_count,
+                                            uint64_t *out,
+                                            struct ItofinError *error);
+
+/**
+ * # Safety
+ * Pointers and thread ownership must satisfy the crate-level C caller contract.
+ */
+int32_t itofin_callable_zero_coupon_bond_new(struct ItofinContext *ctx,
+                                             struct ItofinBondConfig a,
+                                             int32_t maturity,
+                                             uint64_t counter,
+                                             const struct ItofinCallability *calls,
+                                             size_t call_count,
+                                             uint64_t *out,
+                                             struct ItofinError *error);
+
+/**
+ * Copy schedule in original order. Capacity zero queries required length.
+ * # Safety
+ * Pointers and thread ownership must satisfy the crate-level C caller contract.
+ */
+int32_t itofin_callable_bond_callability(struct ItofinContext *ctx,
+                                         uint64_t id,
+                                         struct ItofinCallability *out,
+                                         size_t capacity,
+                                         size_t *required,
+                                         struct ItofinError *error);
+
+/**
+ * # Safety
+ * Pointers and thread ownership must satisfy the crate-level C caller contract.
+ */
+int32_t itofin_callable_zero_bond_day_counter(struct ItofinContext *ctx,
+                                              uint64_t id,
+                                              uint64_t *out,
+                                              struct ItofinError *error);
 
 /**
  * Compute Wilder +DI, -DI, DX and ADX in channel-major order.
