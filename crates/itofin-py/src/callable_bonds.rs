@@ -2,15 +2,20 @@
 
 use crate::bonds::{BondBacking, PyBond, adjust, advance, finite, positive};
 use crate::helpers::PyBondPriceType;
+use crate::hullwhite::PyHullWhite;
 use crate::settings::PySettings;
 use crate::time::{
     PyBusinessDayConvention, PyCalendar, PyDate, PyDayCounter, PyFrequency, PyPeriod, PySchedule,
 };
 use crate::{ItofinError, PyQlError};
+use libitofin::instrument::Instrument;
 use libitofin::instruments::{
     BondPrice, Callability, CallabilityType, CallableFixedRateBond, CallableZeroCouponBond,
 };
-use libitofin::shared::shared_mut;
+use libitofin::pricingengine::PricingEngine;
+use libitofin::pricingengines::bond::TreeCallableFixedRateBondEngine;
+use libitofin::settings::Settings;
+use libitofin::shared::{Shared, SharedMut, shared_mut};
 use libitofin::time::date::Date;
 use libitofin::time::frequency::Frequency;
 use pyo3::prelude::*;
@@ -224,6 +229,20 @@ impl PyCallableFixedRateBond {
             day_counter: PyDayCounter::from_inner(accrual_day_counter.inner()),
         }))
     }
+    /// Attach a retained Hull-White tree engine sharing this bond's settings.
+    fn set_tree_engine(&mut self, engine: &PyTreeCallableFixedRateBondEngine) -> PyResult<()> {
+        if !Shared::ptr_eq(
+            &self.inner.borrow().bond().settings_handle(),
+            &engine.settings,
+        ) {
+            return Err(ItofinError::new_err("bond and engine must share settings"));
+        }
+        self.inner
+            .borrow_mut()
+            .base_mut()
+            .set_pricing_engine(engine.engine());
+        Ok(())
+    }
     fn callability(&self) -> Vec<PyCallability> {
         self.inner
             .borrow()
@@ -289,6 +308,20 @@ impl PyCallableZeroCouponBond {
         ))
         .add_subclass(Self { inner }))
     }
+    /// Attach a retained Hull-White tree engine sharing this bond's settings.
+    fn set_tree_engine(&mut self, engine: &PyTreeCallableFixedRateBondEngine) -> PyResult<()> {
+        if !Shared::ptr_eq(
+            &self.inner.borrow().bond().settings_handle(),
+            &engine.settings,
+        ) {
+            return Err(ItofinError::new_err("bond and engine must share settings"));
+        }
+        self.inner
+            .borrow_mut()
+            .base_mut()
+            .set_pricing_engine(engine.engine());
+        Ok(())
+    }
     fn callability(&self) -> Vec<PyCallability> {
         self.inner
             .borrow()
@@ -300,5 +333,198 @@ impl PyCallableZeroCouponBond {
     }
     fn day_counter(&self) -> PyDayCounter {
         PyDayCounter::from_inner(self.inner.borrow().day_counter().clone())
+    }
+}
+
+/// Event-aligned callable fixed/zero bond pricing on the retained Hull-White model.
+#[gen_stub_pyclass]
+#[pyclass(
+    name = "TreeCallableFixedRateBondEngine",
+    unsendable,
+    module = "itofin.pricingengines"
+)]
+pub struct PyTreeCallableFixedRateBondEngine {
+    inner: SharedMut<TreeCallableFixedRateBondEngine>,
+    settings: Shared<Settings<Date>>,
+}
+#[gen_stub_pymethods]
+#[pymethods]
+impl PyTreeCallableFixedRateBondEngine {
+    /// Retain the existing model and settings; time steps must be positive.
+    #[new]
+    fn new(model: &PyHullWhite, time_steps: usize, settings: &PySettings) -> PyResult<Self> {
+        Ok(Self {
+            inner: shared_mut(
+                TreeCallableFixedRateBondEngine::new(model.inner(), time_steps, settings.inner())
+                    .map_err(PyQlError::from)?,
+            ),
+            settings: settings.inner(),
+        })
+    }
+}
+impl PyTreeCallableFixedRateBondEngine {
+    fn engine(&self) -> SharedMut<dyn PricingEngine> {
+        SharedMut::clone(&self.inner) as SharedMut<dyn PricingEngine>
+    }
+}
+
+#[cfg(test)]
+mod tree_tests {
+    use super::*;
+    use libitofin::handle::{Handle, RelinkableHandle};
+    use libitofin::interestrate::Compounding;
+    use libitofin::math::array::Array;
+    use libitofin::models::model::CalibratedModelHolder;
+    use libitofin::models::shortrate::HullWhite;
+    use libitofin::patterns::observable::Observer;
+    use libitofin::quotes::{Quote, SimpleQuote};
+    use libitofin::shared::shared;
+    use libitofin::termstructures::yields::FlatForward;
+    use libitofin::termstructures::yieldtermstructure::YieldTermStructure;
+    use libitofin::time::businessdayconvention::BusinessDayConvention;
+    use libitofin::time::calendars::NullCalendar;
+    use libitofin::time::date::Month;
+    use libitofin::time::daycounters::actual365fixed::Actual365Fixed;
+    use std::cell::Cell;
+
+    struct Notifications(Shared<Cell<usize>>);
+    impl Observer for Notifications {
+        fn update(&mut self) {
+            self.0.set(self.0.get() + 1);
+        }
+    }
+    fn reference() -> Date {
+        Date::new(7, Month::July, 2026)
+    }
+    fn flat(rate: f64) -> Shared<dyn YieldTermStructure> {
+        shared(FlatForward::with_rate(
+            reference(),
+            rate,
+            Actual365Fixed::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        ))
+    }
+    fn product(settings: Shared<Settings<Date>>) -> PyCallableZeroCouponBond {
+        let call = Callability::new(
+            BondPrice::Clean(95.25),
+            CallabilityType::Put,
+            Date::new(7, Month::July, 2028),
+        )
+        .unwrap();
+        PyCallableZeroCouponBond {
+            inner: shared_mut(
+                CallableZeroCouponBond::new(
+                    2,
+                    1000.0,
+                    NullCalendar::new(),
+                    Date::new(7, Month::July, 2031),
+                    Actual365Fixed::new(),
+                    BusinessDayConvention::Unadjusted,
+                    100.0,
+                    None,
+                    vec![call],
+                    settings,
+                )
+                .unwrap(),
+            ),
+        }
+    }
+    fn engine(
+        model: SharedMut<HullWhite>,
+        settings: Shared<Settings<Date>>,
+    ) -> PyTreeCallableFixedRateBondEngine {
+        PyTreeCallableFixedRateBondEngine {
+            inner: shared_mut(
+                TreeCallableFixedRateBondEngine::new(model, 100, Shared::clone(&settings)).unwrap(),
+            ),
+            settings,
+        }
+    }
+    #[test]
+    fn typed_tree_attachment_observes_native_model_relink_and_detaches_old_engine() {
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(reference());
+        let quote = shared(SimpleQuote::new(0.03));
+        let initial: Shared<dyn YieldTermStructure> = shared(FlatForward::new(
+            reference(),
+            Handle::new(quote.clone() as Shared<dyn Quote>),
+            Actual365Fixed::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        ));
+        let curve = RelinkableHandle::new(initial);
+        let model = HullWhite::new(curve.handle().clone(), 0.1, 0.01).unwrap();
+        let original = engine(model.clone(), settings.clone());
+        let mut bond = product(settings.clone());
+        bond.set_tree_engine(&original).unwrap();
+        let first = bond.inner.borrow_mut().clean_price().unwrap();
+        quote.set_value(0.04);
+        assert!(!bond.inner.borrow().base().is_calculated());
+        let quote_price = bond.inner.borrow_mut().clean_price().unwrap();
+        assert!((first - quote_price).abs() > 0.01);
+        quote.set_value(f64::NAN);
+        assert!(bond.inner.borrow_mut().npv().is_err());
+        quote.set_value(0.04);
+        assert!((bond.inner.borrow_mut().clean_price().unwrap() - quote_price).abs() <= 1e-11);
+        curve.link_to(flat(0.025));
+        assert!(!bond.inner.borrow().base().is_calculated());
+        model
+            .borrow_mut()
+            .set_params(&Array::from([0.1, 0.02]))
+            .unwrap();
+        assert!(!bond.inner.borrow().base().is_calculated());
+        let current = bond.inner.borrow_mut().clean_price().unwrap();
+        let mut fresh = product(settings.clone());
+        fresh
+            .set_tree_engine(&engine(
+                HullWhite::new(Handle::new(flat(0.025)), 0.1, 0.02).unwrap(),
+                settings.clone(),
+            ))
+            .unwrap();
+        assert!((current - fresh.inner.borrow_mut().clean_price().unwrap()).abs() <= 1e-11);
+        let replacement_model = HullWhite::new(Handle::new(flat(0.05)), 0.1, 0.01).unwrap();
+        let replacement = engine(replacement_model, settings.clone());
+        bond.set_tree_engine(&replacement).unwrap();
+        let replaced = bond.inner.borrow_mut().npv().unwrap();
+        quote.set_value(0.07);
+        model
+            .borrow_mut()
+            .set_params(&Array::from([0.15, 0.025]))
+            .unwrap();
+        assert!(bond.inner.borrow().base().is_calculated());
+        assert_eq!(bond.inner.borrow_mut().npv().unwrap(), replaced);
+        curve.reset();
+        assert!(bond.inner.borrow().base().is_calculated());
+        assert_eq!(bond.inner.borrow_mut().npv().unwrap(), replaced);
+    }
+    #[test]
+    fn settings_mismatch_preserves_attachment_and_does_not_refresh_silent_policy() {
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(reference());
+        let model = HullWhite::new(Handle::new(flat(0.03)), 0.1, 0.01).unwrap();
+        let original = engine(model.clone(), settings.clone());
+        let mut bond = product(settings.clone());
+        bond.set_tree_engine(&original).unwrap();
+        let value = bond.inner.borrow_mut().npv().unwrap();
+        let notifications = shared(Cell::new(0));
+        let observer = shared_mut(Notifications(notifications.clone())) as SharedMut<dyn Observer>;
+        bond.inner.borrow().base().register_observer(&observer);
+        let wrong_settings = shared(Settings::new());
+        wrong_settings.set_evaluation_date(reference());
+        let wrong = engine(model, wrong_settings);
+        settings.set_include_reference_date_events(true);
+        assert!(bond.inner.borrow().bond().base().is_calculated());
+        assert!(bond.set_tree_engine(&wrong).is_err());
+        let borrowed = bond.inner.borrow();
+        assert!(borrowed.bond().base().is_calculated());
+        assert_eq!(borrowed.bond().base().results().value, Some(value));
+        assert!(SharedMut::ptr_eq(
+            borrowed.bond().base().pricing_engine().unwrap(),
+            &original.engine()
+        ));
+        assert_eq!(notifications.get(), 0);
+        assert!(!borrowed.base().is_calculated());
+        assert_eq!(notifications.get(), 0);
     }
 }

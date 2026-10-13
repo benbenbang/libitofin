@@ -10,7 +10,9 @@ There is no separate cash-flow bond or second valuation cache.
 ```python
 from itofin import Settings
 from itofin.instruments import Callability, CallabilityType, CallableFixedRateBond, CallableZeroCouponBond
-from itofin.termstructures import BondPriceType
+from itofin.models import HullWhite
+from itofin.pricingengines import TreeCallableFixedRateBondEngine
+from itofin.termstructures import BondPriceType, FlatForward
 from itofin.time import BusinessDayConvention, Calendar, Date, DayCounter, Frequency, Schedule
 
 settings = Settings()
@@ -24,7 +26,12 @@ schedule = Schedule(
 rights = [Callability(100.0, CallabilityType.Call, Date(15, 1, 2028), BondPriceType.Clean)]
 fixed = CallableFixedRateBond(2, 250.0, schedule, [0.045], day_counter, rights, settings)
 zero = CallableZeroCouponBond(2, calendar, 250.0, Date(15, 1, 2030), day_counter, rights, settings)
-print(fixed.settlement_date(), fixed.accrued_amount(), zero.day_counter())
+curve = FlatForward(Date(15, 3, 2026), 0.031, day_counter)
+model = HullWhite(curve, 0.1, 0.01)
+engine = TreeCallableFixedRateBondEngine(model, 100, settings)
+fixed.set_tree_engine(engine)
+zero.set_tree_engine(engine)
+print(fixed.npv(), fixed.clean_price(), zero.settlement_value())
 ```
 
 - `Callability` is immutable. `price()`, `price_type()`, `call_type()` and `date()`
@@ -110,15 +117,54 @@ unchanged.
 
 The generic `DiscountingBondEngine` is the wrong engine contract for either
 callable product. `Bond.set_engine` / `Bond.SetEngine` reject it before mutating
-attachment or cache state. Callable engine bindings are a separate feature.
+attachment or cache state. Use the additive `set_tree_engine` / `SetTreeEngine`
+methods for the typed callable tree engine. Existing base signatures are unchanged.
+
+## Hull-White tree engine
+
+`TreeCallableFixedRateBondEngine(model, time_steps, settings)` retains the existing
+`HullWhite` model and its actual live curve graph, with positive required time
+steps and explicit retained settings. Go uses
+`Session.NewTreeCallableFixedRateBondEngine(model, timeSteps, settings)` and both
+concrete callable products expose `SetTreeEngine`.
+
+- Bond and engine must share the **same Settings allocation**, not merely equal
+  evaluation dates. A mismatch fails before replacing the real installed engine.
+  HullWhite has no settings member, so there is no invented model/settings check.
+- Attachment and all valuation methods use the actual callable's one lazy base.
+  Replacing a tree engine detaches the former engine observer registration.
+- Engine/model/curve/settings wrappers can be released after attachment: native
+  dependencies remain retained. Live curve quotes and model notifications
+  invalidate the attached bond. Existing freeze, unfreeze, recalculate and native
+  expiry behavior remains intact.
+- The lattice rebuilds with mandatory exercise/payment times on each calculation.
+  Empty, multiple, mixed, unsorted and coincident hard rights retain native order.
+- NPV is currency at the **model curve reference date**. Settlement value is NPV
+  divided by the model curve's unspread settlement discount. Clean/dirty quotes
+  are per 100 of current notional, using the actual typed native methods.
+- Constructor does not require an evaluation date or price eagerly. Actual use
+  propagates unset evaluation, settlement-before-reference, invalid discounts,
+  unsupported calendar dates and nonfinite pricing errors without clamping or
+  enabling extrapolation. Zero redemption with a future positive put can have
+  positive value.
+- The inherited stateless yield/curve/Z-spread methods remain contractual
+  straight-cashflow analytics, not option-adjusted prices. They do not modify the
+  installed tree, lazy cache or freeze state on success or error.
+
+This is the existing Hull-White tree engine only. No generic/G2 model, alternate
+model-fitting curve, public continuous-spread pricing shortcut or new model
+calibration/mutation API is added.
 
 ## Scope and evidence
 
-Constructor, inherited analytics, ownership, calendar/date boundaries, wrong-engine
-failure and native lazy-dispatch regressions cover this foundation. Existing
-Rust/native callable numerical fixtures remain intact; this feature does not
-claim new engine-bound numerical coverage. No core algorithm or public Rust API
-changes are made.
+Constructor, inherited analytics, ownership, calendar/date boundaries, typed-engine
+failure and lazy-dispatch regressions cover the bindings. Independent QuantLib 1.43
+fixed/ex-coupon and nonflat zero fixtures exercise tree NPV/settlement/clean/dirty
+quotes with unchanged native/core tolerances. Mixed expired/future direction
+fixtures retain the known native original-schedule bug separately and use fresh
+settlement-eligible native rights as the aligned pricing oracle. Existing corrected
+Rust silent-zero flag semantics are preserved. No core algorithm or public Rust
+API changes are made.
 
 Soft calls, convertibles, generic/G2 trees, full callable volatility surfaces and
 multi-exercise Black approximations remain outside the approved binding scope.

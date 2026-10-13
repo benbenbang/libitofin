@@ -259,6 +259,66 @@
       "python": "itofin.instruments.CallabilityType.__new__",
       "reason": "Python CallabilityType forbids construction; Go uses typed integer constants and casts. Callability APIs revalidate discriminants.",
       "status": "language-specific"
+    },
+    {
+      "c": [
+        "itofin_callable_bond_set_tree_engine"
+      ],
+      "go": [
+        "CallableFixedRateBond.SetTreeEngine"
+      ],
+      "python": "itofin.instruments.CallableFixedRateBond.set_tree_engine",
+      "status": "implemented",
+      "tests": [
+        "TestCallableTreeQuantLibOracles",
+        "TestCallableTreeRetainedLifecycleAndReplacement",
+        "TestCallableTreeValidationAndSessions"
+      ]
+    },
+    {
+      "c": [
+        "itofin_callable_bond_set_tree_engine"
+      ],
+      "go": [
+        "CallableZeroCouponBond.SetTreeEngine"
+      ],
+      "python": "itofin.instruments.CallableZeroCouponBond.set_tree_engine",
+      "status": "implemented",
+      "tests": [
+        "TestCallableTreeQuantLibOracles",
+        "TestCallableTreeRetainedLifecycleAndReplacement",
+        "TestCallableTreeValidationAndSessions"
+      ]
+    },
+    {
+      "c": [
+        "itofin_tree_callable_bond_engine_new"
+      ],
+      "go": [
+        "Session.NewTreeCallableFixedRateBondEngine"
+      ],
+      "python": "itofin.pricingengines.TreeCallableFixedRateBondEngine",
+      "status": "implemented",
+      "tests": [
+        "TestCallableTreeQuantLibOracles",
+        "TestCallableTreeRetainedLifecycleAndReplacement",
+        "TestCallableTreeValidationAndSessions"
+      ]
+    },
+    {
+      "c": [
+        "itofin_tree_callable_bond_engine_new"
+      ],
+      "go": [
+        "Session.NewTreeCallableFixedRateBondEngine"
+      ],
+      "python": "itofin.pricingengines.TreeCallableFixedRateBondEngine.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestCallableTreeQuantLibOracles",
+        "TestCallableTreeRetainedLifecycleAndReplacement",
+        "TestCallableTreeValidationAndSessions"
+      ]
     }
   ]
 }

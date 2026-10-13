@@ -1,0 +1,562 @@
+{
+  "compiled_oracle": "Independent prebuilt QuantLib 1.43 release wheel, original core native generators rerun without libitofin import",
+  "ex_coupon": {
+    "compiled_oracle": "PyPI QuantLib 1.43 Python bindings and compiled library",
+    "inputs": {
+      "calendar": "NullCalendar",
+      "convention": "Unadjusted",
+      "coupon": 0.05,
+      "day_counter": "Actual365Fixed",
+      "ex_coupon_convention": "Unadjusted",
+      "face": 1000,
+      "hull_white_a": 0.1,
+      "hull_white_sigma": 0.01,
+      "issue": "2026-07-07",
+      "maturity": "2031-07-07",
+      "redemption_per_100": 100,
+      "risk_free": 0.03,
+      "settlement_days": 2,
+      "tenor_months": 6,
+      "tree_steps": 100
+    },
+    "local_source_revision": "9863b578af0caa4cecabf697196533e84a8308b6",
+    "local_source_version": "1.43-dev",
+    "quantlib_version": "1.43",
+    "rows": [
+      {
+        "accrued": 0.02739726027396472,
+        "clean": 103.74302463627785,
+        "dirty": 103.77042189655182,
+        "events": [
+          {
+            "date": "2028-07-05",
+            "kind": "call",
+            "price": 100,
+            "quote_type": "clean"
+          }
+        ],
+        "ex_coupon_days": 7,
+        "name": "ex_coupon_close_call",
+        "npv": 1037.5336514697024,
+        "reference": "2026-07-07",
+        "settlement": "2026-07-09",
+        "settlement_value": 1037.7042189655183
+      },
+      {
+        "accrued": -0.02739726027396472,
+        "clean": 100.18003917162349,
+        "dirty": 100.15264191134953,
+        "events": [
+          {
+            "date": "2028-08-07",
+            "kind": "call",
+            "price": 100,
+            "quote_type": "clean"
+          }
+        ],
+        "ex_coupon_days": 7,
+        "name": "ex_coupon_settlement_clean_call",
+        "npv": 1001.3617981645008,
+        "reference": "2028-07-03",
+        "settlement": "2028-07-05",
+        "settlement_value": 1001.5264191134953
+      },
+      {
+        "accrued": -0.02739726027396472,
+        "clean": 99.75653188758969,
+        "dirty": 99.72913462731572,
+        "events": [
+          {
+            "date": "2028-08-07",
+            "kind": "call",
+            "price": 100,
+            "quote_type": "dirty"
+          }
+        ],
+        "ex_coupon_days": 7,
+        "name": "ex_coupon_settlement_dirty_call",
+        "npv": 997.127421443303,
+        "reference": "2028-07-03",
+        "settlement": "2028-07-05",
+        "settlement_value": 997.291346273157
+      },
+      {
+        "accrued": 0.02739726027396472,
+        "clean": 103.8013364352658,
+        "dirty": 103.82873369553975,
+        "events": [
+          {
+            "date": "2028-07-07",
+            "kind": "call",
+            "price": 100,
+            "quote_type": "clean"
+          },
+          {
+            "date": "2029-07-07",
+            "kind": "put",
+            "price": 101,
+            "quote_type": "clean"
+          }
+        ],
+        "ex_coupon_days": 0,
+        "name": "multiple_call_put",
+        "npv": 1038.1166736124476,
+        "reference": "2026-07-07",
+        "settlement": "2026-07-09",
+        "settlement_value": 1038.2873369553974
+      },
+      {
+        "accrued": 0.02739726027396472,
+        "clean": 109.1075059355635,
+        "dirty": 109.13490319583745,
+        "events": [
+          {
+            "date": "2031-07-07",
+            "kind": "call",
+            "price": 100,
+            "quote_type": "clean"
+          }
+        ],
+        "ex_coupon_days": 0,
+        "name": "maturity_call",
+        "npv": 1091.1696468618893,
+        "reference": "2026-07-07",
+        "settlement": "2026-07-09",
+        "settlement_value": 1091.3490319583746
+      }
+    ]
+  },
+  "fixed": {
+    "compiled_oracle": "PyPI QuantLib 1.43 Python bindings and compiled library",
+    "inputs": {
+      "calendar": "NullCalendar",
+      "convention": "Unadjusted",
+      "coupon": 0.05,
+      "day_counter": "Actual365Fixed",
+      "face": 1000,
+      "hull_white_a": 0.1,
+      "hull_white_sigma": 0.01,
+      "maturity": "2031-07-07",
+      "redemption_per_100": 100,
+      "reference": "2026-07-07",
+      "risk_free": 0.03,
+      "settlement_days": 2,
+      "tenor_months": 6,
+      "tree_steps": 100
+    },
+    "local_source_revision": "9863b578af0caa4cecabf697196533e84a8308b6",
+    "local_source_version": "1.43-dev",
+    "quantlib_version": "1.43",
+    "rows": [
+      {
+        "accrued": 0.02739726027396472,
+        "call_date": "2028-07-07",
+        "call_price": 100,
+        "clean": 109.1075059355635,
+        "dirty": 109.13490319583745,
+        "name": "noncallable",
+        "npv": 1091.1696468618893,
+        "settlement": "2026-07-09",
+        "settlement_value": 1091.3490319583746
+      },
+      {
+        "accrued": 0.02739726027396472,
+        "call_date": "2028-07-07",
+        "call_price": 100,
+        "clean": 103.75249200869519,
+        "dirty": 103.77988926896914,
+        "name": "call_clean",
+        "npv": 1037.6283096323507,
+        "settlement": "2026-07-09",
+        "settlement_value": 1037.7988926896915
+      },
+      {
+        "accrued": 0.02739726027396472,
+        "call_date": "2028-07-07",
+        "call_price": 100,
+        "clean": 109.15939393250781,
+        "dirty": 109.18679119278177,
+        "name": "put_clean",
+        "npv": 1091.6884415430052,
+        "settlement": "2026-07-09",
+        "settlement_value": 1091.8679119278177
+      },
+      {
+        "accrued": 0.02739726027396472,
+        "call_date": "2028-08-07",
+        "call_price": 100,
+        "clean": 103.90900764654836,
+        "dirty": 103.93640490682232,
+        "name": "call_clean_off_coupon",
+        "npv": 1039.193208746048,
+        "settlement": "2026-07-09",
+        "settlement_value": 1039.3640490682233
+      },
+      {
+        "accrued": 0.02739726027396472,
+        "call_date": "2028-08-07",
+        "call_price": 100,
+        "clean": 103.52480528747083,
+        "dirty": 103.5522025477448,
+        "name": "call_dirty_off_coupon",
+        "npv": 1035.351816668888,
+        "settlement": "2026-07-09",
+        "settlement_value": 1035.522025477448
+      },
+      {
+        "accrued": 0.02739726027396472,
+        "call_date": "2028-07-05",
+        "call_price": 100,
+        "clean": 103.74302463627785,
+        "dirty": 103.77042189655182,
+        "name": "call_close_coupon",
+        "npv": 1037.5336514697024,
+        "settlement": "2026-07-09",
+        "settlement_value": 1037.7042189655183
+      }
+    ]
+  },
+  "provenance": {
+    "oracle-fixed/callable-edge-cases.json": "a7cbde1bdd33d37b7dadce2c1996a31f72d9181e2eaef8b1688ca5cd713cab2f",
+    "oracle-fixed/callable-prices.json": "eb3911209aefeb88de24abe371e63b3b7145dd5ed0fae0e260e525850c76ed5a",
+    "oracle-supplement.json": "1939d2d2db569941fea5460ee015ef9de603663c047684e9f3eaf1566ce4b686",
+    "oracle-zero/reference.tsv": "2e3462bc8e2925795217537d083f90e35f83dd92ea0e0799d8e221d21580de63"
+  },
+  "quantlib_version": "1.43",
+  "supplement": {
+    "quantlib_version": "1.43",
+    "rows": [
+      {
+        "eligible_events": [
+          [
+            "2026-10-13",
+            "Call",
+            "Clean",
+            120.0
+          ],
+          [
+            "2029-02-11",
+            "Put",
+            "Dirty",
+            95.25
+          ]
+        ],
+        "expected_aligned": {
+          "accrued": 0.0,
+          "clean": 94.14356386012565,
+          "dirty": 94.14356386012565,
+          "npv": 1162266.2099187558,
+          "payment_date": "2031-10-13",
+          "settlement_date": "2026-10-12",
+          "settlement_value": 1162266.2099187558
+        },
+        "kind": "zero",
+        "name": "zero_lag_0_expired_call_future_put",
+        "native_original": {
+          "accrued": 0.0,
+          "clean": 94.14356386012565,
+          "dirty": 94.14356386012565,
+          "npv": 1162266.2099187558,
+          "payment_date": "2031-10-13",
+          "settlement_date": "2026-10-12",
+          "settlement_value": 1162266.2099187558
+        },
+        "oracle_policy": "Fresh native product excludes settlement-ineligible events, preserving type/order; raw native full-schedule quote retained but not expected when direction-index bug applies.",
+        "original_events": [
+          [
+            "2026-10-13",
+            "Call",
+            "Clean",
+            120.0
+          ],
+          [
+            "2029-02-11",
+            "Put",
+            "Dirty",
+            95.25
+          ]
+        ],
+        "settlement_days": 0
+      },
+      {
+        "eligible_events": [
+          [
+            "2029-02-11",
+            "Put",
+            "Dirty",
+            95.25
+          ]
+        ],
+        "expected_aligned": {
+          "accrued": 0.0,
+          "clean": 94.15141769142056,
+          "dirty": 94.15141769142056,
+          "npv": 1162267.0796831609,
+          "payment_date": "2031-10-13",
+          "settlement_date": "2026-10-14",
+          "settlement_value": 1162363.1707980575
+        },
+        "kind": "zero",
+        "name": "zero_lag_2_expired_call_future_put",
+        "native_original": {
+          "accrued": 0.0,
+          "clean": 88.91818073641738,
+          "dirty": 88.91818073641738,
+          "npv": 1097664.557680608,
+          "payment_date": "2031-10-13",
+          "settlement_date": "2026-10-14",
+          "settlement_value": 1097755.3077439745
+        },
+        "oracle_policy": "Fresh native product excludes settlement-ineligible events, preserving type/order; raw native full-schedule quote retained but not expected when direction-index bug applies.",
+        "original_events": [
+          [
+            "2026-10-13",
+            "Call",
+            "Clean",
+            120.0
+          ],
+          [
+            "2029-02-11",
+            "Put",
+            "Dirty",
+            95.25
+          ]
+        ],
+        "settlement_days": 2
+      },
+      {
+        "eligible_events": [
+          [
+            "2029-02-11",
+            "Put",
+            "Dirty",
+            95.25
+          ]
+        ],
+        "expected_aligned": {
+          "accrued": 0.0,
+          "clean": 94.20003208667859,
+          "dirty": 94.20003208667859,
+          "npv": 1162267.0796831609,
+          "payment_date": "2031-10-13",
+          "settlement_date": "2026-10-26",
+          "settlement_value": 1162963.3485118307
+        },
+        "kind": "zero",
+        "name": "zero_lag_10_expired_call_future_put",
+        "native_original": {
+          "accrued": 0.0,
+          "clean": 88.96409298808535,
+          "dirty": 88.96409298808535,
+          "npv": 1097664.557680608,
+          "payment_date": "2031-10-13",
+          "settlement_date": "2026-10-26",
+          "settlement_value": 1098322.1256606432
+        },
+        "oracle_policy": "Fresh native product excludes settlement-ineligible events, preserving type/order; raw native full-schedule quote retained but not expected when direction-index bug applies.",
+        "original_events": [
+          [
+            "2026-10-13",
+            "Call",
+            "Clean",
+            120.0
+          ],
+          [
+            "2029-02-11",
+            "Put",
+            "Dirty",
+            95.25
+          ]
+        ],
+        "settlement_days": 10
+      },
+      {
+        "expected": {
+          "accrued": 0.7624999999999993,
+          "clean": 104.06867242637959,
+          "dirty": 104.8311724263796,
+          "npv": 262.0327993087227,
+          "payment_date": "2030-01-15",
+          "settlement_date": "2026-03-17",
+          "settlement_value": 262.077931065949
+        },
+        "kind": "fixed",
+        "name": "fixed_zero_rule_once_tree",
+        "native_frequency_label": "Once"
+      }
+    ],
+    "source": "Independent prebuilt QuantLib1.43 native release wheel, no libitofin import"
+  },
+  "zero": {
+    "inputs": {
+      "a": 0.073,
+      "calendar": "TARGET",
+      "curve_dates": [
+        "2026-10-12",
+        "2027-10-12",
+        "2030-10-12",
+        "2035-10-12"
+      ],
+      "curve_yields": [
+        0.015,
+        0.031,
+        0.024,
+        0.04
+      ],
+      "day_counter": "Actual365Fixed",
+      "face": 1234567.89,
+      "issue": "2026-10-09",
+      "maturity": "2031-10-12",
+      "reference": "2026-10-12",
+      "settlement_days": 2,
+      "sigma": 0.014,
+      "tree_steps": 120
+    },
+    "rows": [
+      {
+        "case": "plain",
+        "clean": 93.82106374135729,
+        "convention": "Following",
+        "dirty": 93.82106374135729,
+        "events": "",
+        "npv": 1158188.973052199,
+        "payment_date": "2031-10-13",
+        "redemption": 107.5,
+        "settlement_date": "2026-10-14",
+        "settlement_value": 1158284.7270072296
+      },
+      {
+        "case": "call_clean",
+        "clean": 92.01012109319785,
+        "convention": "Following",
+        "dirty": 92.01012109319785,
+        "events": "2028-06-17,C,Clean,98.75",
+        "npv": 1135833.5048631974,
+        "payment_date": "2031-10-13",
+        "redemption": 107.5,
+        "settlement_date": "2026-10-14",
+        "settlement_value": 1135927.4105667376
+      },
+      {
+        "case": "call_dirty",
+        "clean": 92.01012109319785,
+        "convention": "Following",
+        "dirty": 92.01012109319785,
+        "events": "2028-06-17,C,Dirty,98.75",
+        "npv": 1135833.5048631974,
+        "payment_date": "2031-10-13",
+        "redemption": 107.5,
+        "settlement_date": "2026-10-14",
+        "settlement_value": 1135927.4105667376
+      },
+      {
+        "case": "put",
+        "clean": 94.15141769142056,
+        "convention": "Following",
+        "dirty": 94.15141769142056,
+        "events": "2029-02-11,P,Clean,95.25",
+        "npv": 1162267.0796831609,
+        "payment_date": "2031-10-13",
+        "redemption": 107.5,
+        "settlement_date": "2026-10-14",
+        "settlement_value": 1162363.1707980575
+      },
+      {
+        "case": "mixed",
+        "clean": 88.49403130337026,
+        "convention": "Following",
+        "dirty": 88.49403130337026,
+        "events": "2029-02-11,P,Dirty,96;2028-06-17,C,Clean,93",
+        "npv": 1092428.5778623044,
+        "payment_date": "2031-10-13",
+        "redemption": 107.5,
+        "settlement_date": "2026-10-14",
+        "settlement_value": 1092518.8950379577
+      },
+      {
+        "case": "tie_call_put",
+        "clean": 93.69924901467793,
+        "convention": "Following",
+        "dirty": 93.69924901467793,
+        "events": "2029-02-11,C,Clean,90;2029-02-11,P,Dirty,100",
+        "npv": 1156685.2118756645,
+        "payment_date": "2031-10-13",
+        "redemption": 107.5,
+        "settlement_date": "2026-10-14",
+        "settlement_value": 1156780.841506355
+      },
+      {
+        "case": "tie_put_call",
+        "clean": 84.32932411321012,
+        "convention": "Following",
+        "dirty": 84.32932411321012,
+        "events": "2029-02-11,P,Dirty,100;2029-02-11,C,Clean,90",
+        "npv": 1041016.6906880981,
+        "payment_date": "2031-10-13",
+        "redemption": 107.5,
+        "settlement_date": "2026-10-14",
+        "settlement_value": 1041102.7573557193
+      },
+      {
+        "case": "maturity_call",
+        "clean": 61.100018001180246,
+        "convention": "Following",
+        "dirty": 61.100018001180246,
+        "events": "2031-10-12,C,Clean,70",
+        "npv": 754258.8442329046,
+        "payment_date": "2031-10-13",
+        "redemption": 107.5,
+        "settlement_date": "2026-10-14",
+        "settlement_value": 754321.2030267911
+      },
+      {
+        "case": "redemption_put",
+        "clean": 104.7676738033108,
+        "convention": "Preceding",
+        "dirty": 104.7676738033108,
+        "events": "2031-10-10,P,Dirty,120",
+        "npv": 1293321.1337896613,
+        "payment_date": "2031-10-10",
+        "redemption": 107.5,
+        "settlement_date": "2026-10-14",
+        "settlement_value": 1293428.0598756168
+      },
+      {
+        "case": "settlement_filter",
+        "clean": 84.99645588173283,
+        "convention": "Following",
+        "dirty": 84.99645588173283,
+        "events": "2026-10-13,C,Clean,120;2026-10-14,C,Dirty,50;2026-10-15,C,Clean,85",
+        "npv": 1049252.2044103243,
+        "payment_date": "2031-10-13",
+        "redemption": 107.5,
+        "settlement_date": "2026-10-14",
+        "settlement_value": 1049338.9519538898
+      },
+      {
+        "case": "zero_redemption_put",
+        "clean": 89.24853468648074,
+        "convention": "Following",
+        "dirty": 89.24853468648074,
+        "events": "2029-02-11,P,Clean,95.25",
+        "npv": 1101742.6643115708,
+        "payment_date": "2031-10-13",
+        "redemption": 0.0,
+        "settlement_date": "2026-10-14",
+        "settlement_value": 1101833.7515348033
+      },
+      {
+        "case": "negative_rates",
+        "clean": 100.74488128172224,
+        "convention": "Following",
+        "dirty": 100.74488128172224,
+        "events": "2028-06-17,C,Clean,98.75",
+        "npv": 1243845.739551052,
+        "payment_date": "2031-10-13",
+        "redemption": 107.5,
+        "settlement_date": "2026-10-14",
+        "settlement_value": 1243763.9551227633
+      }
+    ]
+  }
+}

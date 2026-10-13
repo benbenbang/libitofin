@@ -15,9 +15,9 @@ bindings. All three language surfaces share the Rust numerical core.
 Go and Python expose fixed/zero/floating bond instruments, retained discounting
 engines and [yield/Z-spread analytics](bond-analytics.md):
 [bond binding guide](bond-bindings.md). Existing bootstrap helpers remain
-separate. [Callable bond construction](callable-bond-bindings.md) shares the
-retained Bond interface; callable engine pricing and analytical risk measures
-remain separate binding work.
+separate. [Callable bonds and Hull-White tree pricing](callable-bond-bindings.md)
+share the retained Bond interface. Black callable pricing/IV, OAS and effective
+risk measures remain separate binding work.
 
 ## Install
 

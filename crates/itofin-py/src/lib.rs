@@ -412,6 +412,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     let pricingengines = PyModule::new(py, "pricingengines")?;
     pricingengines.add_class::<bonds::PyDiscountingBondEngine>()?;
+    pricingengines.add_class::<callable_bonds::PyTreeCallableFixedRateBondEngine>()?;
     pricingengines.add_class::<variance_swap::PyReplicatingVarianceSwapEngine>()?;
     pricingengines.add_class::<mc_variance_swap::PyMCVarianceSwapEngine>()?;
     pricingengines.add_class::<PyCashAnnuityModel>()?;
