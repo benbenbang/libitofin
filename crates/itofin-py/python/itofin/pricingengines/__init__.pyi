@@ -38,6 +38,7 @@ __all__ = [
     "NumericalFix",
     "QMCEuropeanEngine",
     "ReplicatingVarianceSwapEngine",
+    "TreeCallableFixedRateBondEngine",
     "TreeCapFloorEngine",
     "TreeSwaptionEngine",
     "YoYInflationCapFloorEngine",
@@ -615,6 +616,16 @@ class ReplicatingVarianceSwapEngine:
 
         PyO3 extracts Python sequences before core bounds; additional core
         allocations are bounded. No iterator-only generator contract is promised.
+        """
+
+@typing.final
+class TreeCallableFixedRateBondEngine:
+    r"""
+    Event-aligned callable fixed/zero bond pricing on the retained Hull-White model.
+    """
+    def __init__(self, model: models.HullWhite, time_steps: builtins.int, settings: itofin.Settings) -> None:
+        r"""
+        Retain the existing model and settings; time steps must be positive.
         """
 
 @typing.final
