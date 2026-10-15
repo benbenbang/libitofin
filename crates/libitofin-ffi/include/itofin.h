@@ -259,6 +259,23 @@ typedef struct ItofinCallability {
   int32_t date;
 } ItofinCallability;
 
+typedef struct ItofinCallableOASConfig {
+  uint64_t day_counter;
+  /**
+   * Existing compounding tags 0 through 4.
+   */
+  int32_t compounding;
+  /**
+   * Annual=0, Semiannual=1, Quarterly=2, Monthly=3.
+   */
+  int32_t frequency;
+  /**
+   * Bit 1 supplies an actual unadjusted settlement; other bits reject.
+   */
+  uint32_t settlement_flags;
+  int32_t settlement;
+} ItofinCallableOASConfig;
+
 typedef struct ItofinFloatingBondConfig {
   struct ItofinBondConfig bond;
   uint64_t schedule;
@@ -2197,6 +2214,34 @@ int32_t itofin_callable_zero_bond_day_counter(struct ItofinContext *ctx,
                                               uint64_t id,
                                               uint64_t *out,
                                               struct ItofinError *error);
+
+/**
+ * Pure clean settlement quote per 100 from a conventional decimal spread.
+ * # Safety
+ * Pointers and thread ownership must satisfy the crate-level C caller contract.
+ */
+int32_t itofin_callable_bond_clean_price_oas(struct ItofinContext *ctx,
+                                             uint64_t bond,
+                                             double spread,
+                                             uint64_t engine,
+                                             struct ItofinCallableOASConfig config,
+                                             double *out,
+                                             struct ItofinError *error);
+
+/**
+ * Recover conventional decimal OAS without altering bond or engine state.
+ * Omitted solver controls use 1e-10, 100 and zero in continuous shift units.
+ * # Safety
+ * Pointers and thread ownership must satisfy the crate-level C caller contract.
+ */
+int32_t itofin_callable_bond_oas(struct ItofinContext *ctx,
+                                 uint64_t bond,
+                                 double clean_price,
+                                 uint64_t engine,
+                                 struct ItofinCallableOASConfig config,
+                                 struct ItofinAnalyticsSolverConfig solver,
+                                 double *out,
+                                 struct ItofinError *error);
 
 /**
  * Construct without eager valuation. Time steps must be positive and fit usize.

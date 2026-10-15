@@ -23,6 +23,7 @@ pub mod bootstrap_variables;
 pub mod boundary;
 pub mod callable_black_api;
 pub mod callable_bond_api;
+pub mod callable_oas_api;
 pub mod callable_tree_api;
 pub mod chart_adx_api;
 pub mod chart_api;
