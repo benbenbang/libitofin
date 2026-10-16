@@ -1,0 +1,395 @@
+{
+  "boundary": {
+    "delivery": 45845,
+    "settlement": 45754,
+    "values": [
+      -5.208381048492436,
+      99.6024761554503,
+      99.53398300476537
+    ]
+  },
+  "live_rows": [
+    {
+      "stage": "base",
+      "values": [
+        [
+          -2.480553214910031,
+          102.46975225146585,
+          102.46975225146585
+        ],
+        [
+          -2.498701450365973,
+          102.4512404406221,
+          102.4512404406221
+        ]
+      ]
+    },
+    {
+      "stage": "finance",
+      "values": [
+        [
+          -0.9246181156667105,
+          104.0427226770635,
+          104.0427226770635
+        ],
+        [
+          -0.9786603420687401,
+          103.98677158013051,
+          103.98677158013051
+        ]
+      ]
+    },
+    {
+      "stage": "income",
+      "values": [
+        [
+          -0.9246181156667105,
+          104.0427226770635,
+          104.0427226770635
+        ],
+        [
+          -0.9127716258631874,
+          104.05498760660917,
+          104.05498760660917
+        ]
+      ]
+    },
+    {
+      "stage": "spot",
+      "values": [
+        [
+          -5.317430813707568,
+          99.49474777965425,
+          99.49474777965425
+        ],
+        [
+          -5.3055843239040446,
+          99.50701270919993,
+          99.50701270919993
+        ]
+      ]
+    }
+  ],
+  "rows": [
+    {
+      "delivery": 45839,
+      "face": 100.0,
+      "kind": "fixed",
+      "separate": false,
+      "settlement": 45659,
+      "short": false,
+      "values": [
+        -0.061079527740859514,
+        104.93770365378091,
+        102.47195022912338
+      ]
+    },
+    {
+      "delivery": 45839,
+      "face": 100.0,
+      "kind": "fixed",
+      "separate": false,
+      "settlement": 45659,
+      "short": true,
+      "values": [
+        0.061079527740859514,
+        104.93770365378091,
+        102.47195022912338
+      ]
+    },
+    {
+      "delivery": 45839,
+      "face": 100.0,
+      "kind": "fixed",
+      "separate": true,
+      "settlement": 45659,
+      "short": false,
+      "values": [
+        -0.061079527740859514,
+        104.93770365378091,
+        102.47195022912338
+      ]
+    },
+    {
+      "delivery": 45839,
+      "face": 100.0,
+      "kind": "fixed",
+      "separate": true,
+      "settlement": 45659,
+      "short": true,
+      "values": [
+        0.061079527740859514,
+        104.93770365378091,
+        102.47195022912338
+      ]
+    },
+    {
+      "delivery": 45840,
+      "face": 100.0,
+      "kind": "fixed",
+      "separate": false,
+      "settlement": 45659,
+      "short": false,
+      "values": [
+        -2.480553214910031,
+        102.46975225146585,
+        102.46975225146585
+      ]
+    },
+    {
+      "delivery": 45840,
+      "face": 100.0,
+      "kind": "fixed",
+      "separate": false,
+      "settlement": 45659,
+      "short": true,
+      "values": [
+        2.480553214910031,
+        102.46975225146585,
+        102.46975225146585
+      ]
+    },
+    {
+      "delivery": 45840,
+      "face": 100.0,
+      "kind": "fixed",
+      "separate": true,
+      "settlement": 45659,
+      "short": false,
+      "values": [
+        -2.498701450365973,
+        102.4512404406221,
+        102.4512404406221
+      ]
+    },
+    {
+      "delivery": 45840,
+      "face": 100.0,
+      "kind": "fixed",
+      "separate": true,
+      "settlement": 45659,
+      "short": true,
+      "values": [
+        2.498701450365973,
+        102.4512404406221,
+        102.4512404406221
+      ]
+    },
+    {
+      "delivery": 46205,
+      "face": 100.0,
+      "kind": "fixed",
+      "separate": false,
+      "settlement": 45659,
+      "short": false,
+      "values": [
+        -97.39340052906425,
+        1.6011263981184753,
+        1.6011263981184753
+      ]
+    },
+    {
+      "delivery": 46205,
+      "face": 100.0,
+      "kind": "fixed",
+      "separate": false,
+      "settlement": 45659,
+      "short": true,
+      "values": [
+        97.39340052906425,
+        1.6011263981184753,
+        1.6011263981184753
+      ]
+    },
+    {
+      "delivery": 46205,
+      "face": 100.0,
+      "kind": "fixed",
+      "separate": true,
+      "settlement": 45659,
+      "short": false,
+      "values": [
+        -99.63854660262638,
+        -0.7824599005110053,
+        -0.7824599005110053
+      ]
+    },
+    {
+      "delivery": 46205,
+      "face": 100.0,
+      "kind": "fixed",
+      "separate": true,
+      "settlement": 45659,
+      "short": true,
+      "values": [
+        99.63854660262638,
+        -0.7824599005110053,
+        -0.7824599005110053
+      ]
+    },
+    {
+      "delivery": 45839,
+      "face": 250.0,
+      "kind": "fixed",
+      "separate": false,
+      "settlement": 45659,
+      "short": false,
+      "values": [
+        -0.06107952774084558,
+        104.93770365378093,
+        102.4719502291234
+      ]
+    },
+    {
+      "delivery": 45839,
+      "face": 250.0,
+      "kind": "fixed",
+      "separate": false,
+      "settlement": 45659,
+      "short": true,
+      "values": [
+        0.06107952774084558,
+        104.93770365378093,
+        102.4719502291234
+      ]
+    },
+    {
+      "delivery": 45839,
+      "face": 250.0,
+      "kind": "fixed",
+      "separate": true,
+      "settlement": 45659,
+      "short": false,
+      "values": [
+        -0.06107952774084558,
+        104.93770365378093,
+        102.4719502291234
+      ]
+    },
+    {
+      "delivery": 45839,
+      "face": 250.0,
+      "kind": "fixed",
+      "separate": true,
+      "settlement": 45659,
+      "short": true,
+      "values": [
+        0.06107952774084558,
+        104.93770365378093,
+        102.4719502291234
+      ]
+    },
+    {
+      "delivery": 45840,
+      "face": 250.0,
+      "kind": "fixed",
+      "separate": false,
+      "settlement": 45659,
+      "short": false,
+      "values": [
+        -6.126685951891369,
+        98.75057416927409,
+        98.75057416927409
+      ]
+    },
+    {
+      "delivery": 45840,
+      "face": 250.0,
+      "kind": "fixed",
+      "separate": false,
+      "settlement": 45659,
+      "short": true,
+      "values": [
+        6.126685951891369,
+        98.75057416927409,
+        98.75057416927409
+      ]
+    },
+    {
+      "delivery": 45840,
+      "face": 250.0,
+      "kind": "fixed",
+      "separate": true,
+      "settlement": 45659,
+      "short": false,
+      "values": [
+        -6.172056540531232,
+        98.70429464216471,
+        98.70429464216471
+      ]
+    },
+    {
+      "delivery": 45840,
+      "face": 250.0,
+      "kind": "fixed",
+      "separate": true,
+      "settlement": 45659,
+      "short": true,
+      "values": [
+        6.172056540531232,
+        98.70429464216471,
+        98.70429464216471
+      ]
+    },
+    {
+      "delivery": 46205,
+      "face": 250.0,
+      "kind": "fixed",
+      "separate": false,
+      "settlement": 45659,
+      "short": false,
+      "values": [
+        -249.46317640103553,
+        -159.84557788201477,
+        -159.84557788201477
+      ]
+    },
+    {
+      "delivery": 46205,
+      "face": 250.0,
+      "kind": "fixed",
+      "separate": false,
+      "settlement": 45659,
+      "short": true,
+      "values": [
+        249.46317640103553,
+        -159.84557788201477,
+        -159.84557788201477
+      ]
+    },
+    {
+      "delivery": 46205,
+      "face": 250.0,
+      "kind": "fixed",
+      "separate": true,
+      "settlement": 45659,
+      "short": false,
+      "values": [
+        -255.0760415849408,
+        -165.80454362858842,
+        -165.80454362858842
+      ]
+    },
+    {
+      "delivery": 46205,
+      "face": 250.0,
+      "kind": "fixed",
+      "separate": true,
+      "settlement": 45659,
+      "short": true,
+      "values": [
+        255.0760415849408,
+        -165.80454362858842,
+        -165.80454362858842
+      ]
+    }
+  ],
+  "source_hashes": {
+    "ql/instruments/bondforward.cpp": "db0cf0854e13b6841818bfe2409825d33430778d6a191be95595a016a3889fce",
+    "ql/instruments/bonds/fixedratebond.cpp": "7d929aa5cecbfa908a359cca59e953fc5f1319e15eef4d25e8a4bd22a6565a61",
+    "ql/instruments/bonds/zerocouponbond.cpp": "67c88a9bed1111775ba24663bf0b2f4550b169b1d6d52a6007c7b556aed7d1a4",
+    "ql/instruments/forward.cpp": "820d22fde5e3635b9b00a77618ddfb06bc91d4aebb4dae3a27001a6dc870b181"
+  },
+  "source_revision": "9863b578af0caa4cecabf697196533e84a8308b6",
+  "version": "1.43"
+}
