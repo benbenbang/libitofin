@@ -315,4 +315,63 @@ impl PyFloatFloatSwap {
     fn npv(&mut self) -> PyResult<f64> {
         self.value(0)
     }
+    /// Signed paid-leg present value.
+    fn pay_leg_npv(&mut self) -> PyResult<f64> {
+        self.value(1)
+    }
+    /// Signed received-leg present value.
+    fn receive_leg_npv(&mut self) -> PyResult<f64> {
+        self.value(2)
+    }
+    /// Signed paid-leg sensitivity for one basis point of spread.
+    fn pay_leg_bps(&mut self) -> PyResult<f64> {
+        self.value(3)
+    }
+    /// Signed received-leg sensitivity for one basis point of spread.
+    fn receive_leg_bps(&mut self) -> PyResult<f64> {
+        self.value(4)
+    }
+    /// Absolute paid spread zeroing NPV while holding the received spread fixed.
+    fn fair_pay_spread(&mut self) -> PyResult<f64> {
+        self.value(5)
+    }
+    /// Absolute received spread zeroing NPV while holding the paid spread fixed.
+    fn fair_receive_spread(&mut self) -> PyResult<f64> {
+        self.value(6)
+    }
+    /// Populate native cached results if needed.
+    fn calculate(&mut self) -> PyResult<()> {
+        self.prepare(false)?;
+        self.inner.calculate().map_err(PyQlError::from)?;
+        self.flags = flags(&self.settings);
+        Ok(())
+    }
+    /// Force native repricing, including while frozen.
+    fn recalculate(&mut self) -> PyResult<()> {
+        self.prepare(true)?;
+        self.inner.recalculate().map_err(PyQlError::from)?;
+        self.flags = flags(&self.settings);
+        Ok(())
+    }
+    /// Pin native cached results until unfreeze or explicit recalculate.
+    fn freeze(&mut self) {
+        self.inner.base_mut().freeze();
+        self.frozen = true;
+    }
+    /// Resume native observer-driven repricing.
+    fn unfreeze(&mut self) {
+        self.inner.base_mut().unfreeze();
+        self.frozen = false;
+    }
+    /// Read the native cache flag without calculating.
+    fn is_calculated(&self) -> bool {
+        self.inner.base().is_calculated()
+    }
+    /// Test native expiry without calculating.
+    fn is_expired(&self) -> PyResult<bool> {
+        self.inner
+            .is_expired()
+            .map_err(PyQlError::from)
+            .map_err(Into::into)
+    }
 }

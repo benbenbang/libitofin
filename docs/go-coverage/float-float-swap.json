@@ -32,6 +32,138 @@
         "TestFloatFloatIdentityLifetimeAndFreeze",
         "TestFloatFloatSessionNilAndNumericGuards"
       ]
+    },
+    {
+      "c": "itofin_float_float_swap_value",
+      "go": "FloatFloatSwap.PayLegNPV",
+      "python": "itofin.instruments.FloatFloatSwap.pay_leg_npv",
+      "status": "implemented",
+      "tests": [
+        "TestFloatFloatNativeSignedOracle",
+        "TestFloatFloatIdentityLifetimeAndFreeze",
+        "TestFloatFloatSessionNilAndNumericGuards"
+      ]
+    },
+    {
+      "c": "itofin_float_float_swap_value",
+      "go": "FloatFloatSwap.ReceiveLegNPV",
+      "python": "itofin.instruments.FloatFloatSwap.receive_leg_npv",
+      "status": "implemented",
+      "tests": [
+        "TestFloatFloatNativeSignedOracle",
+        "TestFloatFloatIdentityLifetimeAndFreeze",
+        "TestFloatFloatSessionNilAndNumericGuards"
+      ]
+    },
+    {
+      "c": "itofin_float_float_swap_value",
+      "go": "FloatFloatSwap.PayLegBPS",
+      "python": "itofin.instruments.FloatFloatSwap.pay_leg_bps",
+      "status": "implemented",
+      "tests": [
+        "TestFloatFloatNativeSignedOracle",
+        "TestFloatFloatIdentityLifetimeAndFreeze",
+        "TestFloatFloatSessionNilAndNumericGuards"
+      ]
+    },
+    {
+      "c": "itofin_float_float_swap_value",
+      "go": "FloatFloatSwap.ReceiveLegBPS",
+      "python": "itofin.instruments.FloatFloatSwap.receive_leg_bps",
+      "status": "implemented",
+      "tests": [
+        "TestFloatFloatNativeSignedOracle",
+        "TestFloatFloatIdentityLifetimeAndFreeze",
+        "TestFloatFloatSessionNilAndNumericGuards"
+      ]
+    },
+    {
+      "c": "itofin_float_float_swap_value",
+      "go": "FloatFloatSwap.FairPaySpread",
+      "python": "itofin.instruments.FloatFloatSwap.fair_pay_spread",
+      "status": "implemented",
+      "tests": [
+        "TestFloatFloatNativeSignedOracle",
+        "TestFloatFloatIdentityLifetimeAndFreeze",
+        "TestFloatFloatSessionNilAndNumericGuards"
+      ]
+    },
+    {
+      "c": "itofin_float_float_swap_value",
+      "go": "FloatFloatSwap.FairReceiveSpread",
+      "python": "itofin.instruments.FloatFloatSwap.fair_receive_spread",
+      "status": "implemented",
+      "tests": [
+        "TestFloatFloatNativeSignedOracle",
+        "TestFloatFloatIdentityLifetimeAndFreeze",
+        "TestFloatFloatSessionNilAndNumericGuards"
+      ]
+    },
+    {
+      "c": "itofin_float_float_swap_action",
+      "go": "FloatFloatSwap.Calculate",
+      "python": "itofin.instruments.FloatFloatSwap.calculate",
+      "status": "implemented",
+      "tests": [
+        "TestFloatFloatNativeSignedOracle",
+        "TestFloatFloatIdentityLifetimeAndFreeze",
+        "TestFloatFloatSessionNilAndNumericGuards"
+      ]
+    },
+    {
+      "c": "itofin_float_float_swap_action",
+      "go": "FloatFloatSwap.Recalculate",
+      "python": "itofin.instruments.FloatFloatSwap.recalculate",
+      "status": "implemented",
+      "tests": [
+        "TestFloatFloatNativeSignedOracle",
+        "TestFloatFloatIdentityLifetimeAndFreeze",
+        "TestFloatFloatSessionNilAndNumericGuards"
+      ]
+    },
+    {
+      "c": "itofin_float_float_swap_action",
+      "go": "FloatFloatSwap.Freeze",
+      "python": "itofin.instruments.FloatFloatSwap.freeze",
+      "status": "implemented",
+      "tests": [
+        "TestFloatFloatNativeSignedOracle",
+        "TestFloatFloatIdentityLifetimeAndFreeze",
+        "TestFloatFloatSessionNilAndNumericGuards"
+      ]
+    },
+    {
+      "c": "itofin_float_float_swap_action",
+      "go": "FloatFloatSwap.Unfreeze",
+      "python": "itofin.instruments.FloatFloatSwap.unfreeze",
+      "status": "implemented",
+      "tests": [
+        "TestFloatFloatNativeSignedOracle",
+        "TestFloatFloatIdentityLifetimeAndFreeze",
+        "TestFloatFloatSessionNilAndNumericGuards"
+      ]
+    },
+    {
+      "c": "itofin_float_float_swap_value",
+      "go": "FloatFloatSwap.IsCalculated",
+      "python": "itofin.instruments.FloatFloatSwap.is_calculated",
+      "status": "implemented",
+      "tests": [
+        "TestFloatFloatNativeSignedOracle",
+        "TestFloatFloatIdentityLifetimeAndFreeze",
+        "TestFloatFloatSessionNilAndNumericGuards"
+      ]
+    },
+    {
+      "c": "itofin_float_float_swap_value",
+      "go": "FloatFloatSwap.IsExpired",
+      "python": "itofin.instruments.FloatFloatSwap.is_expired",
+      "status": "implemented",
+      "tests": [
+        "TestFloatFloatNativeSignedOracle",
+        "TestFloatFloatIdentityLifetimeAndFreeze",
+        "TestFloatFloatSessionNilAndNumericGuards"
+      ]
     }
   ],
   "scope": "Plain same-currency equal positive constant-notional Ibor legs with direct curve/Settings attachment"
