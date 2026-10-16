@@ -94,6 +94,12 @@ cc -std=c11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
 c++ -x c++ -std=c++11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
   crates/libitofin-ffi/tests/callable_risk.c -Ltarget/release -litofin_ffi -o target/cpp-callable-risk
 ./target/cpp-callable-risk
+cc -std=c11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
+  crates/libitofin-ffi/tests/bond_forward.c -Ltarget/release -litofin_ffi -o target/c-bond-forward
+./target/c-bond-forward
+c++ -x c++ -std=c++11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
+  crates/libitofin-ffi/tests/bond_forward.c -Ltarget/release -litofin_ffi -o target/cpp-bond-forward
+./target/cpp-bond-forward
 cargo build -p libitofin-ffi --release --features optimization-method-oracle
 cd sdk/go
 go vet ./...

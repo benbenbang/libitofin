@@ -18,6 +18,8 @@ pub mod bond_api;
 mod bond_api_tests;
 mod bond_backing;
 pub mod bond_forward_api;
+#[cfg(test)]
+mod bond_forward_api_tests;
 pub mod bootstrap_api;
 pub mod bootstrap_callbacks;
 pub mod bootstrap_variables;
