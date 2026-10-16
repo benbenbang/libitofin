@@ -573,6 +573,20 @@ typedef struct ItofinFdConfig {
 } ItofinFdConfig;
 
 /**
+ * Two state components in x, y order, passed and returned by value.
+ */
+typedef struct ItofinG2Vector {
+  double values[2];
+} ItofinG2Vector;
+
+/**
+ * Two-by-two matrix in row-major order: xx, xy, yx, yy.
+ */
+typedef struct ItofinG2Matrix {
+  double values[4];
+} ItofinG2Matrix;
+
+/**
  * Daily variance parameters; live states contain annualized variance.
  */
 typedef struct ItofinGjrParameters {
@@ -3669,6 +3683,66 @@ int32_t itofin_fd_black_scholes_engine_new(struct ItofinContext *ctx,
                                            struct ItofinFdConfig cfg,
                                            uint64_t *out,
                                            struct ItofinError *error);
+
+/**
+ * Create a bare-factor process. Signed reversions and zero volatility are valid.
+ * # Safety
+ * Follow the crate-level C caller contract. Output is written only on success.
+ */
+int32_t itofin_g2_process_new(struct ItofinContext *ctx,
+                              double a,
+                              double sigma,
+                              double b,
+                              double eta,
+                              double rho,
+                              uint64_t *out,
+                              struct ItofinError *error);
+
+/**
+ * Scalar kind: 0 size, 1 factors, 2 x0, 3 y0, 4 a, 5 sigma, 6 b, 7 eta, 8 rho.
+ * # Safety
+ * Follow the crate-level C caller contract. Output is written only on success.
+ */
+int32_t itofin_g2_process_scalar(struct ItofinContext *ctx,
+                                 uint64_t process,
+                                 int32_t kind,
+                                 double *out,
+                                 struct ItofinError *error);
+
+/**
+ * Vector kind: 0 initial values, 1 drift, 2 expectation, 3 apply, 4 evolve.
+ * Drift uses t/state; expectation adds dt; apply uses state/change; evolve uses
+ * t/state/dt/change, where change is two independent standard Gaussian draws.
+ * Unused inputs are ignored. Apply requires finite inputs and finite sums.
+ * # Safety
+ * Follow the crate-level C caller contract. Output is written only on success.
+ */
+int32_t itofin_g2_process_vector(struct ItofinContext *ctx,
+                                 uint64_t process,
+                                 int32_t kind,
+                                 double t,
+                                 struct ItofinG2Vector state,
+                                 double dt,
+                                 struct ItofinG2Vector change,
+                                 struct ItofinG2Vector *out,
+                                 struct ItofinError *error);
+
+/**
+ * Matrix kind: 0 instantaneous diffusion, 1 exact step root, 2 covariance.
+ * All use t/state; kinds 1 and 2 additionally use dt. Results are row-major.
+ * Diffusion uses rho*eta in its lower-left entry, correcting QuantLib's
+ * unequal-volatility defect. Step roots map independent standard normals.
+ * # Safety
+ * Follow the crate-level C caller contract. Output is written only on success.
+ */
+int32_t itofin_g2_process_matrix(struct ItofinContext *ctx,
+                                 uint64_t process,
+                                 int32_t kind,
+                                 double t,
+                                 struct ItofinG2Vector state,
+                                 double dt,
+                                 struct ItofinG2Matrix *out,
+                                 struct ItofinError *error);
 
 /**
  * Fit a stationary GARCH(1,1) model to a return series and forecast one variance.
