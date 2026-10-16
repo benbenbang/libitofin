@@ -276,6 +276,24 @@ typedef struct ItofinCallableOASConfig {
   int32_t settlement;
 } ItofinCallableOASConfig;
 
+typedef struct ItofinCallableBondRiskConfig {
+  uint64_t tree_engine;
+  uint64_t day_counter;
+  /**
+   * Simple=0, Compounded=1, Continuous=2, SimpleThenCompounded=3, CompoundedThenSimple=4.
+   */
+  int32_t compounding;
+  /**
+   * Annual=0, Semiannual=1, Quarterly=2, Monthly=3.
+   */
+  int32_t frequency;
+  /**
+   * Bit 1 selects an explicit positive bump; zero preserves native None (2e-4).
+   */
+  uint32_t flags;
+  double bump;
+} ItofinCallableBondRiskConfig;
+
 typedef struct ItofinFloatingBondConfig {
   struct ItofinBondConfig bond;
   uint64_t schedule;
@@ -2242,6 +2260,30 @@ int32_t itofin_callable_bond_oas(struct ItofinContext *ctx,
                                  struct ItofinAnalyticsSolverConfig solver,
                                  double *out,
                                  struct ItofinError *error);
+
+/**
+ * Effective clean-price duration from the explicit immutable tree, without installed-engine changes.
+ * # Safety
+ * Pointers and thread ownership must satisfy the crate-level C caller contract.
+ */
+int32_t itofin_callable_bond_effective_duration(struct ItofinContext *ctx,
+                                                uint64_t id,
+                                                double spread,
+                                                struct ItofinCallableBondRiskConfig config,
+                                                double *out,
+                                                struct ItofinError *error);
+
+/**
+ * Effective clean-price convexity from the explicit immutable tree, without installed-engine changes.
+ * # Safety
+ * Pointers and thread ownership must satisfy the crate-level C caller contract.
+ */
+int32_t itofin_callable_bond_effective_convexity(struct ItofinContext *ctx,
+                                                 uint64_t id,
+                                                 double spread,
+                                                 struct ItofinCallableBondRiskConfig config,
+                                                 double *out,
+                                                 struct ItofinError *error);
 
 /**
  * Construct without eager valuation. Time steps must be positive and fit usize.
