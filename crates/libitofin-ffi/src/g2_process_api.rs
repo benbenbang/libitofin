@@ -175,3 +175,7 @@ pub unsafe extern "C" fn itofin_g2_process_matrix(
         })
     }
 }
+
+#[cfg(test)]
+#[path = "g2_process_api_tests.rs"]
+mod tests;
