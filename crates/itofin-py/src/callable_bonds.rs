@@ -362,6 +362,76 @@ impl PyCallableFixedRateBond {
             max_vol,
         )
     }
+    /// Effective conventional-OAS clean-price duration, without changing installed pricing state.
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature=(spread, engine, day_counter, compounding, frequency, *, bump=None))]
+    fn effective_duration(
+        self_: PyRef<'_, Self>,
+        spread: f64,
+        engine: &PyTreeCallableFixedRateBondEngine,
+        day_counter: &PyDayCounter,
+        compounding: PyCompounding,
+        frequency: &PyFrequency,
+        bump: Option<f64>,
+    ) -> PyResult<f64> {
+        risk_controls(spread, bump)?;
+        if !Shared::ptr_eq(
+            &self_.inner.borrow().bond().settings_handle(),
+            &engine.settings,
+        ) {
+            return Err(ItofinError::new_err("bond and engine must share settings"));
+        }
+        self_.as_super().callable_probe_settlement(None)?;
+        finite(
+            self_
+                .inner
+                .borrow()
+                .effective_duration(
+                    spread,
+                    &engine.inner.borrow(),
+                    day_counter.inner(),
+                    compounding.inner(),
+                    frequency.inner(),
+                    bump,
+                )
+                .map_err(PyQlError::from)?,
+        )
+    }
+    /// Effective conventional-OAS clean-price convexity, without changing installed pricing state.
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature=(spread, engine, day_counter, compounding, frequency, *, bump=None))]
+    fn effective_convexity(
+        self_: PyRef<'_, Self>,
+        spread: f64,
+        engine: &PyTreeCallableFixedRateBondEngine,
+        day_counter: &PyDayCounter,
+        compounding: PyCompounding,
+        frequency: &PyFrequency,
+        bump: Option<f64>,
+    ) -> PyResult<f64> {
+        risk_controls(spread, bump)?;
+        if !Shared::ptr_eq(
+            &self_.inner.borrow().bond().settings_handle(),
+            &engine.settings,
+        ) {
+            return Err(ItofinError::new_err("bond and engine must share settings"));
+        }
+        self_.as_super().callable_probe_settlement(None)?;
+        finite(
+            self_
+                .inner
+                .borrow()
+                .effective_convexity(
+                    spread,
+                    &engine.inner.borrow(),
+                    day_counter.inner(),
+                    compounding.inner(),
+                    frequency.inner(),
+                    bump,
+                )
+                .map_err(PyQlError::from)?,
+        )
+    }
     fn callability(&self) -> Vec<PyCallability> {
         self.inner
             .borrow()
@@ -555,6 +625,76 @@ impl PyCallableZeroCouponBond {
             max_vol,
         )
     }
+    /// Effective conventional-OAS clean-price duration, without changing installed pricing state.
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature=(spread, engine, day_counter, compounding, frequency, *, bump=None))]
+    fn effective_duration(
+        self_: PyRef<'_, Self>,
+        spread: f64,
+        engine: &PyTreeCallableFixedRateBondEngine,
+        day_counter: &PyDayCounter,
+        compounding: PyCompounding,
+        frequency: &PyFrequency,
+        bump: Option<f64>,
+    ) -> PyResult<f64> {
+        risk_controls(spread, bump)?;
+        if !Shared::ptr_eq(
+            &self_.inner.borrow().bond().settings_handle(),
+            &engine.settings,
+        ) {
+            return Err(ItofinError::new_err("bond and engine must share settings"));
+        }
+        self_.as_super().callable_probe_settlement(None)?;
+        finite(
+            self_
+                .inner
+                .borrow()
+                .effective_duration(
+                    spread,
+                    &engine.inner.borrow(),
+                    day_counter.inner(),
+                    compounding.inner(),
+                    frequency.inner(),
+                    bump,
+                )
+                .map_err(PyQlError::from)?,
+        )
+    }
+    /// Effective conventional-OAS clean-price convexity, without changing installed pricing state.
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature=(spread, engine, day_counter, compounding, frequency, *, bump=None))]
+    fn effective_convexity(
+        self_: PyRef<'_, Self>,
+        spread: f64,
+        engine: &PyTreeCallableFixedRateBondEngine,
+        day_counter: &PyDayCounter,
+        compounding: PyCompounding,
+        frequency: &PyFrequency,
+        bump: Option<f64>,
+    ) -> PyResult<f64> {
+        risk_controls(spread, bump)?;
+        if !Shared::ptr_eq(
+            &self_.inner.borrow().bond().settings_handle(),
+            &engine.settings,
+        ) {
+            return Err(ItofinError::new_err("bond and engine must share settings"));
+        }
+        self_.as_super().callable_probe_settlement(None)?;
+        finite(
+            self_
+                .inner
+                .borrow()
+                .effective_convexity(
+                    spread,
+                    &engine.inner.borrow(),
+                    day_counter.inner(),
+                    compounding.inner(),
+                    frequency.inner(),
+                    bump,
+                )
+                .map_err(PyQlError::from)?,
+        )
+    }
     fn callability(&self) -> Vec<PyCallability> {
         self.inner
             .borrow()
@@ -636,6 +776,14 @@ impl PyBlackCallableFixedRateBondEngine {
     fn engine(&self) -> SharedMut<dyn PricingEngine> {
         SharedMut::clone(&self.inner) as SharedMut<dyn PricingEngine>
     }
+}
+
+fn risk_controls(spread: f64, bump: Option<f64>) -> PyResult<()> {
+    finite(spread)?;
+    if let Some(value) = bump {
+        positive(value)?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]

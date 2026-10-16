@@ -225,6 +225,14 @@ class CallableFixedRateBond(Bond):
         r"""
         Solve relative forward-yield volatility without changing installed pricing state.
         """
+    def effective_duration(self, spread: builtins.float, engine: pricingengines.TreeCallableFixedRateBondEngine, day_counter: time.DayCounter, compounding: time.Compounding, frequency: time.Frequency, *, bump: typing.Optional[builtins.float] = None) -> builtins.float:
+        r"""
+        Effective conventional-OAS clean-price duration, without changing installed pricing state.
+        """
+    def effective_convexity(self, spread: builtins.float, engine: pricingengines.TreeCallableFixedRateBondEngine, day_counter: time.DayCounter, compounding: time.Compounding, frequency: time.Frequency, *, bump: typing.Optional[builtins.float] = None) -> builtins.float:
+        r"""
+        Effective conventional-OAS clean-price convexity, without changing installed pricing state.
+        """
     def callability(self) -> builtins.list[Callability]: ...
     def frequency(self) -> time.Frequency: ...
     def day_counter(self) -> time.DayCounter: ...
@@ -254,6 +262,14 @@ class CallableZeroCouponBond(Bond):
     def implied_volatility(self, target_price: builtins.float, discount_curve: termstructures.YieldTermStructure, *, price_type: termstructures.BondPriceType = termstructures.BondPriceType.Clean, accuracy: builtins.float = 1e-10, max_evaluations: builtins.int = 100, min_vol: builtins.float = 0.0, max_vol: builtins.float = 1.0) -> builtins.float:
         r"""
         Solve relative forward-yield volatility without changing installed pricing state.
+        """
+    def effective_duration(self, spread: builtins.float, engine: pricingengines.TreeCallableFixedRateBondEngine, day_counter: time.DayCounter, compounding: time.Compounding, frequency: time.Frequency, *, bump: typing.Optional[builtins.float] = None) -> builtins.float:
+        r"""
+        Effective conventional-OAS clean-price duration, without changing installed pricing state.
+        """
+    def effective_convexity(self, spread: builtins.float, engine: pricingengines.TreeCallableFixedRateBondEngine, day_counter: time.DayCounter, compounding: time.Compounding, frequency: time.Frequency, *, bump: typing.Optional[builtins.float] = None) -> builtins.float:
+        r"""
+        Effective conventional-OAS clean-price convexity, without changing installed pricing state.
         """
     def callability(self) -> builtins.list[Callability]: ...
     def day_counter(self) -> time.DayCounter: ...
