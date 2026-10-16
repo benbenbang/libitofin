@@ -118,3 +118,5 @@ go run ./examples/chart_adx
 go run ./examples/callable-oas
 
 go run ./examples/callable-risk
+
+go run ./examples/bond-forward
