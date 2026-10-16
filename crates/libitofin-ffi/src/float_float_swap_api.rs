@@ -412,3 +412,7 @@ pub unsafe extern "C" fn itofin_float_float_swap_action(
         })
     }
 }
+
+#[cfg(test)]
+#[path = "float_float_swap_api_tests.rs"]
+mod tests;
