@@ -262,3 +262,42 @@ API changes are made.
 
 Soft calls, convertibles, generic/G2 trees, full callable volatility surfaces and
 multi-exercise Black approximations remain outside the approved binding scope.
+
+## Explicit-tree OAS
+
+Both callable concrete classes provide `clean_price_oas` and `oas` in Python,
+`CleanPriceOAS` and `OAS` in Go. Each takes an explicit retained
+`TreeCallableFixedRateBondEngine`. These immutable analytics do not attach that
+engine, populate the bond cache, thaw a frozen result, refresh silent Settings
+flags or alter the model, curve or installed pricing engine. The explicit tree
+and bond must share the exact Settings allocation, not merely equal dates.
+
+- Spread input and recovered OAS are decimal conventional rates, not basis points.
+- Select day counter, compounding and frequency explicitly. Conversion uses the
+  curve zero rate at contractual maturity, not the adjusted redemption date.
+- Targets are clean settlement quotes per 100. Settlement normalization uses the
+  unspread curve discount and actual notional. This differs from QuantLib's
+  unnormalized positive-settlement-lag helper quote.
+- Omitted settlement uses checked native settlement. A supplied settlement is
+  an actual date, without calendar adjustment or settlement lag, and may be a
+  nonbusiness day or precede evaluation where native date bounds permit it.
+- Solver accuracy and guess are **continuous additive short-rate shift units**.
+  Defaults are accuracy `1e-10`, maximum evaluations `100`, guess `0.0`.
+  Explicit zero accuracy or budget rejects; zero spread or guess is valid.
+  Budgets count actual native lattice probes and are strict.
+
+```python
+price = bond.clean_price_oas(
+    0.015, tree, day_counter, Compounding.Compounded, Frequency.Semiannual,
+)
+spread = bond.oas(
+    price, tree, day_counter, Compounding.Compounded, Frequency.Semiannual,
+    accuracy=1e-10, max_evaluations=100, guess=0.0,
+)
+```
+
+Go uses `CallableOASConfig` and `CallableOASSolveConfig`, with existing optional
+`AnalyticsSolverConfig` controls. A nil settlement means omission; an explicit
+zero `Date` rejects rather than falling back to default settlement. The C config
+has settlement-presence bit `1`, with unknown bits rejected; errors leave the
+result pointer untouched. See `sdk/go/examples/callable-oas`.

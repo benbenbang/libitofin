@@ -288,6 +288,16 @@ impl PyBond {
         base.guard = Some(guard);
         base
     }
+    pub(crate) fn callable_probe_settlement(
+        &self,
+        settlement: Option<&PyDate>,
+    ) -> PyResult<Option<Date>> {
+        let actual = analytical_date(settlement)?;
+        if actual.is_none() {
+            self.settlement_date(None)?;
+        }
+        Ok(actual)
+    }
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn callable_implied_volatility(
         &self,
