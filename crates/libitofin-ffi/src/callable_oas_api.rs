@@ -143,3 +143,6 @@ pub unsafe extern "C" fn itofin_callable_bond_oas(
         })
     }
 }
+#[cfg(test)]
+#[path = "callable_oas_api_tests.rs"]
+mod tests;
