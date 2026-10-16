@@ -35,6 +35,7 @@ mod curve;
 mod discrepancy_statistics;
 mod drawdown;
 mod fdengine;
+mod float_float_swap;
 mod floating_bonds;
 mod fra;
 mod general_statistics;
@@ -379,6 +380,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     instruments.add_class::<PyVanillaOption>()?;
     instruments.add_class::<PySwapType>()?;
     instruments.add_class::<PyVanillaSwap>()?;
+    instruments.add_class::<float_float_swap::PyFloatFloatSwap>()?;
     instruments.add_class::<bma::PyBMASwap>()?;
     instruments.add_class::<PyMakeVanillaSwap>()?;
     instruments.add_class::<makeswaption::PyMakeSwaption>()?;

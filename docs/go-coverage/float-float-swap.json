@@ -1,0 +1,38 @@
+{
+  "entries": [
+    {
+      "c": "itofin_float_float_swap_new",
+      "go": "Session.NewFloatFloatSwap",
+      "python": "itofin.instruments.FloatFloatSwap.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestFloatFloatNativeSignedOracle",
+        "TestFloatFloatIdentityLifetimeAndFreeze",
+        "TestFloatFloatSessionNilAndNumericGuards"
+      ]
+    },
+    {
+      "c": "itofin_float_float_swap_set_engine",
+      "go": "FloatFloatSwap.SetEngine",
+      "python": "itofin.instruments.FloatFloatSwap.set_engine",
+      "status": "implemented",
+      "tests": [
+        "TestFloatFloatNativeSignedOracle",
+        "TestFloatFloatIdentityLifetimeAndFreeze",
+        "TestFloatFloatSessionNilAndNumericGuards"
+      ]
+    },
+    {
+      "c": "itofin_float_float_swap_value",
+      "go": "FloatFloatSwap.NPV",
+      "python": "itofin.instruments.FloatFloatSwap.npv",
+      "status": "implemented",
+      "tests": [
+        "TestFloatFloatNativeSignedOracle",
+        "TestFloatFloatIdentityLifetimeAndFreeze",
+        "TestFloatFloatSessionNilAndNumericGuards"
+      ]
+    }
+  ],
+  "scope": "Plain same-currency equal positive constant-notional Ibor legs with direct curve/Settings attachment"
+}
