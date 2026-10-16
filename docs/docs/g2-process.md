@@ -93,7 +93,34 @@ zero-step/zero-volatility and zero-reversion divisions are not imported.
 - A deterministic term-structure shift `phi(t)` or fitted G2 short-rate model.
 - Interpreting `x+y` as a curve-fitted short rate.
 - G2ForwardProcess, two-factor trees/lattices, calibration or pricing engines.
-- New Python, C or Go bindings.
 
 Existing APIs and models are unchanged. See [simulation](simulation.md) for
 other processes and path-generation conventions.
+
+## Python and Go bindings
+
+The additive immutable bindings expose the same bare factors, not a fitted G2
+model or curve. Python accepts exactly two finite state or noise values and
+returns owned lists, with nested row lists for matrices:
+
+```python
+from itofin.processes import G2Process
+
+process = G2Process(0.1, 0.01, 0.2, 0.008, -0.75)
+state = process.initial_values()
+next_state = process.evolve(0.0, state, 0.25, [0.5, -0.3])
+covariance = process.covariance(0.0, state, 0.25)
+```
+
+Go uses fixed `[2]float64` states and `[2][2]float64` matrices through
+`Session.NewG2Process(a, sigma, b, eta, rho)`. Objects require `Close`, belong to
+one session, and calls serialize on its native owner thread. Python objects are
+thread-confined. Neither interface has an evaluation date or market-data owner.
+
+Both interfaces expose `size`/`factors`, the five coefficients, initial values,
+`drift`, `diffusion`, `expectation`, `std_deviation`, `covariance`, `apply` and
+`evolve` (exported PascalCase in Go). `std_deviation` is a transition loading
+matrix, not entrywise standard deviations. `apply` checks finite two-element
+inputs and results around native component-wise addition. The C ABI passes
+`ItofinG2Vector` by value and writes one complete two-double vector or four-double
+row-major matrix only on success. Unused inputs for C query kinds are ignored.
