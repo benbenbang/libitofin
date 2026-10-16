@@ -1,0 +1,133 @@
+{
+  "inputs": {
+    "discount_reference": "2026-07-17",
+    "enforce_today": false,
+    "evaluation": "2026-07-17",
+    "fixings1": [
+      [
+        "2026-01-17",
+        0.021
+      ],
+      [
+        "2026-04-17",
+        0.021
+      ]
+    ],
+    "fixings2": [
+      [
+        "2026-01-17",
+        0.031
+      ]
+    ],
+    "forward_reference": "2026-01-02",
+    "no_fixings_on_evaluation": true,
+    "nominal": 1000000.0,
+    "payment_convention": "Unadjusted from each schedule",
+    "rates": [
+      0.025,
+      0.034,
+      0.02
+    ],
+    "spreads": [
+      0.001,
+      -0.002
+    ]
+  },
+  "measure_order": [
+    "npv",
+    "pay_leg_npv",
+    "receive_leg_npv",
+    "pay_leg_bps",
+    "receive_leg_bps",
+    "fair_pay_spread",
+    "fair_receive_spread"
+  ],
+  "method": "fresh compiled QuantLib 1.43, default DiscountingSwapEngine(discount) only; no itofin imports",
+  "rows": [
+    {
+      "include_reference": false,
+      "include_today": null,
+      "values": [
+        2887.6824400905953,
+        -13228.03271366239,
+        16115.715153752984,
+        -50.720923151953926,
+        49.89827174517023,
+        0.006693276582209353,
+        -0.007787139191589539
+      ]
+    },
+    {
+      "include_reference": false,
+      "include_today": false,
+      "values": [
+        2887.6824400905953,
+        -13228.03271366239,
+        16115.715153752984,
+        -50.720923151953926,
+        49.89827174517023,
+        0.006693276582209353,
+        -0.007787139191589539
+      ]
+    },
+    {
+      "include_reference": false,
+      "include_today": true,
+      "values": [
+        11707.393246787702,
+        -18789.143824773502,
+        30496.537071561204,
+        -75.99870092973171,
+        99.48731284106064,
+        0.016404728111882254,
+        -0.013767724861049617
+      ]
+    },
+    {
+      "include_reference": true,
+      "include_today": null,
+      "values": [
+        11707.393246787702,
+        -18789.143824773502,
+        30496.537071561204,
+        -75.99870092973171,
+        99.48731284106064,
+        0.016404728111882254,
+        -0.013767724861049617
+      ]
+    },
+    {
+      "include_reference": true,
+      "include_today": false,
+      "values": [
+        2887.6824400905953,
+        -13228.03271366239,
+        16115.715153752984,
+        -50.720923151953926,
+        49.89827174517023,
+        0.006693276582209353,
+        -0.007787139191589539
+      ]
+    },
+    {
+      "include_reference": true,
+      "include_today": true,
+      "values": [
+        11707.393246787702,
+        -18789.143824773502,
+        30496.537071561204,
+        -75.99870092973171,
+        99.48731284106064,
+        0.016404728111882254,
+        -0.013767724861049617
+      ]
+    }
+  ],
+  "source_revision": "9863b578af0caa4cecabf697196533e84a8308b6",
+  "source_sha256": {
+    "ql/cashflows/cashflows.cpp": "a0a1d9fb9d98a79c13e6441f1af8c11faf1b572409b2b113a8b04ba0687cb58c",
+    "ql/instruments/floatfloatswap.cpp": "405a9887a79c81b884823933207f2d653817ca4a4554c038550a1d1e70c29358",
+    "ql/pricingengines/swap/discountingswapengine.cpp": "aae28df3275a73b235bf58f04700590058a616a4b2d47d200c0f8a12478fdf93"
+  },
+  "version": "1.43"
+}
