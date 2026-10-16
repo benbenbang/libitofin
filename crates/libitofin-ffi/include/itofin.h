@@ -208,6 +208,26 @@ typedef struct ItofinFixedBondConfig {
   uint8_t ex_coupon_end_of_month;
 } ItofinFixedBondConfig;
 
+typedef struct ItofinBondForwardConfig {
+  uint64_t bond;
+  int32_t value_date;
+  int32_t delivery_date;
+  /**
+   * 0 Long, 1 Short. Strike is a dirty delivery quote, not a cash notional.
+   */
+  int32_t position;
+  double strike;
+  uint32_t settlement_days;
+  uint64_t day_counter;
+  uint64_t calendar;
+  int32_t convention;
+  uint64_t discount;
+  /**
+   * Zero explicitly defaults income discounting to the financing curve.
+   */
+  uint64_t income_discount;
+} ItofinBondForwardConfig;
+
 /**
  * Borrowed arrays valid only during a penalty callback; consumers must copy them.
  */
@@ -2061,6 +2081,47 @@ int32_t itofin_bond_action(struct ItofinContext *ctx,
                            uint64_t id,
                            int32_t action,
                            struct ItofinError *error);
+
+/**
+ * # Safety
+ * Pointers and thread ownership must satisfy the crate-level C caller contract.
+ */
+int32_t itofin_bond_forward_new(struct ItofinContext *ctx,
+                                struct ItofinBondForwardConfig a,
+                                uint64_t *out,
+                                struct ItofinError *error);
+
+/**
+ * Fields: 0 NPV, 1 fair dirty forward quote, 2 clean forward quote, 3 strike.
+ * # Safety
+ * Pointers and thread ownership must satisfy the crate-level C caller contract.
+ */
+int32_t itofin_bond_forward_value(struct ItofinContext *ctx,
+                                  uint64_t id,
+                                  int32_t field,
+                                  double *out,
+                                  struct ItofinError *error);
+
+/**
+ * Fields: 0 checked settlement, 1 adjusted delivery, 2 value date, 3 expiry flag, 4 position.
+ * # Safety
+ * Pointers and thread ownership must satisfy the crate-level C caller contract.
+ */
+int32_t itofin_bond_forward_integer(struct ItofinContext *ctx,
+                                    uint64_t id,
+                                    int32_t field,
+                                    int32_t *out,
+                                    struct ItofinError *error);
+
+/**
+ * Actions: 0 force recalculation, 1 freeze, 2 unfreeze.
+ * # Safety
+ * Pointers and thread ownership must satisfy the crate-level C caller contract.
+ */
+int32_t itofin_bond_forward_control(struct ItofinContext *ctx,
+                                    uint64_t id,
+                                    int32_t action,
+                                    struct ItofinError *error);
 
 /**
  * Construct a global discount curve, kind 0 log-linear or 1 linear.
