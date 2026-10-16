@@ -120,3 +120,7 @@ pub unsafe extern "C" fn itofin_callable_bond_effective_convexity(
         })
     }
 }
+
+#[cfg(test)]
+#[path = "callable_risk_api_tests.rs"]
+mod tests;
