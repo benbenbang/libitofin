@@ -1,0 +1,200 @@
+{
+  "domain": "bond-forward",
+  "entries": [
+    {
+      "c": [
+        "itofin_bond_forward_new"
+      ],
+      "go": [
+        "Session.NewBondForward"
+      ],
+      "python": "itofin.instruments.BondForward.__new__",
+      "status": "implemented",
+      "tests": [
+        "TestBondForwardCompiledQuantLib",
+        "TestBondForwardRetentionFreezeExpiryAndSession",
+        "TestBondForwardInvalidConstruction"
+      ]
+    },
+    {
+      "c": [
+        "itofin_bond_forward_value"
+      ],
+      "go": [
+        "BondForward.NPV"
+      ],
+      "python": "itofin.instruments.BondForward.npv",
+      "status": "implemented",
+      "tests": [
+        "TestBondForwardCompiledQuantLib",
+        "TestBondForwardRetentionFreezeExpiryAndSession",
+        "TestBondForwardInvalidConstruction"
+      ]
+    },
+    {
+      "c": [
+        "itofin_bond_forward_value"
+      ],
+      "go": [
+        "BondForward.FairForwardPrice"
+      ],
+      "python": "itofin.instruments.BondForward.fair_forward_price",
+      "status": "implemented",
+      "tests": [
+        "TestBondForwardCompiledQuantLib",
+        "TestBondForwardRetentionFreezeExpiryAndSession",
+        "TestBondForwardInvalidConstruction"
+      ]
+    },
+    {
+      "c": [
+        "itofin_bond_forward_value"
+      ],
+      "go": [
+        "BondForward.CleanForwardPrice"
+      ],
+      "python": "itofin.instruments.BondForward.clean_forward_price",
+      "status": "implemented",
+      "tests": [
+        "TestBondForwardCompiledQuantLib",
+        "TestBondForwardRetentionFreezeExpiryAndSession",
+        "TestBondForwardInvalidConstruction"
+      ]
+    },
+    {
+      "c": [
+        "itofin_bond_forward_value"
+      ],
+      "go": [
+        "BondForward.Strike"
+      ],
+      "python": "itofin.instruments.BondForward.strike",
+      "status": "implemented",
+      "tests": [
+        "TestBondForwardCompiledQuantLib",
+        "TestBondForwardRetentionFreezeExpiryAndSession",
+        "TestBondForwardInvalidConstruction"
+      ]
+    },
+    {
+      "c": [
+        "itofin_bond_forward_integer"
+      ],
+      "go": [
+        "BondForward.Position"
+      ],
+      "python": "itofin.instruments.BondForward.position",
+      "status": "implemented",
+      "tests": [
+        "TestBondForwardCompiledQuantLib",
+        "TestBondForwardRetentionFreezeExpiryAndSession",
+        "TestBondForwardInvalidConstruction"
+      ]
+    },
+    {
+      "c": [
+        "itofin_bond_forward_integer"
+      ],
+      "go": [
+        "BondForward.SettlementDate"
+      ],
+      "python": "itofin.instruments.BondForward.settlement_date",
+      "status": "implemented",
+      "tests": [
+        "TestBondForwardCompiledQuantLib",
+        "TestBondForwardRetentionFreezeExpiryAndSession",
+        "TestBondForwardInvalidConstruction"
+      ]
+    },
+    {
+      "c": [
+        "itofin_bond_forward_integer"
+      ],
+      "go": [
+        "BondForward.DeliveryDate"
+      ],
+      "python": "itofin.instruments.BondForward.delivery_date",
+      "status": "implemented",
+      "tests": [
+        "TestBondForwardCompiledQuantLib",
+        "TestBondForwardRetentionFreezeExpiryAndSession",
+        "TestBondForwardInvalidConstruction"
+      ]
+    },
+    {
+      "c": [
+        "itofin_bond_forward_integer"
+      ],
+      "go": [
+        "BondForward.ValueDate"
+      ],
+      "python": "itofin.instruments.BondForward.value_date",
+      "status": "implemented",
+      "tests": [
+        "TestBondForwardCompiledQuantLib",
+        "TestBondForwardRetentionFreezeExpiryAndSession",
+        "TestBondForwardInvalidConstruction"
+      ]
+    },
+    {
+      "c": [
+        "itofin_bond_forward_integer"
+      ],
+      "go": [
+        "BondForward.IsExpired"
+      ],
+      "python": "itofin.instruments.BondForward.is_expired",
+      "status": "implemented",
+      "tests": [
+        "TestBondForwardCompiledQuantLib",
+        "TestBondForwardRetentionFreezeExpiryAndSession",
+        "TestBondForwardInvalidConstruction"
+      ]
+    },
+    {
+      "c": [
+        "itofin_bond_forward_control"
+      ],
+      "go": [
+        "BondForward.Freeze"
+      ],
+      "python": "itofin.instruments.BondForward.freeze",
+      "status": "implemented",
+      "tests": [
+        "TestBondForwardCompiledQuantLib",
+        "TestBondForwardRetentionFreezeExpiryAndSession",
+        "TestBondForwardInvalidConstruction"
+      ]
+    },
+    {
+      "c": [
+        "itofin_bond_forward_control"
+      ],
+      "go": [
+        "BondForward.Unfreeze"
+      ],
+      "python": "itofin.instruments.BondForward.unfreeze",
+      "status": "implemented",
+      "tests": [
+        "TestBondForwardCompiledQuantLib",
+        "TestBondForwardRetentionFreezeExpiryAndSession",
+        "TestBondForwardInvalidConstruction"
+      ]
+    },
+    {
+      "c": [
+        "itofin_bond_forward_control"
+      ],
+      "go": [
+        "BondForward.Recalculate"
+      ],
+      "python": "itofin.instruments.BondForward.recalculate",
+      "status": "implemented",
+      "tests": [
+        "TestBondForwardCompiledQuantLib",
+        "TestBondForwardRetentionFreezeExpiryAndSession",
+        "TestBondForwardInvalidConstruction"
+      ]
+    }
+  ]
+}

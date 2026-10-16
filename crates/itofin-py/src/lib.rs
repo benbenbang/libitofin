@@ -8,6 +8,7 @@
 mod bates;
 mod benchmark_beta;
 mod bma;
+mod bond_forward;
 mod bonds;
 mod bootstrap;
 mod calibration;
@@ -365,6 +366,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     let instruments = PyModule::new(py, "instruments")?;
     instruments.add_class::<bonds::PyBond>()?;
+    instruments.add_class::<bond_forward::PyBondForward>()?;
     instruments.add_class::<callable_bonds::PyCallabilityType>()?;
     instruments.add_class::<callable_bonds::PyCallability>()?;
     instruments.add_class::<callable_bonds::PyCallableFixedRateBond>()?;
