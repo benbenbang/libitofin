@@ -50,6 +50,7 @@ pub mod curves_api;
 pub mod discrepancy_statistics_api;
 pub mod drawdown_api;
 pub mod fd_engine_api;
+pub mod g2_process_api;
 pub mod garch_api;
 pub mod general_statistics_api;
 pub mod geometric_brownian_api;
