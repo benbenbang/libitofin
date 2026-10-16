@@ -31,6 +31,7 @@ pub mod callable_risk_api;
 pub mod callable_tree_api;
 pub mod chart_adx_api;
 pub mod chart_api;
+pub mod float_float_swap_api;
 pub mod floating_bond_api;
 pub mod merton_paths_api;
 pub mod ou_paths_api;
