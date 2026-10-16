@@ -138,3 +138,5 @@ links to the language guides and project documentation.
 - [Callable bond sensitivities](callable-bond-sensitivities.md).
 
 - [Bare-factor G2 process](g2-process.md).
+
+[Bond forward bindings](bond-forward-bindings.md) retain live plain fixed/zero bonds and explicit financing/income curves.
