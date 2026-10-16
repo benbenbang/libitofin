@@ -213,6 +213,14 @@ class CallableFixedRateBond(Bond):
         r"""
         Attach a retained single-European Black engine sharing this bond's settings.
         """
+    def clean_price_oas(self, spread: builtins.float, engine: pricingengines.TreeCallableFixedRateBondEngine, day_counter: time.DayCounter, compounding: time.Compounding, frequency: time.Frequency, settlement: typing.Optional[time.Date] = None) -> builtins.float:
+        r"""
+        Clean settlement quote per 100 from a conventional decimal OAS and explicit tree.
+        """
+    def oas(self, clean_price: builtins.float, engine: pricingengines.TreeCallableFixedRateBondEngine, day_counter: time.DayCounter, compounding: time.Compounding, frequency: time.Frequency, settlement: typing.Optional[time.Date] = None, *, accuracy: builtins.float = 1e-10, max_evaluations: builtins.int = 100, guess: builtins.float = 0.0) -> builtins.float:
+        r"""
+        Solve conventional decimal OAS; accuracy and guess are continuous shift units.
+        """
     def implied_volatility(self, target_price: builtins.float, discount_curve: termstructures.YieldTermStructure, *, price_type: termstructures.BondPriceType = termstructures.BondPriceType.Clean, accuracy: builtins.float = 1e-10, max_evaluations: builtins.int = 100, min_vol: builtins.float = 0.0, max_vol: builtins.float = 1.0) -> builtins.float:
         r"""
         Solve relative forward-yield volatility without changing installed pricing state.
@@ -234,6 +242,14 @@ class CallableZeroCouponBond(Bond):
     def set_black_engine(self, engine: pricingengines.BlackCallableFixedRateBondEngine) -> None:
         r"""
         Attach a retained single-European Black engine sharing this bond's settings.
+        """
+    def clean_price_oas(self, spread: builtins.float, engine: pricingengines.TreeCallableFixedRateBondEngine, day_counter: time.DayCounter, compounding: time.Compounding, frequency: time.Frequency, settlement: typing.Optional[time.Date] = None) -> builtins.float:
+        r"""
+        Clean settlement quote per 100 from a conventional decimal OAS and explicit tree.
+        """
+    def oas(self, clean_price: builtins.float, engine: pricingengines.TreeCallableFixedRateBondEngine, day_counter: time.DayCounter, compounding: time.Compounding, frequency: time.Frequency, settlement: typing.Optional[time.Date] = None, *, accuracy: builtins.float = 1e-10, max_evaluations: builtins.int = 100, guess: builtins.float = 0.0) -> builtins.float:
+        r"""
+        Solve conventional decimal OAS; accuracy and guess are continuous shift units.
         """
     def implied_volatility(self, target_price: builtins.float, discount_curve: termstructures.YieldTermStructure, *, price_type: termstructures.BondPriceType = termstructures.BondPriceType.Clean, accuracy: builtins.float = 1e-10, max_evaluations: builtins.int = 100, min_vol: builtins.float = 0.0, max_vol: builtins.float = 1.0) -> builtins.float:
         r"""

@@ -415,6 +415,62 @@
         "TestCallableBlackImpliedVolatilityPreservesInstalledState",
         "TestCallableBlackConcurrentCallers"
       ]
+    },
+    {
+      "c": [
+        "itofin_callable_bond_clean_price_oas"
+      ],
+      "go": [
+        "CallableFixedRateBond.CleanPriceOAS"
+      ],
+      "python": "itofin.instruments.CallableFixedRateBond.clean_price_oas",
+      "status": "implemented",
+      "tests": [
+        "TestCallableOASQuantLibOracles",
+        "TestCallableOASContractsAndSessions"
+      ]
+    },
+    {
+      "c": [
+        "itofin_callable_bond_oas"
+      ],
+      "go": [
+        "CallableFixedRateBond.OAS"
+      ],
+      "python": "itofin.instruments.CallableFixedRateBond.oas",
+      "status": "implemented",
+      "tests": [
+        "TestCallableOASQuantLibOracles",
+        "TestCallableOASContractsAndSessions"
+      ]
+    },
+    {
+      "c": [
+        "itofin_callable_bond_clean_price_oas"
+      ],
+      "go": [
+        "CallableZeroCouponBond.CleanPriceOAS"
+      ],
+      "python": "itofin.instruments.CallableZeroCouponBond.clean_price_oas",
+      "status": "implemented",
+      "tests": [
+        "TestCallableOASQuantLibOracles",
+        "TestCallableOASContractsAndSessions"
+      ]
+    },
+    {
+      "c": [
+        "itofin_callable_bond_oas"
+      ],
+      "go": [
+        "CallableZeroCouponBond.OAS"
+      ],
+      "python": "itofin.instruments.CallableZeroCouponBond.oas",
+      "status": "implemented",
+      "tests": [
+        "TestCallableOASQuantLibOracles",
+        "TestCallableOASContractsAndSessions"
+      ]
     }
   ]
 }
