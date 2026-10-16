@@ -804,6 +804,54 @@ class FloatFloatSwap:
         r"""
         Signed present value under the retained engine.
         """
+    def pay_leg_npv(self) -> builtins.float:
+        r"""
+        Signed paid-leg present value.
+        """
+    def receive_leg_npv(self) -> builtins.float:
+        r"""
+        Signed received-leg present value.
+        """
+    def pay_leg_bps(self) -> builtins.float:
+        r"""
+        Signed paid-leg sensitivity for one basis point of spread.
+        """
+    def receive_leg_bps(self) -> builtins.float:
+        r"""
+        Signed received-leg sensitivity for one basis point of spread.
+        """
+    def fair_pay_spread(self) -> builtins.float:
+        r"""
+        Absolute paid spread zeroing NPV while holding the received spread fixed.
+        """
+    def fair_receive_spread(self) -> builtins.float:
+        r"""
+        Absolute received spread zeroing NPV while holding the paid spread fixed.
+        """
+    def calculate(self) -> None:
+        r"""
+        Populate native cached results if needed.
+        """
+    def recalculate(self) -> None:
+        r"""
+        Force native repricing, including while frozen.
+        """
+    def freeze(self) -> None:
+        r"""
+        Pin native cached results until unfreeze or explicit recalculate.
+        """
+    def unfreeze(self) -> None:
+        r"""
+        Resume native observer-driven repricing.
+        """
+    def is_calculated(self) -> builtins.bool:
+        r"""
+        Read the native cache flag without calculating.
+        """
+    def is_expired(self) -> builtins.bool:
+        r"""
+        Test native expiry without calculating.
+        """
 
 @typing.final
 class FloatingRateBond(Bond):
