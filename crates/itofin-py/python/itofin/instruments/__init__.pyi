@@ -27,6 +27,7 @@ __all__ = [
     "CreditDefaultSwap",
     "EuropeanExercise",
     "FixedRateBond",
+    "FloatFloatSwap",
     "FloatingRateBond",
     "ForwardRateAgreement",
     "MakeCreditDefaultSwap",
@@ -784,6 +785,25 @@ class FixedRateBond(Bond):
     def frequency(self) -> time.Frequency: ...
     def day_counter(self) -> time.DayCounter: ...
     def first_period_day_counter(self) -> typing.Optional[time.DayCounter]: ...
+
+@typing.final
+class FloatFloatSwap:
+    r"""
+    Plain same-currency swap paying the first Ibor leg and receiving the second.
+    Both legs share one positive constant nominal; no principal is exchanged.
+    """
+    def __init__(self, nominal: builtins.float, pay_schedule: time.Schedule, pay_index: indexes.IborIndex, pay_spread: builtins.float, pay_day_count: time.DayCounter, receive_schedule: time.Schedule, receive_index: indexes.IborIndex, receive_spread: builtins.float, receive_day_count: time.DayCounter, settings: itofin.Settings, *, payment_convention: typing.Optional[time.BusinessDayConvention] = None) -> None:
+        r"""
+        Build plain Ibor legs; omitted payment convention uses each schedule's convention.
+        """
+    def set_engine(self, curve: termstructures.YieldTermStructure, settings: itofin.Settings) -> None:
+        r"""
+        Attach a retained live curve with native defaults; Settings must be the same object.
+        """
+    def npv(self) -> builtins.float:
+        r"""
+        Signed present value under the retained engine.
+        """
 
 @typing.final
 class FloatingRateBond(Bond):
