@@ -249,6 +249,44 @@ discountCurve, settings)`, concrete `SetBlackEngine` and
 `itofin_callable_bond_implied_volatility`; optional control presence bits are
 1, 2, 4 and 8 respectively. Existing session/thread/output contracts apply.
 
+## Effective clean-price risk
+
+Both concrete callable products expose pure native duration and convexity:
+
+```python
+bond.effective_duration(spread, engine, day_counter, compounding, frequency, bump=None)
+bond.effective_convexity(spread, engine, day_counter, compounding, frequency, bump=None)
+```
+
+- `engine` is an explicit immutable Hull-White tree sharing the bond's exact
+  Settings allocation. An equal-valued separate Settings object is rejected.
+- `spread` is a finite conventional OAS in decimal units. The day counter,
+  compounding and frequency determine its contractual-maturity conversion.
+- Omitted `bump` delegates native `None`, exactly `2e-4` (two basis points).
+  An explicit bump must be finite, positive and representable around the spread.
+- Results normalize centered conventional-spread bumps by default-settlement
+  **clean price per 100**, not dirty price, currency PV or curve-reference NPV.
+  Negative convexity is valid. A zero center returns zero only after both bumped
+  prices succeed. Conversion, arithmetic and pricing errors remain errors.
+- Neither success nor failure attaches an engine, prepares the installed engine,
+  changes frozen/cache/policy state or mutates model parameters or curve handles.
+  No installed engine is required; an explicitly supplied tree may differ from it.
+- There is no settlement override, curve override or solver control. The native
+  default settlement retains checked calendar/date bounds and issue-date floor.
+
+Go concrete methods are `EffectiveDuration` and `EffectiveConvexity`, each taking
+`(spread, engine, dayCounter, compounding, frequency, options)`.
+`CallableBondRiskOptions{Bump: &bump}` selects an explicit bump; nil options or
+nil `Bump` preserves native omission. The runnable `sdk/go/examples/callable-risk`
+example demonstrates both with no installed pricing engine.
+
+C exposes `ItofinCallableBondRiskConfig` and
+`itofin_callable_bond_effective_duration` / `itofin_callable_bond_effective_convexity`.
+Config presence bit 1 selects `bump`; an unflagged payload is ignored, including
+NaN. All other flag bits reject. Standard session/thread/type and untouched-output
+on error contracts apply. The 36-row QuantLib 1.43 sensitivity oracle preserves
+core absolute tolerances `2e-9` for duration and `2e-6` for convexity.
+
 ## Scope and evidence
 
 Constructor, inherited analytics, ownership, calendar/date boundaries, typed-engine
