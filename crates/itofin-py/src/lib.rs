@@ -38,6 +38,7 @@ mod fdengine;
 mod float_float_swap;
 mod floating_bonds;
 mod fra;
+mod g2_process;
 mod general_statistics;
 mod geometric_brownian;
 mod gjr;
@@ -331,6 +332,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     processes.add_class::<merton::PyMerton76Process>()?;
     processes.add_class::<geometric_brownian::PyGeometricBrownianMotionProcess>()?;
     processes.add_class::<gjr::PyGjrGarchProcess>()?;
+    processes.add_class::<g2_process::PyG2Process>()?;
 
     let indexes = PyModule::new(py, "indexes")?;
     indexes.add_class::<overnightfuture::PySofr>()?;

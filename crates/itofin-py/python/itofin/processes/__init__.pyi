@@ -9,6 +9,7 @@ import typing
 __all__ = [
     "BatesProcess",
     "BlackScholesProcess",
+    "G2Process",
     "GJRGARCHProcess",
     "GeometricBrownianMotionProcess",
     "HestonProcess",
@@ -131,6 +132,88 @@ class BlackScholesProcess:
         Returns:
             float: The continuously compounded zero rate on the dividend curve at the
             reference date.
+        """
+
+@typing.final
+class G2Process:
+    r"""
+    Two correlated zero-level Gaussian factors, initially x=y=0.
+
+    Signed reversions and zero volatilities are supported. This is not a fitted
+    short-rate model, curve, tree or pricing engine. Matrices are owned row lists.
+    Diffusion uses rho*eta, correcting QuantLib's unequal-volatility defect.
+    """
+    def __init__(self, a: builtins.float, sigma: builtins.float, b: builtins.float, eta: builtins.float, rho: builtins.float) -> None:
+        r"""
+        Copy finite parameters; require nonnegative sigma/eta and rho in [-1,1].
+        """
+    def size(self) -> builtins.int:
+        r"""
+        Return the two state dimensions.
+        """
+    def factors(self) -> builtins.int:
+        r"""
+        Return the two independent Gaussian factors.
+        """
+    def x0(self) -> builtins.float:
+        r"""
+        Return initial x, always zero.
+        """
+    def y0(self) -> builtins.float:
+        r"""
+        Return initial y, always zero.
+        """
+    def a(self) -> builtins.float:
+        r"""
+        Return signed x reversion.
+        """
+    def sigma(self) -> builtins.float:
+        r"""
+        Return x volatility.
+        """
+    def b(self) -> builtins.float:
+        r"""
+        Return signed y reversion.
+        """
+    def eta(self) -> builtins.float:
+        r"""
+        Return y volatility.
+        """
+    def rho(self) -> builtins.float:
+        r"""
+        Return instantaneous correlation.
+        """
+    def initial_values(self) -> builtins.list[builtins.float]:
+        r"""
+        Return a fresh [0,0] state.
+        """
+    def drift(self, t: builtins.float, x: typing.Sequence[builtins.float]) -> builtins.list[builtins.float]:
+        r"""
+        Return the native drift at finite nonnegative time and two finite states.
+        """
+    def diffusion(self, t: builtins.float, x: typing.Sequence[builtins.float]) -> builtins.list[builtins.list[builtins.float]]:
+        r"""
+        Return the instantaneous two-by-two diffusion, one row per component.
+        """
+    def expectation(self, t: builtins.float, x: typing.Sequence[builtins.float], dt: builtins.float) -> builtins.list[builtins.float]:
+        r"""
+        Return exact OU conditional means for finite nonnegative t and dt.
+        """
+    def std_deviation(self, t: builtins.float, x: typing.Sequence[builtins.float], dt: builtins.float) -> builtins.list[builtins.list[builtins.float]]:
+        r"""
+        Return the exact transition root, not entrywise standard deviations.
+        """
+    def covariance(self, t: builtins.float, x: typing.Sequence[builtins.float], dt: builtins.float) -> builtins.list[builtins.list[builtins.float]]:
+        r"""
+        Return exact conditional covariance, one row per state component.
+        """
+    def apply(self, x: typing.Sequence[builtins.float], change: typing.Sequence[builtins.float]) -> builtins.list[builtins.float]:
+        r"""
+        Add two finite component changes; reject nonfinite sums.
+        """
+    def evolve(self, t: builtins.float, x: typing.Sequence[builtins.float], dt: builtins.float, draws: typing.Sequence[builtins.float]) -> builtins.list[builtins.float]:
+        r"""
+        Evolve exactly using two independent standard Gaussian draws.
         """
 
 @typing.final

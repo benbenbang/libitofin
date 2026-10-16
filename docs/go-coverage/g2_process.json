@@ -1,0 +1,131 @@
+{
+  "domain": "g2-bare-factor-process",
+  "entries": [
+    {
+      "c": "itofin_g2_process_new",
+      "go": "Session.NewG2Process",
+      "python": "itofin.processes.G2Process.__init__",
+      "status": "implemented",
+      "tests": "TestG2ExactTransitions"
+    },
+    {
+      "c": "itofin_g2_process_scalar",
+      "go": "G2Process.Size",
+      "python": "itofin.processes.G2Process.size",
+      "status": "implemented",
+      "tests": "TestG2ExactTransitions"
+    },
+    {
+      "c": "itofin_g2_process_scalar",
+      "go": "G2Process.Factors",
+      "python": "itofin.processes.G2Process.factors",
+      "status": "implemented",
+      "tests": "TestG2ExactTransitions"
+    },
+    {
+      "c": "itofin_g2_process_scalar",
+      "go": "G2Process.X0",
+      "python": "itofin.processes.G2Process.x0",
+      "status": "implemented",
+      "tests": "TestG2ExactTransitions"
+    },
+    {
+      "c": "itofin_g2_process_scalar",
+      "go": "G2Process.Y0",
+      "python": "itofin.processes.G2Process.y0",
+      "status": "implemented",
+      "tests": "TestG2ExactTransitions"
+    },
+    {
+      "c": "itofin_g2_process_scalar",
+      "go": "G2Process.A",
+      "python": "itofin.processes.G2Process.a",
+      "status": "implemented",
+      "tests": "TestG2ExactTransitions"
+    },
+    {
+      "c": "itofin_g2_process_scalar",
+      "go": "G2Process.Sigma",
+      "python": "itofin.processes.G2Process.sigma",
+      "status": "implemented",
+      "tests": "TestG2ExactTransitions"
+    },
+    {
+      "c": "itofin_g2_process_scalar",
+      "go": "G2Process.B",
+      "python": "itofin.processes.G2Process.b",
+      "status": "implemented",
+      "tests": "TestG2ExactTransitions"
+    },
+    {
+      "c": "itofin_g2_process_scalar",
+      "go": "G2Process.Eta",
+      "python": "itofin.processes.G2Process.eta",
+      "status": "implemented",
+      "tests": "TestG2ExactTransitions"
+    },
+    {
+      "c": "itofin_g2_process_scalar",
+      "go": "G2Process.Rho",
+      "python": "itofin.processes.G2Process.rho",
+      "status": "implemented",
+      "tests": "TestG2ExactTransitions"
+    },
+    {
+      "c": "itofin_g2_process_vector",
+      "go": "G2Process.InitialValues",
+      "python": "itofin.processes.G2Process.initial_values",
+      "status": "implemented",
+      "tests": "TestG2ExactTransitions"
+    },
+    {
+      "c": "itofin_g2_process_vector",
+      "go": "G2Process.Drift",
+      "python": "itofin.processes.G2Process.drift",
+      "status": "implemented",
+      "tests": "TestG2ExactTransitions"
+    },
+    {
+      "c": "itofin_g2_process_vector",
+      "go": "G2Process.Expectation",
+      "python": "itofin.processes.G2Process.expectation",
+      "status": "implemented",
+      "tests": "TestG2ExactTransitions"
+    },
+    {
+      "c": "itofin_g2_process_vector",
+      "go": "G2Process.Apply",
+      "python": "itofin.processes.G2Process.apply",
+      "status": "implemented",
+      "tests": "TestG2ExactTransitions"
+    },
+    {
+      "c": "itofin_g2_process_vector",
+      "go": "G2Process.Evolve",
+      "python": "itofin.processes.G2Process.evolve",
+      "status": "implemented",
+      "tests": "TestG2ExactTransitions"
+    },
+    {
+      "c": "itofin_g2_process_matrix",
+      "go": "G2Process.Diffusion",
+      "python": "itofin.processes.G2Process.diffusion",
+      "status": "implemented",
+      "tests": "TestG2ExactTransitions"
+    },
+    {
+      "c": "itofin_g2_process_matrix",
+      "go": "G2Process.StdDeviation",
+      "python": "itofin.processes.G2Process.std_deviation",
+      "status": "implemented",
+      "tests": "TestG2ExactTransitions"
+    },
+    {
+      "c": "itofin_g2_process_matrix",
+      "go": "G2Process.Covariance",
+      "python": "itofin.processes.G2Process.covariance",
+      "status": "implemented",
+      "tests": "TestG2ExactTransitions"
+    }
+  ]
+}
