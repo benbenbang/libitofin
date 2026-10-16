@@ -100,6 +100,12 @@ cc -std=c11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
 c++ -x c++ -std=c++11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
   crates/libitofin-ffi/tests/bond_forward.c -Ltarget/release -litofin_ffi -o target/cpp-bond-forward
 ./target/cpp-bond-forward
+cc -std=c11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
+  crates/libitofin-ffi/tests/float_float_swap.c -Ltarget/release -litofin_ffi -o target/c-float-float-swap
+./target/c-float-float-swap
+c++ -x c++ -std=c++11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
+  crates/libitofin-ffi/tests/float_float_swap.c -Ltarget/release -litofin_ffi -o target/cpp-float-float-swap
+./target/cpp-float-float-swap
 cargo build -p libitofin-ffi --release --features optimization-method-oracle
 cd sdk/go
 go vet ./...
@@ -120,3 +126,5 @@ go run ./examples/callable-oas
 go run ./examples/callable-risk
 
 go run ./examples/bond-forward
+
+go run ./examples/float-float-swap
