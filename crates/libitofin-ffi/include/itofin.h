@@ -314,6 +314,24 @@ typedef struct ItofinCallableBondRiskConfig {
   double bump;
 } ItofinCallableBondRiskConfig;
 
+/**
+ * Plain same-currency paid and received Ibor legs. Flag zero preserves native defaults.
+ */
+typedef struct ItofinFloatFloatSwapConfig {
+  double nominal;
+  uint64_t pay_schedule;
+  uint64_t pay_index;
+  double pay_spread;
+  uint64_t pay_day_counter;
+  uint64_t receive_schedule;
+  uint64_t receive_index;
+  double receive_spread;
+  uint64_t receive_day_counter;
+  uint64_t settings;
+  uint8_t has_payment_convention;
+  int32_t payment_convention;
+} ItofinFloatFloatSwapConfig;
+
 typedef struct ItofinFloatingBondConfig {
   struct ItofinBondConfig bond;
   uint64_t schedule;
@@ -2604,6 +2622,49 @@ int32_t itofin_chart_volume_bars(const ItofinReal *open,
                                  int8_t *out_direction,
                                  size_t capacity,
                                  struct ItofinError *error);
+
+/**
+ * Construct and retain the original native instrument, Settings and both indexes.
+ * # Safety
+ * Follow the crate-level pointer and thread contract.
+ */
+int32_t itofin_float_float_swap_new(struct ItofinContext *ctx,
+                                    const struct ItofinFloatFloatSwapConfig *cfg,
+                                    uint64_t *out,
+                                    struct ItofinError *error);
+
+/**
+ * Attach a live discount curve with native date/flow defaults and identical Settings.
+ * # Safety
+ * Follow the crate-level pointer and thread contract.
+ */
+int32_t itofin_float_float_swap_set_engine(struct ItofinContext *ctx,
+                                           uint64_t id,
+                                           uint64_t discount,
+                                           uint64_t settings_id,
+                                           struct ItofinError *error);
+
+/**
+ * Query 0 NPV, 1/2 paid/received NPV, 3/4 paid/received BPS, 5/6 absolute fair
+ * paid/received spread, 7 cached state, 8 expiry. Failures leave output untouched.
+ * # Safety
+ * Follow the crate-level pointer and thread contract.
+ */
+int32_t itofin_float_float_swap_value(struct ItofinContext *ctx,
+                                      uint64_t id,
+                                      int32_t query,
+                                      double *out,
+                                      struct ItofinError *error);
+
+/**
+ * Action 0 calculate, 1 recalculate, 2 freeze, 3 unfreeze.
+ * # Safety
+ * Follow the crate-level pointer and thread contract.
+ */
+int32_t itofin_float_float_swap_action(struct ItofinContext *ctx,
+                                       uint64_t id,
+                                       int32_t action,
+                                       struct ItofinError *error);
 
 /**
  * Construct without requiring coupon histories or a cap/floor pricer.
