@@ -19,6 +19,13 @@ separate. [Callable bonds, Hull-White tree and single-European Black pricing/IV]
 share the retained Bond interface. OAS and effective risk measures remain
 separate binding work.
 
+## Standalone binding helpers
+
+- [Reusable currencies and stored fields](currency-bindings.md), plus
+  [named currency presets including TWD](currency-presets.md).
+- [Black FX delta conventions](black-delta-bindings.md): standalone
+  delta/strike and ATM conversions, not an FX option pricing engine.
+
 ## Install
 
 === "Python"
