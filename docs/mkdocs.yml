@@ -71,7 +71,7 @@ plugins:
 
 nav:
   - Bare-factor G2 process: g2-process.md
-  - Black delta bindings: black-delta-bindings.md
+  - Black FX delta conventions: black-delta-bindings.md
   - Callable bond sensitivities: callable-bond-sensitivities.md
   - Callable OAS: callable-oas.md
   - Callable implied volatility: callable-implied-volatility.md
