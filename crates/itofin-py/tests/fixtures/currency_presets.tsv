@@ -1,0 +1,21 @@
+kind	name	code	numeric_code	symbol	fraction_symbol	fractions_per_unit	quantlib_class	source	line
+4	Taiwan dollar	TWD	901	NT$		100	TWDCurrency	ql/currencies/asia.cpp	196
+5	Swiss franc	CHF	756	SwF		100	CHFCurrency	ql/currencies/europe.cpp	52
+6	Australian dollar	AUD	36	A$		100	AUDCurrency	ql/currencies/oceania.cpp	33
+7	Canadian dollar	CAD	124	Can$		100	CADCurrency	ql/currencies/america.cpp	52
+8	Swedish krona	SEK	752	kr		100	SEKCurrency	ql/currencies/europe.cpp	205
+9	Norwegian krone	NOK	578	NKr		100	NOKCurrency	ql/currencies/europe.cpp	160
+10	Danish krone	DKK	208	Dkr		100	DKKCurrency	ql/currencies/europe.cpp	79
+11	New Zealand dollar	NZD	554	NZ$		100	NZDCurrency	ql/currencies/oceania.cpp	42
+12	Hong Kong dollar	HKD	344	HK$		100	HKDCurrency	ql/currencies/asia.cpp	52
+13	Singapore dollar	SGD	702	S$		100	SGDCurrency	ql/currencies/asia.cpp	178
+14	Chinese yuan	CNY	156	Y		100	CNYCurrency	ql/currencies/asia.cpp	43
+15	South-Korean won	KRW	410	W		100	KRWCurrency	ql/currencies/asia.cpp	115
+16	Indian rupee	INR	356	Rs		100	INRCurrency	ql/currencies/asia.cpp	79
+17	Brazilian real	BRL	986	R$		100	BRLCurrency	ql/currencies/america.cpp	43
+18	Mexican peso	MXN	484	Mex$		100	MXNCurrency	ql/currencies/america.cpp	79
+19	South-African rand	ZAR	710	R		100	ZARCurrency	ql/currencies/africa.cpp	99
+20	Polish zloty	PLN	985	zl		100	PLNCurrency	ql/currencies/europe.cpp	169
+21	Czech koruna	CZK	203	Kc		100	CZKCurrency	ql/currencies/europe.cpp	70
+22	Hungarian forint	HUF	348	Ft		1	HUFCurrency	ql/currencies/europe.cpp	115
+23	New Turkish lira	TRY	949	YTL		100	TRYCurrency	ql/currencies/europe.cpp	232

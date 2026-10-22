@@ -45,3 +45,30 @@ PSO follows Kennedy and Eberhart (1995), DOI
 <https://doi.org/10.1109/ICEC.1998.699146>. DE follows Storn and Price (1997),
 DOI <https://doi.org/10.1023/A:1008202821328>. The crate's own notices document
 our policies and prior design comparisons; no clean-room claim is made.
+
+## QuantLib currency presets
+
+The twenty additional currency presets and their six-field test fixtures are
+adapted from QuantLib revision
+`9863b578af0caa4cecabf697196533e84a8308b6` (local version 1.43-dev),
+`ql/currencies/{africa,america,asia,europe,oceania}.cpp`.
+The stored name, code, numeric code, symbol, fraction symbol and fractions per
+unit are preserved. QuantLib rounding and triangulation behavior are not included.
+The exact source hashes and field provenance are recorded in
+`docs/docs/currency-presets.md` and the accompanying currency preset TSV fixtures.
+
+The upstream source headers contain these notices:
+
+- `africa.cpp`: Copyright (C) 2004, 2005 StatPro Italia srl;
+  Copyright (C) 2016 Quaternion Risk Management Ltd;
+  Copyright (C) 2023 Skandinaviska Enskilda Banken AB (publ).
+- `america.cpp`: Copyright (C) 2004, 2005, 2008 StatPro Italia srl;
+  Copyright (C) 2016 Quaternion Risk Management Ltd.
+- `asia.cpp`: Copyright (C) 2004, 2005 StatPro Italia srl;
+  Copyright (C) 2016 Quaternion Risk Management Ltd.
+- `europe.cpp`: Copyright (C) 2004, 2005, 2006 StatPro Italia srl;
+  Copyright (C) 2016 Quaternion Risk Management Ltd.
+- `oceania.cpp`: Copyright (C) 2004, 2005 StatPro Italia srl.
+
+The complete QuantLib license and contributor notices are included in
+[QUANTLIB_LICENSE.txt](QUANTLIB_LICENSE.txt).
