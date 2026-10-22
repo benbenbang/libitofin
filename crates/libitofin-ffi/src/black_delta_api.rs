@@ -164,3 +164,7 @@ pub unsafe extern "C" fn itofin_black_delta_atm_strike(
         })
     }
 }
+
+#[cfg(test)]
+#[path = "black_delta_api_tests.rs"]
+mod tests;

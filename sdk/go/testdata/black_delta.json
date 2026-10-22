@@ -1,0 +1,61 @@
+{
+  "delta_strike": 1.6,
+  "inverse_abs_delta": 0.15,
+  "parameters": [
+    1.421,
+    0.997306,
+    0.992266,
+    0.1180654
+  ],
+  "rows": [
+    {
+      "convention": 0,
+      "delta": 0.16013974647836293,
+      "option": 0,
+      "strike": 1.6080794396498383
+    },
+    {
+      "convention": 1,
+      "delta": 0.16138792065672203,
+      "option": 0,
+      "strike": 1.6090292778757842
+    },
+    {
+      "convention": 2,
+      "delta": 0.15067826139118903,
+      "option": 0,
+      "strike": 1.6005703561512619
+    },
+    {
+      "convention": 3,
+      "delta": 0.15185269009639454,
+      "option": 0,
+      "strike": 1.6015501875673384
+    },
+    {
+      "convention": 0,
+      "delta": -0.832126253521637,
+      "option": 1,
+      "strike": 1.260473835686862
+    },
+    {
+      "convention": 1,
+      "delta": -0.838612079343278,
+      "option": 1,
+      "strike": 1.2597297558566178
+    },
+    {
+      "convention": 2,
+      "delta": -0.9722560102485015,
+      "option": 1,
+      "strike": 1.2546219991778351
+    },
+    {
+      "convention": 3,
+      "delta": -0.9798340467661911,
+      "option": 1,
+      "strike": 1.2539067336573
+    }
+  ],
+  "source": "Copied without numeric changes from core compiled_quantlib_1_43_delta_and_strike_oracle test. These are existing compiled QuantLib 1.43 fixture values, not a fresh binding-run oracle."
+}
