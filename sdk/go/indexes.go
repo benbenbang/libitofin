@@ -33,6 +33,26 @@ func (s *Session) EUR() (*Currency, error) { return s.currency(0) }
 func (s *Session) USD() (*Currency, error) { return s.currency(1) }
 func (s *Session) GBP() (*Currency, error) { return s.currency(2) }
 func (s *Session) JPY() (*Currency, error) { return s.currency(3) }
+func (s *Session) TWD() (*Currency, error) { return s.currency(4) }
+func (s *Session) CHF() (*Currency, error) { return s.currency(5) }
+func (s *Session) AUD() (*Currency, error) { return s.currency(6) }
+func (s *Session) CAD() (*Currency, error) { return s.currency(7) }
+func (s *Session) SEK() (*Currency, error) { return s.currency(8) }
+func (s *Session) NOK() (*Currency, error) { return s.currency(9) }
+func (s *Session) DKK() (*Currency, error) { return s.currency(10) }
+func (s *Session) NZD() (*Currency, error) { return s.currency(11) }
+func (s *Session) HKD() (*Currency, error) { return s.currency(12) }
+func (s *Session) SGD() (*Currency, error) { return s.currency(13) }
+func (s *Session) CNY() (*Currency, error) { return s.currency(14) }
+func (s *Session) KRW() (*Currency, error) { return s.currency(15) }
+func (s *Session) INR() (*Currency, error) { return s.currency(16) }
+func (s *Session) BRL() (*Currency, error) { return s.currency(17) }
+func (s *Session) MXN() (*Currency, error) { return s.currency(18) }
+func (s *Session) ZAR() (*Currency, error) { return s.currency(19) }
+func (s *Session) PLN() (*Currency, error) { return s.currency(20) }
+func (s *Session) CZK() (*Currency, error) { return s.currency(21) }
+func (s *Session) HUF() (*Currency, error) { return s.currency(22) }
+func (s *Session) TRY() (*Currency, error) { return s.currency(23) }
 func (c *Currency) Code() (string, error) {
 	if err := c.checked(); err != nil {
 		return "", err
