@@ -23,6 +23,11 @@ allows C/Go and Python builds to share Cargo target directories. The cgo flags u
 relative to this checkout. An external Go module uses the `itofin_external` build tag with the native
 package headers and library paths described in the installation guide.
 
+Source API guides: [currency fields](https://github.com/benbenbang/libitofin/blob/main/docs/docs/currency-bindings.md),
+[currency presets including TWD](https://github.com/benbenbang/libitofin/blob/main/docs/docs/currency-presets.md),
+and [Black FX delta conventions](https://github.com/benbenbang/libitofin/blob/main/docs/docs/black-delta-bindings.md).
+These helpers do not add currency rounding, conversion or a new option pricing engine.
+
 ## Sessions and ownership
 
 ```go

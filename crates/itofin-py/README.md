@@ -4,6 +4,11 @@ Idiomatic Python bindings over the [`libitofin`](https://github.com/benbenbang/l
 
 The API mirrors QuantLib's `ql/` layout: types live in submodules (`itofin.time`, `itofin.instruments`, `itofin.models`, ...), while `Settings` and `ItofinError` stay at the top level.
 
+Source API guides: [currency fields](https://github.com/benbenbang/libitofin/blob/main/docs/docs/currency-bindings.md),
+[currency presets including TWD](https://github.com/benbenbang/libitofin/blob/main/docs/docs/currency-presets.md),
+and [Black FX delta conventions](https://github.com/benbenbang/libitofin/blob/main/docs/docs/black-delta-bindings.md).
+These helpers do not add currency rounding, conversion or a new option pricing engine.
+
 ## Install
 
 ```bash
