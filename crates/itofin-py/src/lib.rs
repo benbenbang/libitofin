@@ -7,6 +7,7 @@
 
 mod bates;
 mod benchmark_beta;
+mod black_delta;
 mod bma;
 mod bond_forward;
 mod bonds;
@@ -248,6 +249,8 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     let quotes = PyModule::new(py, "quotes")?;
     quotes.add_class::<PySimpleQuote>()?;
+    quotes.add_class::<black_delta::PyDeltaType>()?;
+    quotes.add_class::<black_delta::PyAtmType>()?;
 
     let termstructures = PyModule::new(py, "termstructures")?;
     termstructures.add_class::<PyYieldTermStructure>()?;
@@ -417,6 +420,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     models.add_class::<PyCalibrationErrorType>()?;
 
     let pricingengines = PyModule::new(py, "pricingengines")?;
+    pricingengines.add_class::<black_delta::PyBlackDeltaCalculator>()?;
     pricingengines.add_class::<bonds::PyDiscountingBondEngine>()?;
     pricingengines.add_class::<callable_bonds::PyTreeCallableFixedRateBondEngine>()?;
     pricingengines.add_class::<callable_bonds::PyBlackCallableFixedRateBondEngine>()?;

@@ -4,6 +4,7 @@
 import builtins
 import itofin
 from itofin import indexes
+from itofin import instruments
 from itofin import models
 from itofin import processes
 from itofin import quotes
@@ -18,6 +19,7 @@ __all__ = [
     "BatesEngine",
     "BlackCallableFixedRateBondEngine",
     "BlackCapFloorEngine",
+    "BlackDeltaCalculator",
     "BlackSwaptionEngine",
     "CashAnnuityModel",
     "CosHestonEngine",
@@ -200,6 +202,33 @@ class BlackCapFloorEngine:
 
         Returns:
             float: The displacement.
+        """
+
+@typing.final
+class BlackDeltaCalculator:
+    r"""
+    Immutable standalone FX delta/strike conversion, not a pricing engine.
+    Premium-adjusted calls invert on the high-strike branch.
+    """
+    def __init__(self, option_type: instruments.OptionType, delta_type: quotes.DeltaType, spot: builtins.float, domestic_discount: builtins.float, foreign_discount: builtins.float, std_dev: builtins.float) -> None:
+        r"""
+        Copy positive finite spot/discounts and finite nonnegative std_dev.
+        std_dev is volatility times sqrt(time). Construct a new calculator to
+        change option or delta convention; no mutators are exposed.
+        """
+    def delta_from_strike(self, strike: builtins.float) -> builtins.float:
+        r"""
+        Signed delta at finite nonnegative strike, including zero deviation.
+        Premium-adjusted put deltas may be below minus one.
+        """
+    def strike_from_delta(self, delta: builtins.float) -> builtins.float:
+        r"""
+        Invert a signed interior delta with positive deviation. A premium-adjusted
+        call returns the high-strike root, not necessarily the original strike.
+        """
+    def atm_strike(self, atm_type: quotes.AtmType) -> builtins.float:
+        r"""
+        ATM strike; Null errors and PutCall50 is valid only for Fwd delta.
         """
 
 @typing.final
