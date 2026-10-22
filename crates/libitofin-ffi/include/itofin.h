@@ -21,6 +21,61 @@
 #include <stdlib.h>
 typedef double ItofinReal;
 
+/**
+ * Spot delta convention.
+ */
+#define ITOFIN_DELTA_SPOT 0
+
+/**
+ * Forward delta convention.
+ */
+#define ITOFIN_DELTA_FWD 1
+
+/**
+ * Premium-adjusted spot delta convention.
+ */
+#define ITOFIN_DELTA_PA_SPOT 2
+
+/**
+ * Premium-adjusted forward delta convention.
+ */
+#define ITOFIN_DELTA_PA_FWD 3
+
+/**
+ * Unspecified ATM convention, rejected by atm_strike.
+ */
+#define ITOFIN_ATM_NULL 0
+
+/**
+ * Spot ATM strike.
+ */
+#define ITOFIN_ATM_SPOT 1
+
+/**
+ * Forward ATM strike.
+ */
+#define ITOFIN_ATM_FWD 2
+
+/**
+ * Delta-neutral ATM strike.
+ */
+#define ITOFIN_ATM_DELTA_NEUTRAL 3
+
+/**
+ * Maximum-vega ATM strike.
+ */
+#define ITOFIN_ATM_VEGA_MAX 4
+
+/**
+ * Maximum-gamma ATM strike.
+ */
+#define ITOFIN_ATM_GAMMA_MAX 5
+
+/**
+ * Fifty-delta ATM strike, valid only for unadjusted forward delta.
+ */
+#define ITOFIN_ATM_PUT_CALL_50 6
+
 #define ITOFIN_INVALID_ARGUMENT 1
 
 #define ITOFIN_INVALID_HANDLE 2
@@ -1769,6 +1824,59 @@ int32_t itofin_bates_calibrate_with_options(struct ItofinContext *ctx,
                                             size_t integration_order,
                                             const struct ItofinCalibrationOptions *options,
                                             struct ItofinError *error);
+
+/**
+ * Copy validated parameters into an immutable calculator. Option kind is
+ * 0 call or 1 put, preserving the existing ABI mapping. Deviation is volatility
+ * times square root of time, not volatility or maturity separately.
+ * # Safety
+ * Follow the crate-level C caller contract. Output is written only on success.
+ */
+int32_t itofin_black_delta_new(struct ItofinContext *ctx,
+                               int32_t option_kind,
+                               int32_t delta_kind,
+                               double spot,
+                               double domestic_discount,
+                               double foreign_discount,
+                               double std_dev,
+                               uint64_t *out,
+                               struct ItofinError *error);
+
+/**
+ * Signed delta at a finite nonnegative strike. Zero deviation is supported;
+ * premium-adjusted put deltas are not clamped to minus one.
+ * # Safety
+ * Follow the crate-level C caller contract. Output is written only on success.
+ */
+int32_t itofin_black_delta_delta_from_strike(struct ItofinContext *ctx,
+                                             uint64_t calculator,
+                                             double strike,
+                                             double *out,
+                                             struct ItofinError *error);
+
+/**
+ * Invert a signed interior delta with positive deviation. Premium-adjusted
+ * calls select the high-strike root, not necessarily the original strike.
+ * # Safety
+ * Follow the crate-level C caller contract. Output is written only on success.
+ */
+int32_t itofin_black_delta_strike_from_delta(struct ItofinContext *ctx,
+                                             uint64_t calculator,
+                                             double delta,
+                                             double *out,
+                                             struct ItofinError *error);
+
+/**
+ * ATM strike for a stable ITOFIN_ATM_* value. Null is an error; PutCall50
+ * requires ITOFIN_DELTA_FWD, not premium-adjusted forward delta.
+ * # Safety
+ * Follow the crate-level C caller contract. Output is written only on success.
+ */
+int32_t itofin_black_delta_atm_strike(struct ItofinContext *ctx,
+                                      uint64_t calculator,
+                                      int32_t atm_kind,
+                                      double *out,
+                                      struct ItofinError *error);
 
 /**
  * Construct a retained BMA index; zero forwarding creates an empty forecast handle.
