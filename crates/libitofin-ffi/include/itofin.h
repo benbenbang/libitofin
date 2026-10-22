@@ -1826,6 +1826,121 @@ int32_t itofin_bates_calibrate_with_options(struct ItofinContext *ctx,
                                             struct ItofinError *error);
 
 /**
+ * Copy finite parameters for a plain-vanilla call (0) or put (1).
+ * Strike and std_dev are nonnegative; forward and discount are positive.
+ * std_dev is volatility times sqrt(time). No payoff handle is accepted.
+ * # Safety
+ * Follow the crate-level C caller contract. Output is written only on success.
+ */
+int32_t itofin_black_calculator_new(struct ItofinContext *ctx,
+                                    int32_t option_kind,
+                                    double strike,
+                                    double forward,
+                                    double std_dev,
+                                    double discount,
+                                    uint64_t *out,
+                                    struct ItofinError *error);
+
+/**
+ * Present value.
+ * Nonfinite native results are errors; finite native edge behavior is unchanged.
+ * # Safety
+ * Follow the crate-level C caller contract. Output is written only on success.
+ */
+int32_t itofin_black_calculator_value(struct ItofinContext *ctx,
+                                      uint64_t calculator,
+                                      double *out,
+                                      struct ItofinError *error);
+
+/**
+ * Forward delta.
+ * Nonfinite native results are errors; finite native edge behavior is unchanged.
+ * # Safety
+ * Follow the crate-level C caller contract. Output is written only on success.
+ */
+int32_t itofin_black_calculator_delta_forward(struct ItofinContext *ctx,
+                                              uint64_t calculator,
+                                              double *out,
+                                              struct ItofinError *error);
+
+/**
+ * Forward elasticity; native finite MAX/MIN sentinels are retained.
+ * Nonfinite native results are errors; finite native edge behavior is unchanged.
+ * # Safety
+ * Follow the crate-level C caller contract. Output is written only on success.
+ */
+int32_t itofin_black_calculator_elasticity_forward(struct ItofinContext *ctx,
+                                                   uint64_t calculator,
+                                                   double *out,
+                                                   struct ItofinError *error);
+
+/**
+ * Forward gamma.
+ * Nonfinite native results are errors; finite native edge behavior is unchanged.
+ * # Safety
+ * Follow the crate-level C caller contract. Output is written only on success.
+ */
+int32_t itofin_black_calculator_gamma_forward(struct ItofinContext *ctx,
+                                              uint64_t calculator,
+                                              double *out,
+                                              struct ItofinError *error);
+
+/**
+ * Native N(d2), independent of option sign.
+ * Nonfinite native results are errors; finite native edge behavior is unchanged.
+ * # Safety
+ * Follow the crate-level C caller contract. Output is written only on success.
+ */
+int32_t itofin_black_calculator_itm_cash_probability(struct ItofinContext *ctx,
+                                                     uint64_t calculator,
+                                                     double *out,
+                                                     struct ItofinError *error);
+
+/**
+ * Native N(d1), independent of option sign.
+ * Nonfinite native results are errors; finite native edge behavior is unchanged.
+ * # Safety
+ * Follow the crate-level C caller contract. Output is written only on success.
+ */
+int32_t itofin_black_calculator_itm_asset_probability(struct ItofinContext *ctx,
+                                                      uint64_t calculator,
+                                                      double *out,
+                                                      struct ItofinError *error);
+
+/**
+ * Strike sensitivity.
+ * Nonfinite native results are errors; finite native edge behavior is unchanged.
+ * # Safety
+ * Follow the crate-level C caller contract. Output is written only on success.
+ */
+int32_t itofin_black_calculator_strike_sensitivity(struct ItofinContext *ctx,
+                                                   uint64_t calculator,
+                                                   double *out,
+                                                   struct ItofinError *error);
+
+/**
+ * Forward coefficient in the native value formula.
+ * Nonfinite native results are errors; finite native edge behavior is unchanged.
+ * # Safety
+ * Follow the crate-level C caller contract. Output is written only on success.
+ */
+int32_t itofin_black_calculator_alpha(struct ItofinContext *ctx,
+                                      uint64_t calculator,
+                                      double *out,
+                                      struct ItofinError *error);
+
+/**
+ * Strike coefficient in the native value formula.
+ * Nonfinite native results are errors; finite native edge behavior is unchanged.
+ * # Safety
+ * Follow the crate-level C caller contract. Output is written only on success.
+ */
+int32_t itofin_black_calculator_beta(struct ItofinContext *ctx,
+                                     uint64_t calculator,
+                                     double *out,
+                                     struct ItofinError *error);
+
+/**
  * Copy validated parameters into an immutable calculator. Option kind is
  * 0 call or 1 put, preserving the existing ABI mapping. Deviation is volatility
  * times square root of time, not volatility or maturity separately.
