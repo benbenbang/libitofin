@@ -89,6 +89,21 @@ pub unsafe extern "C" fn itofin_black_calculator_delta_forward(
     unsafe { calculate(ctx, calculator, out, error, |c| Ok(c.delta_forward())) }
 }
 
+/// Spot delta, requiring positive finite spot.
+/// Nonfinite native results are errors; finite native edge behavior is unchanged.
+/// # Safety
+/// Follow the crate-level C caller contract. Output is written only on success.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn itofin_black_calculator_delta(
+    ctx: *mut Context,
+    calculator: u64,
+    spot: f64,
+    out: *mut f64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe { calculate(ctx, calculator, out, error, |c| Ok(c.delta(spot)?)) }
+}
+
 /// Forward elasticity; native finite MAX/MIN sentinels are retained.
 /// Nonfinite native results are errors; finite native edge behavior is unchanged.
 /// # Safety
@@ -103,6 +118,21 @@ pub unsafe extern "C" fn itofin_black_calculator_elasticity_forward(
     unsafe { calculate(ctx, calculator, out, error, |c| Ok(c.elasticity_forward())) }
 }
 
+/// Spot elasticity, requiring positive finite spot.
+/// Nonfinite native results are errors; finite native edge behavior is unchanged.
+/// # Safety
+/// Follow the crate-level C caller contract. Output is written only on success.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn itofin_black_calculator_elasticity(
+    ctx: *mut Context,
+    calculator: u64,
+    spot: f64,
+    out: *mut f64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe { calculate(ctx, calculator, out, error, |c| Ok(c.elasticity(spot)?)) }
+}
+
 /// Forward gamma.
 /// Nonfinite native results are errors; finite native edge behavior is unchanged.
 /// # Safety
@@ -115,6 +145,114 @@ pub unsafe extern "C" fn itofin_black_calculator_gamma_forward(
     error: *mut ItofinError,
 ) -> i32 {
     unsafe { calculate(ctx, calculator, out, error, |c| Ok(c.gamma_forward())) }
+}
+
+/// Spot gamma, requiring positive finite spot.
+/// Nonfinite native results are errors; finite native edge behavior is unchanged.
+/// # Safety
+/// Follow the crate-level C caller contract. Output is written only on success.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn itofin_black_calculator_gamma(
+    ctx: *mut Context,
+    calculator: u64,
+    spot: f64,
+    out: *mut f64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe { calculate(ctx, calculator, out, error, |c| Ok(c.gamma(spot)?)) }
+}
+
+/// Theta per year. Native expiry shortcut is retained.
+/// Nonfinite native results are errors; finite native edge behavior is unchanged.
+/// # Safety
+/// Follow the crate-level C caller contract. Output is written only on success.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn itofin_black_calculator_theta(
+    ctx: *mut Context,
+    calculator: u64,
+    spot: f64,
+    maturity: f64,
+    out: *mut f64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        calculate(
+            ctx,
+            calculator,
+            out,
+            error,
+            |c| Ok(c.theta(spot, maturity)?),
+        )
+    }
+}
+
+/// Theta divided by 365. Native expiry shortcut is retained.
+/// Nonfinite native results are errors; finite native edge behavior is unchanged.
+/// # Safety
+/// Follow the crate-level C caller contract. Output is written only on success.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn itofin_black_calculator_theta_per_day(
+    ctx: *mut Context,
+    calculator: u64,
+    spot: f64,
+    maturity: f64,
+    out: *mut f64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        calculate(ctx, calculator, out, error, |c| {
+            Ok(c.theta_per_day(spot, maturity)?)
+        })
+    }
+}
+
+/// Vega for finite nonnegative maturity.
+/// Nonfinite native results are errors; finite native edge behavior is unchanged.
+/// # Safety
+/// Follow the crate-level C caller contract. Output is written only on success.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn itofin_black_calculator_vega(
+    ctx: *mut Context,
+    calculator: u64,
+    maturity: f64,
+    out: *mut f64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe { calculate(ctx, calculator, out, error, |c| Ok(c.vega(maturity)?)) }
+}
+
+/// Discount-rate rho for finite nonnegative maturity.
+/// Nonfinite native results are errors; finite native edge behavior is unchanged.
+/// # Safety
+/// Follow the crate-level C caller contract. Output is written only on success.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn itofin_black_calculator_rho(
+    ctx: *mut Context,
+    calculator: u64,
+    maturity: f64,
+    out: *mut f64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe { calculate(ctx, calculator, out, error, |c| Ok(c.rho(maturity)?)) }
+}
+
+/// Growth-rate rho for finite nonnegative maturity.
+/// Nonfinite native results are errors; finite native edge behavior is unchanged.
+/// # Safety
+/// Follow the crate-level C caller contract. Output is written only on success.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn itofin_black_calculator_dividend_rho(
+    ctx: *mut Context,
+    calculator: u64,
+    maturity: f64,
+    out: *mut f64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        calculate(ctx, calculator, out, error, |c| {
+            Ok(c.dividend_rho(maturity)?)
+        })
+    }
 }
 
 /// Native N(d2), independent of option sign.
