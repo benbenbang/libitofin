@@ -81,10 +81,44 @@ class Currency:
     r"""
     An ISO 4217 currency specification.
 
-    Only the four named currencies the core provides are exposed; the general
-    constructor is omitted, as the core ports only the currencies its indexes
-    need and the full catalogue is deferred there.
+    A custom code contains exactly three ASCII letters, without registry lookup.
+    Numeric fields retain the core's signed 32-bit integer semantics.
     """
+    def __init__(self, name: builtins.str, code: builtins.str, numeric_code: builtins.int, symbol: builtins.str, fraction_symbol: builtins.str, fractions_per_unit: builtins.int) -> None:
+        r"""
+        Construct a reusable currency specification, copying every stored field.
+
+        Args:
+            name (str): Name used for core currency equality.
+            code (str): Exactly three ASCII letters; no registry lookup or normalization.
+            numeric_code (int): Signed 32-bit numeric identifier.
+            symbol (str): Currency symbol, retaining Unicode and embedded NULs.
+            fraction_symbol (str): Fraction symbol, retaining Unicode and embedded NULs.
+            fractions_per_unit (int): Signed 32-bit number of fractions in one unit.
+
+        Raises:
+            ValueError: If code is not three ASCII letters.
+        """
+    def name(self) -> builtins.str:
+        r"""
+        Return the name used for core currency equality.
+        """
+    def numeric_code(self) -> builtins.int:
+        r"""
+        Return the signed numeric identifier without registry lookup.
+        """
+    def symbol(self) -> builtins.str:
+        r"""
+        Return the symbol, retaining Unicode and embedded NULs.
+        """
+    def fraction_symbol(self) -> builtins.str:
+        r"""
+        Return the fraction symbol, retaining Unicode and embedded NULs.
+        """
+    def fractions_per_unit(self) -> builtins.int:
+        r"""
+        Return the stored number of fractions per unit.
+        """
     @staticmethod
     def eur() -> Currency:
         r"""
