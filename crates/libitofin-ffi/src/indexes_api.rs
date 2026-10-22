@@ -65,6 +65,9 @@ pub(crate) fn period(length: i32, unit: i32) -> BindingResult<Period> {
 /// must not overlap inputs or other outputs. Any context and its handles must
 /// belong to the calling thread; serialize calls including destruction.
 /// See the crate-level C caller contract for lifetime requirements.
+/// Presets: 0 EUR, 1 USD, 2 GBP, 3 JPY, 4 TWD, 5 CHF, 6 AUD, 7 CAD,
+/// 8 SEK, 9 NOK, 10 DKK, 11 NZD, 12 HKD, 13 SGD, 14 CNY, 15 KRW,
+/// 16 INR, 17 BRL, 18 MXN, 19 ZAR, 20 PLN, 21 CZK, 22 HUF, 23 TRY.
 pub unsafe extern "C" fn itofin_currency_new(
     ctx: *mut Context,
     kind: i32,
@@ -79,6 +82,26 @@ pub unsafe extern "C" fn itofin_currency_new(
                 1 => Currency::usd(),
                 2 => Currency::gbp(),
                 3 => Currency::jpy(),
+                4 => Currency::twd(),
+                5 => Currency::chf(),
+                6 => Currency::aud(),
+                7 => Currency::cad(),
+                8 => Currency::sek(),
+                9 => Currency::nok(),
+                10 => Currency::dkk(),
+                11 => Currency::nzd(),
+                12 => Currency::hkd(),
+                13 => Currency::sgd(),
+                14 => Currency::cny(),
+                15 => Currency::krw(),
+                16 => Currency::inr(),
+                17 => Currency::brl(),
+                18 => Currency::mxn(),
+                19 => Currency::zar(),
+                20 => Currency::pln(),
+                21 => Currency::czk(),
+                22 => Currency::huf(),
+                23 => Currency::try_(),
                 _ => return Err(BindingError::invalid("unknown currency")),
             };
             output(out, c.insert(v)?)
@@ -517,3 +540,7 @@ pub unsafe extern "C" fn itofin_overnight_fixing_days(
         })
     }
 }
+
+#[cfg(test)]
+#[path = "currency_presets_tests.rs"]
+mod currency_presets_tests;

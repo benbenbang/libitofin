@@ -5,7 +5,7 @@
 //! fractionary parts per unit. It is a value type, exercised through the indexes
 //! and (later) money rather than by any dedicated numeric test.
 //!
-//! Only the currencies the ported indexes need are provided here. The full
+//! Selected source-pinned presets supplement the currencies needed by indexes. The full
 //! `ql/currencies/*` catalogue is deferred to a later ticket.
 //!
 //! ## Divergences from QuantLib
@@ -99,6 +99,106 @@ impl Currency {
     /// the `rounding` field (see the module divergences).
     pub fn jpy() -> Self {
         Currency::new("Japanese yen", "JPY", 392, "\u{a5}", "", 100)
+    }
+
+    /// The Taiwan dollar, matching QuantLib `TWDCurrency`.
+    pub fn twd() -> Self {
+        Self::new("Taiwan dollar", "TWD", 901, "NT$", "", 100)
+    }
+
+    /// The Swiss franc, matching QuantLib `CHFCurrency`.
+    pub fn chf() -> Self {
+        Self::new("Swiss franc", "CHF", 756, "SwF", "", 100)
+    }
+
+    /// The Australian dollar, matching QuantLib `AUDCurrency`.
+    pub fn aud() -> Self {
+        Self::new("Australian dollar", "AUD", 36, "A$", "", 100)
+    }
+
+    /// The Canadian dollar, matching QuantLib `CADCurrency`.
+    pub fn cad() -> Self {
+        Self::new("Canadian dollar", "CAD", 124, "Can$", "", 100)
+    }
+
+    /// The Swedish krona, matching QuantLib `SEKCurrency`.
+    pub fn sek() -> Self {
+        Self::new("Swedish krona", "SEK", 752, "kr", "", 100)
+    }
+
+    /// The Norwegian krone, matching QuantLib `NOKCurrency`.
+    pub fn nok() -> Self {
+        Self::new("Norwegian krone", "NOK", 578, "NKr", "", 100)
+    }
+
+    /// The Danish krone, matching QuantLib `DKKCurrency`.
+    pub fn dkk() -> Self {
+        Self::new("Danish krone", "DKK", 208, "Dkr", "", 100)
+    }
+
+    /// The New Zealand dollar, matching QuantLib `NZDCurrency`.
+    pub fn nzd() -> Self {
+        Self::new("New Zealand dollar", "NZD", 554, "NZ$", "", 100)
+    }
+
+    /// The Hong Kong dollar, matching QuantLib `HKDCurrency`.
+    pub fn hkd() -> Self {
+        Self::new("Hong Kong dollar", "HKD", 344, "HK$", "", 100)
+    }
+
+    /// The Singapore dollar, matching QuantLib `SGDCurrency`.
+    pub fn sgd() -> Self {
+        Self::new("Singapore dollar", "SGD", 702, "S$", "", 100)
+    }
+
+    /// The Chinese yuan, matching QuantLib `CNYCurrency`.
+    pub fn cny() -> Self {
+        Self::new("Chinese yuan", "CNY", 156, "Y", "", 100)
+    }
+
+    /// The South-Korean won, matching QuantLib `KRWCurrency`.
+    pub fn krw() -> Self {
+        Self::new("South-Korean won", "KRW", 410, "W", "", 100)
+    }
+
+    /// The Indian rupee, matching QuantLib `INRCurrency`.
+    pub fn inr() -> Self {
+        Self::new("Indian rupee", "INR", 356, "Rs", "", 100)
+    }
+
+    /// The Brazilian real, matching QuantLib `BRLCurrency`.
+    pub fn brl() -> Self {
+        Self::new("Brazilian real", "BRL", 986, "R$", "", 100)
+    }
+
+    /// The Mexican peso, matching QuantLib `MXNCurrency`.
+    pub fn mxn() -> Self {
+        Self::new("Mexican peso", "MXN", 484, "Mex$", "", 100)
+    }
+
+    /// The South-African rand, matching QuantLib `ZARCurrency`.
+    pub fn zar() -> Self {
+        Self::new("South-African rand", "ZAR", 710, "R", "", 100)
+    }
+
+    /// The Polish zloty, matching QuantLib `PLNCurrency`.
+    pub fn pln() -> Self {
+        Self::new("Polish zloty", "PLN", 985, "zl", "", 100)
+    }
+
+    /// The Czech koruna, matching QuantLib `CZKCurrency`.
+    pub fn czk() -> Self {
+        Self::new("Czech koruna", "CZK", 203, "Kc", "", 100)
+    }
+
+    /// The Hungarian forint, matching QuantLib `HUFCurrency`.
+    pub fn huf() -> Self {
+        Self::new("Hungarian forint", "HUF", 348, "Ft", "", 1)
+    }
+
+    /// The New Turkish lira, matching QuantLib `TRYCurrency`.
+    pub fn try_() -> Self {
+        Self::new("New Turkish lira", "TRY", 949, "YTL", "", 100)
     }
 
     /// Currency name, e.g. `"European Euro"`.
