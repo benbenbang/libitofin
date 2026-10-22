@@ -4520,6 +4520,9 @@ int32_t itofin_incremental_statistics_query(struct ItofinContext *ctx,
  * must not overlap inputs or other outputs. Any context and its handles must
  * belong to the calling thread; serialize calls including destruction.
  * See the crate-level C caller contract for lifetime requirements.
+ * Presets: 0 EUR, 1 USD, 2 GBP, 3 JPY, 4 TWD, 5 CHF, 6 AUD, 7 CAD,
+ * 8 SEK, 9 NOK, 10 DKK, 11 NZD, 12 HKD, 13 SGD, 14 CNY, 15 KRW,
+ * 16 INR, 17 BRL, 18 MXN, 19 ZAR, 20 PLN, 21 CZK, 22 HUF, 23 TRY.
  */
 int32_t itofin_currency_new(struct ItofinContext *ctx,
                             int32_t kind,
