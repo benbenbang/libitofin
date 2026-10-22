@@ -1,14 +1,8 @@
 //! Facade for the currency specification Currency.
 //!
-//! An index carries a currency, so the general IborIndex constructor cannot be
-//! called without one. Only the four named currencies the core provides are
-//! exposed as staticmethods; the general Currency.new() form is deliberately
-//! omitted, since the core itself ports only the currencies the indexes need
-//! and the full `ql/currencies/*` catalogue is deferred there.
-//!
-//! It is registered under `itofin.indexes` rather than a submodule of its own:
-//! the index constructors are its only consumers today, both the general
-//! IborIndex one and, since #868, SwapIndex, which used to hard-code EUR.
+//! Currency values are reusable in index constructors. Text fields retain UTF-8
+//! and embedded NULs; equality inside the core remains name-based. Rounding,
+//! triangulation and minor-unit metadata remain outside this stored-field slice.
 
 use libitofin::currency::Currency;
 use pyo3::prelude::*;
@@ -19,9 +13,8 @@ use pyo3_stub_gen::derive::{
 
 /// An ISO 4217 currency specification.
 ///
-/// Only the four named currencies the core provides are exposed; the general
-/// constructor is omitted, as the core ports only the currencies its indexes
-/// need and the full catalogue is deferred there.
+/// A custom code contains exactly three ASCII letters, without registry lookup.
+/// Numeric fields retain the core's signed 32-bit integer semantics.
 #[gen_stub_pyclass]
 #[pyclass(name = "Currency", unsendable, module = "itofin.indexes")]
 pub struct PyCurrency {
@@ -31,6 +24,69 @@ pub struct PyCurrency {
 #[gen_stub_pymethods]
 #[pymethods]
 impl PyCurrency {
+    /// Construct a reusable currency specification, copying every stored field.
+    ///
+    /// Args:
+    ///     name (str): Name used for core currency equality.
+    ///     code (str): Exactly three ASCII letters; no registry lookup or normalization.
+    ///     numeric_code (int): Signed 32-bit numeric identifier.
+    ///     symbol (str): Currency symbol, retaining Unicode and embedded NULs.
+    ///     fraction_symbol (str): Fraction symbol, retaining Unicode and embedded NULs.
+    ///     fractions_per_unit (int): Signed 32-bit number of fractions in one unit.
+    ///
+    /// Raises:
+    ///     ValueError: If code is not three ASCII letters.
+    #[new]
+    fn new(
+        name: String,
+        code: String,
+        numeric_code: i32,
+        symbol: String,
+        fraction_symbol: String,
+        fractions_per_unit: i32,
+    ) -> PyResult<Self> {
+        if code.len() != 3 || !code.bytes().all(|b| b.is_ascii_alphabetic()) {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "currency code needs three ASCII letters",
+            ));
+        }
+        Ok(Self {
+            inner: Currency::new(
+                name,
+                code,
+                numeric_code,
+                symbol,
+                fraction_symbol,
+                fractions_per_unit,
+            ),
+        })
+    }
+
+    /// Return the name used for core currency equality.
+    fn name(&self) -> &str {
+        self.inner.name()
+    }
+
+    /// Return the signed numeric identifier without registry lookup.
+    fn numeric_code(&self) -> i32 {
+        self.inner.numeric_code()
+    }
+
+    /// Return the symbol, retaining Unicode and embedded NULs.
+    fn symbol(&self) -> &str {
+        self.inner.symbol()
+    }
+
+    /// Return the fraction symbol, retaining Unicode and embedded NULs.
+    fn fraction_symbol(&self) -> &str {
+        self.inner.fraction_symbol()
+    }
+
+    /// Return the stored number of fractions per unit.
+    fn fractions_per_unit(&self) -> i32 {
+        self.inner.fractions_per_unit()
+    }
+
     /// Return the European Euro.
     ///
     /// Returns:

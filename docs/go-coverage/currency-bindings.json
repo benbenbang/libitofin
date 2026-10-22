@@ -1,0 +1,51 @@
+{
+  "domain": "standalone-currency-constructor-and-fields",
+  "entries": [
+    {
+      "c": "itofin_currency_custom_new",
+      "go": "Session.NewCurrency",
+      "python": "itofin.indexes.Currency.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestCustomCurrencyStoredFieldsAndRetainedIndex",
+        "TestCustomCurrencyValidationAndSessionLifecycle"
+      ]
+    },
+    {
+      "c": "itofin_currency_text",
+      "go": "Currency.Name",
+      "python": "itofin.indexes.Currency.name",
+      "status": "implemented",
+      "tests": "TestCustomCurrencyStoredFieldsAndRetainedIndex"
+    },
+    {
+      "c": "itofin_currency_integer",
+      "go": "Currency.NumericCode",
+      "python": "itofin.indexes.Currency.numeric_code",
+      "status": "implemented",
+      "tests": "TestCustomCurrencyStoredFieldsAndRetainedIndex"
+    },
+    {
+      "c": "itofin_currency_text",
+      "go": "Currency.Symbol",
+      "python": "itofin.indexes.Currency.symbol",
+      "status": "implemented",
+      "tests": "TestCustomCurrencyStoredFieldsAndRetainedIndex"
+    },
+    {
+      "c": "itofin_currency_text",
+      "go": "Currency.FractionSymbol",
+      "python": "itofin.indexes.Currency.fraction_symbol",
+      "status": "implemented",
+      "tests": "TestCustomCurrencyStoredFieldsAndRetainedIndex"
+    },
+    {
+      "c": "itofin_currency_integer",
+      "go": "Currency.FractionsPerUnit",
+      "python": "itofin.indexes.Currency.fractions_per_unit",
+      "status": "implemented",
+      "tests": "TestCustomCurrencyStoredFieldsAndRetainedIndex"
+    }
+  ],
+  "scope": "Reusable six-field currency specification; existing code accessor and EUR/USD/GBP/JPY mappings remain in curves.json. No rounding, triangulation, money or exchange-rate facade."
+}
