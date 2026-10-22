@@ -1,0 +1,206 @@
+{
+  "domain": "twenty-additional-currency-presets",
+  "entries": [
+    {
+      "c": "itofin_currency_new",
+      "go": "Session.TWD",
+      "python": "itofin.indexes.Currency.twd",
+      "status": "implemented",
+      "tests": [
+        "TestCurrencyPresetCodesAndOwnership",
+        "TestCurrencyPresetSessionConcurrency"
+      ]
+    },
+    {
+      "c": "itofin_currency_new",
+      "go": "Session.CHF",
+      "python": "itofin.indexes.Currency.chf",
+      "status": "implemented",
+      "tests": [
+        "TestCurrencyPresetCodesAndOwnership",
+        "TestCurrencyPresetSessionConcurrency"
+      ]
+    },
+    {
+      "c": "itofin_currency_new",
+      "go": "Session.AUD",
+      "python": "itofin.indexes.Currency.aud",
+      "status": "implemented",
+      "tests": [
+        "TestCurrencyPresetCodesAndOwnership",
+        "TestCurrencyPresetSessionConcurrency"
+      ]
+    },
+    {
+      "c": "itofin_currency_new",
+      "go": "Session.CAD",
+      "python": "itofin.indexes.Currency.cad",
+      "status": "implemented",
+      "tests": [
+        "TestCurrencyPresetCodesAndOwnership",
+        "TestCurrencyPresetSessionConcurrency"
+      ]
+    },
+    {
+      "c": "itofin_currency_new",
+      "go": "Session.SEK",
+      "python": "itofin.indexes.Currency.sek",
+      "status": "implemented",
+      "tests": [
+        "TestCurrencyPresetCodesAndOwnership",
+        "TestCurrencyPresetSessionConcurrency"
+      ]
+    },
+    {
+      "c": "itofin_currency_new",
+      "go": "Session.NOK",
+      "python": "itofin.indexes.Currency.nok",
+      "status": "implemented",
+      "tests": [
+        "TestCurrencyPresetCodesAndOwnership",
+        "TestCurrencyPresetSessionConcurrency"
+      ]
+    },
+    {
+      "c": "itofin_currency_new",
+      "go": "Session.DKK",
+      "python": "itofin.indexes.Currency.dkk",
+      "status": "implemented",
+      "tests": [
+        "TestCurrencyPresetCodesAndOwnership",
+        "TestCurrencyPresetSessionConcurrency"
+      ]
+    },
+    {
+      "c": "itofin_currency_new",
+      "go": "Session.NZD",
+      "python": "itofin.indexes.Currency.nzd",
+      "status": "implemented",
+      "tests": [
+        "TestCurrencyPresetCodesAndOwnership",
+        "TestCurrencyPresetSessionConcurrency"
+      ]
+    },
+    {
+      "c": "itofin_currency_new",
+      "go": "Session.HKD",
+      "python": "itofin.indexes.Currency.hkd",
+      "status": "implemented",
+      "tests": [
+        "TestCurrencyPresetCodesAndOwnership",
+        "TestCurrencyPresetSessionConcurrency"
+      ]
+    },
+    {
+      "c": "itofin_currency_new",
+      "go": "Session.SGD",
+      "python": "itofin.indexes.Currency.sgd",
+      "status": "implemented",
+      "tests": [
+        "TestCurrencyPresetCodesAndOwnership",
+        "TestCurrencyPresetSessionConcurrency"
+      ]
+    },
+    {
+      "c": "itofin_currency_new",
+      "go": "Session.CNY",
+      "python": "itofin.indexes.Currency.cny",
+      "status": "implemented",
+      "tests": [
+        "TestCurrencyPresetCodesAndOwnership",
+        "TestCurrencyPresetSessionConcurrency"
+      ]
+    },
+    {
+      "c": "itofin_currency_new",
+      "go": "Session.KRW",
+      "python": "itofin.indexes.Currency.krw",
+      "status": "implemented",
+      "tests": [
+        "TestCurrencyPresetCodesAndOwnership",
+        "TestCurrencyPresetSessionConcurrency"
+      ]
+    },
+    {
+      "c": "itofin_currency_new",
+      "go": "Session.INR",
+      "python": "itofin.indexes.Currency.inr",
+      "status": "implemented",
+      "tests": [
+        "TestCurrencyPresetCodesAndOwnership",
+        "TestCurrencyPresetSessionConcurrency"
+      ]
+    },
+    {
+      "c": "itofin_currency_new",
+      "go": "Session.BRL",
+      "python": "itofin.indexes.Currency.brl",
+      "status": "implemented",
+      "tests": [
+        "TestCurrencyPresetCodesAndOwnership",
+        "TestCurrencyPresetSessionConcurrency"
+      ]
+    },
+    {
+      "c": "itofin_currency_new",
+      "go": "Session.MXN",
+      "python": "itofin.indexes.Currency.mxn",
+      "status": "implemented",
+      "tests": [
+        "TestCurrencyPresetCodesAndOwnership",
+        "TestCurrencyPresetSessionConcurrency"
+      ]
+    },
+    {
+      "c": "itofin_currency_new",
+      "go": "Session.ZAR",
+      "python": "itofin.indexes.Currency.zar",
+      "status": "implemented",
+      "tests": [
+        "TestCurrencyPresetCodesAndOwnership",
+        "TestCurrencyPresetSessionConcurrency"
+      ]
+    },
+    {
+      "c": "itofin_currency_new",
+      "go": "Session.PLN",
+      "python": "itofin.indexes.Currency.pln",
+      "status": "implemented",
+      "tests": [
+        "TestCurrencyPresetCodesAndOwnership",
+        "TestCurrencyPresetSessionConcurrency"
+      ]
+    },
+    {
+      "c": "itofin_currency_new",
+      "go": "Session.CZK",
+      "python": "itofin.indexes.Currency.czk",
+      "status": "implemented",
+      "tests": [
+        "TestCurrencyPresetCodesAndOwnership",
+        "TestCurrencyPresetSessionConcurrency"
+      ]
+    },
+    {
+      "c": "itofin_currency_new",
+      "go": "Session.HUF",
+      "python": "itofin.indexes.Currency.huf",
+      "status": "implemented",
+      "tests": [
+        "TestCurrencyPresetCodesAndOwnership",
+        "TestCurrencyPresetSessionConcurrency"
+      ]
+    },
+    {
+      "c": "itofin_currency_new",
+      "go": "Session.TRY",
+      "python": "itofin.indexes.Currency.try_",
+      "status": "implemented",
+      "tests": [
+        "TestCurrencyPresetCodesAndOwnership",
+        "TestCurrencyPresetSessionConcurrency"
+      ]
+    }
+  ],
+  "scope": "Twenty named presets, including TWD; original four selectors and name-based core identity remain unchanged. No full QuantLib currency catalogue claim."
+}
