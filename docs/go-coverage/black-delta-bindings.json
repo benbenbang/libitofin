@@ -1,0 +1,161 @@
+{
+  "domain": "immutable-black-fx-delta-conventions",
+  "entries": [
+    {
+      "c": "itofin_black_delta_new",
+      "go": "Session.NewBlackDeltaCalculator",
+      "python": "itofin.pricingengines.BlackDeltaCalculator.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestBlackDeltaFixturesAndConventions",
+        "TestBlackDeltaBranchesDomainsAndZeroVol"
+      ]
+    },
+    {
+      "c": "itofin_black_delta_delta_from_strike",
+      "go": "BlackDeltaCalculator.DeltaFromStrike",
+      "python": "itofin.pricingengines.BlackDeltaCalculator.delta_from_strike",
+      "status": "implemented",
+      "tests": [
+        "TestBlackDeltaFixturesAndConventions",
+        "TestBlackDeltaBranchesDomainsAndZeroVol"
+      ]
+    },
+    {
+      "c": "itofin_black_delta_strike_from_delta",
+      "go": "BlackDeltaCalculator.StrikeFromDelta",
+      "python": "itofin.pricingengines.BlackDeltaCalculator.strike_from_delta",
+      "status": "implemented",
+      "tests": [
+        "TestBlackDeltaFixturesAndConventions",
+        "TestBlackDeltaBranchesDomainsAndZeroVol"
+      ]
+    },
+    {
+      "c": "itofin_black_delta_atm_strike",
+      "go": "BlackDeltaCalculator.AtmStrike",
+      "python": "itofin.pricingengines.BlackDeltaCalculator.atm_strike",
+      "status": "implemented",
+      "tests": [
+        "TestBlackDeltaFixturesAndConventions",
+        "TestBlackDeltaBranchesDomainsAndZeroVol"
+      ]
+    },
+    {
+      "go": "DeltaType",
+      "python": "itofin.quotes.DeltaType",
+      "status": "implemented",
+      "tests": "TestBlackDeltaFixturesAndConventions"
+    },
+    {
+      "go": "DeltaType: explicit integer conversion",
+      "python": "itofin.quotes.DeltaType.__int__",
+      "status": "implemented",
+      "tests": "TestBlackDeltaFixturesAndConventions"
+    },
+    {
+      "c": "int32 discriminant 0",
+      "go": "DeltaSpot",
+      "python": "itofin.quotes.DeltaType.Spot",
+      "status": "implemented",
+      "tests": "TestBlackDeltaFixturesAndConventions"
+    },
+    {
+      "c": "int32 discriminant 1",
+      "go": "DeltaFwd",
+      "python": "itofin.quotes.DeltaType.Fwd",
+      "status": "implemented",
+      "tests": "TestBlackDeltaFixturesAndConventions"
+    },
+    {
+      "c": "int32 discriminant 2",
+      "go": "DeltaPaSpot",
+      "python": "itofin.quotes.DeltaType.PaSpot",
+      "status": "implemented",
+      "tests": "TestBlackDeltaFixturesAndConventions"
+    },
+    {
+      "c": "int32 discriminant 3",
+      "go": "DeltaPaFwd",
+      "python": "itofin.quotes.DeltaType.PaFwd",
+      "status": "implemented",
+      "tests": "TestBlackDeltaFixturesAndConventions"
+    },
+    {
+      "classification": "nonconstructible-enum",
+      "go": "DeltaType",
+      "python": "itofin.quotes.DeltaType.__new__",
+      "reason": "Python DeltaType forbids construction; Go uses typed integer constants and casts. Native Black delta APIs validate discriminants.",
+      "status": "language-specific"
+    },
+    {
+      "go": "AtmType",
+      "python": "itofin.quotes.AtmType",
+      "status": "implemented",
+      "tests": "TestBlackDeltaFixturesAndConventions"
+    },
+    {
+      "go": "AtmType: explicit integer conversion",
+      "python": "itofin.quotes.AtmType.__int__",
+      "status": "implemented",
+      "tests": "TestBlackDeltaFixturesAndConventions"
+    },
+    {
+      "c": "int32 discriminant 0",
+      "go": "AtmNull",
+      "python": "itofin.quotes.AtmType.Null",
+      "status": "implemented",
+      "tests": "TestBlackDeltaFixturesAndConventions"
+    },
+    {
+      "c": "int32 discriminant 1",
+      "go": "AtmSpot",
+      "python": "itofin.quotes.AtmType.Spot",
+      "status": "implemented",
+      "tests": "TestBlackDeltaFixturesAndConventions"
+    },
+    {
+      "c": "int32 discriminant 2",
+      "go": "AtmFwd",
+      "python": "itofin.quotes.AtmType.Fwd",
+      "status": "implemented",
+      "tests": "TestBlackDeltaFixturesAndConventions"
+    },
+    {
+      "c": "int32 discriminant 3",
+      "go": "AtmDeltaNeutral",
+      "python": "itofin.quotes.AtmType.DeltaNeutral",
+      "status": "implemented",
+      "tests": "TestBlackDeltaFixturesAndConventions"
+    },
+    {
+      "c": "int32 discriminant 4",
+      "go": "AtmVegaMax",
+      "python": "itofin.quotes.AtmType.VegaMax",
+      "status": "implemented",
+      "tests": "TestBlackDeltaFixturesAndConventions"
+    },
+    {
+      "c": "int32 discriminant 5",
+      "go": "AtmGammaMax",
+      "python": "itofin.quotes.AtmType.GammaMax",
+      "status": "implemented",
+      "tests": "TestBlackDeltaFixturesAndConventions"
+    },
+    {
+      "c": "int32 discriminant 6",
+      "go": "AtmPutCall50",
+      "python": "itofin.quotes.AtmType.PutCall50",
+      "status": "implemented",
+      "tests": "TestBlackDeltaFixturesAndConventions"
+    },
+    {
+      "classification": "nonconstructible-enum",
+      "go": "AtmType",
+      "python": "itofin.quotes.AtmType.__new__",
+      "reason": "Python AtmType forbids construction; Go uses typed integer constants and casts. Native Black delta APIs validate discriminants.",
+      "status": "language-specific"
+    }
+  ],
+  "scope": "Standalone delta/strike/ATM conversion and immutable quote-convention enums, not a new FX option pricing engine. Premium-adjusted call inversion keeps the native high-strike branch."
+}

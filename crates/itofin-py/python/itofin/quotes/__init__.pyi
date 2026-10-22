@@ -4,6 +4,8 @@
 import builtins
 import typing
 __all__ = [
+    "AtmType",
+    "DeltaType",
     "SimpleQuote",
 ]
 
@@ -39,3 +41,32 @@ class SimpleQuote:
             value (float): The new value; observers are notified when it actually
                 changes, so dependent valuations recompute on next access.
         """
+
+@typing.final
+class AtmType:
+    r"""
+    ATM conventions. Null is invalid for calculation; PutCall50 requires Fwd.
+    """
+    Null: typing.ClassVar[AtmType]
+    Spot: typing.ClassVar[AtmType]
+    Fwd: typing.ClassVar[AtmType]
+    DeltaNeutral: typing.ClassVar[AtmType]
+    VegaMax: typing.ClassVar[AtmType]
+    GammaMax: typing.ClassVar[AtmType]
+    PutCall50: typing.ClassVar[AtmType]
+    def __new__(cls, _unconstructible: typing.NoReturn) -> AtmType: ...
+    def __int__(self) -> builtins.int: ...
+    __hash__: typing.ClassVar[None]  # type: ignore[assignment]
+
+@typing.final
+class DeltaType:
+    r"""
+    Spot, forward and premium-adjusted delta conventions.
+    """
+    Spot: typing.ClassVar[DeltaType]
+    Fwd: typing.ClassVar[DeltaType]
+    PaSpot: typing.ClassVar[DeltaType]
+    PaFwd: typing.ClassVar[DeltaType]
+    def __new__(cls, _unconstructible: typing.NoReturn) -> DeltaType: ...
+    def __int__(self) -> builtins.int: ...
+    __hash__: typing.ClassVar[None]  # type: ignore[assignment]
