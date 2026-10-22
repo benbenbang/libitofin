@@ -49,6 +49,7 @@ Use `-tags itofin_external` for builds, runs, tests, and vet outside this checko
 | Topic | Start here |
 |-------|------------|
 | Language guides and examples | [Rust](wiki/rust.md) · [Python](wiki/python.md) · [Go](wiki/go.md) |
+| Standalone currencies | [Constructor and fields](docs/docs/currency-bindings.md) |
 | Worked pricing walkthrough | [Python, Rust, and Go](https://benbenbang.github.io/libitofin/getting-started/) |
 | Releases, coverage, and remaining work | [Status and scope](wiki/status.md) · [Issues](https://github.com/benbenbang/libitofin/issues) |
 | Build, test, and repository layout | [Development](wiki/development.md) |
