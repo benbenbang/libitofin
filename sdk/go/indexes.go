@@ -34,6 +34,9 @@ func (s *Session) USD() (*Currency, error) { return s.currency(1) }
 func (s *Session) GBP() (*Currency, error) { return s.currency(2) }
 func (s *Session) JPY() (*Currency, error) { return s.currency(3) }
 func (c *Currency) Code() (string, error) {
+	if err := c.checked(); err != nil {
+		return "", err
+	}
 	var buf [4]C.uint8_t
 	err := c.session.invoke(func() error {
 		var e C.ItofinError
