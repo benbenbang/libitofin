@@ -112,7 +112,7 @@ cc -std=c11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
 c++ -x c++ -std=c++11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
   crates/libitofin-ffi/tests/g2_process.c -Ltarget/release -litofin_ffi -lm -o target/cpp-g2-process
 ./target/cpp-g2-process
-for probe in c_currency; do
+for probe in c_currency black_delta; do
   cc -std=c11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
     "crates/libitofin-ffi/tests/$probe.c" -Ltarget/release -litofin_ffi -lm -o "target/c-$probe"
   "./target/c-$probe"
