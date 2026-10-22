@@ -10,6 +10,7 @@
 
 pub mod bates_api;
 pub mod bates_calibration_api;
+pub mod black_calculator_api;
 pub mod black_delta_api;
 pub mod bma_api;
 pub mod bma_swap_api;
