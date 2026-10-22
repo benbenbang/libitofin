@@ -83,6 +83,7 @@ class Currency:
 
     A custom code contains exactly three ASCII letters, without registry lookup.
     Numeric fields retain the core's signed 32-bit integer semantics.
+    Selected named presets match the stored fields of pinned QuantLib source.
     """
     def __init__(self, name: builtins.str, code: builtins.str, numeric_code: builtins.int, symbol: builtins.str, fraction_symbol: builtins.str, fractions_per_unit: builtins.int) -> None:
         r"""
@@ -150,6 +151,106 @@ class Currency:
 
         Returns:
             Currency: The yen, ISO code "JPY".
+        """
+    @staticmethod
+    def twd() -> Currency:
+        r"""
+        Return the Taiwan dollar.
+        """
+    @staticmethod
+    def chf() -> Currency:
+        r"""
+        Return the Swiss franc.
+        """
+    @staticmethod
+    def aud() -> Currency:
+        r"""
+        Return the Australian dollar.
+        """
+    @staticmethod
+    def cad() -> Currency:
+        r"""
+        Return the Canadian dollar.
+        """
+    @staticmethod
+    def sek() -> Currency:
+        r"""
+        Return the Swedish krona.
+        """
+    @staticmethod
+    def nok() -> Currency:
+        r"""
+        Return the Norwegian krone.
+        """
+    @staticmethod
+    def dkk() -> Currency:
+        r"""
+        Return the Danish krone.
+        """
+    @staticmethod
+    def nzd() -> Currency:
+        r"""
+        Return the New Zealand dollar.
+        """
+    @staticmethod
+    def hkd() -> Currency:
+        r"""
+        Return the Hong Kong dollar.
+        """
+    @staticmethod
+    def sgd() -> Currency:
+        r"""
+        Return the Singapore dollar.
+        """
+    @staticmethod
+    def cny() -> Currency:
+        r"""
+        Return the Chinese yuan.
+        """
+    @staticmethod
+    def krw() -> Currency:
+        r"""
+        Return the South-Korean won.
+        """
+    @staticmethod
+    def inr() -> Currency:
+        r"""
+        Return the Indian rupee.
+        """
+    @staticmethod
+    def brl() -> Currency:
+        r"""
+        Return the Brazilian real.
+        """
+    @staticmethod
+    def mxn() -> Currency:
+        r"""
+        Return the Mexican peso.
+        """
+    @staticmethod
+    def zar() -> Currency:
+        r"""
+        Return the South-African rand.
+        """
+    @staticmethod
+    def pln() -> Currency:
+        r"""
+        Return the Polish zloty.
+        """
+    @staticmethod
+    def czk() -> Currency:
+        r"""
+        Return the Czech koruna.
+        """
+    @staticmethod
+    def huf() -> Currency:
+        r"""
+        Return the Hungarian forint.
+        """
+    @staticmethod
+    def try_() -> Currency:
+        r"""
+        Return the New Turkish lira.
         """
     def code(self) -> builtins.str:
         r"""
