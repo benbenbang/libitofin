@@ -102,7 +102,7 @@ pub unsafe extern "C" fn itofin_currency_code(
     unsafe {
         with_context(ctx, error, |c| {
             let v = c.get::<Currency>(id)?;
-            if capacity < 4 {
+            if capacity < 4 || capacity <= v.code().len() {
                 return Err(BindingError::invalid("currency buffer needs four bytes"));
             };
             check_ptr(out)?;

@@ -543,6 +543,22 @@ typedef struct ItofinMakeCdsConfig {
 } ItofinMakeCdsConfig;
 
 /**
+ * Owned-on-construction UTF-8 fields. Code must contain three ASCII letters.
+ */
+typedef struct ItofinCurrencyConfig {
+  const uint8_t *name;
+  size_t name_length;
+  const uint8_t *code;
+  size_t code_length;
+  int32_t numeric_code;
+  const uint8_t *symbol;
+  size_t symbol_length;
+  const uint8_t *fraction_symbol;
+  size_t fraction_symbol_length;
+  int32_t fractions_per_unit;
+} ItofinCurrencyConfig;
+
+/**
  * Maximum fractional running-peak loss and zero-based peak/trough indices.
  */
 typedef struct ItofinDrawdownResult {
@@ -3524,6 +3540,43 @@ int32_t itofin_cds_results(struct ItofinContext *ctx,
                            uint64_t id,
                            uint64_t *out,
                            struct ItofinError *error);
+
+/**
+ * Construct a reusable currency, copying all input bytes. No ISO registry lookup.
+ * Numeric fields retain the core's signed integer semantics.
+ * # Safety
+ * Follow the crate-level C caller contract. Output is written only on success.
+ */
+int32_t itofin_currency_custom_new(struct ItofinContext *ctx,
+                                   const struct ItofinCurrencyConfig *config,
+                                   uint64_t *out,
+                                   struct ItofinError *error);
+
+/**
+ * UTF-8 bytes without a trailing NUL, retaining embedded NULs.
+ * Field: 0 name, 1 code, 2 symbol, 3 fraction symbol. Capacity zero queries length.
+ * On error neither the buffer nor required length is changed.
+ * # Safety
+ * Follow the crate-level C caller contract, including non-overlapping outputs.
+ */
+int32_t itofin_currency_text(struct ItofinContext *ctx,
+                             uint64_t id,
+                             int32_t field,
+                             uint8_t *out,
+                             size_t capacity,
+                             size_t *required,
+                             struct ItofinError *error);
+
+/**
+ * Field: 0 numeric code, 1 fractions per unit.
+ * # Safety
+ * Follow the crate-level C caller contract. Output is written only on success.
+ */
+int32_t itofin_currency_integer(struct ItofinContext *ctx,
+                                uint64_t id,
+                                int32_t field,
+                                int32_t *out,
+                                struct ItofinError *error);
 
 /**
  * # Safety

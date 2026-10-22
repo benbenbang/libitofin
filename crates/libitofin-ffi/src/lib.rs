@@ -46,6 +46,7 @@ pub mod convergence_statistics_api;
 pub mod credit_api;
 pub mod credit_helpers_api;
 pub mod credit_instruments_api;
+pub mod currency_api;
 pub mod curves_api;
 pub mod discrepancy_statistics_api;
 pub mod drawdown_api;
