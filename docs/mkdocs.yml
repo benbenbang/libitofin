@@ -83,6 +83,7 @@ nav:
   - Home: index.md
   - Getting started: getting-started.md
   - Go SDK: go.md
+  - Standalone currencies: currency-bindings.md
   - Finite-difference options: finite-difference.md
   - Exotic option scope: exotic-options.md
   - Variance swaps: variance-swaps.md
