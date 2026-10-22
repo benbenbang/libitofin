@@ -1864,6 +1864,18 @@ int32_t itofin_black_calculator_delta_forward(struct ItofinContext *ctx,
                                               struct ItofinError *error);
 
 /**
+ * Spot delta, requiring positive finite spot.
+ * Nonfinite native results are errors; finite native edge behavior is unchanged.
+ * # Safety
+ * Follow the crate-level C caller contract. Output is written only on success.
+ */
+int32_t itofin_black_calculator_delta(struct ItofinContext *ctx,
+                                      uint64_t calculator,
+                                      double spot,
+                                      double *out,
+                                      struct ItofinError *error);
+
+/**
  * Forward elasticity; native finite MAX/MIN sentinels are retained.
  * Nonfinite native results are errors; finite native edge behavior is unchanged.
  * # Safety
@@ -1875,6 +1887,18 @@ int32_t itofin_black_calculator_elasticity_forward(struct ItofinContext *ctx,
                                                    struct ItofinError *error);
 
 /**
+ * Spot elasticity, requiring positive finite spot.
+ * Nonfinite native results are errors; finite native edge behavior is unchanged.
+ * # Safety
+ * Follow the crate-level C caller contract. Output is written only on success.
+ */
+int32_t itofin_black_calculator_elasticity(struct ItofinContext *ctx,
+                                           uint64_t calculator,
+                                           double spot,
+                                           double *out,
+                                           struct ItofinError *error);
+
+/**
  * Forward gamma.
  * Nonfinite native results are errors; finite native edge behavior is unchanged.
  * # Safety
@@ -1884,6 +1908,80 @@ int32_t itofin_black_calculator_gamma_forward(struct ItofinContext *ctx,
                                               uint64_t calculator,
                                               double *out,
                                               struct ItofinError *error);
+
+/**
+ * Spot gamma, requiring positive finite spot.
+ * Nonfinite native results are errors; finite native edge behavior is unchanged.
+ * # Safety
+ * Follow the crate-level C caller contract. Output is written only on success.
+ */
+int32_t itofin_black_calculator_gamma(struct ItofinContext *ctx,
+                                      uint64_t calculator,
+                                      double spot,
+                                      double *out,
+                                      struct ItofinError *error);
+
+/**
+ * Theta per year. Native expiry shortcut is retained.
+ * Nonfinite native results are errors; finite native edge behavior is unchanged.
+ * # Safety
+ * Follow the crate-level C caller contract. Output is written only on success.
+ */
+int32_t itofin_black_calculator_theta(struct ItofinContext *ctx,
+                                      uint64_t calculator,
+                                      double spot,
+                                      double maturity,
+                                      double *out,
+                                      struct ItofinError *error);
+
+/**
+ * Theta divided by 365. Native expiry shortcut is retained.
+ * Nonfinite native results are errors; finite native edge behavior is unchanged.
+ * # Safety
+ * Follow the crate-level C caller contract. Output is written only on success.
+ */
+int32_t itofin_black_calculator_theta_per_day(struct ItofinContext *ctx,
+                                              uint64_t calculator,
+                                              double spot,
+                                              double maturity,
+                                              double *out,
+                                              struct ItofinError *error);
+
+/**
+ * Vega for finite nonnegative maturity.
+ * Nonfinite native results are errors; finite native edge behavior is unchanged.
+ * # Safety
+ * Follow the crate-level C caller contract. Output is written only on success.
+ */
+int32_t itofin_black_calculator_vega(struct ItofinContext *ctx,
+                                     uint64_t calculator,
+                                     double maturity,
+                                     double *out,
+                                     struct ItofinError *error);
+
+/**
+ * Discount-rate rho for finite nonnegative maturity.
+ * Nonfinite native results are errors; finite native edge behavior is unchanged.
+ * # Safety
+ * Follow the crate-level C caller contract. Output is written only on success.
+ */
+int32_t itofin_black_calculator_rho(struct ItofinContext *ctx,
+                                    uint64_t calculator,
+                                    double maturity,
+                                    double *out,
+                                    struct ItofinError *error);
+
+/**
+ * Growth-rate rho for finite nonnegative maturity.
+ * Nonfinite native results are errors; finite native edge behavior is unchanged.
+ * # Safety
+ * Follow the crate-level C caller contract. Output is written only on success.
+ */
+int32_t itofin_black_calculator_dividend_rho(struct ItofinContext *ctx,
+                                             uint64_t calculator,
+                                             double maturity,
+                                             double *out,
+                                             struct ItofinError *error);
 
 /**
  * Native N(d2), independent of option sign.
