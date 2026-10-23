@@ -32,6 +32,7 @@ __all__ = [
     "FloatFloatSwap",
     "FloatingRateBond",
     "ForwardRateAgreement",
+    "FxForward",
     "MakeCreditDefaultSwap",
     "MakeOis",
     "MakeSwaption",
@@ -1084,6 +1085,64 @@ class ForwardRateAgreement:
 
         Returns:
             Date: The adjusted maturity date.
+        """
+
+@typing.final
+class FxForward:
+    r"""
+    Fixed-date forward with an immutable quote-per-base spot snapshot.
+
+    Long receives base and pays quote. NPV is in quote currency at the quote
+    curve reference date. Explicit evaluation dates control expiry only.
+    This is not a live spot quote, rolling spot lag or full FX engine facade.
+    """
+    def __init__(self, base_currency: indexes.Currency, quote_currency: indexes.Currency, spot: builtins.float, base_curve: termstructures.YieldTermStructure, quote_curve: termstructures.YieldTermStructure, base_notional: builtins.float, strike: builtins.float, spot_settlement_date: time.Date, delivery_date: time.Date, position: Position) -> None:
+        r"""
+        Copy currencies and spot; retain the two live discount curves.
+        """
+    def fair_forward_rate(self) -> builtins.float:
+        r"""
+        Fair quote-per-base rate; does not apply expiry.
+        """
+    def npv(self, evaluation_date: time.Date) -> builtins.float:
+        r"""
+        Quote-currency NPV at the quote curve reference date, not evaluation date.
+        """
+    def is_expired(self, evaluation_date: time.Date) -> builtins.bool:
+        r"""
+        True only when delivery is strictly before the explicit evaluation date.
+        """
+    def spot(self) -> builtins.float:
+        r"""
+        Immutable quote-currency units per one base-currency unit.
+        """
+    def strike(self) -> builtins.float:
+        r"""
+        Contractual quote-per-base delivery rate.
+        """
+    def base_notional(self) -> builtins.float:
+        r"""
+        Positive notional denominated in the base currency.
+        """
+    def spot_settlement_date(self) -> time.Date:
+        r"""
+        Fixed, unadjusted value date of the supplied spot snapshot.
+        """
+    def delivery_date(self) -> time.Date:
+        r"""
+        Fixed, unadjusted contractual delivery date.
+        """
+    def position(self) -> Position:
+        r"""
+        Long receives base and pays quote; short reverses both legs.
+        """
+    def base_currency(self) -> indexes.Currency:
+        r"""
+        Independent copy of the base-currency specification.
+        """
+    def quote_currency(self) -> indexes.Currency:
+        r"""
+        Independent copy of the quote currency, which denominates NPV.
         """
 
 @typing.final
