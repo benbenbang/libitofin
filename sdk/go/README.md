@@ -106,3 +106,8 @@ Regenerate the header with cbindgen 0.29.2:
 cbindgen --config crates/libitofin-ffi/cbindgen.toml \
   --crate libitofin-ffi --output crates/libitofin-ffi/include/itofin.h
 ```
+
+## Standalone plain-vanilla BlackCalculator
+
+Immutable Black 1976 value and scalar Greeks are available through `BlackCalculator`.
+See the [bounded scope and edge-case contract](https://github.com/benbenbang/libitofin/blob/main/docs/docs/black-calculator-bindings.md).
