@@ -140,6 +140,7 @@ nav:
   - Zero-coupon bonds: zero-coupon-bonds.md
   - Floating-rate bonds: floating-rate-bonds.md
   - Par asset swaps: asset-swaps.md
+  - Asset swap bindings: asset-swap-bindings.md
   - Currency presets: currency-presets.md
   - Cross-currency basis swaps: cross-currency-basis-swaps.md
   - MF state process: mf-state-process.md

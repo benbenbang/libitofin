@@ -111,3 +111,10 @@ cbindgen --config crates/libitofin-ffi/cbindgen.toml \
 
 Immutable Black 1976 value and scalar Greeks are available through `BlackCalculator`.
 See the [bounded scope and edge-case contract](https://github.com/benbenbang/libitofin/blob/main/docs/docs/black-calculator-bindings.md).
+
+### Par asset swap bindings
+
+Plain fixed/zero bullet-bond `AssetSwap` supports live discounting, signed leg
+values, floating BPS and fair spread/clean price. Market, amortizing, callable
+and overnight variants are excluded. See the [bounded scope and lifecycle
+contract](https://github.com/benbenbang/libitofin/blob/main/docs/docs/asset-swap-bindings.md).
