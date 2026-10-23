@@ -2389,6 +2389,45 @@ int32_t itofin_bond_risk(struct ItofinContext *ctx,
                          struct ItofinError *error);
 
 /**
+ * Coupon-rate BPS per 100 of notional, not signed yield BPV. Coupon amounts are not read.
+ * Settlement-date and ex-coupon flows are excluded. No pricing engine is required.
+ * # Safety
+ * Pointers and thread ownership must satisfy the crate-level C caller contract.
+ */
+int32_t itofin_bond_bps_from_curve(struct ItofinContext *ctx,
+                                   uint64_t id,
+                                   uint64_t discount,
+                                   int32_t serial,
+                                   double *out,
+                                   struct ItofinError *error);
+
+/**
+ * Coupon-rate BPS per 100 under flat-yield discounting, not signed yield BPV.
+ * Coupon amounts are not read. Settlement-date and ex-coupon flows are excluded.
+ * # Safety
+ * Pointers and thread ownership must satisfy the crate-level C caller contract.
+ */
+int32_t itofin_bond_bps_from_yield(struct ItofinContext *ctx,
+                                   uint64_t id,
+                                   double rate,
+                                   struct ItofinBondYieldAnalyticsConfig a,
+                                   double *out,
+                                   struct ItofinError *error);
+
+/**
+ * The coupon rate repricing the bond's own curve NPV, not a par-price target.
+ * Reads live coupon amounts without a pricing engine. Ordinary bonds only.
+ * # Safety
+ * Pointers and thread ownership must satisfy the crate-level C caller contract.
+ */
+int32_t itofin_bond_atm_rate_from_curve(struct ItofinContext *ctx,
+                                        uint64_t id,
+                                        uint64_t discount,
+                                        int32_t serial,
+                                        double *out,
+                                        struct ItofinError *error);
+
+/**
  * # Safety
  * Pointers and thread ownership must satisfy the crate-level C caller contract.
  */

@@ -183,6 +183,101 @@ pub unsafe extern "C" fn itofin_bond_risk(
         })
     }
 }
+fn coupon_sensitivity_settlement(bond: &NativeBond, serial: i32) -> BindingResult<Date> {
+    match optional_date(serial)? {
+        Some(date) => Ok(date),
+        None => bond.settlement(None),
+    }
+}
+#[unsafe(no_mangle)]
+/// Coupon-rate BPS per 100 of notional, not signed yield BPV. Coupon amounts are not read.
+/// Settlement-date and ex-coupon flows are excluded. No pricing engine is required.
+/// # Safety
+/// Pointers and thread ownership must satisfy the crate-level C caller contract.
+pub unsafe extern "C" fn itofin_bond_bps_from_curve(
+    ctx: *mut Context,
+    id: u64,
+    discount: u64,
+    serial: i32,
+    out: *mut f64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            if !error.is_null() {
+                check_ptr(error)?;
+            }
+            check_ptr(out)?;
+            let bond = c.get::<NativeBond>(id)?;
+            bond.bond.plain()?;
+            let actual = coupon_sensitivity_settlement(&bond, serial)?;
+            let discount = curve(c, discount)?.current_link()?;
+            let value = BondFunctions::bps(&bond.bond.borrow(), &*discount, Some(actual))?;
+            output(out, finite(value)?)
+        })
+    }
+}
+#[unsafe(no_mangle)]
+/// Coupon-rate BPS per 100 under flat-yield discounting, not signed yield BPV.
+/// Coupon amounts are not read. Settlement-date and ex-coupon flows are excluded.
+/// # Safety
+/// Pointers and thread ownership must satisfy the crate-level C caller contract.
+pub unsafe extern "C" fn itofin_bond_bps_from_yield(
+    ctx: *mut Context,
+    id: u64,
+    rate: f64,
+    a: ItofinBondYieldAnalyticsConfig,
+    out: *mut f64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            if !error.is_null() {
+                check_ptr(error)?;
+            }
+            check_ptr(out)?;
+            let rate = libitofin::interestrate::InterestRate::new(
+                finite(rate)?,
+                day_counter(c, a.day_counter)?,
+                compounding(a.compounding)?,
+                frequency(a.frequency)?,
+            )?;
+            let bond = c.get::<NativeBond>(id)?;
+            bond.bond.plain()?;
+            let actual = coupon_sensitivity_settlement(&bond, a.settlement)?;
+            let value = BondFunctions::bps_at_yield(&bond.bond.borrow(), &rate, Some(actual))?;
+            output(out, finite(value)?)
+        })
+    }
+}
+#[unsafe(no_mangle)]
+/// The coupon rate repricing the bond's own curve NPV, not a par-price target.
+/// Reads live coupon amounts without a pricing engine. Ordinary bonds only.
+/// # Safety
+/// Pointers and thread ownership must satisfy the crate-level C caller contract.
+pub unsafe extern "C" fn itofin_bond_atm_rate_from_curve(
+    ctx: *mut Context,
+    id: u64,
+    discount: u64,
+    serial: i32,
+    out: *mut f64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            if !error.is_null() {
+                check_ptr(error)?;
+            }
+            check_ptr(out)?;
+            let bond = c.get::<NativeBond>(id)?;
+            bond.bond.plain()?;
+            let actual = settlement(&bond, serial, false)?;
+            let discount = curve(c, discount)?.current_link()?;
+            let value = BondFunctions::atm_rate(&bond.bond.borrow(), &*discount, Some(actual))?;
+            output(out, finite(value)?)
+        })
+    }
+}
 #[unsafe(no_mangle)]
 /// # Safety
 /// Pointers and thread ownership must satisfy the crate-level C caller contract.
