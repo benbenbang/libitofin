@@ -1,0 +1,186 @@
+{
+  "domain": "immutable-plain-vanilla-black-calculator",
+  "entries": [
+    {
+      "c": "itofin_black_calculator_new",
+      "go": "Session.NewBlackCalculator",
+      "python": "itofin.pricingengines.BlackCalculator.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestBlackCalculatorAnalytic",
+        "TestBlackCalculatorDomainsAndLifecycle"
+      ]
+    },
+    {
+      "c": "itofin_black_calculator_value",
+      "go": "BlackCalculator.Value",
+      "python": "itofin.pricingengines.BlackCalculator.value",
+      "status": "implemented",
+      "tests": [
+        "TestBlackCalculatorAnalytic",
+        "TestBlackCalculatorDomainsAndLifecycle"
+      ]
+    },
+    {
+      "c": "itofin_black_calculator_delta_forward",
+      "go": "BlackCalculator.DeltaForward",
+      "python": "itofin.pricingengines.BlackCalculator.delta_forward",
+      "status": "implemented",
+      "tests": [
+        "TestBlackCalculatorAnalytic",
+        "TestBlackCalculatorDomainsAndLifecycle"
+      ]
+    },
+    {
+      "c": "itofin_black_calculator_delta",
+      "go": "BlackCalculator.Delta",
+      "python": "itofin.pricingengines.BlackCalculator.delta",
+      "status": "implemented",
+      "tests": [
+        "TestBlackCalculatorAnalytic",
+        "TestBlackCalculatorDomainsAndLifecycle"
+      ]
+    },
+    {
+      "c": "itofin_black_calculator_elasticity_forward",
+      "go": "BlackCalculator.ElasticityForward",
+      "python": "itofin.pricingengines.BlackCalculator.elasticity_forward",
+      "status": "implemented",
+      "tests": [
+        "TestBlackCalculatorAnalytic",
+        "TestBlackCalculatorDomainsAndLifecycle"
+      ]
+    },
+    {
+      "c": "itofin_black_calculator_elasticity",
+      "go": "BlackCalculator.Elasticity",
+      "python": "itofin.pricingengines.BlackCalculator.elasticity",
+      "status": "implemented",
+      "tests": [
+        "TestBlackCalculatorAnalytic",
+        "TestBlackCalculatorDomainsAndLifecycle"
+      ]
+    },
+    {
+      "c": "itofin_black_calculator_gamma_forward",
+      "go": "BlackCalculator.GammaForward",
+      "python": "itofin.pricingengines.BlackCalculator.gamma_forward",
+      "status": "implemented",
+      "tests": [
+        "TestBlackCalculatorAnalytic",
+        "TestBlackCalculatorDomainsAndLifecycle"
+      ]
+    },
+    {
+      "c": "itofin_black_calculator_gamma",
+      "go": "BlackCalculator.Gamma",
+      "python": "itofin.pricingengines.BlackCalculator.gamma",
+      "status": "implemented",
+      "tests": [
+        "TestBlackCalculatorAnalytic",
+        "TestBlackCalculatorDomainsAndLifecycle"
+      ]
+    },
+    {
+      "c": "itofin_black_calculator_theta",
+      "go": "BlackCalculator.Theta",
+      "python": "itofin.pricingengines.BlackCalculator.theta",
+      "status": "implemented",
+      "tests": [
+        "TestBlackCalculatorAnalytic",
+        "TestBlackCalculatorDomainsAndLifecycle"
+      ]
+    },
+    {
+      "c": "itofin_black_calculator_theta_per_day",
+      "go": "BlackCalculator.ThetaPerDay",
+      "python": "itofin.pricingengines.BlackCalculator.theta_per_day",
+      "status": "implemented",
+      "tests": [
+        "TestBlackCalculatorAnalytic",
+        "TestBlackCalculatorDomainsAndLifecycle"
+      ]
+    },
+    {
+      "c": "itofin_black_calculator_vega",
+      "go": "BlackCalculator.Vega",
+      "python": "itofin.pricingengines.BlackCalculator.vega",
+      "status": "implemented",
+      "tests": [
+        "TestBlackCalculatorAnalytic",
+        "TestBlackCalculatorDomainsAndLifecycle"
+      ]
+    },
+    {
+      "c": "itofin_black_calculator_rho",
+      "go": "BlackCalculator.Rho",
+      "python": "itofin.pricingengines.BlackCalculator.rho",
+      "status": "implemented",
+      "tests": [
+        "TestBlackCalculatorAnalytic",
+        "TestBlackCalculatorDomainsAndLifecycle"
+      ]
+    },
+    {
+      "c": "itofin_black_calculator_dividend_rho",
+      "go": "BlackCalculator.DividendRho",
+      "python": "itofin.pricingengines.BlackCalculator.dividend_rho",
+      "status": "implemented",
+      "tests": [
+        "TestBlackCalculatorAnalytic",
+        "TestBlackCalculatorDomainsAndLifecycle"
+      ]
+    },
+    {
+      "c": "itofin_black_calculator_itm_cash_probability",
+      "go": "BlackCalculator.ITMCashProbability",
+      "python": "itofin.pricingengines.BlackCalculator.itm_cash_probability",
+      "status": "implemented",
+      "tests": [
+        "TestBlackCalculatorAnalytic",
+        "TestBlackCalculatorDomainsAndLifecycle"
+      ]
+    },
+    {
+      "c": "itofin_black_calculator_itm_asset_probability",
+      "go": "BlackCalculator.ITMAssetProbability",
+      "python": "itofin.pricingengines.BlackCalculator.itm_asset_probability",
+      "status": "implemented",
+      "tests": [
+        "TestBlackCalculatorAnalytic",
+        "TestBlackCalculatorDomainsAndLifecycle"
+      ]
+    },
+    {
+      "c": "itofin_black_calculator_strike_sensitivity",
+      "go": "BlackCalculator.StrikeSensitivity",
+      "python": "itofin.pricingengines.BlackCalculator.strike_sensitivity",
+      "status": "implemented",
+      "tests": [
+        "TestBlackCalculatorAnalytic",
+        "TestBlackCalculatorDomainsAndLifecycle"
+      ]
+    },
+    {
+      "c": "itofin_black_calculator_alpha",
+      "go": "BlackCalculator.Alpha",
+      "python": "itofin.pricingengines.BlackCalculator.alpha",
+      "status": "implemented",
+      "tests": [
+        "TestBlackCalculatorAnalytic",
+        "TestBlackCalculatorDomainsAndLifecycle"
+      ]
+    },
+    {
+      "c": "itofin_black_calculator_beta",
+      "go": "BlackCalculator.Beta",
+      "python": "itofin.pricingengines.BlackCalculator.beta",
+      "status": "implemented",
+      "tests": [
+        "TestBlackCalculatorAnalytic",
+        "TestBlackCalculatorDomainsAndLifecycle"
+      ]
+    }
+  ],
+  "scope": "All 17 existing plain-vanilla scalar queries, including value. No payoff visitor, digital or pricing engine expansion. Nonfinite native results are errors in all facades; no core math changes."
+}
