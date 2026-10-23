@@ -64,6 +64,7 @@ mod mc_variance_swap;
 mod mcengine;
 mod merton;
 mod merton_simulation;
+mod mf_state_process;
 mod ois;
 mod optimize;
 mod option;
@@ -341,6 +342,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     processes.add_class::<gjr::PyGjrGarchProcess>()?;
     processes.add_class::<g2_process::PyG2Process>()?;
     processes.add_class::<gsr_process::PyGsrProcess>()?;
+    processes.add_class::<mf_state_process::PyMfStateProcess>()?;
 
     let indexes = PyModule::new(py, "indexes")?;
     indexes.add_class::<overnightfuture::PySofr>()?;

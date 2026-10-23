@@ -15,6 +15,7 @@ __all__ = [
     "GsrProcess",
     "HestonProcess",
     "Merton76Process",
+    "MfStateProcess",
 ]
 
 @typing.final
@@ -500,4 +501,59 @@ class Merton76Process:
     def time(self, date: time.Date) -> builtins.float:
         r"""
         Convert a date with the risk-free curve's reference date and day count.
+        """
+
+@typing.final
+class MfStateProcess:
+    r"""
+    Standalone Gaussian state process with immutable volatility buckets.
+
+    Not a fitted Markov-functional interest-rate model. Times are process years.
+    Diffusion returns raw volatility; variance integrates sigma(s)^2 exp(2 a s).
+    With no bucket times, variance uses unit volatility irrespective of vols[0].
+    """
+    def __init__(self, reversion: builtins.float, times: typing.Sequence[builtins.float], vols: typing.Sequence[builtins.float]) -> None:
+        r"""
+        Copy signed reversion, increasing times and nonnegative raw volatilities.
+        Volatility count must exceed time count by one; all inputs must be finite.
+        """
+    def reversion(self) -> builtins.float:
+        r"""
+        Return the signed exponential reversion parameter.
+        """
+    def times(self) -> builtins.list[builtins.float]:
+        r"""
+        Return a new copy of the right-continuous bucket boundaries.
+        """
+    def volatilities(self) -> builtins.list[builtins.float]:
+        r"""
+        Return a new copy of the raw bucket volatilities.
+        """
+    def x0(self) -> builtins.float:
+        r"""
+        Return zero, the initial process state.
+        """
+    def drift(self, t: builtins.float, x: builtins.float) -> builtins.float:
+        r"""
+        Return zero after validating process time and state.
+        """
+    def diffusion(self, t: builtins.float, x: builtins.float) -> builtins.float:
+        r"""
+        Return raw sigma(t), not sigma(t) exp(reversion*t).
+        """
+    def expectation(self, t: builtins.float, x: builtins.float, dt: builtins.float) -> builtins.float:
+        r"""
+        Return the unchanged state after validating the interval.
+        """
+    def std_deviation(self, t: builtins.float, x: builtins.float, dt: builtins.float) -> builtins.float:
+        r"""
+        Return the exact conditional standard deviation.
+        """
+    def variance(self, t: builtins.float, x: builtins.float, dt: builtins.float) -> builtins.float:
+        r"""
+        Integrate sigma(s)^2 exp(2*reversion*s) over the interval.
+        """
+    def evolve(self, t: builtins.float, x: builtins.float, dt: builtins.float, dw: builtins.float) -> builtins.float:
+        r"""
+        Evolve using one finite standard Gaussian draw.
         """
