@@ -6643,6 +6643,50 @@ int32_t itofin_jump_diffusion_engine_new(struct ItofinContext *ctx,
                                          struct ItofinError *error);
 
 /**
+ * Copies the parameter arrays. Volatility count must exceed time count by one.
+ * # Safety
+ * Follow the crate-level C caller contract. Output is written only on success.
+ */
+int32_t itofin_mf_state_process_new(struct ItofinContext *ctx,
+                                    double reversion,
+                                    const double *times,
+                                    size_t times_len,
+                                    const double *vols,
+                                    size_t vols_len,
+                                    uint64_t *out,
+                                    struct ItofinError *error);
+
+/**
+ * Query kind: 0 reversion, 1 x0, 2 drift, 3 diffusion, 4 expectation,
+ * 5 standard deviation, 6 variance, 7 evolve. Unused inputs are ignored.
+ * # Safety
+ * Follow the crate-level C caller contract. Output is written only on success.
+ */
+int32_t itofin_mf_state_process_query(struct ItofinContext *ctx,
+                                      uint64_t process,
+                                      int32_t kind,
+                                      double t,
+                                      double x,
+                                      double dt,
+                                      double dw,
+                                      double *out,
+                                      struct ItofinError *error);
+
+/**
+ * Copies grid kind 0 times or 1 volatilities. Pass null output/capacity zero
+ * to obtain its size. An undersized buffer leaves both outputs unchanged.
+ * # Safety
+ * Follow the crate-level C caller contract. Buffers and written must not overlap.
+ */
+int32_t itofin_mf_state_process_grid(struct ItofinContext *ctx,
+                                     uint64_t process,
+                                     int32_t kind,
+                                     double *out,
+                                     size_t capacity,
+                                     size_t *written,
+                                     struct ItofinError *error);
+
+/**
  * # Safety
  * Pointers must be aligned, live and valid for their stated lengths. Outputs
  * must not overlap inputs or other outputs. Any context and its handles must
