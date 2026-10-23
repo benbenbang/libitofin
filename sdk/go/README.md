@@ -31,6 +31,20 @@ These helpers do not add currency rounding, conversion or a new option pricing e
 Standalone [constant-parameter GSR process](https://github.com/benbenbang/libitofin/blob/main/docs/docs/gsr-process-bindings.md)
 bindings expose forward-measure transitions, not a fitted GSR model.
 
+## Pricing and process binding guides
+
+| Scope | Guide | Example |
+| --- | --- | --- |
+| Ordinary bond coupon helpers | [BPS and ATM rate](https://github.com/benbenbang/libitofin/blob/main/docs/docs/bond-coupon-analytics.md) | [Example](https://github.com/benbenbang/libitofin/blob/main/sdk/go/examples/bond-coupon-analytics/main.go) |
+| European analytic cash digitals | [Cash-or-nothing](https://github.com/benbenbang/libitofin/blob/main/docs/docs/cash-digital-bindings.md) | [Example](https://github.com/benbenbang/libitofin/blob/main/sdk/go/examples/cash_digital/main.go) |
+| Standalone Gaussian state process | [MF state](https://github.com/benbenbang/libitofin/blob/main/docs/docs/mf-state-process-bindings.md) | [Example](https://github.com/benbenbang/libitofin/blob/main/sdk/go/examples/mf_state_process/main.go) |
+| Standalone live-curve forward process | [Hull-White forward](https://github.com/benbenbang/libitofin/blob/main/docs/docs/hw-forward-process-bindings.md) | [Example](https://github.com/benbenbang/libitofin/blob/main/sdk/go/examples/hw_forward_process/main.go) |
+| Constant-notional Ibor cross-currency swaps | [Xccy basis](https://github.com/benbenbang/libitofin/blob/main/docs/docs/xccy-basis-bindings.md) | [Example](https://github.com/benbenbang/libitofin/blob/main/sdk/go/examples/xccy_basis/main.go) |
+
+These helpers do not complete the wider `BondFunctions` overload set. The
+process facades are not fitted models; cash digitals cover European analytic
+Black-Scholes pricing, and Xccy spot is an immutable snapshot.
+
 ## Sessions and ownership
 
 ```go

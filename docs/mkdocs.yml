@@ -74,6 +74,7 @@ nav:
   - Constant-parameter GSR process: gsr-process-bindings.md
   - Black FX delta conventions: black-delta-bindings.md
   - Plain-vanilla BlackCalculator: black-calculator-bindings.md
+  - European analytic cash digitals: cash-digital-bindings.md
   - Callable bond sensitivities: callable-bond-sensitivities.md
   - Callable OAS: callable-oas.md
   - Callable implied volatility: callable-implied-volatility.md
@@ -132,6 +133,7 @@ nav:
   - FX forwards: fx-forwards.md
   - Go/Python FX forward bindings: fx-forward-bindings.md
   - Hull-White forward process: hullwhite-forward-process.md
+  - Hull-White forward process bindings: hw-forward-process-bindings.md
   - Quanto term structure: quanto-term-structure.md
   - ABCD math and volatility: abcd.md
   - Householder utilities: householder.md
@@ -139,13 +141,16 @@ nav:
   - Go/Python bond forward bindings: bond-forward-bindings.md
   - Go/Python callable bond bindings: callable-bond-bindings.md
   - Bond yield and Z-spread analytics: bond-analytics.md
+  - Bond coupon BPS and ATM rate: bond-coupon-analytics.md
   - Zero-coupon bonds: zero-coupon-bonds.md
   - Floating-rate bonds: floating-rate-bonds.md
   - Par asset swaps: asset-swaps.md
   - Asset swap bindings: asset-swap-bindings.md
   - Currency presets: currency-presets.md
   - Cross-currency basis swaps: cross-currency-basis-swaps.md
+  - Constant-notional Ibor Xccy bindings: xccy-basis-bindings.md
   - MF state process: mf-state-process.md
+  - Standalone MF state bindings: mf-state-process-bindings.md
   - Asset-or-nothing payoff: asset-or-nothing-payoff.md
   - Gap payoff: gap-payoff.md
   - Cap/floor optionlets: capfloor-optionlets.md
