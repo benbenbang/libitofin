@@ -4736,6 +4736,50 @@ int32_t itofin_firefly_result(struct ItofinContext *ctx,
                               struct ItofinError *error);
 
 /**
+ * Copies a constant parameter grid. Signed reversion and zero volatility are valid.
+ * # Safety
+ * Follow the crate-level C caller contract. Output is written only on success.
+ */
+int32_t itofin_gsr_process_new(struct ItofinContext *ctx,
+                               const double *times,
+                               size_t times_len,
+                               const double *vols,
+                               size_t vols_len,
+                               const double *reversions,
+                               size_t reversions_len,
+                               double horizon,
+                               uint64_t *out,
+                               struct ItofinError *error);
+
+/**
+ * Query kind: 0 x0, 1 horizon, 2 sigma(t), 3 reversion(t), 4 y(t),
+ * 5 G(t,end), 6 drift(t,x), 7 diffusion(t,x), 8 expectation(t,x,dt),
+ * 9 standard deviation(t,x,dt), 10 variance(t,x,dt), 11 evolve(t,x,dt,dw).
+ * Kind 5 uses `dt` as the absolute end time. Other unused inputs are ignored.
+ * # Safety
+ * Follow the crate-level C caller contract. Output is written only on success.
+ */
+int32_t itofin_gsr_process_query(struct ItofinContext *ctx,
+                                 uint64_t process,
+                                 int32_t kind,
+                                 double t,
+                                 double x,
+                                 double dt,
+                                 double dw,
+                                 double *out,
+                                 struct ItofinError *error);
+
+/**
+ * Updates the horizon through the native notifying setter. Invalid values preserve it.
+ * # Safety
+ * Follow the crate-level C caller contract.
+ */
+int32_t itofin_gsr_process_set_forward_measure_time(struct ItofinContext *ctx,
+                                                    uint64_t process,
+                                                    double horizon,
+                                                    struct ItofinError *error);
+
+/**
  * # Safety
  * Pointers must be aligned, live and valid for their stated lengths. Outputs
  * must not overlap inputs or other outputs. Any context and its handles must
