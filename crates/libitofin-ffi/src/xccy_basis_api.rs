@@ -266,3 +266,7 @@ pub unsafe extern "C" fn itofin_xccy_basis_swap_currency(
         })
     }
 }
+
+#[cfg(test)]
+#[path = "xccy_basis_api_tests.rs"]
+mod tests;
