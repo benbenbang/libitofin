@@ -679,6 +679,52 @@ typedef struct ItofinFdConfig {
 } ItofinFdConfig;
 
 /**
+ * Quote-per-base spot/strike, positive base notional, fixed unadjusted dates.
+ */
+typedef struct ItofinFxForwardConfig {
+  /**
+   * Typed Currency handle copied as the base/source specification.
+   */
+  uint64_t base_currency;
+  /**
+   * Typed Currency handle copied as the quote/target NPV denomination.
+   */
+  uint64_t quote_currency;
+  /**
+   * Immutable finite positive quote-currency units per one base unit.
+   */
+  double spot;
+  /**
+   * Typed yield-curve Handle retained for live base-currency discounting.
+   */
+  uint64_t base_curve;
+  /**
+   * Typed yield-curve Handle retained for live quote-currency discounting.
+   */
+  uint64_t quote_curve;
+  /**
+   * Finite positive notional denominated in the base currency.
+   */
+  double base_notional;
+  /**
+   * Finite positive contractual quote-per-base delivery rate.
+   */
+  double strike;
+  /**
+   * Fixed unadjusted spot-value-date serial, valid in 1901-2199.
+   */
+  int32_t spot_settlement_date;
+  /**
+   * Fixed unadjusted delivery-date serial, on or after spot settlement.
+   */
+  int32_t delivery_date;
+  /**
+   * 0 receives base and pays quote; 1 reverses both legs.
+   */
+  int32_t position;
+} ItofinFxForwardConfig;
+
+/**
  * Two state components in x, y order, passed and returned by value.
  */
 typedef struct ItofinG2Vector {
@@ -4153,6 +4199,53 @@ int32_t itofin_fd_black_scholes_engine_new(struct ItofinContext *ctx,
                                            struct ItofinFdConfig cfg,
                                            uint64_t *out,
                                            struct ItofinError *error);
+
+/**
+ * Retain both live curves and copy both currencies and the spot snapshot.
+ * # Safety
+ * Follow the crate-level pointer and owning-thread contract. Output on success only.
+ */
+int32_t itofin_fx_forward_new(struct ItofinContext *ctx,
+                              struct ItofinFxForwardConfig a,
+                              uint64_t *out,
+                              struct ItofinError *error);
+
+/**
+ * Fields: 0 spot, 1 strike, 2 base notional, 3 fair forward, 4 quote-currency NPV.
+ * Only NPV uses evaluation_date; NPV is at the quote curve reference date.
+ * # Safety
+ * Follow the crate-level pointer and owning-thread contract. Output on success only.
+ */
+int32_t itofin_fx_forward_value(struct ItofinContext *ctx,
+                                uint64_t id,
+                                int32_t field,
+                                int32_t evaluation_date,
+                                double *out,
+                                struct ItofinError *error);
+
+/**
+ * Fields: 0 spot settlement, 1 delivery, 2 position (0 long/1 short), 3 expiry.
+ * Only expiry uses evaluation_date. Delivery on evaluation remains active.
+ * # Safety
+ * Follow the crate-level pointer and owning-thread contract. Output on success only.
+ */
+int32_t itofin_fx_forward_integer(struct ItofinContext *ctx,
+                                  uint64_t id,
+                                  int32_t field,
+                                  int32_t evaluation_date,
+                                  int32_t *out,
+                                  struct ItofinError *error);
+
+/**
+ * Copy an endpoint currency into a new owned handle. Side 0 base, 1 quote.
+ * # Safety
+ * Follow the crate-level pointer and owning-thread contract. Output on success only.
+ */
+int32_t itofin_fx_forward_currency(struct ItofinContext *ctx,
+                                   uint64_t id,
+                                   int32_t side,
+                                   uint64_t *out,
+                                   struct ItofinError *error);
 
 /**
  * Create a bare-factor process. Signed reversions and zero volatility are valid.
