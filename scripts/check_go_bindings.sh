@@ -135,6 +135,7 @@ go test -race -count=1 -coverprofile=../../target/go-coverage.out ./...
 go run ./examples/european_option
 go run ./examples/portfolio
 go run ./examples/g2_process
+go run ./examples/gsr_process
 
 go run ./examples/drawdown
 go run ./examples/benchmark_beta
