@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -122,5 +123,144 @@ func TestBondCouponAnalyticsQuantLibOracles(t *testing.T) {
 			}
 			bondCheck(t, settings.SetEvaluationDate(settlement))
 		})
+	}
+}
+
+func TestBondCouponAnalyticsFloatingAmountGuardAndFrozenLifecycle(t *testing.T) {
+	s, e := NewSession()
+	bondCheck(t, e)
+	defer s.Close()
+	exercised := false
+	for _, native := range floatingOracles(t) {
+		if !native.Historical || native.ExCoupon {
+			continue
+		}
+		m := floatingFixture(t, s, native, false)
+		settlement, e := DateFromSerial(native.Today)
+		bondCheck(t, e)
+		config := BondYieldConfig{DayCounter: m.counter, Compounding: Compounded, Frequency: Semiannual, SettlementDate: &settlement}
+		bps, e := m.bond.BPSFromCurve(m.discountCurve, &settlement)
+		bondCheck(t, e)
+		if bps <= 0 {
+			t.Fatal("missing-fixing BPS must retain coupon annuity")
+		}
+		if _, e := m.bond.BPSFromYield(.052, config); e != nil {
+			t.Fatal("BPS must not read coupon amount", e)
+		}
+		if _, e := m.bond.ATMRateFromCurve(m.discountCurve, &settlement); e == nil {
+			t.Fatal("ATM accepted missing fixing")
+		}
+		exercised = true
+		break
+	}
+	if !exercised {
+		t.Fatal("missing historical fixing fixture")
+	}
+	native := floatingOracles(t)[0]
+	m := floatingFixture(t, s, native, true)
+	cached, e := m.bond.NPV()
+	bondCheck(t, e)
+	bondCheck(t, m.bond.Freeze())
+	settlement, e := DateFromSerial(native.Today)
+	bondCheck(t, e)
+	before, e := m.bond.ATMRateFromCurve(m.discountCurve, &settlement)
+	bondCheck(t, e)
+	bps, e := m.bond.BPSFromCurve(m.discountCurve, &settlement)
+	bondCheck(t, e)
+	bondCheck(t, m.rate.SetValue(.08))
+	changed, e := m.bond.ATMRateFromCurve(m.discountCurve, &settlement)
+	bondCheck(t, e)
+	if changed == before {
+		t.Fatal("ATM ignored live forward")
+	}
+	got, e := m.bond.BPSFromCurve(m.discountCurve, &settlement)
+	bondCheck(t, e)
+	analyticsNear(t, got, bps)
+	got, e = m.bond.NPV()
+	bondCheck(t, e)
+	analyticsNear(t, got, cached)
+	for _, close := range []func() error{m.rate.Close, m.volatility.Close, m.index.Close, m.forward.Close, m.settings.Close, m.pricer.Close} {
+		bondCheck(t, close())
+	}
+	got, e = m.bond.ATMRateFromCurve(m.discountCurve, &settlement)
+	bondCheck(t, e)
+	analyticsNear(t, got, changed)
+	var wg sync.WaitGroup
+	for range 4 {
+		wg.Go(func() {
+			for range 8 {
+				value, err := m.bond.BPSFromCurve(m.discountCurve, &settlement)
+				if err != nil || math.Abs(value-bps) > 3e-12 {
+					t.Errorf("concurrent BPS %g %v", value, err)
+				}
+			}
+		})
+	}
+	wg.Wait()
+}
+
+func TestBondCouponAnalyticsDefaultsAndYieldDomains(t *testing.T) {
+	s, err := NewSession()
+	bondCheck(t, err)
+	defer s.Close()
+	a := analyticsOracles(t)[0]
+	b, settings, dc, curve := analyticsFixture(t, s, a)
+	reference, err := DateFromSerial(a.Reference)
+	bondCheck(t, err)
+	bondCheck(t, settings.SetEvaluationDate(reference))
+	actual, err := b.SettlementDate(nil)
+	bondCheck(t, err)
+	config := BondYieldConfig{DayCounter: dc, Compounding: Compounded, Frequency: Semiannual}
+	got, err := b.BPSFromCurve(curve, nil)
+	bondCheck(t, err)
+	explicit, err := b.BPSFromCurve(curve, &actual)
+	bondCheck(t, err)
+	analyticsNear(t, got, explicit)
+	curveWant := explicit
+	yield, err := b.BPSFromYield(.052, config)
+	bondCheck(t, err)
+	config.SettlementDate = &actual
+	explicit, err = b.BPSFromYield(.052, config)
+	bondCheck(t, err)
+	analyticsNear(t, yield, explicit)
+	if _, err := b.BPSFromYield(.052, BondYieldConfig{}); err == nil {
+		t.Fatal("nil day counter accepted")
+	}
+	for _, mode := range []Compounding{-1, 5} {
+		invalid := config
+		invalid.Compounding = mode
+		if _, err := b.BPSFromYield(.052, invalid); err == nil {
+			t.Fatal("invalid compounding accepted")
+		}
+	}
+	for _, frequency := range []Frequency{-1, 99} {
+		invalid := config
+		invalid.Frequency = frequency
+		if _, err := b.BPSFromYield(.052, invalid); err == nil {
+			t.Fatal("invalid frequency accepted")
+		}
+	}
+	callable, _, _, callableDC, callableCurve := callableFoundationFixture(t, s, "zero")
+	callableConfig := BondYieldConfig{DayCounter: callableDC, Compounding: Compounded, Frequency: Semiannual, SettlementDate: &actual}
+	for _, read := range []func() (float64, error){
+		func() (float64, error) { return callable.BPSFromCurve(callableCurve, &actual) },
+		func() (float64, error) { return callable.BPSFromYield(.052, callableConfig) },
+		func() (float64, error) { return callable.ATMRateFromCurve(callableCurve, &actual) },
+	} {
+		if _, err := read(); err == nil || !strings.Contains(err.Error(), "callable") {
+			t.Fatalf("callable backing: %v", err)
+		}
+	}
+	bondCheck(t, settings.Close())
+	got, err = b.BPSFromCurve(curve, &actual)
+	bondCheck(t, err)
+	analyticsNear(t, got, curveWant)
+	bondCheck(t, dc.Close())
+	if _, err := b.BPSFromYield(.052, config); err == nil {
+		t.Fatal("closed day counter accepted")
+	}
+	bondCheck(t, s.Close())
+	if _, err := b.ATMRateFromCurve(curve, &actual); !errors.Is(err, ErrClosed) {
+		t.Fatalf("closed session: %v", err)
 	}
 }

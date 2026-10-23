@@ -8,7 +8,9 @@
       "status": "implemented",
       "tests": [
         "TestBondCouponAnalyticsValuesAndErrors",
-        "TestBondCouponAnalyticsQuantLibOracles"
+        "TestBondCouponAnalyticsQuantLibOracles",
+        "TestBondCouponAnalyticsFloatingAmountGuardAndFrozenLifecycle",
+        "TestBondCouponAnalyticsDefaultsAndYieldDomains"
       ]
     },
     {
@@ -18,7 +20,9 @@
       "status": "implemented",
       "tests": [
         "TestBondCouponAnalyticsValuesAndErrors",
-        "TestBondCouponAnalyticsQuantLibOracles"
+        "TestBondCouponAnalyticsQuantLibOracles",
+        "TestBondCouponAnalyticsFloatingAmountGuardAndFrozenLifecycle",
+        "TestBondCouponAnalyticsDefaultsAndYieldDomains"
       ]
     },
     {
@@ -28,7 +32,9 @@
       "status": "implemented",
       "tests": [
         "TestBondCouponAnalyticsValuesAndErrors",
-        "TestBondCouponAnalyticsQuantLibOracles"
+        "TestBondCouponAnalyticsQuantLibOracles",
+        "TestBondCouponAnalyticsFloatingAmountGuardAndFrozenLifecycle",
+        "TestBondCouponAnalyticsDefaultsAndYieldDomains"
       ]
     }
   ],

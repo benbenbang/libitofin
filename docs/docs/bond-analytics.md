@@ -214,4 +214,5 @@ The shared 55-case test fixture was freshly generated from a QuantLib 1.43 wheel
 on the existing analytics construction inputs. Source review uses QuantLib
 `9863b578af0caa4cecabf697196533e84a8308b6` (1.43-dev), not a claim that this source
 pin produced the wheel. Matching distribution notices retain upstream attribution.
-Remaining BPS and ATM helpers are separate scope.
+Coupon-rate BPS and default own-NPV ATM are documented separately in
+[bond coupon analytics](bond-coupon-analytics.md).
