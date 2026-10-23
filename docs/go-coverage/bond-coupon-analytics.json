@@ -6,21 +6,30 @@
       "go": "Bond.BPSFromCurve",
       "python": "itofin.instruments.Bond.bps_from_curve",
       "status": "implemented",
-      "tests": "TestBondCouponAnalyticsValuesAndErrors"
+      "tests": [
+        "TestBondCouponAnalyticsValuesAndErrors",
+        "TestBondCouponAnalyticsQuantLibOracles"
+      ]
     },
     {
       "c": "itofin_bond_bps_from_yield",
       "go": "Bond.BPSFromYield",
       "python": "itofin.instruments.Bond.bps_from_yield",
       "status": "implemented",
-      "tests": "TestBondCouponAnalyticsValuesAndErrors"
+      "tests": [
+        "TestBondCouponAnalyticsValuesAndErrors",
+        "TestBondCouponAnalyticsQuantLibOracles"
+      ]
     },
     {
       "c": "itofin_bond_atm_rate_from_curve",
       "go": "Bond.ATMRateFromCurve",
       "python": "itofin.instruments.Bond.atm_rate_from_curve",
       "status": "implemented",
-      "tests": "TestBondCouponAnalyticsValuesAndErrors"
+      "tests": [
+        "TestBondCouponAnalyticsValuesAndErrors",
+        "TestBondCouponAnalyticsQuantLibOracles"
+      ]
     }
   ],
   "scope": "Coupon-rate BPS per100 and default own-NPV ATM rate; not signed yield BPV or every BondFunctions overload."

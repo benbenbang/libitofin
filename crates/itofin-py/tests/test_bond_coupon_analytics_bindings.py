@@ -1,13 +1,16 @@
 """Coupon-rate sensitivity is per100 and independent of signed flat-yield BPV."""
+import csv
+import datetime
 import gc
 import math
+from pathlib import Path
 
 import pytest
 
 from itofin import ItofinError, Settings
-from itofin.instruments import CallableZeroCouponBond, FixedRateBond, ZeroCouponBond
+from itofin.instruments import Bond, CallableZeroCouponBond, FixedRateBond, ZeroCouponBond
 from itofin.termstructures import FlatForward
-from itofin.time import BusinessDayConvention as BDC, Calendar, Compounding, Date, DateGeneration, DayCounter, Frequency, Schedule
+from itofin.time import BusinessDayConvention as BDC, Calendar, Compounding, Date, DateGeneration, DayCounter, Frequency, Period, Schedule
 from test_bond_analytics_bindings import floating_market
 
 
@@ -110,3 +113,40 @@ def test_floating_live_amounts_and_frozen_cache() -> None:
     del settings, forward, vol, dc
     gc.collect()
     assert bond.bps_from_curve(curve, settlement=settlement) == sensitivity
+
+
+def date_from_serial(serial: int) -> Date:
+    """Convert the QuantLib/Excel serial using Python calendar arithmetic."""
+    value = datetime.date(1899, 12, 30) + datetime.timedelta(days=serial)
+    return Date(value.day, value.month, value.year)
+
+
+def coupon_oracles() -> list[dict[str, str]]:
+    """Read exact-binary64 text shared with the public Go regression."""
+    with (Path(__file__).parent / "fixtures/bond_coupon_analytics.tsv").open(newline="") as stream:
+        rows = list(csv.DictReader(stream, delimiter="\t"))
+    assert len(rows) == 55
+    return rows
+
+
+@pytest.mark.parametrize("row", coupon_oracles(), ids=lambda row: row["name"])
+def test_coupon_analytics_compiled_quantlib_oracles(row: dict[str, str]) -> None:
+    """Pin every existing compounding/frequency combination plus zero and ex-coupon cases."""
+    settings = Settings()
+    dc, calendar = DayCounter.actual360(), Calendar.null_calendar()
+    start, end, reference, settlement = [date_from_serial(int(row[key])) for key in ["start", "end", "reference", "settlement"]]
+    face = float(row["face"])
+    if row["kind"] == "zero":
+        bond: Bond = ZeroCouponBond(5, calendar, face, end, settings, issue_date=start, payment_convention=BDC.Unadjusted, redemption=102.0)
+    else:
+        schedule = Schedule(start, end, Frequency.Semiannual, calendar, BDC.Unadjusted, DateGeneration.Backward)
+        if row["kind"] == "ex_coupon":
+            bond = FixedRateBond(5, face, schedule, [.047, .058], dc, settings, issue_date=start, payment_convention=BDC.Unadjusted, redemption=102.0, ex_coupon_period=Period(7, "Days"), ex_coupon_calendar=calendar)
+        else:
+            bond = FixedRateBond(5, face, schedule, [.047, .058], dc, settings, issue_date=start, payment_convention=BDC.Unadjusted, redemption=102.0)
+    curve = FlatForward(reference, .032, DayCounter.actual365_fixed())
+    modes = [Compounding.Simple, Compounding.Compounded, Compounding.Continuous, Compounding.SimpleThenCompounded, Compounding.CompoundedThenSimple]
+    frequencies = [Frequency.Annual, Frequency.Semiannual, Frequency.Quarterly, Frequency.Monthly]
+    expected = [float(row[key]) for key in ["bps_curve", "bps_yield", "atm_curve"]]
+    got = [bond.bps_from_curve(curve, settlement=settlement), bond.bps_from_yield(float(row["yield"]), dc, modes[int(row["compounding"])], frequencies[int(row["frequency"])], settlement=settlement), bond.atm_rate_from_curve(curve, settlement=settlement)]
+    assert got == pytest.approx(expected, abs=3e-12, rel=3e-13)

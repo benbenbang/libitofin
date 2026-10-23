@@ -83,5 +83,5 @@
       "status": "language-specific"
     }
   ],
-  "scope": "Duration, convexity and native signed unscaled BPV/YVBP for ordinary fixed/zero/floating bonds. Not callable effective risk or remaining BPS/ATM helpers."
+  "scope": "Duration, convexity and native signed unscaled BPV/YVBP for ordinary fixed/zero/floating bonds. Not callable effective risk; coupon BPS/ATM are mapped separately."
 }

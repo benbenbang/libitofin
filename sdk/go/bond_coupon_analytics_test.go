@@ -1,8 +1,12 @@
 package itofin
 
 import (
+	"encoding/csv"
 	"errors"
 	"math"
+	"os"
+	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -71,5 +75,52 @@ func TestBondCouponAnalyticsValuesAndErrors(t *testing.T) {
 	bondCheck(t, b.Close())
 	if _, e := b.BPSFromYield(.052, config); e == nil {
 		t.Fatal("closed bond accepted")
+	}
+}
+
+func TestBondCouponAnalyticsQuantLibOracles(t *testing.T) {
+	data, err := os.ReadFile("testdata/bond_coupon_analytics.tsv")
+	bondCheck(t, err)
+	reader := csv.NewReader(strings.NewReader(string(data)))
+	reader.Comma = '\t'
+	records, err := reader.ReadAll()
+	bondCheck(t, err)
+	if len(records) != 56 {
+		t.Fatal("coupon oracle row count")
+	}
+	for _, record := range records[1:] {
+		fields := map[string]string{}
+		for i, key := range records[0] {
+			fields[key] = record[i]
+		}
+		integer := func(key string) int32 {
+			v, e := strconv.ParseInt(fields[key], 10, 32)
+			bondCheck(t, e)
+			return int32(v)
+		}
+		real := func(key string) float64 { v, e := strconv.ParseFloat(fields[key], 64); bondCheck(t, e); return v }
+		t.Run(fields["name"], func(t *testing.T) {
+			s, e := NewSession()
+			bondCheck(t, e)
+			defer s.Close()
+			a := analyticsCase{Kind: fields["kind"], Face: real("face"), Start: integer("start"), End: integer("end"), Reference: integer("reference"), Settlement: integer("settlement")}
+			bond, settings, dc, curve := analyticsFixture(t, s, a)
+			settlement, e := DateFromSerial(a.Settlement)
+			bondCheck(t, e)
+			config := BondYieldConfig{DayCounter: dc, Compounding: Compounding(integer("compounding")), Frequency: Frequency(integer("frequency")), SettlementDate: &settlement}
+			for _, c := range []struct {
+				read func() (float64, error)
+				key  string
+			}{
+				{func() (float64, error) { return bond.BPSFromCurve(curve, &settlement) }, "bps_curve"},
+				{func() (float64, error) { return bond.BPSFromYield(real("yield"), config) }, "bps_yield"},
+				{func() (float64, error) { return bond.ATMRateFromCurve(curve, &settlement) }, "atm_curve"},
+			} {
+				got, e := c.read()
+				bondCheck(t, e)
+				analyticsNear(t, got, real(c.key))
+			}
+			bondCheck(t, settings.SetEvaluationDate(settlement))
+		})
 	}
 }
