@@ -14,6 +14,7 @@ from itofin import termstructures
 from itofin import time
 import typing
 __all__ = [
+    "AssetSwap",
     "BMASwap",
     "BermudanExercise",
     "Bond",
@@ -54,6 +55,46 @@ __all__ = [
     "ZeroCouponBond",
     "ZeroCouponInflationSwap",
 ]
+
+@typing.final
+class AssetSwap:
+    r"""
+    Full-maturity par asset swap over a plain fixed/zero bullet bond and Ibor index.
+    An explicit floating schedule must end at adjusted full bond maturity.
+    Without one, generate backwards from settlement using the index tenor.
+    """
+    def __init__(self, pay_bond_coupon: builtins.bool, bond: Bond, clean_price: builtins.float, index: indexes.IborIndex, spread: builtins.float, floating_schedule: typing.Optional[time.Schedule] = None, floating_day_counter: typing.Optional[time.DayCounter] = None) -> None:
+        r"""
+        Build a par swap with an optional floating schedule and index day-counter default.
+        """
+    def set_engine(self, curve: termstructures.YieldTermStructure, settings: itofin.Settings) -> None:
+        r"""
+        Attach a live discount curve; Settings must be the bond's identical object.
+        """
+    def npv(self) -> builtins.float:
+        r"""
+        Signed present value of both legs, including eligible upfront exchange.
+        """
+    def bond_leg_npv(self) -> builtins.float:
+        r"""
+        Signed bond-leg present value.
+        """
+    def floating_leg_npv(self) -> builtins.float:
+        r"""
+        Signed floating-leg present value, including principal exchanges.
+        """
+    def floating_leg_bps(self) -> builtins.float:
+        r"""
+        Signed floating-leg value for a one-basis-point spread change.
+        """
+    def fair_spread(self) -> builtins.float:
+        r"""
+        Absolute floating spread that zeroes the current NPV.
+        """
+    def fair_clean_price(self) -> builtins.float:
+        r"""
+        Native fair clean quote per 100; zeroes NPV only if upfront is included.
+        """
 
 @typing.final
 class BMASwap:

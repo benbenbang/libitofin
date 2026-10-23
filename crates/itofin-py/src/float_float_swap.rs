@@ -29,12 +29,12 @@ fn flags(s: &Settings<Date>) -> Flags {
         s.using_at_par_coupons(),
     )
 }
-struct LegGuard {
-    index: Shared<IborIndex>,
-    calendars: [PyCalendar; 3],
+pub(crate) struct LegGuard {
+    pub(crate) index: Shared<IborIndex>,
+    pub(crate) calendars: [PyCalendar; 3],
 }
 impl LegGuard {
-    fn check(&self, start: Date, end: Date, settings: &Settings<Date>) -> PyResult<()> {
+    pub(crate) fn check(&self, start: Date, end: Date, settings: &Settings<Date>) -> PyResult<()> {
         let [fixing_calendar, value_calendar, maturity_calendar] = &self.calendars;
         let days = i64::from(self.index.fixing_days());
         let fixing = advance(
@@ -106,7 +106,7 @@ impl LegGuard {
         }
         Ok(())
     }
-    fn construction(
+    pub(crate) fn construction(
         &self,
         schedule: &Schedule,
         calendar: &PyCalendar,
