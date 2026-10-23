@@ -219,6 +219,33 @@ impl Bond {
         Ok(bond)
     }
 
+    /// Copy immutable bond terms while retaining the original cashflows and settings.
+    ///
+    /// The returned bond has a fresh observer graph and no engine, pricing results,
+    /// cached calculation or frozen state. Later structural term changes are not
+    /// synchronized. Source engine/cache changes are independent;
+    /// shared cashflow and evaluation-date notifications reach both instruments.
+    pub fn unpriced_snapshot(&self) -> Bond {
+        let base = InstrumentBase::new();
+        self.settings.register_eval_date_observer(&base.observer());
+        for flow in &self.cashflows {
+            base.register_with(flow.observable());
+        }
+        Bond {
+            base,
+            settings: Shared::clone(&self.settings),
+            settlement_days: self.settlement_days,
+            calendar: self.calendar.clone(),
+            notional_schedule: self.notional_schedule.clone(),
+            notionals: self.notionals.clone(),
+            cashflows: self.cashflows.clone(),
+            redemptions: self.redemptions.clone(),
+            maturity_date: self.maturity_date,
+            issue_date: self.issue_date,
+            settlement_value: None,
+        }
+    }
+
     /// The number of settlement days.
     pub fn settlement_days(&self) -> Natural {
         self.settlement_days
@@ -718,6 +745,83 @@ mod tests {
             ),
             settlement_value,
         })
+    }
+
+    #[test]
+    fn unpriced_snapshot_preserves_terms_and_shared_inputs_not_engine_or_cache() {
+        let mut source = par_bond();
+        source.base_mut().set_pricing_engine(stub_engine(91.0));
+        assert_eq!(source.npv().unwrap(), 91.0);
+        source.base_mut().freeze();
+        let mut snapshot = source.unpriced_snapshot();
+        assert!(Shared::ptr_eq(&source.settings, &snapshot.settings));
+        assert_eq!(source.settlement_days, snapshot.settlement_days);
+        assert_eq!(source.calendar.name(), snapshot.calendar.name());
+        assert_eq!(source.notional_schedule, snapshot.notional_schedule);
+        assert_eq!(source.notionals, snapshot.notionals);
+        assert_eq!(source.maturity_date, snapshot.maturity_date);
+        assert_eq!(source.issue_date, snapshot.issue_date);
+        assert!(snapshot.settlement_value.is_none());
+        for (original, copied) in source.cashflows.iter().zip(&snapshot.cashflows) {
+            assert!(Shared::ptr_eq(original, copied));
+        }
+        assert!(Shared::ptr_eq(
+            &source.redemptions[0],
+            &snapshot.redemptions[0]
+        ));
+        assert!(!Shared::ptr_eq(
+            &source.base.observer(),
+            &snapshot.base.observer()
+        ));
+        assert!(snapshot.base.pricing_engine().is_none());
+        assert!(!snapshot.base.is_calculated());
+        assert!(snapshot.npv().is_err());
+        snapshot.base_mut().set_pricing_engine(stub_engine(87.0));
+        assert_eq!(snapshot.npv().unwrap(), 87.0);
+        assert_eq!(source.npv().unwrap(), 91.0);
+        source.settings.set_evaluation_date(today() + 1);
+        assert!(!snapshot.base.is_calculated());
+        assert_eq!(snapshot.npv().unwrap(), 87.0);
+        source.cashflows[0].observable().notify_observers();
+        assert!(!snapshot.base.is_calculated());
+        snapshot.base_mut().set_pricing_engine(stub_engine(85.0));
+        assert_eq!(snapshot.npv().unwrap(), 85.0);
+        assert_eq!(source.npv().unwrap(), 91.0);
+    }
+
+    #[test]
+    fn unpriced_snapshot_observes_live_quotes_with_independent_discounting() {
+        use crate::handle::Handle;
+        use crate::pricingengines::bond::DiscountingBondEngine;
+        use crate::quotes::{Quote, SimpleQuote};
+        use crate::termstructures::yields::FlatForward;
+        use crate::termstructures::yieldtermstructure::YieldTermStructure;
+        let mut source = par_bond();
+        let mut snapshot = source.unpriced_snapshot();
+        let quote = shared(SimpleQuote::new(0.03));
+        let curve = Handle::new(shared(FlatForward::new(
+            today(),
+            Handle::new(quote.clone() as Shared<dyn Quote>),
+            Actual360::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        )) as Shared<dyn YieldTermStructure>);
+        for bond in [&mut source, &mut snapshot] {
+            let settings = bond.settings_handle();
+            bond.base_mut()
+                .set_pricing_engine(shared_mut(DiscountingBondEngine::new(
+                    curve.clone(),
+                    None,
+                    settings,
+                )));
+        }
+        let before = snapshot.npv().unwrap();
+        assert_eq!(source.npv().unwrap(), before);
+        source.base_mut().freeze();
+        quote.set_value(0.06);
+        assert!(!snapshot.base().is_calculated());
+        assert!(snapshot.npv().unwrap() < before);
+        assert_eq!(source.npv().unwrap(), before);
     }
 
     /// The redemption is appended after the coupons and carries the full
