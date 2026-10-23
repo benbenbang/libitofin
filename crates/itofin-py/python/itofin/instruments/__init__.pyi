@@ -226,6 +226,18 @@ class Bond:
         r"""
         Dirty analytical quote per 100 using a parallel zero-rate spread.
         """
+    def bps_from_curve(self, discount_curve: termstructures.YieldTermStructure, *, settlement: typing.Optional[time.Date] = None) -> builtins.float:
+        r"""
+        Coupon-rate sensitivity per 100, not signed yield BPV. Coupon amounts are not read.
+        """
+    def bps_from_yield(self, yield_rate: builtins.float, day_counter: time.DayCounter, compounding: time.Compounding, frequency: time.Frequency, *, settlement: typing.Optional[time.Date] = None) -> builtins.float:
+        r"""
+        Coupon-rate BPS per 100 under flat-yield discounting, not signed yield BPV.
+        """
+    def atm_rate_from_curve(self, discount_curve: termstructures.YieldTermStructure, *, settlement: typing.Optional[time.Date] = None) -> builtins.float:
+        r"""
+        The coupon rate repricing the bond's own curve NPV, not a par-price target.
+        """
     def duration(self, yield_rate: builtins.float, day_counter: time.DayCounter, compounding: time.Compounding, frequency: time.Frequency, *, duration_type: Duration = Duration.Modified, settlement: typing.Optional[time.Date] = None) -> builtins.float:
         r"""
         Flat-yield duration, independent of pricing engines. Macaulay requires compounded yield.

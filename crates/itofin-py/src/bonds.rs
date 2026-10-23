@@ -380,6 +380,13 @@ impl PyBond {
         }
         .map_err(|error| PyQlError::from(error).into())
     }
+    fn coupon_sensitivity_settlement(&self, settlement: Option<&PyDate>) -> PyResult<Date> {
+        if !matches!(self.inner, BondBacking::Plain(_)) {
+            return Err(ItofinError::new_err("ordinary noncallable bond required"));
+        }
+        analytical_date(settlement)?
+            .map_or_else(|| self.settlement_date(None).map(|date| date.inner()), Ok)
+    }
     fn risk_settlement(&self, settlement: Option<&PyDate>) -> PyResult<Date> {
         if !matches!(self.inner, BondBacking::Plain(_)) {
             return Err(ItofinError::new_err("ordinary noncallable bond required"));
@@ -667,6 +674,63 @@ impl PyBond {
                 Some(settlement),
             )
             .map_err(PyQlError::from)?,
+        )
+    }
+    /// Coupon-rate sensitivity per 100, not signed yield BPV. Coupon amounts are not read.
+    #[pyo3(signature=(discount_curve, *, settlement=None))]
+    fn bps_from_curve(
+        &self,
+        discount_curve: &PyYieldTermStructure,
+        settlement: Option<&PyDate>,
+    ) -> PyResult<f64> {
+        let settlement = self.coupon_sensitivity_settlement(settlement)?;
+        let curve = discount_curve
+            .handle()
+            .current_link()
+            .map_err(PyQlError::from)?;
+        finite(
+            BondFunctions::bps(&self.inner.borrow(), &*curve, Some(settlement))
+                .map_err(PyQlError::from)?,
+        )
+    }
+    /// Coupon-rate BPS per 100 under flat-yield discounting, not signed yield BPV.
+    #[pyo3(signature=(yield_rate, day_counter, compounding, frequency, *, settlement=None))]
+    fn bps_from_yield(
+        &self,
+        yield_rate: f64,
+        day_counter: &PyDayCounter,
+        compounding: PyCompounding,
+        frequency: &PyFrequency,
+        settlement: Option<&PyDate>,
+    ) -> PyResult<f64> {
+        let rate = libitofin::interestrate::InterestRate::new(
+            finite(yield_rate)?,
+            day_counter.inner(),
+            compounding.inner(),
+            frequency.inner(),
+        )
+        .map_err(PyQlError::from)?;
+        let settlement = self.coupon_sensitivity_settlement(settlement)?;
+        finite(
+            BondFunctions::bps_at_yield(&self.inner.borrow(), &rate, Some(settlement))
+                .map_err(PyQlError::from)?,
+        )
+    }
+    /// The coupon rate repricing the bond's own curve NPV, not a par-price target.
+    #[pyo3(signature=(discount_curve, *, settlement=None))]
+    fn atm_rate_from_curve(
+        &self,
+        discount_curve: &PyYieldTermStructure,
+        settlement: Option<&PyDate>,
+    ) -> PyResult<f64> {
+        let settlement = self.risk_settlement(settlement)?;
+        let curve = discount_curve
+            .handle()
+            .current_link()
+            .map_err(PyQlError::from)?;
+        finite(
+            BondFunctions::atm_rate(&self.inner.borrow(), &*curve, Some(settlement))
+                .map_err(PyQlError::from)?,
         )
     }
     /// Flat-yield duration, independent of pricing engines. Macaulay requires compounded yield.
