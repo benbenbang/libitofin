@@ -1699,6 +1699,16 @@ class VanillaOption:
                 date the option prices against.
         """
     @classmethod
+    def cash_or_nothing(cls, option_type: OptionType, strike: builtins.float, cash_payoff: builtins.float, expiry: time.Date, settings: itofin.Settings) -> VanillaOption:
+        r"""
+        Build a European fixed-cash digital option, using the existing analytic engine.
+
+        The strike must be finite and nonnegative, and cash_payoff finite. Signed
+        and zero cash amounts are accepted. Use set_engine(process) to attach the
+        analytic European engine; other engine compatibility is not implied.
+        Existing zero-volatility and zero-strike numerical behavior is retained.
+        """
+    @classmethod
     def american(cls, option_type: OptionType, strike: builtins.float, earliest: time.Date, latest: time.Date, settings: itofin.Settings) -> VanillaOption:
         r"""
         Build the option exercisable at any time over [earliest, latest].
