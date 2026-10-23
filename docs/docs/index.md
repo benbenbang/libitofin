@@ -111,6 +111,7 @@ links to the language guides and project documentation.
 - [Floating-rate bonds](floating-rate-bonds.md): Ibor coupons, gearing, caps/floors and ex-coupon schedules.
 
 - [Par asset swaps](asset-swaps.md): bullet-bond dirty upfront and floating fair spread.
+- [Asset swap bindings](asset-swap-bindings.md): retained plain bullet bonds, live Ibor/discount curves and par swap analytics.
 
 - [Cross-currency basis swaps](cross-currency-basis-swaps.md): plain non-resettable Ibor legs and explicit FX valuation.
 
