@@ -106,3 +106,7 @@ pub unsafe extern "C" fn itofin_gsr_process_set_forward_measure_time(
         })
     }
 }
+
+#[cfg(test)]
+#[path = "gsr_process_api_tests.rs"]
+mod tests;
