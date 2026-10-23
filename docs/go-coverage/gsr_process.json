@@ -1,0 +1,103 @@
+{
+  "domain": "gsr-constant-forward-measure-process",
+  "entries": [
+    {
+      "c": "itofin_gsr_process_new",
+      "go": "Session.NewGsrProcess",
+      "python": "itofin.processes.GsrProcess.__init__",
+      "status": "implemented",
+      "tests": "TestGsrConstantGridAndTransitions"
+    },
+    {
+      "c": "itofin_gsr_process_query",
+      "go": "GsrProcess.X0",
+      "python": "itofin.processes.GsrProcess.x0",
+      "status": "implemented",
+      "tests": "TestGsrConstantGridAndTransitions"
+    },
+    {
+      "c": "itofin_gsr_process_query",
+      "go": "GsrProcess.ForwardMeasureTime",
+      "python": "itofin.processes.GsrProcess.forward_measure_time",
+      "status": "implemented",
+      "tests": "TestGsrConstantGridAndTransitions"
+    },
+    {
+      "c": "itofin_gsr_process_query",
+      "go": "GsrProcess.Sigma",
+      "python": "itofin.processes.GsrProcess.sigma",
+      "status": "implemented",
+      "tests": "TestGsrConstantGridAndTransitions"
+    },
+    {
+      "c": "itofin_gsr_process_query",
+      "go": "GsrProcess.Reversion",
+      "python": "itofin.processes.GsrProcess.reversion",
+      "status": "implemented",
+      "tests": "TestGsrConstantGridAndTransitions"
+    },
+    {
+      "c": "itofin_gsr_process_query",
+      "go": "GsrProcess.Y",
+      "python": "itofin.processes.GsrProcess.y",
+      "status": "implemented",
+      "tests": "TestGsrConstantGridAndTransitions"
+    },
+    {
+      "c": "itofin_gsr_process_query",
+      "go": "GsrProcess.G",
+      "python": "itofin.processes.GsrProcess.g",
+      "status": "implemented",
+      "tests": "TestGsrConstantGridAndTransitions"
+    },
+    {
+      "c": "itofin_gsr_process_query",
+      "go": "GsrProcess.Drift",
+      "python": "itofin.processes.GsrProcess.drift",
+      "status": "implemented",
+      "tests": "TestGsrConstantGridAndTransitions"
+    },
+    {
+      "c": "itofin_gsr_process_query",
+      "go": "GsrProcess.Diffusion",
+      "python": "itofin.processes.GsrProcess.diffusion",
+      "status": "implemented",
+      "tests": "TestGsrConstantGridAndTransitions"
+    },
+    {
+      "c": "itofin_gsr_process_query",
+      "go": "GsrProcess.Expectation",
+      "python": "itofin.processes.GsrProcess.expectation",
+      "status": "implemented",
+      "tests": "TestGsrConstantGridAndTransitions"
+    },
+    {
+      "c": "itofin_gsr_process_query",
+      "go": "GsrProcess.StdDeviation",
+      "python": "itofin.processes.GsrProcess.std_deviation",
+      "status": "implemented",
+      "tests": "TestGsrConstantGridAndTransitions"
+    },
+    {
+      "c": "itofin_gsr_process_query",
+      "go": "GsrProcess.Variance",
+      "python": "itofin.processes.GsrProcess.variance",
+      "status": "implemented",
+      "tests": "TestGsrConstantGridAndTransitions"
+    },
+    {
+      "c": "itofin_gsr_process_query",
+      "go": "GsrProcess.Evolve",
+      "python": "itofin.processes.GsrProcess.evolve",
+      "status": "implemented",
+      "tests": "TestGsrConstantGridAndTransitions"
+    },
+    {
+      "c": "itofin_gsr_process_set_forward_measure_time",
+      "go": "GsrProcess.SetForwardMeasureTime",
+      "python": "itofin.processes.GsrProcess.set_forward_measure_time",
+      "status": "implemented",
+      "tests": "TestGsrHorizonAndLifecycle"
+    }
+  ]
+}
