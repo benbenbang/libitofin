@@ -171,3 +171,5 @@ pub unsafe extern "C" fn itofin_fx_forward_currency(
         })
     }
 }
+#[cfg(test)]
+mod tests;
