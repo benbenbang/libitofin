@@ -5035,6 +5035,47 @@ int32_t itofin_cos_heston_value(struct ItofinContext *ctx,
                                 struct ItofinError *error);
 
 /**
+ * Retains the exact curve handle. Initial short rate is captured; horizon starts at zero.
+ * # Safety
+ * Follow the crate-level owning-thread and pointer contract. Output on success only.
+ */
+int32_t itofin_hw_forward_process_new(struct ItofinContext *ctx,
+                                      uint64_t yield_curve,
+                                      double a,
+                                      double sigma,
+                                      uint64_t *out,
+                                      struct ItofinError *error);
+
+/**
+ * Thirteen query kinds: 0 x0, 1 a, 2 sigma, 3 horizon, 4 alpha(t), 5 B(t,dt),
+ * 6 M_T(t,x,dt), 7 drift(t,x), 8 diffusion(t,x), 9 expectation(t,x,dt),
+ * 10 std deviation(t,x,dt), 11 variance(t,x,dt), 12 evolve(t,x,dt,dw).
+ * For kinds 5/6, dt is an absolute maturity; x is the second endpoint for kind 6.
+ * Unused inputs are ignored. Times may exceed the forward-measure horizon.
+ * # Safety
+ * Follow the crate-level owning-thread and pointer contract. Output on success only.
+ */
+int32_t itofin_hw_forward_process_query(struct ItofinContext *ctx,
+                                        uint64_t process,
+                                        int32_t kind,
+                                        double t,
+                                        double x,
+                                        double dt,
+                                        double dw,
+                                        double *out,
+                                        struct ItofinError *error);
+
+/**
+ * Replaces the horizon using the native notifying setter. Invalid values preserve state.
+ * # Safety
+ * Follow the crate-level owning-thread and pointer contract.
+ */
+int32_t itofin_hw_forward_process_set_forward_measure_time(struct ItofinContext *ctx,
+                                                           uint64_t process,
+                                                           double horizon,
+                                                           struct ItofinError *error);
+
+/**
  * Create an empty incremental accumulator in the caller's context.
  *
  * # Safety
