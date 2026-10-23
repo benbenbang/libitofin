@@ -152,3 +152,5 @@ go run ./examples/callable-risk
 go run ./examples/bond-forward
 
 go run ./examples/float-float-swap
+
+go run ./examples/xccy_basis
