@@ -12,6 +12,7 @@ __all__ = [
     "G2Process",
     "GJRGARCHProcess",
     "GeometricBrownianMotionProcess",
+    "GsrProcess",
     "HestonProcess",
     "Merton76Process",
 ]
@@ -332,6 +333,75 @@ class GeometricBrownianMotionProcess:
     def evolve(self, t0: builtins.float, x: builtins.float, dt: builtins.float, dw: builtins.float) -> builtins.float:
         r"""
         Return Euler expectation plus signed deviation times a standard draw.
+        """
+
+@typing.final
+class GsrProcess:
+    r"""
+    Constant-volatility, signed constant-reversion Gaussian forward-measure process.
+
+    This is not a fitted or calibrated GSR model. Times are process years within
+    [0,T]; date conversion and varying parameter grids are unsupported.
+    """
+    def __init__(self, times: typing.Sequence[builtins.float], vols: typing.Sequence[builtins.float], reversions: typing.Sequence[builtins.float], t_measure: builtins.float) -> None:
+        r"""
+        Copy a validated constant grid and finite nonnegative forward horizon.
+
+        Volatility count is time count plus one. Reversions contain one value or
+        match volatility count. All repeated values must be identical. Grid times
+        are finite, nonnegative and strictly increasing. Zero horizon is valid.
+        """
+    def forward_measure_time(self) -> builtins.float:
+        r"""
+        Return the current forward-measure horizon.
+        """
+    def set_forward_measure_time(self, horizon: builtins.float) -> None:
+        r"""
+        Replace the horizon and notify observers. Invalid values preserve state.
+        """
+    def x0(self) -> builtins.float:
+        r"""
+        Return the zero initial state.
+        """
+    def sigma(self, t: builtins.float) -> builtins.float:
+        r"""
+        Return constant volatility at a valid process time.
+        """
+    def reversion(self, t: builtins.float) -> builtins.float:
+        r"""
+        Return signed reversion at a valid process time.
+        """
+    def y(self, t: builtins.float) -> builtins.float:
+        r"""
+        Return the auxiliary variance y(t).
+        """
+    def g(self, t: builtins.float, end: builtins.float) -> builtins.float:
+        r"""
+        Return G(t,end) for ordered endpoints inside the horizon.
+        """
+    def drift(self, t: builtins.float, x: builtins.float) -> builtins.float:
+        r"""
+        Return the forward-measure drift.
+        """
+    def diffusion(self, t: builtins.float, x: builtins.float) -> builtins.float:
+        r"""
+        Return instantaneous diffusion.
+        """
+    def expectation(self, t: builtins.float, x: builtins.float, dt: builtins.float) -> builtins.float:
+        r"""
+        Return the exact conditional mean.
+        """
+    def std_deviation(self, t: builtins.float, x: builtins.float, dt: builtins.float) -> builtins.float:
+        r"""
+        Return the exact conditional standard deviation.
+        """
+    def variance(self, t: builtins.float, x: builtins.float, dt: builtins.float) -> builtins.float:
+        r"""
+        Return the exact conditional variance.
+        """
+    def evolve(self, t: builtins.float, x: builtins.float, dt: builtins.float, dw: builtins.float) -> builtins.float:
+        r"""
+        Evolve using one finite standard Gaussian draw.
         """
 
 @typing.final

@@ -49,6 +49,7 @@ mod gjr;
 mod gjr_model;
 mod gjr_simulation;
 mod global_calibration;
+mod gsr_process;
 mod helpers;
 mod heston;
 mod heston_engines;
@@ -339,6 +340,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     processes.add_class::<geometric_brownian::PyGeometricBrownianMotionProcess>()?;
     processes.add_class::<gjr::PyGjrGarchProcess>()?;
     processes.add_class::<g2_process::PyG2Process>()?;
+    processes.add_class::<gsr_process::PyGsrProcess>()?;
 
     let indexes = PyModule::new(py, "indexes")?;
     indexes.add_class::<overnightfuture::PySofr>()?;
