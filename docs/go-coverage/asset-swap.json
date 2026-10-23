@@ -95,6 +95,138 @@
         "TestAssetSwapSessionDomainsAndConcurrency",
         "TestAssetSwapGeneratedSchedule"
       ]
+    },
+    {
+      "c": "itofin_asset_swap_value",
+      "go": "AssetSwap.CleanPrice",
+      "python": "itofin.instruments.AssetSwap.clean_price",
+      "status": "implemented",
+      "tests": [
+        "TestAssetSwapNativeOracle",
+        "TestAssetSwapRetentionPolicyAndFreeze",
+        "TestAssetSwapSessionDomainsAndConcurrency",
+        "TestAssetSwapGeneratedSchedule"
+      ]
+    },
+    {
+      "c": "itofin_asset_swap_value",
+      "go": "AssetSwap.Spread",
+      "python": "itofin.instruments.AssetSwap.spread",
+      "status": "implemented",
+      "tests": [
+        "TestAssetSwapNativeOracle",
+        "TestAssetSwapRetentionPolicyAndFreeze",
+        "TestAssetSwapSessionDomainsAndConcurrency",
+        "TestAssetSwapGeneratedSchedule"
+      ]
+    },
+    {
+      "c": "itofin_asset_swap_value",
+      "go": "AssetSwap.UpfrontDate",
+      "python": "itofin.instruments.AssetSwap.upfront_date",
+      "status": "implemented",
+      "tests": [
+        "TestAssetSwapNativeOracle",
+        "TestAssetSwapRetentionPolicyAndFreeze",
+        "TestAssetSwapSessionDomainsAndConcurrency",
+        "TestAssetSwapGeneratedSchedule"
+      ]
+    },
+    {
+      "c": "itofin_asset_swap_value",
+      "go": "AssetSwap.PayBondCoupon",
+      "python": "itofin.instruments.AssetSwap.pay_bond_coupon",
+      "status": "implemented",
+      "tests": [
+        "TestAssetSwapNativeOracle",
+        "TestAssetSwapRetentionPolicyAndFreeze",
+        "TestAssetSwapSessionDomainsAndConcurrency",
+        "TestAssetSwapGeneratedSchedule"
+      ]
+    },
+    {
+      "c": "itofin_asset_swap_value",
+      "go": "AssetSwap.ParSwap",
+      "python": "itofin.instruments.AssetSwap.par_swap",
+      "status": "implemented",
+      "tests": [
+        "TestAssetSwapNativeOracle",
+        "TestAssetSwapRetentionPolicyAndFreeze",
+        "TestAssetSwapSessionDomainsAndConcurrency",
+        "TestAssetSwapGeneratedSchedule"
+      ]
+    },
+    {
+      "c": "itofin_asset_swap_value",
+      "go": "AssetSwap.IsCalculated",
+      "python": "itofin.instruments.AssetSwap.is_calculated",
+      "status": "implemented",
+      "tests": [
+        "TestAssetSwapNativeOracle",
+        "TestAssetSwapRetentionPolicyAndFreeze",
+        "TestAssetSwapSessionDomainsAndConcurrency",
+        "TestAssetSwapGeneratedSchedule"
+      ]
+    },
+    {
+      "c": "itofin_asset_swap_value",
+      "go": "AssetSwap.IsExpired",
+      "python": "itofin.instruments.AssetSwap.is_expired",
+      "status": "implemented",
+      "tests": [
+        "TestAssetSwapNativeOracle",
+        "TestAssetSwapRetentionPolicyAndFreeze",
+        "TestAssetSwapSessionDomainsAndConcurrency",
+        "TestAssetSwapGeneratedSchedule"
+      ]
+    },
+    {
+      "c": "itofin_asset_swap_action",
+      "go": "AssetSwap.Calculate",
+      "python": "itofin.instruments.AssetSwap.calculate",
+      "status": "implemented",
+      "tests": [
+        "TestAssetSwapNativeOracle",
+        "TestAssetSwapRetentionPolicyAndFreeze",
+        "TestAssetSwapSessionDomainsAndConcurrency",
+        "TestAssetSwapGeneratedSchedule"
+      ]
+    },
+    {
+      "c": "itofin_asset_swap_action",
+      "go": "AssetSwap.Recalculate",
+      "python": "itofin.instruments.AssetSwap.recalculate",
+      "status": "implemented",
+      "tests": [
+        "TestAssetSwapNativeOracle",
+        "TestAssetSwapRetentionPolicyAndFreeze",
+        "TestAssetSwapSessionDomainsAndConcurrency",
+        "TestAssetSwapGeneratedSchedule"
+      ]
+    },
+    {
+      "c": "itofin_asset_swap_action",
+      "go": "AssetSwap.Freeze",
+      "python": "itofin.instruments.AssetSwap.freeze",
+      "status": "implemented",
+      "tests": [
+        "TestAssetSwapNativeOracle",
+        "TestAssetSwapRetentionPolicyAndFreeze",
+        "TestAssetSwapSessionDomainsAndConcurrency",
+        "TestAssetSwapGeneratedSchedule"
+      ]
+    },
+    {
+      "c": "itofin_asset_swap_action",
+      "go": "AssetSwap.Unfreeze",
+      "python": "itofin.instruments.AssetSwap.unfreeze",
+      "status": "implemented",
+      "tests": [
+        "TestAssetSwapNativeOracle",
+        "TestAssetSwapRetentionPolicyAndFreeze",
+        "TestAssetSwapSessionDomainsAndConcurrency",
+        "TestAssetSwapGeneratedSchedule"
+      ]
     }
   ],
   "scope": "Par full-maturity plain fixed/zero bullet bonds and Ibor index, live discounting, generated/explicit floating schedule; no market/amortizing/overnight/custom repayment variants"
