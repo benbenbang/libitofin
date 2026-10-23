@@ -270,3 +270,69 @@ fn asset_swap_explicit_schedule_can_precede_setting_the_evaluation_date() {
     );
     assert_eq!(sentinel, 12345);
 }
+
+#[test]
+fn asset_swap_enforced_today_fixing_invalidates_cached_native_facade() {
+    use libitofin::indexes::Index;
+    let (mut c, cfg, discount, settings_id) = fixture();
+    let settings = c.get::<Shared<Settings<Date>>>(settings_id).unwrap();
+    settings.set_evaluation_date(Date::from_serial(46027));
+    let index = c.get::<NativeIbor>(cfg.index).unwrap().inner;
+    let build = |c: &mut Context| {
+        let mut id = 0;
+        unsafe {
+            assert_eq!(itofin_asset_swap_new(c, &cfg, &mut id, null_mut()), 0);
+            assert_eq!(
+                itofin_asset_swap_set_engine(c, id, discount, settings_id, null_mut()),
+                0
+            );
+        }
+        id
+    };
+    let value = |c: &mut Context, id| {
+        let mut out = 12345.;
+        let status = unsafe { itofin_asset_swap_value(c, id, 0, &mut out, null_mut()) };
+        (status, out)
+    };
+    let action =
+        |c: &mut Context, id, op| unsafe { itofin_asset_swap_action(c, id, op, null_mut()) };
+    let id = build(&mut c);
+    let (status, forecast) = value(&mut c, id);
+    assert_eq!(status, 0);
+    assert!(
+        c.get::<NativeAssetSwap>(id)
+            .unwrap()
+            .inner
+            .borrow()
+            .base()
+            .is_calculated()
+    );
+    assert_eq!(action(&mut c, id, 2), 0);
+    settings.set_enforces_todays_historic_fixings(true);
+    assert_eq!(value(&mut c, id), (0, forecast));
+    assert_eq!(action(&mut c, id, 0), 0);
+    assert_eq!(action(&mut c, id, 3), 0);
+    let missing = value(&mut c, id);
+    assert_ne!(missing.0, 0);
+    assert_eq!(missing.1, 12345.);
+    let fresh_missing = build(&mut c);
+    assert_eq!(value(&mut c, fresh_missing), missing);
+    settings.set_enforces_todays_historic_fixings(false);
+    assert_eq!(value(&mut c, id), (0, forecast));
+    settings.set_enforces_todays_historic_fixings(true);
+    assert_ne!(value(&mut c, id).0, 0);
+    settings.set_enforces_todays_historic_fixings(false);
+    assert_eq!(value(&mut c, id), (0, forecast));
+    assert_eq!(action(&mut c, id, 2), 0);
+    settings.set_enforces_todays_historic_fixings(true);
+    assert_ne!(action(&mut c, id, 1), 0);
+    index.add_fixing(Date::from_serial(46027), 0.09).unwrap();
+    assert_eq!(action(&mut c, id, 1), 0);
+    let (status, historical) = value(&mut c, id);
+    assert_eq!(status, 0);
+    assert!((historical - forecast).abs() > 1.);
+    let fresh = build(&mut c);
+    assert!((historical - value(&mut c, fresh).1).abs() <= 2e-12);
+    assert_eq!(action(&mut c, id, 3), 0);
+    assert_eq!(value(&mut c, id), (0, historical));
+}

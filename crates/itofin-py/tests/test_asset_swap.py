@@ -134,3 +134,69 @@ def test_asset_swap_explicit_schedule_before_evaluation_date():
     settings.set_evaluation_date(Date(2, 1, 2026))
     swap.set_engine(curve, settings)
     assert abs(swap.npv()) > 0
+
+
+def policy_market(*, stub=False, missing_today=False):
+    swap, settings, _, curves, index, bond, schedule = market(ROWS[-1] if missing_today else ROWS[0])
+    if stub:
+        schedule = Schedule(Date(5, 2, 2026), Date(5, 1, 2029), Frequency.Semiannual, Calendar.null_calendar(), BDC.Unadjusted)
+    if missing_today:
+        index = IborIndex("AssetMissingToday", Period(6, "Months"), 0, Currency.eur(), Calendar.null_calendar(), BDC.Unadjusted, False, DayCounter.actual360(), curves[0], settings)
+
+    def fresh():
+        result = AssetSwap(True, bond, 97.25, index, .0017, schedule)
+        result.set_engine(curves[1], settings)
+        return result
+
+    return fresh(), settings, index, fresh
+
+
+@pytest.mark.parametrize("flag", ["reference", "today", "par"])
+def test_asset_swap_silent_policy_cached_frozen_recalculate(flag):
+    """Every accessible silent flag must agree with a fresh same-input native swap."""
+    swap, settings, _, fresh = policy_market(stub=flag == "par", missing_today=flag != "par")
+    if flag != "par":
+        settings.set_include_todays_cash_flows(None)
+    setter = {"reference": settings.set_include_reference_date_events, "today": settings.set_include_todays_cash_flows, "par": settings.set_using_at_par_coupons}[flag]
+    old, new = (True, False) if flag == "par" else (False, True)
+    setter(old)
+    before = swap.npv()
+    assert swap.is_calculated()
+    setter(new)
+    after = fresh().npv()
+    assert abs(after - before) > 1e-6
+    assert swap.npv() == pytest.approx(after, rel=0, abs=2e-12)
+    swap.freeze()
+    setter(old)
+    assert swap.npv() == after
+    swap.recalculate()
+    assert swap.npv() == pytest.approx(fresh().npv(), rel=0, abs=2e-12)
+    assert swap.npv() == pytest.approx(before, rel=0, abs=2e-12)
+    setter(new)
+    assert swap.npv() == before
+    swap.calculate()
+    swap.unfreeze()
+    assert swap.npv() == pytest.approx(fresh().npv(), rel=0, abs=2e-12)
+    if flag == "today":
+        for reference in [False, True]:
+            settings.set_include_reference_date_events(reference)
+            for today in [True, False, None]:
+                settings.set_include_todays_cash_flows(today)
+                assert settings.include_todays_cash_flows() is today
+                assert swap.npv() == pytest.approx(fresh().npv(), rel=0, abs=2e-12)
+                included = reference if today is None else today
+                assert swap.npv() == pytest.approx(after if included else before, rel=0, abs=2e-12)
+
+
+def test_asset_swap_today_fixing_after_cached_forecast():
+    """A supplied today's fixing replaces a cached forecast, including forced frozen repricing."""
+    swap, _, index, fresh = policy_market(missing_today=True)
+    forecast = swap.npv()
+    swap.freeze()
+    index.add_fixing(Date(5, 1, 2026), .09)
+    assert swap.npv() == forecast
+    swap.recalculate()
+    assert abs(swap.npv() - forecast) > 1
+    assert swap.npv() == pytest.approx(fresh().npv(), rel=0, abs=2e-12)
+    swap.unfreeze()
+    assert swap.npv() == pytest.approx(fresh().npv(), rel=0, abs=2e-12)

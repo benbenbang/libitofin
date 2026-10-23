@@ -95,7 +95,9 @@ impl PyAssetSwap {
             _ => self.inner.fair_clean_price(),
         }
         .map_err(PyQlError::from)?;
-        self.flags = flags(&self.settings);
+        if !self.frozen {
+            self.flags = flags(&self.settings);
+        }
         finite(value)
     }
 }
@@ -256,7 +258,9 @@ impl PyAssetSwap {
     fn calculate(&mut self) -> PyResult<()> {
         self.prepare(false)?;
         self.inner.calculate().map_err(PyQlError::from)?;
-        self.flags = flags(&self.settings);
+        if !self.frozen {
+            self.flags = flags(&self.settings);
+        }
         Ok(())
     }
     /// Force repricing, including while frozen.
@@ -286,5 +290,89 @@ impl PyAssetSwap {
             .is_expired()
             .map_err(PyQlError::from)
             .map_err(Into::into)
+    }
+}
+
+#[cfg(test)]
+mod policy_tests {
+    use super::*;
+    use pyo3::types::PyDict;
+    use std::ffi::CString;
+
+    #[test]
+    fn asset_swap_enforced_today_fixing_invalidates_cached_python_facade() {
+        Python::initialize();
+        Python::attach(|py| {
+            let module = PyModule::new(py, "itofin").unwrap();
+            crate::itofin(&module).unwrap();
+            let locals = PyDict::new(py);
+            locals.set_item("api", module).unwrap();
+            let setup = CString::new(r#"
+T = api.time
+settings = api.Settings()
+settings.set_evaluation_date(T.Date(5, 1, 2026))
+calendar = T.Calendar.null_calendar()
+dc = T.DayCounter.actual360()
+curve = api.termstructures.FlatForward(T.Date(5, 1, 2026), .03, dc)
+index = api.indexes.IborIndex("AssetPrivateToday", T.Period(6, "Months"), 0, api.indexes.Currency.eur(), calendar, T.BusinessDayConvention.Unadjusted, False, dc, curve, settings)
+schedule = T.Schedule(T.Date(5, 1, 2026), T.Date(5, 1, 2029), T.Frequency.Semiannual, calendar, T.BusinessDayConvention.Unadjusted)
+bond = api.instruments.ZeroCouponBond(0, calendar, 100, T.Date(5, 1, 2029), settings)
+def fresh():
+    result = api.instruments.AssetSwap(True, bond, 90, index, .0017, schedule)
+    result.set_engine(curve, settings)
+    return result
+swap = fresh()
+"#).unwrap();
+            py.run(&setup, Some(&locals), Some(&locals)).unwrap();
+            let settings = locals.get_item("settings").unwrap().unwrap();
+            let native = settings.extract::<PyRef<'_, PySettings>>().unwrap().inner();
+            let swap = locals.get_item("swap").unwrap().unwrap();
+            let value = || swap.call_method0("npv").and_then(|v| v.extract::<f64>());
+            let fresh = || {
+                locals
+                    .get_item("fresh")
+                    .unwrap()
+                    .unwrap()
+                    .call0()
+                    .unwrap()
+                    .call_method0("npv")
+                    .and_then(|v| v.extract::<f64>())
+            };
+            let forecast = value().unwrap();
+            assert!(
+                swap.call_method0("is_calculated")
+                    .unwrap()
+                    .extract::<bool>()
+                    .unwrap()
+            );
+            swap.call_method0("freeze").unwrap();
+            native.set_enforces_todays_historic_fixings(true);
+            assert_eq!(value().unwrap(), forecast);
+            swap.call_method0("calculate").unwrap();
+            swap.call_method0("unfreeze").unwrap();
+            assert!(fresh().unwrap_err().is_instance_of::<ItofinError>(py));
+            assert!(value().unwrap_err().is_instance_of::<ItofinError>(py));
+            native.set_enforces_todays_historic_fixings(false);
+            assert_eq!(value().unwrap(), forecast);
+            native.set_enforces_todays_historic_fixings(true);
+            assert!(value().unwrap_err().is_instance_of::<ItofinError>(py));
+            native.set_enforces_todays_historic_fixings(false);
+            assert_eq!(value().unwrap(), forecast);
+            swap.call_method0("freeze").unwrap();
+            native.set_enforces_todays_historic_fixings(true);
+            assert!(
+                swap.call_method0("recalculate")
+                    .unwrap_err()
+                    .is_instance_of::<ItofinError>(py)
+            );
+            let fixing = CString::new("index.add_fixing(T.Date(5, 1, 2026), .09)").unwrap();
+            py.run(&fixing, Some(&locals), Some(&locals)).unwrap();
+            swap.call_method0("recalculate").unwrap();
+            let historical = value().unwrap();
+            assert!((historical - forecast).abs() > 1.);
+            assert!((historical - fresh().unwrap()).abs() <= 2e-12);
+            swap.call_method0("unfreeze").unwrap();
+            assert_eq!(value().unwrap(), historical);
+        });
     }
 }

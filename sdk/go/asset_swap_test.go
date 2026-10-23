@@ -196,3 +196,119 @@ func TestAssetSwapGeneratedSchedule(t *testing.T) {
 		t.Fatal("native generated schedule")
 	}
 }
+
+func assetSwapPolicyMarket(t *testing.T, s *Session, stub, missingToday bool) (assetSwapMarket, func() *AssetSwap) {
+	t.Helper()
+	rows := assetSwapRows(t)
+	row := rows[0]
+	if missingToday {
+		row = rows[len(rows)-1]
+	}
+	m := assetSwapFixture(t, s, row)
+	cal, dc := pricingMust(s.NullCalendar()), pricingMust(s.Actual360())
+	if stub {
+		m.config.FloatingSchedule = pricingMust(s.NewSchedule(ScheduleConfig{Start: testDate(t, 5, 2, 2026), End: testDate(t, 5, 1, 2029), Frequency: Semiannual, Calendar: cal, Convention: Unadjusted}))
+	}
+	if missingToday {
+		m.config.Index = pricingMust(s.NewIborIndex(IborIndexConfig{FamilyName: "AssetMissingToday", Tenor: Period{6, Months}, Currency: pricingMust(s.EUR()), FixingCalendar: cal, Convention: Unadjusted, DayCounter: dc, Forwarding: m.curves[0], Settings: m.settings}))
+	}
+	fresh := func() *AssetSwap {
+		swap := pricingMust(s.NewAssetSwap(m.config))
+		bondCheck(t, swap.SetEngine(m.curves[1], m.settings))
+		return swap
+	}
+	m.swap = fresh()
+	return m, fresh
+}
+
+func TestAssetSwapSilentPoliciesCachedFrozenRecalculate(t *testing.T) {
+	for _, flag := range []string{"reference", "today", "par"} {
+		t.Run(flag, func(t *testing.T) {
+			s := pricingMust(NewSession())
+			defer s.Close()
+			m, fresh := assetSwapPolicyMarket(t, s, flag == "par", flag != "par")
+			setter := m.settings.SetIncludeReferenceDateEvents
+			old, next := false, true
+			if flag == "today" {
+				setter = func(v bool) error { return m.settings.SetIncludeTodaysCashFlows(&v) }
+			} else if flag == "par" {
+				setter, old, next = m.settings.SetUsingAtParCoupons, true, false
+			}
+			near := func(got, want float64) {
+				t.Helper()
+				if math.Abs(got-want) > 2e-12 {
+					t.Fatalf("policy %s: %.17g want %.17g", flag, got, want)
+				}
+			}
+			bondCheck(t, setter(old))
+			before := pricingMust(m.swap.NPV())
+			if !pricingMust(m.swap.IsCalculated()) {
+				t.Fatal("cache not populated")
+			}
+			bondCheck(t, setter(next))
+			after := pricingMust(fresh().NPV())
+			if math.Abs(after-before) <= 1e-6 {
+				t.Fatal("policy setup must change valuation")
+			}
+			near(pricingMust(m.swap.NPV()), after)
+			bondCheck(t, m.swap.Freeze())
+			bondCheck(t, setter(old))
+			if pricingMust(m.swap.NPV()) != after {
+				t.Fatal("silent policy changed frozen cache")
+			}
+			bondCheck(t, m.swap.Recalculate())
+			near(pricingMust(m.swap.NPV()), pricingMust(fresh().NPV()))
+			near(pricingMust(m.swap.NPV()), before)
+			bondCheck(t, setter(next))
+			near(pricingMust(m.swap.NPV()), before)
+			bondCheck(t, m.swap.Calculate())
+			bondCheck(t, m.swap.Unfreeze())
+			near(pricingMust(m.swap.NPV()), pricingMust(fresh().NPV()))
+			if flag == "today" {
+				for _, reference := range []bool{false, true} {
+					bondCheck(t, m.settings.SetIncludeReferenceDateEvents(reference))
+					for _, today := range []*bool{pricingPtr(true), pricingPtr(false), nil} {
+						bondCheck(t, m.settings.SetIncludeTodaysCashFlows(today))
+						actual := pricingMust(m.settings.IncludeTodaysCashFlows())
+						if (actual == nil) != (today == nil) || (actual != nil && *actual != *today) {
+							t.Fatal("three-valued setting")
+						}
+						near(pricingMust(m.swap.NPV()), pricingMust(fresh().NPV()))
+						included := reference
+						if today != nil {
+							included = *today
+						}
+						want := before
+						if included {
+							want = after
+						}
+						near(pricingMust(m.swap.NPV()), want)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestAssetSwapTodayFixingAfterCachedForecast(t *testing.T) {
+	s := pricingMust(NewSession())
+	defer s.Close()
+	m, fresh := assetSwapPolicyMarket(t, s, false, true)
+	forecast := pricingMust(m.swap.NPV())
+	bondCheck(t, m.swap.Freeze())
+	bondCheck(t, m.config.Index.AddFixing(testDate(t, 5, 1, 2026), .09))
+	if pricingMust(m.swap.NPV()) != forecast {
+		t.Fatal("fixing changed frozen cache")
+	}
+	bondCheck(t, m.swap.Recalculate())
+	if math.Abs(pricingMust(m.swap.NPV())-forecast) <= 1 {
+		t.Fatal("today's supplied fixing not used")
+	}
+	if math.Abs(pricingMust(m.swap.NPV())-pricingMust(fresh().NPV())) > 2e-12 {
+		t.Fatal("forced fixing update differs from fresh swap")
+	}
+	bondCheck(t, m.swap.Unfreeze())
+	if math.Abs(pricingMust(m.swap.NPV())-pricingMust(fresh().NPV())) > 2e-12 {
+		t.Fatal("unfrozen fixing update differs from fresh swap")
+	}
+}

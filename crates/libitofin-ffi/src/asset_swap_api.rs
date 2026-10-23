@@ -306,7 +306,7 @@ pub unsafe extern "C" fn itofin_asset_swap_value(
                 11 => f64::from(u8::from(swap.is_expired()?)),
                 _ => unreachable!(),
             };
-            if query <= 5 {
+            if query <= 5 && !owner.frozen.get() {
                 owner.flags.set(flags(&owner.settings));
             }
             output(out, finite(value)?)
@@ -349,7 +349,7 @@ pub unsafe extern "C" fn itofin_asset_swap_action(
                 }
                 _ => unreachable!(),
             }
-            if action <= 1 {
+            if action == 1 || (action == 0 && !owner.frozen.get()) {
                 owner.flags.set(flags(&owner.settings));
             }
             Ok(())
