@@ -1773,6 +1773,39 @@ typedef struct ItofinVarianceSwapMcConfig {
   uint64_t seed;
 } ItofinVarianceSwapMcConfig;
 
+/**
+ * Pay base, receive quote, with mandatory initial and final principal exchanges.
+ * Currency handles and immutable spot are copied; index/curve/Settings graphs are retained.
+ */
+typedef struct ItofinXccyBasisSwapConfig {
+  uint64_t base_schedule;
+  uint64_t base_index;
+  uint64_t base_curve;
+  uint64_t base_day_counter;
+  uint64_t base_currency;
+  uint64_t quote_schedule;
+  uint64_t quote_index;
+  uint64_t quote_curve;
+  uint64_t quote_day_counter;
+  uint64_t quote_currency;
+  uint64_t settings;
+  double base_notional;
+  double quote_notional;
+  double quote_spread;
+  /**
+   * Quote-currency units per base unit at reference or explicit spot settlement.
+   */
+  double spot;
+  uint8_t has_payment_convention;
+  int32_t payment_convention;
+  uint8_t has_valuation_dates;
+  int32_t settlement_date;
+  int32_t npv_date;
+  uint8_t include_settlement_flows;
+  uint8_t has_spot_settlement_date;
+  int32_t spot_settlement_date;
+} ItofinXccyBasisSwapConfig;
+
 #define ITOFIN_OPTIMIZE_CONVERGED_XTOL 0
 
 #define ITOFIN_OPTIMIZE_CONVERGED_FTOL 1
@@ -8926,6 +8959,40 @@ int32_t itofin_variance_swap_samples(struct ItofinContext *ctx,
                                      uint64_t swap,
                                      size_t *out,
                                      struct ItofinError *error);
+
+/**
+ * Construct a plain Ibor swap. Omitted payment convention means Following.
+ * # Safety
+ * Follow the crate-level pointer and owning-thread contract. Output on success only.
+ */
+int32_t itofin_xccy_basis_swap_new(struct ItofinContext *ctx,
+                                   const struct ItofinXccyBasisSwapConfig *cfg,
+                                   uint64_t *out,
+                                   struct ItofinError *error);
+
+/**
+ * Queries: 0 base-leg PV, 1 quote-leg PV, 2 quote-leg BPS, 3 base NPV,
+ * 4 quote NPV, 5 absolute fair quote spread, 6 immutable spot.
+ * Contractual leg PVs precede the paid-base/received-quote signs.
+ * # Safety
+ * Follow the crate-level pointer and owning-thread contract. Output on success only.
+ */
+int32_t itofin_xccy_basis_swap_value(struct ItofinContext *ctx,
+                                     uint64_t id,
+                                     int32_t query,
+                                     double *out,
+                                     struct ItofinError *error);
+
+/**
+ * Copy a currency into an independently owned handle: side zero base, one quote.
+ * # Safety
+ * Follow the crate-level pointer and owning-thread contract. Output on success only.
+ */
+int32_t itofin_xccy_basis_swap_currency(struct ItofinContext *ctx,
+                                        uint64_t id,
+                                        int32_t side,
+                                        uint64_t *out,
+                                        struct ItofinError *error);
 
 #ifdef __cplusplus
 }  // extern "C"
