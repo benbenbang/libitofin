@@ -118,7 +118,7 @@ cc -std=c11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
 c++ -x c++ -std=c++11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
   crates/libitofin-ffi/tests/g2_process.c -Ltarget/release -litofin_ffi -lm -o target/cpp-g2-process
 ./target/cpp-g2-process
-for probe in c_currency black_delta black_calculator bond_risk fx_forward gsr_process cash_digital mf_state_process; do
+for probe in c_currency black_delta black_calculator bond_risk fx_forward gsr_process cash_digital mf_state_process hw_forward_process; do
   cc -std=c11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
     "crates/libitofin-ffi/tests/$probe.c" -Ltarget/release -litofin_ffi -lm -o "target/c-$probe"
   "./target/c-$probe"
@@ -137,6 +137,7 @@ go run ./examples/portfolio
 go run ./examples/g2_process
 go run ./examples/gsr_process
 go run ./examples/mf_state_process
+go run ./examples/hw_forward_process
 
 go run ./examples/drawdown
 go run ./examples/benchmark_beta
