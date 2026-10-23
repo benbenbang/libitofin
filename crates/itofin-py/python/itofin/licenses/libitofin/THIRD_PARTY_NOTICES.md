@@ -72,3 +72,23 @@ The upstream source headers contain these notices:
 
 The complete QuantLib license and contributor notices are included in
 [QUANTLIB_LICENSE.txt](QUANTLIB_LICENSE.txt).
+
+## QuantLib bond risk oracle fixtures
+
+`bond_risk_oracle.tsv` in Go testdata and Python test fixtures contains fresh
+independent numerical queries to the QuantLib 1.43 Python wheel. The wheel is
+not asserted to be the same binary revision as source review pin
+`9863b578af0caa4cecabf697196533e84a8308b6` (1.43-dev).
+No new core algorithms are introduced by these bindings. Closed-form zero-bond
+derivative tests are independently derived, not copied from an upstream test.
+
+The reviewed upstream `ql/pricingengines/bond/bondfunctions.cpp` headers retain:
+Copyright (C) 2009 Nathan Abbott; Copyright (C) 2007, 2008, 2009, 2010 Ferdinando
+Ametrano; Copyright (C) 2007 Chiara Fornarola; Copyright (C) 2008 Simon Ibbotson;
+Copyright (C) 2004 M-Dimension Consulting Inc.; Copyright (C) 2005, 2006, 2007,
+2008, 2009 StatPro Italia srl; Copyright (C) 2004 Jeff Yu.
+`ql/cashflows/cashflows.cpp` retains Copyright (C) 2005, 2006 StatPro Italia srl;
+Copyright (C) 2005 Charles Whitmore; Copyright (C) 2007, 2008, 2009, 2010, 2011,
+2012 Ferdinando Ametrano; Copyright (C) 2008 Toyin Akin.
+The complete QuantLib license and contributor notices are included in
+[QUANTLIB_LICENSE.txt](QUANTLIB_LICENSE.txt).
