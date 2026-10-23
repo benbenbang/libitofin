@@ -297,3 +297,8 @@ See [typing acceptance](TYPING.md) for the pinned, bidirectional Pyright gate.
 ## License
 
 BSD-3-Clause, matching the `libitofin` core. See the [repository](https://github.com/benbenbang/libitofin) for the layer status table, the divergences-from-QuantLib catalogue, and the Rust test oracles behind the numbers above.
+
+## Standalone plain-vanilla BlackCalculator
+
+Immutable Black 1976 value and scalar Greeks are available through `BlackCalculator`.
+See the [bounded scope and edge-case contract](https://github.com/benbenbang/libitofin/blob/main/docs/docs/black-calculator-bindings.md).
