@@ -920,7 +920,7 @@ impl PyBond {
     }
     /// Calendar-adjusted settlement, floored at the issue date.
     #[pyo3(signature = (date=None))]
-    fn settlement_date(&self, date: Option<&PyDate>) -> PyResult<PyDate> {
+    pub(crate) fn settlement_date(&self, date: Option<&PyDate>) -> PyResult<PyDate> {
         let bond = self.inner.borrow();
         let date = date
             .map(PyDate::inner)

@@ -5,6 +5,7 @@
 //! ItofinError exception. The pricing facades land in follow-up tickets
 //! (#485-#487).
 
+mod asset_swap;
 mod bates;
 mod benchmark_beta;
 mod black_calculator;
@@ -387,6 +388,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     instruments.add_class::<PyVanillaOption>()?;
     instruments.add_class::<PySwapType>()?;
     instruments.add_class::<PyVanillaSwap>()?;
+    instruments.add_class::<asset_swap::PyAssetSwap>()?;
     instruments.add_class::<float_float_swap::PyFloatFloatSwap>()?;
     instruments.add_class::<bma::PyBMASwap>()?;
     instruments.add_class::<PyMakeVanillaSwap>()?;
