@@ -1,0 +1,155 @@
+{
+  "domain": "xccy-basis",
+  "entries": [
+    {
+      "c": [
+        "itofin_xccy_basis_swap_new"
+      ],
+      "go": [
+        "Session.NewXccyBasisSwap"
+      ],
+      "python": "itofin.instruments.XccyBasisSwap.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestXccyBasisNativeOracle",
+        "TestXccyBasisLiveRetentionAndSessions",
+        "TestXccyBasisDomainsAndLegSelectiveFixings"
+      ]
+    },
+    {
+      "c": [
+        "itofin_xccy_basis_swap_value"
+      ],
+      "go": [
+        "XccyBasisSwap.BaseLegPV"
+      ],
+      "python": "itofin.instruments.XccyBasisSwap.base_leg_pv",
+      "status": "implemented",
+      "tests": [
+        "TestXccyBasisNativeOracle",
+        "TestXccyBasisLiveRetentionAndSessions",
+        "TestXccyBasisDomainsAndLegSelectiveFixings"
+      ]
+    },
+    {
+      "c": [
+        "itofin_xccy_basis_swap_value"
+      ],
+      "go": [
+        "XccyBasisSwap.QuoteLegPV"
+      ],
+      "python": "itofin.instruments.XccyBasisSwap.quote_leg_pv",
+      "status": "implemented",
+      "tests": [
+        "TestXccyBasisNativeOracle",
+        "TestXccyBasisLiveRetentionAndSessions",
+        "TestXccyBasisDomainsAndLegSelectiveFixings"
+      ]
+    },
+    {
+      "c": [
+        "itofin_xccy_basis_swap_value"
+      ],
+      "go": [
+        "XccyBasisSwap.QuoteLegBPS"
+      ],
+      "python": "itofin.instruments.XccyBasisSwap.quote_leg_bps",
+      "status": "implemented",
+      "tests": [
+        "TestXccyBasisNativeOracle",
+        "TestXccyBasisLiveRetentionAndSessions",
+        "TestXccyBasisDomainsAndLegSelectiveFixings"
+      ]
+    },
+    {
+      "c": [
+        "itofin_xccy_basis_swap_value"
+      ],
+      "go": [
+        "XccyBasisSwap.NPV"
+      ],
+      "python": "itofin.instruments.XccyBasisSwap.npv",
+      "status": "implemented",
+      "tests": [
+        "TestXccyBasisNativeOracle",
+        "TestXccyBasisLiveRetentionAndSessions",
+        "TestXccyBasisDomainsAndLegSelectiveFixings"
+      ]
+    },
+    {
+      "c": [
+        "itofin_xccy_basis_swap_value"
+      ],
+      "go": [
+        "XccyBasisSwap.NPVInQuote"
+      ],
+      "python": "itofin.instruments.XccyBasisSwap.npv_in_quote",
+      "status": "implemented",
+      "tests": [
+        "TestXccyBasisNativeOracle",
+        "TestXccyBasisLiveRetentionAndSessions",
+        "TestXccyBasisDomainsAndLegSelectiveFixings"
+      ]
+    },
+    {
+      "c": [
+        "itofin_xccy_basis_swap_value"
+      ],
+      "go": [
+        "XccyBasisSwap.FairQuoteBasisSpread"
+      ],
+      "python": "itofin.instruments.XccyBasisSwap.fair_quote_basis_spread",
+      "status": "implemented",
+      "tests": [
+        "TestXccyBasisNativeOracle",
+        "TestXccyBasisLiveRetentionAndSessions",
+        "TestXccyBasisDomainsAndLegSelectiveFixings"
+      ]
+    },
+    {
+      "c": [
+        "itofin_xccy_basis_swap_value"
+      ],
+      "go": [
+        "XccyBasisSwap.Spot"
+      ],
+      "python": "itofin.instruments.XccyBasisSwap.spot",
+      "status": "implemented",
+      "tests": [
+        "TestXccyBasisNativeOracle",
+        "TestXccyBasisLiveRetentionAndSessions",
+        "TestXccyBasisDomainsAndLegSelectiveFixings"
+      ]
+    },
+    {
+      "c": [
+        "itofin_xccy_basis_swap_currency"
+      ],
+      "go": [
+        "XccyBasisSwap.BaseCurrency"
+      ],
+      "python": "itofin.instruments.XccyBasisSwap.base_currency",
+      "status": "implemented",
+      "tests": [
+        "TestXccyBasisNativeOracle",
+        "TestXccyBasisLiveRetentionAndSessions",
+        "TestXccyBasisDomainsAndLegSelectiveFixings"
+      ]
+    },
+    {
+      "c": [
+        "itofin_xccy_basis_swap_currency"
+      ],
+      "go": [
+        "XccyBasisSwap.QuoteCurrency"
+      ],
+      "python": "itofin.instruments.XccyBasisSwap.quote_currency",
+      "status": "implemented",
+      "tests": [
+        "TestXccyBasisNativeOracle",
+        "TestXccyBasisLiveRetentionAndSessions",
+        "TestXccyBasisDomainsAndLegSelectiveFixings"
+      ]
+    }
+  ]
+}

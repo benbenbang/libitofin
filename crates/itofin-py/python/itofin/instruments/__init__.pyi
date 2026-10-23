@@ -51,6 +51,7 @@ __all__ = [
     "VanillaOption",
     "VanillaSwap",
     "VarianceSwap",
+    "XccyBasisSwap",
     "YearOnYearInflationSwap",
     "YoYInflationCapFloor",
     "ZeroCouponBond",
@@ -2268,6 +2269,55 @@ class VarianceSwap:
     def maturity_date(self) -> time.Date:
         r"""
         Return the immutable contract maturity date.
+        """
+
+@typing.final
+class XccyBasisSwap:
+    r"""
+    Constant-notional Ibor swap paying base and receiving quote, including principal exchanges.
+    Spot is an immutable quote-per-base snapshot. Every query rereads live curves/fixings/Settings.
+    This is not a resetting, overnight, live-spot or cached pricing-engine facade.
+    """
+    def __init__(self, base_schedule: time.Schedule, base_index: indexes.IborIndex, base_curve: termstructures.YieldTermStructure, base_notional: builtins.float, base_day_count: time.DayCounter, quote_schedule: time.Schedule, quote_index: indexes.IborIndex, quote_curve: termstructures.YieldTermStructure, quote_notional: builtins.float, quote_day_count: time.DayCounter, quote_spread: builtins.float, base_currency: indexes.Currency, quote_currency: indexes.Currency, spot: builtins.float, settings: itofin.Settings, *, payment_convention: typing.Optional[time.BusinessDayConvention] = None, settlement_date: typing.Optional[time.Date] = None, npv_date: typing.Optional[time.Date] = None, include_settlement_flows: builtins.bool = False, spot_settlement_date: typing.Optional[time.Date] = None) -> None:
+        r"""
+        Copy currencies and spot, retaining the exact live curves, indexes, schedules and Settings.
+        Omitted payment convention means Following. Both valuation dates must be supplied together.
+        """
+    def base_leg_pv(self) -> builtins.float:
+        r"""
+        Contractual base-currency leg PV before its paid-leg sign.
+        """
+    def quote_leg_pv(self) -> builtins.float:
+        r"""
+        Contractual quote-currency leg PV before its received-leg sign.
+        """
+    def quote_leg_bps(self) -> builtins.float:
+        r"""
+        Quote-currency sensitivity per one basis point of spread, excluding principal.
+        """
+    def npv(self) -> builtins.float:
+        r"""
+        Signed base-currency NPV at the selected NPV date.
+        """
+    def npv_in_quote(self) -> builtins.float:
+        r"""
+        Signed quote-currency NPV at the selected NPV date.
+        """
+    def fair_quote_basis_spread(self) -> builtins.float:
+        r"""
+        Absolute quote spread repricing the swap to zero, not a spread adjustment.
+        """
+    def spot(self) -> builtins.float:
+        r"""
+        Immutable quote-currency units per one base unit.
+        """
+    def base_currency(self) -> indexes.Currency:
+        r"""
+        Independent copy of the base currency.
+        """
+    def quote_currency(self) -> indexes.Currency:
+        r"""
+        Independent copy of the quote currency.
         """
 
 @typing.final

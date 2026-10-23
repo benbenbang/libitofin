@@ -90,6 +90,7 @@ mod time;
 mod treeswaption;
 mod variance_swap;
 mod vol;
+mod xccy_basis;
 
 use calibration::{
     PyBoundaryConstraint, PyCalibrationErrorType, PyCompositeConstraint, PyConjugateGradient,
@@ -384,6 +385,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     instruments.add_class::<bonds::PyDuration>()?;
     instruments.add_class::<bond_forward::PyBondForward>()?;
     instruments.add_class::<fx_forward::PyFxForward>()?;
+    instruments.add_class::<xccy_basis::PyXccyBasisSwap>()?;
     instruments.add_class::<callable_bonds::PyCallabilityType>()?;
     instruments.add_class::<callable_bonds::PyCallability>()?;
     instruments.add_class::<callable_bonds::PyCallableFixedRateBond>()?;
