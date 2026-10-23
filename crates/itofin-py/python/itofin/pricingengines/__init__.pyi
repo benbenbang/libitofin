@@ -17,6 +17,7 @@ __all__ = [
     "BachelierCapFloorEngine",
     "BachelierSwaptionEngine",
     "BatesEngine",
+    "BlackCalculator",
     "BlackCallableFixedRateBondEngine",
     "BlackCapFloorEngine",
     "BlackDeltaCalculator",
@@ -131,6 +132,86 @@ class BatesEngine:
         Retain the live model with an integration order from 1 through 192.
 
         Only NPV is supplied. Unsupported exercises and Greeks raise ItofinError.
+        """
+
+@typing.final
+class BlackCalculator:
+    r"""
+    Immutable plain-vanilla standalone value and Greeks, not a pricing engine.
+    Every nonfinite result raises ItofinError, including native zero-strike NaNs.
+    """
+    def __init__(self, option_type: instruments.OptionType, strike: builtins.float, forward: builtins.float, std_dev: builtins.float, discount: builtins.float) -> None:
+        r"""
+        Copy finite strike >= 0, forward > 0, std_dev >= 0 and discount > 0.
+        std_dev is volatility times sqrt(time); no payoff objects are accepted.
+        """
+    def value(self) -> builtins.float:
+        r"""
+        Present value.
+        """
+    def delta_forward(self) -> builtins.float:
+        r"""
+        Forward delta.
+        """
+    def delta(self, spot: builtins.float) -> builtins.float:
+        r"""
+        Spot delta, requiring positive finite spot.
+        """
+    def elasticity_forward(self) -> builtins.float:
+        r"""
+        Forward elasticity; native finite MAX/MIN sentinels are retained.
+        """
+    def elasticity(self, spot: builtins.float) -> builtins.float:
+        r"""
+        Spot elasticity, requiring positive finite spot.
+        """
+    def gamma_forward(self) -> builtins.float:
+        r"""
+        Forward gamma.
+        """
+    def gamma(self, spot: builtins.float) -> builtins.float:
+        r"""
+        Spot gamma, requiring positive finite spot.
+        """
+    def theta(self, spot: builtins.float, maturity: builtins.float) -> builtins.float:
+        r"""
+        Theta per year. Native expiry shortcut is retained.
+        """
+    def theta_per_day(self, spot: builtins.float, maturity: builtins.float) -> builtins.float:
+        r"""
+        Theta divided by 365. Native expiry shortcut is retained.
+        """
+    def vega(self, maturity: builtins.float) -> builtins.float:
+        r"""
+        Vega for finite nonnegative maturity.
+        """
+    def rho(self, maturity: builtins.float) -> builtins.float:
+        r"""
+        Discount-rate rho for finite nonnegative maturity.
+        """
+    def dividend_rho(self, maturity: builtins.float) -> builtins.float:
+        r"""
+        Growth-rate rho for finite nonnegative maturity.
+        """
+    def itm_cash_probability(self) -> builtins.float:
+        r"""
+        Native N(d2), independent of option sign.
+        """
+    def itm_asset_probability(self) -> builtins.float:
+        r"""
+        Native N(d1), independent of option sign.
+        """
+    def strike_sensitivity(self) -> builtins.float:
+        r"""
+        Strike sensitivity.
+        """
+    def alpha(self) -> builtins.float:
+        r"""
+        Forward coefficient in the native value formula.
+        """
+    def beta(self) -> builtins.float:
+        r"""
+        Strike coefficient in the native value formula.
         """
 
 @typing.final

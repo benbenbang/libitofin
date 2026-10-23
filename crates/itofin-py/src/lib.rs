@@ -7,6 +7,7 @@
 
 mod bates;
 mod benchmark_beta;
+mod black_calculator;
 mod black_delta;
 mod bma;
 mod bond_forward;
@@ -420,6 +421,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     models.add_class::<PyCalibrationErrorType>()?;
 
     let pricingengines = PyModule::new(py, "pricingengines")?;
+    pricingengines.add_class::<black_calculator::PyBlackCalculator>()?;
     pricingengines.add_class::<black_delta::PyBlackDeltaCalculator>()?;
     pricingengines.add_class::<bonds::PyDiscountingBondEngine>()?;
     pricingengines.add_class::<callable_bonds::PyTreeCallableFixedRateBondEngine>()?;
