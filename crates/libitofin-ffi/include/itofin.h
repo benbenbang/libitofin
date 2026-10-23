@@ -103,6 +103,49 @@ typedef struct ItofinContext ItofinContext;
 typedef struct ItofinBootstrapOutput ItofinBootstrapOutput;
 
 /**
+ * Par full-maturity terms. Zero schedule generates backwards from settlement;
+ * zero day counter uses the index's.
+ */
+typedef struct ItofinAssetSwapConfig {
+  /**
+   * Existing plain fixed/zero bullet bond handle in this context.
+   */
+  uint64_t bond;
+  /**
+   * Ibor index handle sharing the bond's Settings.
+   */
+  uint64_t index;
+  /**
+   * Zero generates backwards from settlement; otherwise a full-maturity schedule handle.
+   */
+  uint64_t floating_schedule;
+  /**
+   * Zero uses the index's counter; otherwise a day-counter handle.
+   */
+  uint64_t floating_day_counter;
+  /**
+   * Forward clean quote per 100 at the floating schedule start.
+   */
+  double clean_price;
+  /**
+   * Floating coupon spread in decimal rate units.
+   */
+  double spread;
+  /**
+   * Zero receives bond coupons; one pays them.
+   */
+  uint8_t pay_bond_coupon;
+} ItofinAssetSwapConfig;
+
+/**
+ * Caller-owned error. Zero code means success; message is NUL-terminated UTF-8.
+ */
+typedef struct ItofinError {
+  int32_t code;
+  char message[1024];
+} ItofinError;
+
+/**
  * Physical constructor order, distinct from calibrated parameter-array order.
  */
 typedef struct ItofinBatesParameters {
@@ -115,14 +158,6 @@ typedef struct ItofinBatesParameters {
   double nu;
   double delta;
 } ItofinBatesParameters;
-
-/**
- * Caller-owned error. Zero code means success; message is NUL-terminated UTF-8.
- */
-typedef struct ItofinError {
-  int32_t code;
-  char message[1024];
-} ItofinError;
 
 typedef struct ItofinCalibrationOptions {
   uint64_t constraint;
@@ -1713,6 +1748,50 @@ typedef struct ItofinVarianceSwapMcConfig {
 #ifdef __cplusplus
 extern "C" {
 #endif // __cplusplus
+
+/**
+ * Construct over a plain fixed/zero bullet bond, retaining its native dependency graph.
+ * # Safety
+ * Follow the crate-level pointer and thread contract.
+ */
+int32_t itofin_asset_swap_new(struct ItofinContext *ctx,
+                              const struct ItofinAssetSwapConfig *cfg,
+                              uint64_t *out,
+                              struct ItofinError *error);
+
+/**
+ * Attach a live discount curve with the bond's identical Settings and native defaults.
+ * # Safety
+ * Follow the crate-level pointer and thread contract.
+ */
+int32_t itofin_asset_swap_set_engine(struct ItofinContext *ctx,
+                                     uint64_t id,
+                                     uint64_t discount,
+                                     uint64_t settings_id,
+                                     struct ItofinError *error);
+
+/**
+ * Query 0 NPV, 1 bond NPV, 2 floating NPV, 3 floating BPS, 4 fair spread,
+ * 5 fair clean price, 6 clean price, 7 spread, 8 upfront serial, 9 payer flag,
+ * 10 calculated flag, 11 expiry. Failures preserve the output.
+ * # Safety
+ * Follow the crate-level pointer and thread contract.
+ */
+int32_t itofin_asset_swap_value(struct ItofinContext *ctx,
+                                uint64_t id,
+                                int32_t query,
+                                double *out,
+                                struct ItofinError *error);
+
+/**
+ * Action 0 calculate, 1 recalculate, 2 freeze, 3 unfreeze.
+ * # Safety
+ * Follow the crate-level pointer and thread contract.
+ */
+int32_t itofin_asset_swap_action(struct ItofinContext *ctx,
+                                 uint64_t id,
+                                 int32_t action,
+                                 struct ItofinError *error);
 
 /**
  * Retain live spot, risk-free and dividend inputs with constant parameters.
