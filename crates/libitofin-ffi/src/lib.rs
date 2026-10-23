@@ -65,6 +65,7 @@ pub mod global_calibration_api;
 pub mod gsr_process_api;
 pub mod helpers_api;
 pub mod heston_engines_api;
+pub mod hw_forward_process_api;
 pub mod incremental_statistics_api;
 pub mod indexes_api;
 pub mod inflation_api;
