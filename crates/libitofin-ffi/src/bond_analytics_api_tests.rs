@@ -621,3 +621,134 @@ fn bond_risk_scalar_boundaries_and_native_equality() {
     .unwrap();
     assert_eq!(wrong_thread, (WRONG_THREAD, -123.0));
 }
+
+#[test]
+fn coupon_analytics_scalar_boundaries_and_zero_bond() {
+    let (mut ctx, bond, _, _, dc, discount) = fixture(100_000);
+    let mut error = ItofinError {
+        code: 0,
+        message: [0; 1024],
+    };
+    let config = ItofinBondYieldAnalyticsConfig {
+        day_counter: dc,
+        compounding: 1,
+        frequency: 1,
+        settlement: 46_210,
+    };
+    let mut value = -123.0;
+    unsafe {
+        assert_eq!(
+            itofin_bond_bps_from_curve(&mut ctx, bond, discount, 46_210, &mut value, &mut error),
+            0
+        );
+        assert_eq!(value, 0.0);
+        assert_eq!(
+            itofin_bond_bps_from_yield(&mut ctx, bond, 0.052, config, &mut value, &mut error),
+            0
+        );
+        assert_eq!(value, 0.0);
+        assert_eq!(
+            itofin_bond_atm_rate_from_curve(
+                &mut ctx, bond, discount, 46_210, &mut value, &mut error
+            ),
+            0
+        );
+        assert_eq!(value, 0.0);
+        value = -123.0;
+        for serial in [0, -1, 46_929] {
+            assert_ne!(
+                itofin_bond_bps_from_curve(
+                    &mut ctx, bond, discount, serial, &mut value, &mut error
+                ),
+                0
+            );
+            assert_eq!(value, -123.0);
+            assert_ne!(
+                itofin_bond_atm_rate_from_curve(
+                    &mut ctx, bond, discount, serial, &mut value, &mut error
+                ),
+                0
+            );
+            assert_eq!(value, -123.0);
+        }
+        assert_ne!(
+            itofin_bond_bps_from_yield(&mut ctx, bond, f64::NAN, config, &mut value, &mut error),
+            0
+        );
+        assert_eq!(value, -123.0);
+        assert_ne!(
+            itofin_bond_bps_from_curve(&mut ctx, bond, bond, 46_210, &mut value, &mut error),
+            0
+        );
+        assert_eq!(value, -123.0);
+        assert_ne!(
+            itofin_bond_bps_from_curve(
+                &mut ctx, discount, discount, 46_210, &mut value, &mut error
+            ),
+            0
+        );
+        assert_eq!(value, -123.0);
+        let misaligned = (&raw mut error)
+            .cast::<u8>()
+            .wrapping_add(1)
+            .cast::<ItofinError>();
+        assert_eq!(
+            itofin_bond_bps_from_curve(&mut ctx, bond, discount, 46_210, &mut value, misaligned),
+            INVALID_ARGUMENT
+        );
+        assert_eq!(value, -123.0);
+        assert_eq!(
+            itofin_bond_bps_from_yield(&mut ctx, bond, 0.052, config, &mut value, misaligned),
+            INVALID_ARGUMENT
+        );
+        assert_eq!(value, -123.0);
+        assert_eq!(
+            itofin_bond_atm_rate_from_curve(
+                &mut ctx, bond, discount, 46_210, &mut value, misaligned
+            ),
+            INVALID_ARGUMENT
+        );
+        assert_eq!(value, -123.0);
+        assert_eq!(
+            itofin_bond_bps_from_curve(&mut ctx, bond, discount, 46_210, null_mut(), &mut error),
+            INVALID_ARGUMENT
+        );
+        assert_eq!(
+            itofin_bond_bps_from_yield(&mut ctx, bond, 0.052, config, null_mut(), &mut error),
+            INVALID_ARGUMENT
+        );
+        assert_eq!(
+            itofin_bond_atm_rate_from_curve(
+                &mut ctx,
+                bond,
+                discount,
+                46_210,
+                null_mut(),
+                &mut error
+            ),
+            INVALID_ARGUMENT
+        );
+        assert_eq!(
+            itofin_bond_bps_from_curve(&mut ctx, bond, discount, 46_210, &mut value, &mut error),
+            0
+        );
+    }
+    let address = (&raw mut ctx) as usize;
+    let wrong = std::thread::spawn(move || {
+        let mut out = -123.0;
+        let status = unsafe {
+            itofin_bond_bps_from_curve(
+                address as *mut Context,
+                bond,
+                discount,
+                46_210,
+                &mut out,
+                null_mut(),
+            )
+        };
+        (status, out)
+    })
+    .join()
+    .unwrap();
+    assert_eq!(wrong, (WRONG_THREAD, -123.0));
+}
