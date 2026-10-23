@@ -6,58 +6,74 @@
       "go": "Bond.Duration",
       "python": "itofin.instruments.Bond.duration",
       "status": "implemented",
-      "tests": "bond_risk_scalar_boundaries_and_native_equality"
+      "tests": [
+        "TestBondRiskAnalyticalAndLifecycle",
+        "TestBondRiskDomainsSessionsAndRecovery",
+        "TestBondRiskQuantLibOracles"
+      ]
     },
     {
       "c": "itofin_bond_risk",
       "go": "Bond.Convexity",
       "python": "itofin.instruments.Bond.convexity",
       "status": "implemented",
-      "tests": "bond_risk_scalar_boundaries_and_native_equality"
+      "tests": [
+        "TestBondRiskAnalyticalAndLifecycle",
+        "TestBondRiskDomainsSessionsAndRecovery",
+        "TestBondRiskQuantLibOracles"
+      ]
     },
     {
       "c": "itofin_bond_risk",
       "go": "Bond.BasisPointValue",
       "python": "itofin.instruments.Bond.basis_point_value",
       "status": "implemented",
-      "tests": "bond_risk_scalar_boundaries_and_native_equality"
+      "tests": [
+        "TestBondRiskAnalyticalAndLifecycle",
+        "TestBondRiskDomainsSessionsAndRecovery",
+        "TestBondRiskQuantLibOracles"
+      ]
     },
     {
       "c": "itofin_bond_risk",
       "go": "Bond.YieldValueBasisPoint",
       "python": "itofin.instruments.Bond.yield_value_basis_point",
       "status": "implemented",
-      "tests": "bond_risk_scalar_boundaries_and_native_equality"
+      "tests": [
+        "TestBondRiskAnalyticalAndLifecycle",
+        "TestBondRiskDomainsSessionsAndRecovery",
+        "TestBondRiskQuantLibOracles"
+      ]
     },
     {
       "go": "DurationType",
       "python": "itofin.instruments.Duration",
       "status": "implemented",
-      "tests": "bond_risk_scalar_boundaries_and_native_equality"
+      "tests": "TestBondRiskAnalyticalAndLifecycle"
     },
     {
       "go": "DurationType: explicit integer conversion",
       "python": "itofin.instruments.Duration.__int__",
       "status": "implemented",
-      "tests": "bond_risk_scalar_boundaries_and_native_equality"
+      "tests": "TestBondRiskAnalyticalAndLifecycle"
     },
     {
       "go": "SimpleDuration",
       "python": "itofin.instruments.Duration.Simple",
       "status": "implemented",
-      "tests": "bond_risk_scalar_boundaries_and_native_equality"
+      "tests": "TestBondRiskAnalyticalAndLifecycle"
     },
     {
       "go": "MacaulayDuration",
       "python": "itofin.instruments.Duration.Macaulay",
       "status": "implemented",
-      "tests": "bond_risk_scalar_boundaries_and_native_equality"
+      "tests": "TestBondRiskAnalyticalAndLifecycle"
     },
     {
       "go": "ModifiedDuration",
       "python": "itofin.instruments.Duration.Modified",
       "status": "implemented",
-      "tests": "bond_risk_scalar_boundaries_and_native_equality"
+      "tests": "TestBondRiskAnalyticalAndLifecycle"
     },
     {
       "classification": "nonconstructible-enum",
