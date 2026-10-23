@@ -28,6 +28,9 @@ Source API guides: [currency fields](https://github.com/benbenbang/libitofin/blo
 and [Black FX delta conventions](https://github.com/benbenbang/libitofin/blob/main/docs/docs/black-delta-bindings.md).
 These helpers do not add currency rounding, conversion or a new option pricing engine.
 
+Standalone [constant-parameter GSR process](https://github.com/benbenbang/libitofin/blob/main/docs/docs/gsr-process-bindings.md)
+bindings expose forward-measure transitions, not a fitted GSR model.
+
 ## Sessions and ownership
 
 ```go
