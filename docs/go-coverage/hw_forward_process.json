@@ -1,0 +1,110 @@
+{
+  "domain": "hull-white-forward-measure-process",
+  "entries": [
+    {
+      "c": "itofin_hw_forward_process_new",
+      "go": "Session.NewHullWhiteForwardProcess",
+      "python": "itofin.processes.HullWhiteForwardProcess.__init__",
+      "status": "implemented",
+      "tests": "TestHullWhiteForwardTransitions"
+    },
+    {
+      "c": "itofin_hw_forward_process_query",
+      "go": "HullWhiteForwardProcess.X0",
+      "python": "itofin.processes.HullWhiteForwardProcess.x0",
+      "status": "implemented",
+      "tests": "TestHullWhiteForwardTransitions"
+    },
+    {
+      "c": "itofin_hw_forward_process_query",
+      "go": "HullWhiteForwardProcess.A",
+      "python": "itofin.processes.HullWhiteForwardProcess.a",
+      "status": "implemented",
+      "tests": "TestHullWhiteForwardTransitions"
+    },
+    {
+      "c": "itofin_hw_forward_process_query",
+      "go": "HullWhiteForwardProcess.Sigma",
+      "python": "itofin.processes.HullWhiteForwardProcess.sigma",
+      "status": "implemented",
+      "tests": "TestHullWhiteForwardTransitions"
+    },
+    {
+      "c": "itofin_hw_forward_process_query",
+      "go": "HullWhiteForwardProcess.ForwardMeasureTime",
+      "python": "itofin.processes.HullWhiteForwardProcess.forward_measure_time",
+      "status": "implemented",
+      "tests": "TestHullWhiteForwardTransitions"
+    },
+    {
+      "c": "itofin_hw_forward_process_query",
+      "go": "HullWhiteForwardProcess.Alpha",
+      "python": "itofin.processes.HullWhiteForwardProcess.alpha",
+      "status": "implemented",
+      "tests": "TestHullWhiteForwardTransitions"
+    },
+    {
+      "c": "itofin_hw_forward_process_query",
+      "go": "HullWhiteForwardProcess.B",
+      "python": "itofin.processes.HullWhiteForwardProcess.b",
+      "status": "implemented",
+      "tests": "TestHullWhiteForwardTransitions"
+    },
+    {
+      "c": "itofin_hw_forward_process_query",
+      "go": "HullWhiteForwardProcess.MT",
+      "python": "itofin.processes.HullWhiteForwardProcess.m_t",
+      "status": "implemented",
+      "tests": "TestHullWhiteForwardTransitions"
+    },
+    {
+      "c": "itofin_hw_forward_process_query",
+      "go": "HullWhiteForwardProcess.Drift",
+      "python": "itofin.processes.HullWhiteForwardProcess.drift",
+      "status": "implemented",
+      "tests": "TestHullWhiteForwardTransitions"
+    },
+    {
+      "c": "itofin_hw_forward_process_query",
+      "go": "HullWhiteForwardProcess.Diffusion",
+      "python": "itofin.processes.HullWhiteForwardProcess.diffusion",
+      "status": "implemented",
+      "tests": "TestHullWhiteForwardTransitions"
+    },
+    {
+      "c": "itofin_hw_forward_process_query",
+      "go": "HullWhiteForwardProcess.Expectation",
+      "python": "itofin.processes.HullWhiteForwardProcess.expectation",
+      "status": "implemented",
+      "tests": "TestHullWhiteForwardTransitions"
+    },
+    {
+      "c": "itofin_hw_forward_process_query",
+      "go": "HullWhiteForwardProcess.StdDeviation",
+      "python": "itofin.processes.HullWhiteForwardProcess.std_deviation",
+      "status": "implemented",
+      "tests": "TestHullWhiteForwardTransitions"
+    },
+    {
+      "c": "itofin_hw_forward_process_query",
+      "go": "HullWhiteForwardProcess.Variance",
+      "python": "itofin.processes.HullWhiteForwardProcess.variance",
+      "status": "implemented",
+      "tests": "TestHullWhiteForwardTransitions"
+    },
+    {
+      "c": "itofin_hw_forward_process_query",
+      "go": "HullWhiteForwardProcess.Evolve",
+      "python": "itofin.processes.HullWhiteForwardProcess.evolve",
+      "status": "implemented",
+      "tests": "TestHullWhiteForwardTransitions"
+    },
+    {
+      "c": "itofin_hw_forward_process_set_forward_measure_time",
+      "go": "HullWhiteForwardProcess.SetForwardMeasureTime",
+      "python": "itofin.processes.HullWhiteForwardProcess.set_forward_measure_time",
+      "status": "implemented",
+      "tests": "TestHullWhiteForwardRetentionAndHorizon"
+    }
+  ]
+}

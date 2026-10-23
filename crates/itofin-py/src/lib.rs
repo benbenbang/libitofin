@@ -54,6 +54,7 @@ mod helpers;
 mod heston;
 mod heston_engines;
 mod hullwhite;
+mod hw_forward_process;
 mod incremental_statistics;
 mod inflation;
 mod iterativebootstrap;
@@ -343,6 +344,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     processes.add_class::<g2_process::PyG2Process>()?;
     processes.add_class::<gsr_process::PyGsrProcess>()?;
     processes.add_class::<mf_state_process::PyMfStateProcess>()?;
+    processes.add_class::<hw_forward_process::PyHullWhiteForwardProcess>()?;
 
     let indexes = PyModule::new(py, "indexes")?;
     indexes.add_class::<overnightfuture::PySofr>()?;
