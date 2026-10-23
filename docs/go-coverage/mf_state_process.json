@@ -1,0 +1,82 @@
+{
+  "domain": "mf-state-standalone-gaussian-process",
+  "entries": [
+    {
+      "c": "itofin_mf_state_process_new",
+      "go": "Session.NewMfStateProcess",
+      "python": "itofin.processes.MfStateProcess.__init__",
+      "status": "implemented",
+      "tests": "TestMfStateProcess"
+    },
+    {
+      "c": "itofin_mf_state_process_query",
+      "go": "MfStateProcess.Reversion",
+      "python": "itofin.processes.MfStateProcess.reversion",
+      "status": "implemented",
+      "tests": "TestMfStateProcess"
+    },
+    {
+      "c": "itofin_mf_state_process_query",
+      "go": "MfStateProcess.X0",
+      "python": "itofin.processes.MfStateProcess.x0",
+      "status": "implemented",
+      "tests": "TestMfStateProcess"
+    },
+    {
+      "c": "itofin_mf_state_process_grid",
+      "go": "MfStateProcess.Times",
+      "python": "itofin.processes.MfStateProcess.times",
+      "status": "implemented",
+      "tests": "TestMfStateProcess"
+    },
+    {
+      "c": "itofin_mf_state_process_grid",
+      "go": "MfStateProcess.Volatilities",
+      "python": "itofin.processes.MfStateProcess.volatilities",
+      "status": "implemented",
+      "tests": "TestMfStateProcess"
+    },
+    {
+      "c": "itofin_mf_state_process_query",
+      "go": "MfStateProcess.Drift",
+      "python": "itofin.processes.MfStateProcess.drift",
+      "status": "implemented",
+      "tests": "TestMfStateProcess"
+    },
+    {
+      "c": "itofin_mf_state_process_query",
+      "go": "MfStateProcess.Diffusion",
+      "python": "itofin.processes.MfStateProcess.diffusion",
+      "status": "implemented",
+      "tests": "TestMfStateProcess"
+    },
+    {
+      "c": "itofin_mf_state_process_query",
+      "go": "MfStateProcess.Expectation",
+      "python": "itofin.processes.MfStateProcess.expectation",
+      "status": "implemented",
+      "tests": "TestMfStateProcess"
+    },
+    {
+      "c": "itofin_mf_state_process_query",
+      "go": "MfStateProcess.StdDeviation",
+      "python": "itofin.processes.MfStateProcess.std_deviation",
+      "status": "implemented",
+      "tests": "TestMfStateProcess"
+    },
+    {
+      "c": "itofin_mf_state_process_query",
+      "go": "MfStateProcess.Variance",
+      "python": "itofin.processes.MfStateProcess.variance",
+      "status": "implemented",
+      "tests": "TestMfStateProcess"
+    },
+    {
+      "c": "itofin_mf_state_process_query",
+      "go": "MfStateProcess.Evolve",
+      "python": "itofin.processes.MfStateProcess.evolve",
+      "status": "implemented",
+      "tests": "TestMfStateProcess"
+    }
+  ]
+}
