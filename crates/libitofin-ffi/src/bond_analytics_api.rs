@@ -130,6 +130,60 @@ fn include(value: i32) -> BindingResult<Option<bool>> {
     }
 }
 #[unsafe(no_mangle)]
+/// Flat-yield risk for ordinary fixed, zero and floating bonds, independent of engines.
+/// Fields: 0 Simple duration, 1 Macaulay duration, 2 Modified duration,
+/// 3 convexity, 4 basis-point value, 5 yield-value basis point.
+/// BPV is signed currency value and YVBP is yield change per currency cent, not per 100.
+/// Macaulay requires compounded yield. Settlement-date flows are excluded.
+/// # Safety
+/// Pointers and thread ownership must satisfy the crate-level C caller contract.
+pub unsafe extern "C" fn itofin_bond_risk(
+    ctx: *mut Context,
+    id: u64,
+    field: i32,
+    rate: f64,
+    a: ItofinBondYieldAnalyticsConfig,
+    out: *mut f64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            if !error.is_null() {
+                check_ptr(error)?;
+            }
+            check_ptr(out)?;
+            if !(0..=5).contains(&field) {
+                return Err(BindingError::invalid("invalid bond risk field"));
+            }
+            let yield_rate = libitofin::interestrate::InterestRate::new(
+                finite(rate)?,
+                day_counter(c, a.day_counter)?,
+                compounding(a.compounding)?,
+                frequency(a.frequency)?,
+            )?;
+            let bond = c.get::<NativeBond>(id)?;
+            bond.bond.plain()?;
+            let actual = settlement(&bond, a.settlement, false)?;
+            let native = bond.bond.borrow();
+            let value = match field {
+                0..=2 => {
+                    use libitofin::cashflows::Duration;
+                    let kind = match field {
+                        0 => Duration::Simple,
+                        1 => Duration::Macaulay,
+                        _ => Duration::Modified,
+                    };
+                    BondFunctions::duration(&native, &yield_rate, kind, Some(actual))?
+                }
+                3 => BondFunctions::convexity(&native, &yield_rate, Some(actual))?,
+                4 => BondFunctions::basis_point_value(&native, &yield_rate, Some(actual))?,
+                _ => BondFunctions::yield_value_basis_point(&native, &yield_rate, Some(actual))?,
+            };
+            output(out, finite(value)?)
+        })
+    }
+}
+#[unsafe(no_mangle)]
 /// # Safety
 /// Pointers and thread ownership must satisfy the crate-level C caller contract.
 pub unsafe extern "C" fn itofin_bond_clean_price_from_curve(

@@ -2247,6 +2247,23 @@ int32_t itofin_bma_helper_new(struct ItofinContext *ctx,
                               struct ItofinError *error);
 
 /**
+ * Flat-yield risk for ordinary fixed, zero and floating bonds, independent of engines.
+ * Fields: 0 Simple duration, 1 Macaulay duration, 2 Modified duration,
+ * 3 convexity, 4 basis-point value, 5 yield-value basis point.
+ * BPV is signed currency value and YVBP is yield change per currency cent, not per 100.
+ * Macaulay requires compounded yield. Settlement-date flows are excluded.
+ * # Safety
+ * Pointers and thread ownership must satisfy the crate-level C caller contract.
+ */
+int32_t itofin_bond_risk(struct ItofinContext *ctx,
+                         uint64_t id,
+                         int32_t field,
+                         double rate,
+                         struct ItofinBondYieldAnalyticsConfig a,
+                         double *out,
+                         struct ItofinError *error);
+
+/**
  * # Safety
  * Pointers and thread ownership must satisfy the crate-level C caller contract.
  */

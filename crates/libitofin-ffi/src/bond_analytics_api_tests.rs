@@ -485,3 +485,139 @@ fn analytics_empty_leg_preserves_zero_and_rejects_malformed_external_values() {
         }
     }
 }
+
+#[test]
+fn bond_risk_scalar_boundaries_and_native_equality() {
+    let (mut ctx, bond, _, _, dc, _) = fixture(100_000);
+    let mut error = ItofinError {
+        code: 0,
+        message: [0; 1024],
+    };
+    let a = ItofinBondYieldAnalyticsConfig {
+        day_counter: dc,
+        compounding: 1,
+        frequency: 1,
+        settlement: 46_210,
+    };
+    let native = ctx.get::<NativeBond>(bond).unwrap();
+    let rate = libitofin::interestrate::InterestRate::new(
+        0.052,
+        day_counter(&ctx, dc).unwrap(),
+        Compounding::Compounded,
+        Frequency::Semiannual,
+    )
+    .unwrap();
+    let actual = Some(crate::time_api::date(a.settlement).unwrap());
+    let b = native.bond.borrow();
+    let expected = [
+        BondFunctions::duration(&b, &rate, libitofin::cashflows::Duration::Simple, actual).unwrap(),
+        BondFunctions::duration(&b, &rate, libitofin::cashflows::Duration::Macaulay, actual)
+            .unwrap(),
+        BondFunctions::duration(&b, &rate, libitofin::cashflows::Duration::Modified, actual)
+            .unwrap(),
+        BondFunctions::convexity(&b, &rate, actual).unwrap(),
+        BondFunctions::basis_point_value(&b, &rate, actual).unwrap(),
+        BondFunctions::yield_value_basis_point(&b, &rate, actual).unwrap(),
+    ];
+    for (field, want) in expected.into_iter().enumerate() {
+        let mut out = -123.0;
+        let status = unsafe {
+            itofin_bond_risk(&mut ctx, bond, field as i32, 0.052, a, &mut out, &mut error)
+        };
+        assert_eq!(status, 0);
+        assert_eq!(out.to_bits(), want.to_bits());
+    }
+    let mut sentinel = -123.0;
+    let misaligned = (&raw mut error)
+        .cast::<u8>()
+        .wrapping_add(1)
+        .cast::<ItofinError>();
+    assert_eq!(
+        unsafe { itofin_bond_risk(&mut ctx, bond, 2, 0.052, a, &mut sentinel, misaligned) },
+        INVALID_ARGUMENT
+    );
+    assert_eq!(sentinel, -123.0);
+    let mut out = -123.0;
+    let cases = [
+        (-1, 0.052, a),
+        (6, 0.052, a),
+        (0, f64::NAN, a),
+        (0, f64::INFINITY, a),
+        (
+            0,
+            0.052,
+            ItofinBondYieldAnalyticsConfig { settlement: 0, ..a },
+        ),
+        (
+            0,
+            0.052,
+            ItofinBondYieldAnalyticsConfig {
+                settlement: 46_929,
+                ..a
+            },
+        ),
+        (
+            0,
+            0.052,
+            ItofinBondYieldAnalyticsConfig {
+                day_counter: bond,
+                ..a
+            },
+        ),
+        (
+            0,
+            0.052,
+            ItofinBondYieldAnalyticsConfig {
+                compounding: 5,
+                ..a
+            },
+        ),
+        (
+            0,
+            0.052,
+            ItofinBondYieldAnalyticsConfig { frequency: 4, ..a },
+        ),
+        (
+            1,
+            0.052,
+            ItofinBondYieldAnalyticsConfig {
+                compounding: 2,
+                ..a
+            },
+        ),
+    ];
+    for (field, rate, config) in cases {
+        assert_ne!(
+            unsafe { itofin_bond_risk(&mut ctx, bond, field, rate, config, &mut out, &mut error) },
+            0
+        );
+        assert_eq!(out, -123.0);
+    }
+    assert_eq!(
+        unsafe { itofin_bond_risk(&mut ctx, bond, 2, 0.052, a, null_mut(), &mut error) },
+        INVALID_ARGUMENT
+    );
+    assert_eq!(
+        unsafe { itofin_bond_risk(&mut ctx, bond, 2, 0.052, a, &mut out, &mut error) },
+        0
+    );
+    let address = (&raw mut ctx) as usize;
+    let wrong_thread = std::thread::spawn(move || {
+        let mut value = -123.0;
+        let status = unsafe {
+            itofin_bond_risk(
+                address as *mut Context,
+                bond,
+                2,
+                0.052,
+                a,
+                &mut value,
+                null_mut(),
+            )
+        };
+        (status, value)
+    })
+    .join()
+    .unwrap();
+    assert_eq!(wrong_thread, (WRONG_THREAD, -123.0));
+}
