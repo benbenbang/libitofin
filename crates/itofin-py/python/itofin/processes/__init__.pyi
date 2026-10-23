@@ -14,6 +14,7 @@ __all__ = [
     "GeometricBrownianMotionProcess",
     "GsrProcess",
     "HestonProcess",
+    "HullWhiteForwardProcess",
     "Merton76Process",
     "MfStateProcess",
 ]
@@ -465,6 +466,75 @@ class HestonProcess:
 
         Returns:
             float: The spot/variance correlation rho.
+        """
+
+@typing.final
+class HullWhiteForwardProcess:
+    r"""
+    Standalone forward-measure short-rate process, not a calibrated pricing model.
+
+    The initial short rate is captured once. Fitting shifts and drift read the
+    retained live curve. Horizon starts at zero; times are process years, not dates.
+    """
+    def __init__(self, curve: termstructures.YieldTermStructure, a: builtins.float, sigma: builtins.float) -> None:
+        r"""
+        Retain the exact curve handle, with finite nonnegative reversion and volatility.
+        """
+    def x0(self) -> builtins.float:
+        r"""
+        Return the short rate captured at construction, unchanged by curve updates.
+        """
+    def a(self) -> builtins.float:
+        r"""
+        Return constant nonnegative mean reversion.
+        """
+    def sigma(self) -> builtins.float:
+        r"""
+        Return constant nonnegative volatility.
+        """
+    def forward_measure_time(self) -> builtins.float:
+        r"""
+        Return the current finite nonnegative horizon.
+        """
+    def set_forward_measure_time(self, horizon: builtins.float) -> None:
+        r"""
+        Replace the horizon and notify observers. Invalid values preserve state.
+        """
+    def alpha(self, t: builtins.float) -> builtins.float:
+        r"""
+        Return the fitting shift using the retained live curve.
+        """
+    def b(self, t: builtins.float, maturity: builtins.float) -> builtins.float:
+        r"""
+        Return B(t,maturity) for absolute endpoints; maturity before t is valid.
+        """
+    def m_t(self, s: builtins.float, t: builtins.float, maturity: builtins.float) -> builtins.float:
+        r"""
+        Return M_T(s,t,maturity) for s <= t and any nonnegative absolute maturity.
+        """
+    def drift(self, t: builtins.float, x: builtins.float) -> builtins.float:
+        r"""
+        Return forward-measure drift using the live curve and current horizon.
+        """
+    def diffusion(self, t: builtins.float, x: builtins.float) -> builtins.float:
+        r"""
+        Return instantaneous volatility at valid t and x.
+        """
+    def expectation(self, t: builtins.float, x: builtins.float, dt: builtins.float) -> builtins.float:
+        r"""
+        Return the exact conditional mean using the retained live curve.
+        """
+    def std_deviation(self, t: builtins.float, x: builtins.float, dt: builtins.float) -> builtins.float:
+        r"""
+        Return conditional standard deviation.
+        """
+    def variance(self, t: builtins.float, x: builtins.float, dt: builtins.float) -> builtins.float:
+        r"""
+        Return variance, retaining the native Ornstein-Uhlenbeck small-speed branch.
+        """
+    def evolve(self, t: builtins.float, x: builtins.float, dt: builtins.float, dw: builtins.float) -> builtins.float:
+        r"""
+        Evolve with one finite standard Gaussian draw.
         """
 
 @typing.final
