@@ -1,0 +1,185 @@
+{
+  "domain": "fx-forward",
+  "entries": [
+    {
+      "c": [
+        "itofin_fx_forward_new"
+      ],
+      "go": [
+        "Session.NewFxForward"
+      ],
+      "python": "itofin.instruments.FxForward.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestFxForwardAnalyticalAndFields",
+        "TestFxForwardRetentionSessionsAndConcurrency",
+        "TestFxForwardInvalidAndExpiredDomains"
+      ]
+    },
+    {
+      "c": [
+        "itofin_fx_forward_value"
+      ],
+      "go": [
+        "FxForward.Spot"
+      ],
+      "python": "itofin.instruments.FxForward.spot",
+      "status": "implemented",
+      "tests": [
+        "TestFxForwardAnalyticalAndFields",
+        "TestFxForwardRetentionSessionsAndConcurrency",
+        "TestFxForwardInvalidAndExpiredDomains"
+      ]
+    },
+    {
+      "c": [
+        "itofin_fx_forward_value"
+      ],
+      "go": [
+        "FxForward.Strike"
+      ],
+      "python": "itofin.instruments.FxForward.strike",
+      "status": "implemented",
+      "tests": [
+        "TestFxForwardAnalyticalAndFields",
+        "TestFxForwardRetentionSessionsAndConcurrency",
+        "TestFxForwardInvalidAndExpiredDomains"
+      ]
+    },
+    {
+      "c": [
+        "itofin_fx_forward_value"
+      ],
+      "go": [
+        "FxForward.BaseNotional"
+      ],
+      "python": "itofin.instruments.FxForward.base_notional",
+      "status": "implemented",
+      "tests": [
+        "TestFxForwardAnalyticalAndFields",
+        "TestFxForwardRetentionSessionsAndConcurrency",
+        "TestFxForwardInvalidAndExpiredDomains"
+      ]
+    },
+    {
+      "c": [
+        "itofin_fx_forward_value"
+      ],
+      "go": [
+        "FxForward.FairForwardRate"
+      ],
+      "python": "itofin.instruments.FxForward.fair_forward_rate",
+      "status": "implemented",
+      "tests": [
+        "TestFxForwardAnalyticalAndFields",
+        "TestFxForwardRetentionSessionsAndConcurrency",
+        "TestFxForwardInvalidAndExpiredDomains"
+      ]
+    },
+    {
+      "c": [
+        "itofin_fx_forward_value"
+      ],
+      "go": [
+        "FxForward.NPV"
+      ],
+      "python": "itofin.instruments.FxForward.npv",
+      "status": "implemented",
+      "tests": [
+        "TestFxForwardAnalyticalAndFields",
+        "TestFxForwardRetentionSessionsAndConcurrency",
+        "TestFxForwardInvalidAndExpiredDomains"
+      ]
+    },
+    {
+      "c": [
+        "itofin_fx_forward_integer"
+      ],
+      "go": [
+        "FxForward.SpotSettlementDate"
+      ],
+      "python": "itofin.instruments.FxForward.spot_settlement_date",
+      "status": "implemented",
+      "tests": [
+        "TestFxForwardAnalyticalAndFields",
+        "TestFxForwardRetentionSessionsAndConcurrency",
+        "TestFxForwardInvalidAndExpiredDomains"
+      ]
+    },
+    {
+      "c": [
+        "itofin_fx_forward_integer"
+      ],
+      "go": [
+        "FxForward.DeliveryDate"
+      ],
+      "python": "itofin.instruments.FxForward.delivery_date",
+      "status": "implemented",
+      "tests": [
+        "TestFxForwardAnalyticalAndFields",
+        "TestFxForwardRetentionSessionsAndConcurrency",
+        "TestFxForwardInvalidAndExpiredDomains"
+      ]
+    },
+    {
+      "c": [
+        "itofin_fx_forward_integer"
+      ],
+      "go": [
+        "FxForward.Position"
+      ],
+      "python": "itofin.instruments.FxForward.position",
+      "status": "implemented",
+      "tests": [
+        "TestFxForwardAnalyticalAndFields",
+        "TestFxForwardRetentionSessionsAndConcurrency",
+        "TestFxForwardInvalidAndExpiredDomains"
+      ]
+    },
+    {
+      "c": [
+        "itofin_fx_forward_integer"
+      ],
+      "go": [
+        "FxForward.IsExpired"
+      ],
+      "python": "itofin.instruments.FxForward.is_expired",
+      "status": "implemented",
+      "tests": [
+        "TestFxForwardAnalyticalAndFields",
+        "TestFxForwardRetentionSessionsAndConcurrency",
+        "TestFxForwardInvalidAndExpiredDomains"
+      ]
+    },
+    {
+      "c": [
+        "itofin_fx_forward_currency"
+      ],
+      "go": [
+        "FxForward.BaseCurrency"
+      ],
+      "python": "itofin.instruments.FxForward.base_currency",
+      "status": "implemented",
+      "tests": [
+        "TestFxForwardAnalyticalAndFields",
+        "TestFxForwardRetentionSessionsAndConcurrency",
+        "TestFxForwardInvalidAndExpiredDomains"
+      ]
+    },
+    {
+      "c": [
+        "itofin_fx_forward_currency"
+      ],
+      "go": [
+        "FxForward.QuoteCurrency"
+      ],
+      "python": "itofin.instruments.FxForward.quote_currency",
+      "status": "implemented",
+      "tests": [
+        "TestFxForwardAnalyticalAndFields",
+        "TestFxForwardRetentionSessionsAndConcurrency",
+        "TestFxForwardInvalidAndExpiredDomains"
+      ]
+    }
+  ]
+}

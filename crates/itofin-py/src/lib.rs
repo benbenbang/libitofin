@@ -41,6 +41,7 @@ mod fdengine;
 mod float_float_swap;
 mod floating_bonds;
 mod fra;
+mod fx_forward;
 mod g2_process;
 mod general_statistics;
 mod geometric_brownian;
@@ -376,6 +377,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     instruments.add_class::<bonds::PyBond>()?;
     instruments.add_class::<bonds::PyDuration>()?;
     instruments.add_class::<bond_forward::PyBondForward>()?;
+    instruments.add_class::<fx_forward::PyFxForward>()?;
     instruments.add_class::<callable_bonds::PyCallabilityType>()?;
     instruments.add_class::<callable_bonds::PyCallability>()?;
     instruments.add_class::<callable_bonds::PyCallableFixedRateBond>()?;
