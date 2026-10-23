@@ -43,6 +43,45 @@ class Other:
         with self.assertRaisesRegex(ValueError, "unsupported generated enum member"):
             gen_stubs.post_process(source.replace("First = ...", "First = 1"))
 
+    def test_member_docs_remain_adjacent(self) -> None:
+        """Keep every attribute docstring adjacent and append methods after the last one."""
+        source = '''import builtins
+import enum
+import typing
+class Choice(enum.Enum):
+    """Choice class documentation."""
+    Simple = ...
+    r"""
+    Simple member documentation.
+    """
+    Macaulay = ...
+    r"""
+    Macaulay requires compounded yield.
+    """
+    Modified = ...
+    r"""
+    Modified member documentation.
+    """
+'''
+        result = gen_stubs.post_process(source)
+        self.assertEqual(result, gen_stubs.post_process(result))
+        cls = next(node for node in ast.parse(result).body if isinstance(node, ast.ClassDef))
+        self.assertEqual(ast.get_docstring(cls), "Choice class documentation.")
+        docs = ["Simple member documentation.", "Macaulay requires compounded yield.", "Modified member documentation."]
+        for index, name in enumerate(["Simple", "Macaulay", "Modified"]):
+            member, doc = cls.body[1 + index * 2:3 + index * 2]
+            self.assertIsInstance(member, ast.AnnAssign)
+            self.assertEqual(ast.unparse(member.target), name)
+            self.assertIsInstance(doc, ast.Expr)
+            self.assertEqual(doc.value.value.strip(), docs[index])
+        self.assertEqual([node.name for node in cls.body[7:9]], ["__new__", "__int__"])
+        self.assertEqual(ast.unparse(cls.body[9].target), "__hash__")
+        plain = gen_stubs.post_process("import enum\nclass Plain(enum.Enum):\n    Value = ...\n")
+        plain_cls = ast.parse(plain).body[0]
+        self.assertIsInstance(plain_cls.body[0], ast.AnnAssign)
+        self.assertEqual([node.name for node in plain_cls.body[1:3]], ["__new__", "__int__"])
+        self.assertEqual(plain, gen_stubs.post_process(plain))
+
     def test_static_enum_contract(self) -> None:
         """Accept all typed members and reject absent Enum APIs and constructors."""
         imports = ["from collections.abc import Hashable"]
@@ -70,7 +109,7 @@ class Other:
                     f"{cls.name}()", f"{cls.name}(0)", f"{instance}.{members[0]} = {instance}",
                     f"h_{cls.name}: Hashable = {instance}",
                 ])
-        self.assertEqual(len(imports), 32)
+        self.assertEqual(len(imports), 33)
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             fixture = root / "enum_contract.py"
