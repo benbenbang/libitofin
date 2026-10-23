@@ -25,7 +25,9 @@ use libitofin::time::date::Date;
 use libitofin::time::period::Period;
 use libitofin::time::timeunit::TimeUnit;
 use pyo3::prelude::*;
-use pyo3_stub_gen::derive::{gen_methods_from_python, gen_stub_pyclass, gen_stub_pymethods};
+use pyo3_stub_gen::derive::{
+    gen_methods_from_python, gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pymethods,
+};
 use pyo3_stub_gen::inventory::submit;
 use std::cell::{Cell, Ref};
 
@@ -250,6 +252,35 @@ impl BondBacking {
     }
 }
 
+/// Flat-yield duration conventions for ordinary bond cash flows.
+#[gen_stub_pyclass_enum]
+#[pyclass(
+    name = "Duration",
+    eq,
+    eq_int,
+    from_py_object,
+    module = "itofin.instruments"
+)]
+#[derive(Clone, Copy, PartialEq)]
+pub enum PyDuration {
+    /// Discounted cash-flow-weighted average payment time.
+    Simple = 0,
+    /// Modified duration scaled by 1 + yield/frequency; requires compounded yield.
+    Macaulay = 1,
+    /// Negative first yield derivative divided by bond value.
+    Modified = 2,
+}
+impl PyDuration {
+    fn inner(self) -> libitofin::cashflows::Duration {
+        use libitofin::cashflows::Duration;
+        match self {
+            Self::Simple => Duration::Simple,
+            Self::Macaulay => Duration::Macaulay,
+            Self::Modified => Duration::Modified,
+        }
+    }
+}
+
 /// Shared bond interface, constructed only through concrete bond classes.
 #[gen_stub_pyclass]
 #[pyclass(name = "Bond", subclass, unsendable, module = "itofin.instruments")]
@@ -348,6 +379,12 @@ impl PyBond {
             }
         }
         .map_err(|error| PyQlError::from(error).into())
+    }
+    fn risk_settlement(&self, settlement: Option<&PyDate>) -> PyResult<Date> {
+        if !matches!(self.inner, BondBacking::Plain(_)) {
+            return Err(ItofinError::new_err("ordinary noncallable bond required"));
+        }
+        self.analytical_settlement(settlement, false)
     }
     fn analytical_settlement(&self, settlement: Option<&PyDate>, clean: bool) -> PyResult<Date> {
         let settlement = analytical_date(settlement)?
@@ -630,6 +667,104 @@ impl PyBond {
                 Some(settlement),
             )
             .map_err(PyQlError::from)?,
+        )
+    }
+    /// Flat-yield duration, independent of pricing engines. Macaulay requires compounded yield.
+    #[pyo3(signature=(yield_rate, day_counter, compounding, frequency, *, duration_type=PyDuration::Modified, settlement=None))]
+    fn duration(
+        &self,
+        yield_rate: f64,
+        day_counter: &PyDayCounter,
+        compounding: PyCompounding,
+        frequency: &PyFrequency,
+        duration_type: PyDuration,
+        settlement: Option<&PyDate>,
+    ) -> PyResult<f64> {
+        let rate = libitofin::interestrate::InterestRate::new(
+            finite(yield_rate)?,
+            day_counter.inner(),
+            compounding.inner(),
+            frequency.inner(),
+        )
+        .map_err(PyQlError::from)?;
+        let settlement = self.risk_settlement(settlement)?;
+        finite(
+            BondFunctions::duration(
+                &self.inner.borrow(),
+                &rate,
+                duration_type.inner(),
+                Some(settlement),
+            )
+            .map_err(PyQlError::from)?,
+        )
+    }
+    /// Flat-yield convexity of ordinary bond cash flows.
+    #[pyo3(signature=(yield_rate, day_counter, compounding, frequency, *, settlement=None))]
+    fn convexity(
+        &self,
+        yield_rate: f64,
+        day_counter: &PyDayCounter,
+        compounding: PyCompounding,
+        frequency: &PyFrequency,
+        settlement: Option<&PyDate>,
+    ) -> PyResult<f64> {
+        let rate = libitofin::interestrate::InterestRate::new(
+            finite(yield_rate)?,
+            day_counter.inner(),
+            compounding.inner(),
+            frequency.inner(),
+        )
+        .map_err(PyQlError::from)?;
+        let settlement = self.risk_settlement(settlement)?;
+        finite(
+            BondFunctions::convexity(&self.inner.borrow(), &rate, Some(settlement))
+                .map_err(PyQlError::from)?,
+        )
+    }
+    /// Signed currency value for a one-basis-point yield rise, not a per-100 quote.
+    #[pyo3(signature=(yield_rate, day_counter, compounding, frequency, *, settlement=None))]
+    fn basis_point_value(
+        &self,
+        yield_rate: f64,
+        day_counter: &PyDayCounter,
+        compounding: PyCompounding,
+        frequency: &PyFrequency,
+        settlement: Option<&PyDate>,
+    ) -> PyResult<f64> {
+        let rate = libitofin::interestrate::InterestRate::new(
+            finite(yield_rate)?,
+            day_counter.inner(),
+            compounding.inner(),
+            frequency.inner(),
+        )
+        .map_err(PyQlError::from)?;
+        let settlement = self.risk_settlement(settlement)?;
+        finite(
+            BondFunctions::basis_point_value(&self.inner.borrow(), &rate, Some(settlement))
+                .map_err(PyQlError::from)?,
+        )
+    }
+    /// Yield change for a one-cent currency value increase, not a per-100 quote.
+    #[pyo3(signature=(yield_rate, day_counter, compounding, frequency, *, settlement=None))]
+    fn yield_value_basis_point(
+        &self,
+        yield_rate: f64,
+        day_counter: &PyDayCounter,
+        compounding: PyCompounding,
+        frequency: &PyFrequency,
+        settlement: Option<&PyDate>,
+    ) -> PyResult<f64> {
+        let rate = libitofin::interestrate::InterestRate::new(
+            finite(yield_rate)?,
+            day_counter.inner(),
+            compounding.inner(),
+            frequency.inner(),
+        )
+        .map_err(PyQlError::from)?;
+        let settlement = self.risk_settlement(settlement)?;
+        finite(
+            BondFunctions::yield_value_basis_point(&self.inner.borrow(), &rate, Some(settlement))
+                .map_err(PyQlError::from)?,
         )
     }
     /// Solve the yield repricing a clean or dirty per-100 quote.

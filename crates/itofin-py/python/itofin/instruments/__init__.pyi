@@ -25,6 +25,7 @@ __all__ = [
     "CapFloor",
     "CapFloorType",
     "CreditDefaultSwap",
+    "Duration",
     "EuropeanExercise",
     "FixedRateBond",
     "FloatFloatSwap",
@@ -138,6 +139,22 @@ class Bond:
     def dirty_price_at_z_spread(self, discount_curve: termstructures.YieldTermStructure, z_spread: builtins.float, compounding: time.Compounding, frequency: time.Frequency, *, settlement: typing.Optional[time.Date] = None) -> builtins.float:
         r"""
         Dirty analytical quote per 100 using a parallel zero-rate spread.
+        """
+    def duration(self, yield_rate: builtins.float, day_counter: time.DayCounter, compounding: time.Compounding, frequency: time.Frequency, *, duration_type: Duration = Duration.Modified, settlement: typing.Optional[time.Date] = None) -> builtins.float:
+        r"""
+        Flat-yield duration, independent of pricing engines. Macaulay requires compounded yield.
+        """
+    def convexity(self, yield_rate: builtins.float, day_counter: time.DayCounter, compounding: time.Compounding, frequency: time.Frequency, *, settlement: typing.Optional[time.Date] = None) -> builtins.float:
+        r"""
+        Flat-yield convexity of ordinary bond cash flows.
+        """
+    def basis_point_value(self, yield_rate: builtins.float, day_counter: time.DayCounter, compounding: time.Compounding, frequency: time.Frequency, *, settlement: typing.Optional[time.Date] = None) -> builtins.float:
+        r"""
+        Signed currency value for a one-basis-point yield rise, not a per-100 quote.
+        """
+    def yield_value_basis_point(self, yield_rate: builtins.float, day_counter: time.DayCounter, compounding: time.Compounding, frequency: time.Frequency, *, settlement: typing.Optional[time.Date] = None) -> builtins.float:
+        r"""
+        Yield change for a one-cent currency value increase, not a per-100 quote.
         """
     def yield_rate(self, price: builtins.float, day_counter: time.DayCounter, compounding: time.Compounding, frequency: time.Frequency, *, price_type: termstructures.BondPriceType = termstructures.BondPriceType.Clean, settlement: typing.Optional[time.Date] = None, accuracy: builtins.float = 1e-10, max_evaluations: builtins.int = 100, guess: builtins.float = 0.05) -> builtins.float:
         r"""
@@ -2709,6 +2726,27 @@ class CapFloorType:
     Floor: typing.ClassVar[CapFloorType]
     Collar: typing.ClassVar[CapFloorType]
     def __new__(cls, _unconstructible: typing.NoReturn) -> CapFloorType: ...
+    def __int__(self) -> builtins.int: ...
+    __hash__: typing.ClassVar[None]  # type: ignore[assignment]
+
+@typing.final
+class Duration:
+    r"""
+    Flat-yield duration conventions for ordinary bond cash flows.
+    """
+    Simple: typing.ClassVar[Duration]
+    r"""
+    Discounted cash-flow-weighted average payment time.
+    """
+    Macaulay: typing.ClassVar[Duration]
+    r"""
+    Modified duration scaled by 1 + yield/frequency; requires compounded yield.
+    """
+    Modified: typing.ClassVar[Duration]
+    r"""
+    Negative first yield derivative divided by bond value.
+    """
+    def __new__(cls, _unconstructible: typing.NoReturn) -> Duration: ...
     def __int__(self) -> builtins.int: ...
     __hash__: typing.ClassVar[None]  # type: ignore[assignment]
 

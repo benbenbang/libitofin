@@ -84,7 +84,15 @@ def rewrite_enums(text: str) -> str:
             replacements[member.lineno - 1] = [
                 f"    {member.targets[0].id}: typing.ClassVar[{node.name}]"
             ]
-        replacements[members[-1].lineno - 1].extend([
+        last_member = members[-1]
+        last_index = node.body.index(last_member)
+        end_line = last_member.end_lineno
+        if last_index + 1 < len(node.body):
+            following = node.body[last_index + 1]
+            if isinstance(following, ast.Expr) and isinstance(following.value, ast.Constant) and isinstance(following.value.value, str):
+                end_line = following.end_lineno
+        assert end_line is not None
+        replacements.setdefault(end_line - 1, [lines[end_line - 1]]).extend([
             f"    def __new__(cls, _unconstructible: typing.NoReturn) -> {node.name}: ...",
             "    def __int__(self) -> builtins.int: ...",
             "    __hash__: typing.ClassVar[None]  # type: ignore[assignment]",

@@ -373,6 +373,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     let instruments = PyModule::new(py, "instruments")?;
     instruments.add_class::<bonds::PyBond>()?;
+    instruments.add_class::<bonds::PyDuration>()?;
     instruments.add_class::<bond_forward::PyBondForward>()?;
     instruments.add_class::<callable_bonds::PyCallabilityType>()?;
     instruments.add_class::<callable_bonds::PyCallability>()?;
