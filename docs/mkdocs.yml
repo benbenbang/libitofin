@@ -130,6 +130,7 @@ nav:
   - Implied volatility term structure: implied-vol-term-structure.md
   - Black-Scholes theta: black-scholes-theta.md
   - FX forwards: fx-forwards.md
+  - Go/Python FX forward bindings: fx-forward-bindings.md
   - Hull-White forward process: hullwhite-forward-process.md
   - Quanto term structure: quanto-term-structure.md
   - ABCD math and volatility: abcd.md

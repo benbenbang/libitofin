@@ -149,3 +149,7 @@ links to the language guides and project documentation.
 - [Constant-parameter GSR process](gsr-process-bindings.md), with mutable forward-measure horizon.
 
 [Bond forward bindings](bond-forward-bindings.md) retain live plain fixed/zero bonds and explicit financing/income curves.
+
+[Plain-vanilla BlackCalculator](black-calculator-bindings.md) exposes scalar pricing and Greeks with documented inherited numerical limits.
+[Bond risk analytics](bond-analytics.md) covers duration, convexity and signed yield sensitivities.
+[FX forward bindings](fx-forward-bindings.md) retain live discount curves with immutable spot and explicit contractual dates.
