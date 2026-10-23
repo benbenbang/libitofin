@@ -59,7 +59,7 @@ Session. Python returns `float` or raises the existing typed binding errors.
 | `dirty_price_at_z_spread` | `DirtyPriceAtZSpread` | Curve, spread, compounding, frequency |
 | `z_spread` | `ZSpread` | Quote, curve, compounding, frequency |
 
-- All Bond outputs/quote targets are **per 100 of current settlement notional**.
+- The price outputs/quote targets in the table above are **per 100 of current settlement notional**.
   Clean quotes exclude accrued interest; dirty quotes include it. Inversions
   accept `price_type=BondPriceType.Clean` by default, or explicit `Dirty`.
 - Python `settlement=None` resolves through the existing checked settlement
@@ -152,6 +152,66 @@ ex-coupon accrual, two faces, inclusion policy and frozen live inputs. Independe
 closed-form zero-coupon checks supplement native prices. Generated stubs, enum
 integer/member accounting and unchanged static-typing diagnostics are required.
 
-This binding wave does not expose duration, convexity, basis-point value, ATM
-rate, InterestRate objects or callable-bond analytics, and changes no core
-algorithm, version or existing engine-based API.
+The yield and Z-spread routes above do not add ATM-rate helpers or an
+InterestRate facade. Ordinary duration, convexity and BPV/YVBP are documented
+below; callable-bond analytics remain separate. No core algorithm, version or
+existing engine-based API is changed.
+
+
+## Ordinary bond risk
+
+These additive methods expose existing `BondFunctions` math for ordinary fixed,
+zero and floating-rate bonds. They do not require a pricing engine, attach an
+engine, change cached engine state or replace callable-bond effective risk.
+Callable backing is rejected explicitly, even though it inherits `Bond` methods.
+
+| Python `Bond` method | Go `*Bond` method | Meaning |
+| --- | --- | --- |
+| `duration` | `Duration` | Simple, Macaulay or Modified duration |
+| `convexity` | `Convexity` | Flat-yield second derivative divided by value |
+| `basis_point_value` | `BasisPointValue` | Signed currency value for a +1 bp yield change |
+| `yield_value_basis_point` | `YieldValueBasisPoint` | Yield change for a +0.01 currency value change |
+
+Python takes `(yield_rate, day_counter, compounding, frequency, *, settlement=None)`.
+`duration` additionally takes keyword-only `duration_type=Duration.Modified`, with
+`Duration` imported from `itofin.instruments`. Go takes `(rate, BondYieldConfig)`;
+`Duration` takes `(rate, DurationType, BondYieldConfig)`, using `SimpleDuration`,
+`MacaulayDuration` or `ModifiedDuration`. Macaulay requires **Compounded**, not a
+hybrid or continuous convention. Each metric is queried independently, so an
+unsupported Macaulay query does not prevent other valid risk queries.
+
+The C scalar query is `itofin_bond_risk` with the existing yield config. Its
+metric fields are 0 Simple, 1 Macaulay, 2 Modified, 3 convexity, 4 BPV, 5 YVBP.
+Errors leave the output untouched. The usual thread/context/handle contract applies.
+
+BPV and YVBP are **not per-100 quotes**. They use actual currency cash flows:
+BPV scales with face amount and YVBP inversely with it. For a paying bond they
+are normally negative. The native BPV convention retains the convexity correction
+`0.5 * (convexity / 100) * value * 0.0001**2`; no rescaling or new math is added.
+Duration and convexity are independent of face scaling.
+
+Explicit settlement is passed unchanged; omission retains existing checked lag
+and issue-date-floor behavior. Settlement-date and ex-coupon flows are excluded
+according to native analytical conventions. Nontradable bonds fail. Floating
+queries retain current fixing, forecast and coupon-pricer guards, even while an
+engine cache is frozen. Live retained market inputs are read for analytical risk;
+`freeze()` does not turn risk into a historical snapshot.
+
+```python
+from itofin.instruments import Duration
+
+modified = bond.duration(
+    0.04, DayCounter.actual365_fixed(), Compounding.Compounded,
+    Frequency.Semiannual, duration_type=Duration.Modified, settlement=settlement,
+)
+bpv = bond.basis_point_value(
+    0.04, DayCounter.actual365_fixed(), Compounding.Compounded,
+    Frequency.Semiannual, settlement=settlement,
+)
+```
+
+The shared 55-case test fixture was freshly generated from a QuantLib 1.43 wheel
+on the existing analytics construction inputs. Source review uses QuantLib
+`9863b578af0caa4cecabf697196533e84a8308b6` (1.43-dev), not a claim that this source
+pin produced the wheel. Matching distribution notices retain upstream attribution.
+Remaining BPS and ATM helpers are separate scope.
