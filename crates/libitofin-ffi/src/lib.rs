@@ -8,6 +8,7 @@
 //! Go enforces these rules through a session worker locked to one OS thread.
 #![deny(unsafe_op_in_unsafe_fn)]
 
+pub mod asset_swap_api;
 pub mod bates_api;
 pub mod bates_calibration_api;
 pub mod black_calculator_api;

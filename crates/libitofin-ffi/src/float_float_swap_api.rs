@@ -76,7 +76,7 @@ impl NativeFloatFloat {
         Ok(())
     }
 }
-fn check_coupon(
+pub(crate) fn check_coupon(
     index: &NativeIbor,
     start: Date,
     end: Date,
@@ -162,7 +162,7 @@ fn check_coupon(
     }
     Ok(())
 }
-fn check_schedule(
+pub(crate) fn check_schedule(
     schedule: &Schedule,
     calendar: &NativeCalendar,
     index: &NativeIbor,
