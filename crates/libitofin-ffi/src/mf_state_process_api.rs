@@ -113,3 +113,7 @@ pub unsafe extern "C" fn itofin_mf_state_process_grid(
         })
     }
 }
+
+#[cfg(test)]
+#[path = "mf_state_process_api_tests.rs"]
+mod tests;
