@@ -51,14 +51,18 @@ Use `-tags itofin_external` for builds, runs, tests, and vet outside this checko
 | Language guides and examples | [Rust](wiki/rust.md) · [Python](wiki/python.md) · [Go](wiki/go.md) |
 | Standalone currencies | [Constructor and fields](docs/docs/currency-bindings.md) · [Presets including TWD](docs/docs/currency-presets.md) |
 | FX delta helpers | [Black delta conventions](docs/docs/black-delta-bindings.md) |
-| Vanilla pricing and risk | [BlackCalculator](docs/docs/black-calculator-bindings.md) · [Bond risk analytics](docs/docs/bond-analytics.md) |
-| Retained instruments | [Par asset swaps](docs/docs/asset-swap-bindings.md) · [Fixed-date FX forwards](docs/docs/fx-forward-bindings.md) |
-| Gaussian forward-measure process | [Constant-parameter GSR](docs/docs/gsr-process-bindings.md) |
+| Vanilla pricing and risk | [BlackCalculator](docs/docs/black-calculator-bindings.md) · [Bond risk analytics](docs/docs/bond-analytics.md) · [Coupon BPS and ATM rate](docs/docs/bond-coupon-analytics.md) |
+| European cash digitals | [Cash-or-nothing analytic pricing](docs/docs/cash-digital-bindings.md) |
+| Retained instruments | [Par asset swaps](docs/docs/asset-swap-bindings.md) · [Fixed-date FX forwards](docs/docs/fx-forward-bindings.md) · [Constant-notional Ibor Xccy](docs/docs/xccy-basis-bindings.md) |
+| Standalone Gaussian processes | [Constant-parameter GSR](docs/docs/gsr-process-bindings.md) · [Hull-White forward](docs/docs/hw-forward-process-bindings.md) · [MF state](docs/docs/mf-state-process-bindings.md) |
 | Worked pricing walkthrough | [Python, Rust, and Go](https://benbenbang.github.io/libitofin/getting-started/) |
 | Releases, coverage, and remaining work | [Status and scope](wiki/status.md) · [Issues](https://github.com/benbenbang/libitofin/issues) |
 | Build, test, and repository layout | [Development](wiki/development.md) |
 | Architecture and porting principles | [Design](wiki/design.md) |
 | Deliberate differences from QuantLib | [Compatibility notes](wiki/compatibility.md) |
+
+Process bindings are not fitted models. Coupon BPS/ATM covers selected
+ordinary-bond helpers, not the wider `BondFunctions` overload set.
 
 The tracked `wiki/` pages hold detailed guides; the
 [MkDocs site](https://benbenbang.github.io/libitofin/) provides language tabs and
