@@ -17,7 +17,9 @@ use crate::time::PyDate;
 use crate::treeswaption::PyBermudanExercise;
 use libitofin::exercise::{AmericanExercise, EuropeanExercise, Exercise};
 use libitofin::instrument::Instrument;
-use libitofin::instruments::{PlainVanillaPayoff, StrikedTypePayoff, VanillaOption};
+use libitofin::instruments::{
+    CashOrNothingPayoff, PlainVanillaPayoff, StrikedTypePayoff, VanillaOption,
+};
 use libitofin::option::OptionType;
 use libitofin::pricingengine::PricingEngine;
 use libitofin::pricingengines::AnalyticEuropeanEngine;
@@ -89,6 +91,37 @@ impl PyVanillaOption {
         PyVanillaOption {
             inner: VanillaOption::new(payoff, exercise, settings.inner()),
         }
+    }
+
+    /// Build a European fixed-cash digital option, using the existing analytic engine.
+    ///
+    /// The strike must be finite and nonnegative, and cash_payoff finite. Signed
+    /// and zero cash amounts are accepted. Use set_engine(process) to attach the
+    /// analytic European engine; other engine compatibility is not implied.
+    /// Existing zero-volatility and zero-strike numerical behavior is retained.
+    #[classmethod]
+    fn cash_or_nothing(
+        _cls: &Bound<'_, PyType>,
+        option_type: PyOptionType,
+        strike: f64,
+        cash_payoff: f64,
+        expiry: &PyDate,
+        settings: &PySettings,
+    ) -> PyResult<Self> {
+        if !strike.is_finite() || strike < 0.0 || !cash_payoff.is_finite() {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "strike must be finite and nonnegative; cash payoff must be finite",
+            ));
+        }
+        let payoff = shared(CashOrNothingPayoff::new(
+            option_type.inner(),
+            strike,
+            cash_payoff,
+        )) as Shared<dyn StrikedTypePayoff>;
+        let exercise = shared(EuropeanExercise::new(expiry.inner())) as Shared<dyn Exercise>;
+        Ok(Self {
+            inner: VanillaOption::new(payoff, exercise, settings.inner()),
+        })
     }
 
     /// Build the option exercisable at any time over [earliest, latest].

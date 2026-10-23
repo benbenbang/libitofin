@@ -7045,6 +7045,23 @@ int32_t itofin_option_new(struct ItofinContext *ctx,
                           struct ItofinError *error);
 
 /**
+ * Build a European cash-or-nothing option retaining the supplied settings.
+ * Kind is 0 call or 1 put. Strike must be finite and nonnegative; cash must
+ * be finite, with signed and zero amounts accepted. Attach the existing analytic
+ * European engine. Other engine compatibility is not established by this factory.
+ * # Safety
+ * Follow the crate-level C caller contract. Output is written only on success.
+ */
+int32_t itofin_option_cash_or_nothing_new(struct ItofinContext *ctx,
+                                          int32_t kind,
+                                          double strike,
+                                          double cash_payoff,
+                                          int32_t expiry,
+                                          uint64_t settings,
+                                          uint64_t *out,
+                                          struct ItofinError *error);
+
+/**
  * Build an American option whose exercise window starts at Date::min_date().
  * # Safety
  * Outputs must be aligned, live and non-overlapping. Context and handles must

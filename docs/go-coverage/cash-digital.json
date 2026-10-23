@@ -1,0 +1,15 @@
+{
+  "domain": "european-cash-or-nothing-option-factory",
+  "entries": [
+    {
+      "c": "itofin_option_cash_or_nothing_new",
+      "go": "Session.NewCashOrNothingOption",
+      "python": "itofin.instruments.VanillaOption.cash_or_nothing",
+      "status": "implemented",
+      "tests": [
+        "TestCashDigitalAnalytic",
+        "TestCashDigitalDomains"
+      ]
+    }
+  ]
+}
