@@ -4,7 +4,7 @@ use crate::curve::PyYieldTermStructure;
 use crate::float_float_swap::LegGuard;
 use crate::hullwhite::PyIborIndex;
 use crate::settings::PySettings;
-use crate::time::{PyDayCounter, PySchedule};
+use crate::time::{PyDate, PyDayCounter, PySchedule};
 use crate::{ItofinError, PyQlError};
 use libitofin::handle::Handle;
 use libitofin::indexes::InterestRateIndex;
@@ -231,5 +231,60 @@ impl PyAssetSwap {
     /// Native fair clean quote per 100; zeroes NPV only if upfront is included.
     fn fair_clean_price(&mut self) -> PyResult<f64> {
         self.value(5)
+    }
+    /// Original quoted clean price, per 100.
+    fn clean_price(&self) -> f64 {
+        self.inner.clean_price()
+    }
+    /// Original floating spread in decimal rate units.
+    fn spread(&self) -> f64 {
+        self.inner.spread()
+    }
+    /// Whether the bond coupons are paid rather than received.
+    fn pay_bond_coupon(&self) -> bool {
+        self.inner.pay_bond_coupon()
+    }
+    /// This bounded API always constructs a par swap.
+    fn par_swap(&self) -> bool {
+        self.inner.par_swap()
+    }
+    /// Date of the dirty-price upfront payment.
+    fn upfront_date(&self) -> PyDate {
+        PyDate::from_inner(self.inner.upfront_date())
+    }
+    /// Populate native cached results if needed.
+    fn calculate(&mut self) -> PyResult<()> {
+        self.prepare(false)?;
+        self.inner.calculate().map_err(PyQlError::from)?;
+        self.flags = flags(&self.settings);
+        Ok(())
+    }
+    /// Force repricing, including while frozen.
+    fn recalculate(&mut self) -> PyResult<()> {
+        self.prepare(true)?;
+        self.inner.recalculate().map_err(PyQlError::from)?;
+        self.flags = flags(&self.settings);
+        Ok(())
+    }
+    /// Pin native cached results until unfreeze or explicit recalculation.
+    fn freeze(&mut self) {
+        self.inner.base_mut().freeze();
+        self.frozen = true;
+    }
+    /// Resume native observer-driven repricing.
+    fn unfreeze(&mut self) {
+        self.inner.base_mut().unfreeze();
+        self.frozen = false;
+    }
+    /// Read native cache state without pricing.
+    fn is_calculated(&self) -> bool {
+        self.inner.base().is_calculated()
+    }
+    /// Test native expiry without pricing.
+    fn is_expired(&self) -> PyResult<bool> {
+        self.inner
+            .is_expired()
+            .map_err(PyQlError::from)
+            .map_err(Into::into)
     }
 }

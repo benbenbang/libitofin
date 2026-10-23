@@ -95,6 +95,50 @@ class AssetSwap:
         r"""
         Native fair clean quote per 100; zeroes NPV only if upfront is included.
         """
+    def clean_price(self) -> builtins.float:
+        r"""
+        Original quoted clean price, per 100.
+        """
+    def spread(self) -> builtins.float:
+        r"""
+        Original floating spread in decimal rate units.
+        """
+    def pay_bond_coupon(self) -> builtins.bool:
+        r"""
+        Whether the bond coupons are paid rather than received.
+        """
+    def par_swap(self) -> builtins.bool:
+        r"""
+        This bounded API always constructs a par swap.
+        """
+    def upfront_date(self) -> time.Date:
+        r"""
+        Date of the dirty-price upfront payment.
+        """
+    def calculate(self) -> None:
+        r"""
+        Populate native cached results if needed.
+        """
+    def recalculate(self) -> None:
+        r"""
+        Force repricing, including while frozen.
+        """
+    def freeze(self) -> None:
+        r"""
+        Pin native cached results until unfreeze or explicit recalculation.
+        """
+    def unfreeze(self) -> None:
+        r"""
+        Resume native observer-driven repricing.
+        """
+    def is_calculated(self) -> builtins.bool:
+        r"""
+        Read native cache state without pricing.
+        """
+    def is_expired(self) -> builtins.bool:
+        r"""
+        Test native expiry without pricing.
+        """
 
 @typing.final
 class BMASwap:
