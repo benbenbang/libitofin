@@ -107,6 +107,12 @@ c++ -x c++ -std=c++11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
   crates/libitofin-ffi/tests/float_float_swap.c -Ltarget/release -litofin_ffi -o target/cpp-float-float-swap
 ./target/cpp-float-float-swap
 cc -std=c11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
+  crates/libitofin-ffi/tests/asset_swap.c -Ltarget/release -litofin_ffi -o target/c-asset-swap
+./target/c-asset-swap
+c++ -x c++ -std=c++11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
+  crates/libitofin-ffi/tests/asset_swap.c -Ltarget/release -litofin_ffi -o target/cpp-asset-swap
+./target/cpp-asset-swap
+cc -std=c11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
   crates/libitofin-ffi/tests/g2_process.c -Ltarget/release -litofin_ffi -lm -o target/c-g2-process
 ./target/c-g2-process
 c++ -x c++ -std=c++11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \

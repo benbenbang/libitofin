@@ -356,3 +356,7 @@ pub unsafe extern "C" fn itofin_asset_swap_action(
         })
     }
 }
+
+#[cfg(test)]
+#[path = "asset_swap_api_tests.rs"]
+mod tests;
