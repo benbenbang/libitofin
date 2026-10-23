@@ -51,6 +51,8 @@ Use `-tags itofin_external` for builds, runs, tests, and vet outside this checko
 | Language guides and examples | [Rust](wiki/rust.md) · [Python](wiki/python.md) · [Go](wiki/go.md) |
 | Standalone currencies | [Constructor and fields](docs/docs/currency-bindings.md) · [Presets including TWD](docs/docs/currency-presets.md) |
 | FX delta helpers | [Black delta conventions](docs/docs/black-delta-bindings.md) |
+| Vanilla pricing and risk | [BlackCalculator](docs/docs/black-calculator-bindings.md) · [Bond risk analytics](docs/docs/bond-analytics.md) |
+| Retained instruments | [Par asset swaps](docs/docs/asset-swap-bindings.md) · [Fixed-date FX forwards](docs/docs/fx-forward-bindings.md) |
 | Gaussian forward-measure process | [Constant-parameter GSR](docs/docs/gsr-process-bindings.md) |
 | Worked pricing walkthrough | [Python, Rust, and Go](https://benbenbang.github.io/libitofin/getting-started/) |
 | Releases, coverage, and remaining work | [Status and scope](wiki/status.md) · [Issues](https://github.com/benbenbang/libitofin/issues) |
