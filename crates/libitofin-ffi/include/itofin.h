@@ -7213,6 +7213,24 @@ int32_t itofin_option_asset_or_nothing_new(struct ItofinContext *ctx,
                                            struct ItofinError *error);
 
 /**
+ * Build a European gap option with a separate trigger and payment strike.
+ * Kind is 0 call or 1 put. The trigger strike must be finite and nonnegative;
+ * the payment strike must be finite and may be signed. Trigger equality is
+ * included and negative payments are not floored. Use the existing FD engine;
+ * the analytic European engine rejects this payoff.
+ * # Safety
+ * Follow the crate-level C caller contract. Output is written only on success.
+ */
+int32_t itofin_option_gap_new(struct ItofinContext *ctx,
+                              int32_t kind,
+                              double strike,
+                              double second_strike,
+                              int32_t expiry,
+                              uint64_t settings,
+                              uint64_t *out,
+                              struct ItofinError *error);
+
+/**
  * Build an American option whose exercise window starts at Date::min_date().
  * # Safety
  * Outputs must be aligned, live and non-overlapping. Context and handles must
