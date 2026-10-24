@@ -44,6 +44,8 @@
       "status": "implemented",
       "tests": [
         "TestBondPriceATMUnitsDefaultsAndLifecycle",
+        "TestBondPriceATMIndependentFixedAndZeroRows",
+        "TestBondPriceATMIndependentMaturityAndZeroBPSErrors",
         "TestBondPriceATMFloatingGuardsAndFrozenGraph"
       ]
     }
