@@ -1,0 +1,56 @@
+{
+  "acceptance_predeclared_before_candidate_observation": {
+    "accrued_abs": 2e-12,
+    "atm_abs": 2e-13,
+    "current_notional": "exact",
+    "maturity_and_zero_bps_errors": "required separately, not tolerance exceptions"
+  },
+  "actual_evidence": {
+    "actual-loader.json": "0c54f8934e592236bb86888ed7cc1b617a24ae119791fc0271a1d16b6e1ff703",
+    "barriers.json": "d1f88f633c78dd57e5d8340814fc0fc9466bd23bf8446872a9baf3e08c65d67a",
+    "bond_atm_from_price_errors.csv": "060438b59d5bb4dbb0717da31fe83b576c4a5f799e5d184f005d8742009b4a3e",
+    "bond_atm_from_price_reference.csv": "16f7b522af2a8f1c8e827b3dedd61cb29f3903b9e56641899f07cc65a71af7a5",
+    "observations.json": "5c553b87513ccbc20552c8b1936696f7c914536e5807188336c25bf5301908a1",
+    "receipt.json": "115514e532930c380112dd6c089b96f0e87a71dce679c02aafa3d9262981a02a"
+  },
+  "actual_native_process_exit": 0,
+  "binary64_native_csv_scalar_cells_verified": 726,
+  "candidate_dependency": false,
+  "case_count": 49,
+  "case_slices": [
+    "Existing fixed builder faces100/375/750, semiannualMar24 2026-Mar24 2028, rates.047/.058, redemption102; NullCalendar, explicitJun26 andSep16/17/18/24 ex7 boundaries.",
+    "Amortizing annualJan1 2025/26/27/28, notionals375/250/125, rate.04/redemption100; refDec1 2025/.032 discount, current-notional375->250 afterJan1 coupon/principal payment.",
+    "Clean85/100/103.25 paired to independent dirty amounts for each case.",
+    "Maturity current notional0 nontradable; zero-coupon/rate0 price100 produces exactzero ATM while price0/101 requires null-BPS error."
+  ],
+  "compiled_wheel": "QuantLib1.43 cp39-abi3 macOSarm64, separately installed, not claimed same-source local build",
+  "expected_domain_error_queries": 52,
+  "finite_numeric_rows": 242,
+  "finite_row_classification": {
+    "amortizing": 60,
+    "fixed": 180,
+    "zero": 2
+  },
+  "independent_accrued": "ACT360 elapsed coupon accrual per100 CURRENT notional, subtract full current-period accrual when trading ex-coupon; coupon excluded at settlement payment boundary, principal excluded on same payment boundary.",
+  "independent_equation": "(dirtyPricePer100*currentNotional/100*DF(settlement)-discountedRemainingPrincipal)/discountedCouponNominalAccrualAnnuity",
+  "independent_precision": "100-digit Decimal; explicit civil-date schedule/Actual360 coupon accrual and Actual365Fixed discounting, not native cashflow amounts used as expected values",
+  "max_abs_native_vs_independent_atm_observed": 1.5265566588595902e-16,
+  "native_api": "BondFunctions.atmRate(bond,curve,explicitSettlement,BondPrice(amount,Clean|Dirty))",
+  "oracle_python": "3.13.16 private existing wheel interpreter, isolated -I -B, no bytecode",
+  "qualifications": [
+    "Amortizing rows are core/future merged-factory coverage, not proof that an isolated bullet-only facade branch already exposes amortization.",
+    "This fixed-coupon fixture does not assert floating historical fixing/amount-guard coverage; those remain separate genuine instrument fixtures/runtime tests.",
+    "Executed generator retains original absolute local paths. A portable wrapper would be a separately qualified successor.",
+    "Old source, package/native/interpreter bytes/modes/metadata were unchanged before/after; exact actual module and dyld image were verified."
+  ],
+  "query_count": 294,
+  "schema_version": 1,
+  "source_files": {
+    "bond-atm-cases-v1.json": "274f4aa3c99f65a190416a2741f8b5322ce036dc50727af53acf375966b62f32",
+    "generate_bond_atm_wheel_v1.py": "f7a262201211f008324c03a543f70bb5fd4e49dcf8acd91abcbc2214e05118b0",
+    "independent_bond_atm_laws.py": "fbddf91acd340c1fe2160211afd19f8aaffa70473c2ea9334c805662590545ab",
+    "oracle-metadata-v1.json": "b59188edbc218455e73c5ce650e038b059834cb81f85786a162a9a6dd89f78e2"
+  },
+  "source_revision": "9863b578af0caa4cecabf697196533e84a8308b6",
+  "status": "GENUINE_SEPARATE_NATIVE_QUANTLIB_AND_INDEPENDENT_CASHFLOW_FIXTURE"
+}
