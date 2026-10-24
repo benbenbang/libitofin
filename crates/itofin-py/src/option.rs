@@ -18,7 +18,8 @@ use crate::treeswaption::PyBermudanExercise;
 use libitofin::exercise::{AmericanExercise, EuropeanExercise, Exercise};
 use libitofin::instrument::Instrument;
 use libitofin::instruments::{
-    AssetOrNothingPayoff, CashOrNothingPayoff, PlainVanillaPayoff, StrikedTypePayoff, VanillaOption,
+    AssetOrNothingPayoff, CashOrNothingPayoff, GapPayoff, PlainVanillaPayoff, StrikedTypePayoff,
+    VanillaOption,
 };
 use libitofin::option::OptionType;
 use libitofin::pricingengine::PricingEngine;
@@ -144,6 +145,35 @@ impl PyVanillaOption {
             ));
         }
         let payoff = shared(AssetOrNothingPayoff::new(option_type.inner(), strike))
+            as Shared<dyn StrikedTypePayoff>;
+        let exercise = shared(EuropeanExercise::new(expiry.inner())) as Shared<dyn Exercise>;
+        Ok(Self {
+            inner: VanillaOption::new(payoff, exercise, settings.inner()),
+        })
+    }
+
+    /// Build a European gap option with separate trigger and payment strikes.
+    ///
+    /// The trigger strike must be finite and nonnegative, and second_strike
+    /// finite (signed values are accepted). Trigger equality is included and
+    /// negative payments are retained. Attach an existing finite-difference
+    /// engine with set_fd_engine; set_engine's analytic Black path rejects Gap.
+    /// FD cell averaging preserves its existing signed/cancelling-value fallback.
+    #[classmethod]
+    fn gap(
+        _cls: &Bound<'_, PyType>,
+        option_type: PyOptionType,
+        strike: f64,
+        second_strike: f64,
+        expiry: &PyDate,
+        settings: &PySettings,
+    ) -> PyResult<Self> {
+        if !strike.is_finite() || strike < 0.0 || !second_strike.is_finite() {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "trigger strike must be finite and nonnegative; payment strike must be finite",
+            ));
+        }
+        let payoff = shared(GapPayoff::new(option_type.inner(), strike, second_strike))
             as Shared<dyn StrikedTypePayoff>;
         let exercise = shared(EuropeanExercise::new(expiry.inner())) as Shared<dyn Exercise>;
         Ok(Self {
