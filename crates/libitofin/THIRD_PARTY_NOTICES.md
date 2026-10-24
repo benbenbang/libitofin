@@ -103,3 +103,15 @@ Copyright (C) 2009 Nathan Abbott; 2007-2010 Ferdinando Ametrano; 2007 Chiara
 Fornarola; 2008 Simon Ibbotson; 2004 M-Dimension Consulting Inc.; 2005-2009
 StatPro Italia srl; 2004 Jeff Yu. The complete license and contributor notices
 are included in `QUANTLIB_LICENSE.txt`.
+
+## QuantLib amortizing fixed-rate bond construction
+
+The named bounded amortizing fixed-rate factory follows the composition in
+`ql/instruments/bonds/amortizingfixedratebond.{hpp,cpp}` at source revision
+`9863b578af0caa4cecabf697196533e84a8308b6`: the existing fixed-rate leg and Bond
+redemption machinery, without a new pricing formula.
+Upstream headers retain Copyright (C) 2008 Simon Ibbotson.
+The independently selected JSONL fixture queries the QuantLib 1.43 Python wheel,
+not asserted to be a build of that source revision. No upstream test vectors
+are copied. The complete QuantLib license and contributor notices are included
+in [QUANTLIB_LICENSE.txt](QUANTLIB_LICENSE.txt).
