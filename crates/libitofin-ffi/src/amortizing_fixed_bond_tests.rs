@@ -12,7 +12,7 @@ use libitofin::time::{
     daycounters::actual360::Actual360,
 };
 use serde_json::Value;
-use std::ptr::null_mut;
+use std::ptr::{null, null_mut};
 
 fn serial(day: i32, year: i32) -> i32 {
     Date::new(day, Month::January, year).serial_number()
@@ -187,4 +187,225 @@ fn amortizing_fixed_ffi_matches_shared_native_fixture() {
         }
     }
     assert_eq!(count, 108);
+}
+#[test]
+fn amortizing_fixed_ffi_errors_preserve_outputs_and_context() {
+    for balances in [
+        vec![],
+        vec![1000.],
+        vec![1000., 750., 400., 1.],
+        vec![1000., 1001., 400.],
+        vec![1000., 0., 0.],
+        vec![1000., f64::NAN, 400.],
+        vec![f64::INFINITY, 750., 400.],
+    ] {
+        let (mut c, a) = fixture();
+        let mut out = 987;
+        unsafe {
+            assert_ne!(
+                itofin_amortizing_fixed_rate_bond_new(
+                    &mut c,
+                    a,
+                    balances.as_ptr(),
+                    balances.len(),
+                    [0.045].as_ptr(),
+                    1,
+                    &mut out,
+                    null_mut()
+                ),
+                0
+            );
+        }
+        assert_eq!(out, 987);
+    }
+    for kind in 0..9 {
+        let (mut c, mut a) = fixture();
+        let mut out = 987;
+        if kind == 0 {
+            a.settings = a.day_counter;
+        }
+        if kind == 1 {
+            a.schedule = a.day_counter;
+        }
+        if kind == 2 {
+            a.day_counter = a.settings;
+        }
+        if kind == 3 {
+            a.has_ex_coupon = 2;
+        }
+        if kind == 4 {
+            a.ex_coupon_end_of_month = 2;
+        }
+        if kind == 5 {
+            a.ex_coupon_length = -1;
+        }
+        if kind == 6 {
+            a.issue_date = i32::MAX;
+        }
+        if kind == 7 {
+            a.payment_convention = 999;
+        }
+        if kind == 8 {
+            a.settlement_days = u32::MAX;
+        }
+        unsafe {
+            assert_ne!(
+                itofin_amortizing_fixed_rate_bond_new(
+                    &mut c,
+                    a,
+                    [1000., 750., 400.].as_ptr(),
+                    3,
+                    [0.045].as_ptr(),
+                    1,
+                    &mut out,
+                    null_mut()
+                ),
+                0
+            );
+        }
+        assert_eq!(out, 987);
+    }
+    let (mut c, a) = fixture();
+    let mut out = 987;
+    unsafe {
+        assert_eq!(
+            itofin_amortizing_fixed_rate_bond_new(
+                &mut c,
+                a,
+                null(),
+                3,
+                [0.045].as_ptr(),
+                1,
+                &mut out,
+                null_mut()
+            ),
+            INVALID_ARGUMENT
+        );
+    }
+    assert_eq!(out, 987);
+    let (mut c, a) = fixture();
+    unsafe {
+        assert_eq!(
+            itofin_amortizing_fixed_rate_bond_new(
+                &mut c,
+                a,
+                [1000., 750., 400.].as_ptr(),
+                3,
+                [0.045].as_ptr(),
+                1,
+                null_mut(),
+                null_mut()
+            ),
+            INVALID_ARGUMENT
+        );
+    }
+    let (mut c, a) = fixture();
+    unsafe {
+        assert_eq!(
+            itofin_amortizing_fixed_rate_bond_new(
+                &mut c,
+                a,
+                [1000., 750., 400.].as_ptr(),
+                3,
+                [0.045].as_ptr(),
+                1,
+                &mut out,
+                null_mut()
+            ),
+            0
+        );
+    }
+    assert_ne!(out, 987);
+}
+
+#[test]
+fn amortizing_fixed_ffi_foreign_thread_and_nonfinite_coupon_do_not_poison() {
+    let (mut c, a) = fixture();
+    let address = (&mut c as *mut Context) as usize;
+    let (status, out) = std::thread::spawn(move || {
+        let mut out = 987;
+        let status = unsafe {
+            itofin_amortizing_fixed_rate_bond_new(
+                address as *mut Context,
+                a,
+                [1000., 750., 400.].as_ptr(),
+                3,
+                [0.045].as_ptr(),
+                1,
+                &mut out,
+                null_mut(),
+            )
+        };
+        (status, out)
+    })
+    .join()
+    .unwrap();
+    assert_eq!(status, WRONG_THREAD);
+    assert_eq!(out, 987);
+    for rate in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, f64::MAX] {
+        let (mut c, a) = fixture();
+        let mut out = 987;
+        unsafe {
+            assert_ne!(
+                itofin_amortizing_fixed_rate_bond_new(
+                    &mut c,
+                    a,
+                    [1000., 750., 400.].as_ptr(),
+                    3,
+                    [rate].as_ptr(),
+                    1,
+                    &mut out,
+                    null_mut()
+                ),
+                0
+            );
+        }
+        assert_eq!(out, 987);
+    }
+    let (mut c, a) = fixture();
+    let mut out = 0;
+    unsafe {
+        assert_eq!(
+            itofin_amortizing_fixed_rate_bond_new(
+                &mut c,
+                a,
+                [1000., 750., 400.].as_ptr(),
+                3,
+                [0.045].as_ptr(),
+                1,
+                &mut out,
+                null_mut()
+            ),
+            0
+        );
+    }
+}
+
+#[test]
+fn amortizing_fixed_misaligned_error_preserves_output_and_native_owners() {
+    let (mut c, a) = fixture();
+    let settings = c.get::<Shared<Settings<Date>>>(a.settings).unwrap();
+    let owners = Shared::strong_count(&settings);
+    let mut storage = [0x5A5A_5A5A_u32; size_of::<ItofinError>() / size_of::<u32>() + 1];
+    let before = storage;
+    let error = storage.as_mut_ptr().cast::<u8>();
+    let error = error.wrapping_add(1).cast::<ItofinError>();
+    assert!(!error.is_aligned());
+    let mut out = 777;
+    let status = unsafe {
+        itofin_amortizing_fixed_rate_bond_new(
+            &mut c,
+            a,
+            [1000., 750., 400.].as_ptr(),
+            3,
+            [0.045].as_ptr(),
+            1,
+            &mut out,
+            error,
+        )
+    };
+    assert_eq!(status, INVALID_ARGUMENT);
+    assert_eq!(out, 777);
+    assert_eq!(storage, before);
+    assert_eq!(Shared::strong_count(&settings), owners);
 }
