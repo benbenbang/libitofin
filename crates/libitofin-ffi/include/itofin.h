@@ -451,6 +451,34 @@ typedef struct ItofinFloatFloatSwapConfig {
   int32_t payment_convention;
 } ItofinFloatFloatSwapConfig;
 
+/**
+ * Plain ibor amortization, with par principal and no optional payoff terms.
+ */
+typedef struct ItofinAmortizingFloatingBondConfig {
+  uint32_t settlement_days;
+  uint64_t schedule;
+  uint64_t index;
+  uint64_t day_counter;
+  uint64_t settings;
+  int32_t payment_convention;
+  /**
+   * Zero means no issue date.
+   */
+  int32_t issue_date;
+  uint32_t fixing_days;
+  uint8_t has_fixing_days;
+  int32_t fixing_convention;
+  /**
+   * Zero selects NullCalendar when an ex-coupon period is present.
+   */
+  uint64_t ex_coupon_calendar;
+  int32_t ex_coupon_length;
+  int32_t ex_coupon_unit;
+  int32_t ex_coupon_convention;
+  uint8_t has_ex_coupon;
+  uint8_t ex_coupon_end_of_month;
+} ItofinAmortizingFloatingBondConfig;
+
 typedef struct ItofinFloatingBondConfig {
   struct ItofinBondConfig bond;
   uint64_t schedule;
@@ -3293,6 +3321,23 @@ int32_t itofin_float_float_swap_action(struct ItofinContext *ctx,
                                        uint64_t id,
                                        int32_t action,
                                        struct ItofinError *error);
+
+/**
+ * Copy one positive nonincreasing balance per schedule period; repay principal at par.
+ * Empty spreads mean zero and shorter spread vectors repeat their last entry.
+ * Construction does not require historical fixings or a separate coupon pricer.
+ * Date lags cannot exceed the supported maximum-minus-minimum Date span.
+ * # Safety
+ * Pointers and thread ownership must satisfy the crate-level C caller contract.
+ */
+int32_t itofin_amortizing_floating_rate_bond_new(struct ItofinContext *ctx,
+                                                 struct ItofinAmortizingFloatingBondConfig a,
+                                                 const double *notionals,
+                                                 size_t count,
+                                                 const double *spreads,
+                                                 size_t spreads_count,
+                                                 uint64_t *out,
+                                                 struct ItofinError *error);
 
 /**
  * Construct without requiring coupon histories or a cap/floor pricer.
