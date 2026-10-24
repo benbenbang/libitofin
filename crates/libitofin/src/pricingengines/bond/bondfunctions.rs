@@ -12,13 +12,9 @@
 //!   carries the tradability guard and the `100 / notional` scaling
 //!   (`bond.cpp` delegates the same call to `BondFunctions` in reverse); the
 //!   wrapper here is the free-function surface over it.
-//! - `atmRate` takes no [`BondPrice`]: the type lands with the yield wrappers
-//!   below (#290), but the price-fed curve round trip of `bonds.cpp:241` stays
-//!   a discount-curve follow-up and is unreachable here. The
-//!   port ports the discount-curve `atmRate` at its `price = {}` default,
-//!   whose target NPV is the leg's own; with one coupon rate that recovers the
-//!   coupon exactly for any curve (a curve-independent invariant, not a curve
-//!   oracle - the clean-price tests are the curve oracles).
+//! - `atm_rate` preserves the own-NPV default. The additive
+//!   [`BondFunctions::atm_rate_from_price`] accepts an explicit clean or dirty
+//!   quote and scales it by the current settlement notional.
 
 use crate::cashflows::{CashFlows, Duration};
 use crate::errors::QlResult;
@@ -148,6 +144,47 @@ impl BondFunctions {
             Some(settlement),
             None,
         )
+    }
+
+    /// The coupon rate repricing an explicit clean or dirty quote per 100.
+    ///
+    /// Clean quotes include settlement accrued interest before scaling by the
+    /// current notional. Settlement-date and ex-coupon flows are excluded, and
+    /// the underlying ATM calculation still reads live coupon amounts.
+    /// The existing [`Self::atm_rate`] keeps its own-NPV target unchanged.
+    ///
+    /// # Errors
+    ///
+    /// The bond must be tradable, the price and result finite, and the leg must
+    /// have basis-point sensitivity unless the required coupon value is zero.
+    pub fn atm_rate_from_price(
+        bond: &Bond,
+        discount_curve: &dyn YieldTermStructure,
+        price: BondPrice,
+        settlement: Option<Date>,
+    ) -> QlResult<Rate> {
+        require!(price.amount().is_finite(), "bond price must be finite");
+        let settlement = Self::settlement_or_eval(bond, settlement)?;
+        let notional = Self::require_tradable(bond, settlement)?;
+        let dirty = price.amount()
+            + if matches!(price, BondPrice::Clean(_)) {
+                bond.accrued_amount(Some(settlement))?
+            } else {
+                0.0
+            };
+        let target = dirty / 100.0 * notional;
+        require!(target.is_finite(), "target NPV must be finite");
+        let rate = CashFlows::atm_rate(
+            bond.cashflows(),
+            discount_curve,
+            bond.settings(),
+            Some(false),
+            Some(settlement),
+            Some(settlement),
+            Some(target),
+        )?;
+        require!(rate.is_finite(), "ATM rate must be finite");
+        Ok(rate)
     }
 
     /// The yield (internal rate of return) that reprices the bond at `price`,
@@ -656,9 +693,7 @@ mod tests {
     /// the target NPV is the leg's own, so the numerator and denominator
     /// discount factors cancel and the rate is `coupon-leg PV / bps = coupon`
     /// for any curve. This is a coupon-recovery invariant, not a curve oracle -
-    /// the curve oracles are the two clean-price tests above. The price-fed
-    /// `atmRate` round trip of `bonds.cpp:241` needs the `Bond::Price` argument
-    /// deferred to #290.
+    /// the curve oracles are the two clean-price tests above.
     #[test]
     fn the_atm_rate_recovers_the_single_coupon_rate() {
         let bond = plain_bond();
@@ -1177,3 +1212,7 @@ mod yield_tests {
         assert!((accrued - 0.7).abs() < 1e-6, "accrued {accrued}");
     }
 }
+
+#[cfg(test)]
+#[path = "bond_price_atm_tests.rs"]
+mod price_atm_tests;
