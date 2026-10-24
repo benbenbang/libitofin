@@ -95,6 +95,12 @@ c++ -x c++ -std=c++11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
   crates/libitofin-ffi/tests/callable_risk.c -Ltarget/release -litofin_ffi -o target/cpp-callable-risk
 ./target/cpp-callable-risk
 cc -std=c11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
+  crates/libitofin-ffi/tests/amortizing_fixed_bond.c -Ltarget/release -litofin_ffi -o target/c-amortizing-fixed-bond
+./target/c-amortizing-fixed-bond
+c++ -x c++ -std=c++11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
+  crates/libitofin-ffi/tests/amortizing_fixed_bond.c -Ltarget/release -litofin_ffi -o target/cpp-amortizing-fixed-bond
+./target/cpp-amortizing-fixed-bond
+cc -std=c11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
   crates/libitofin-ffi/tests/bond_forward.c -Ltarget/release -litofin_ffi -o target/c-bond-forward
 ./target/c-bond-forward
 c++ -x c++ -std=c++11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
