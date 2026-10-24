@@ -12,6 +12,7 @@ use crate::cashflows::{
 use crate::errors::QlResult;
 use crate::indexes::iborindex::IborIndex;
 use crate::indexes::index::Index;
+use crate::indexes::interestrateindex::InterestRateIndex;
 use crate::instrument::Instrument;
 use crate::instruments::Bond;
 use crate::patterns::observable::{AsObservable, Observable};
@@ -27,7 +28,7 @@ use crate::time::schedule::Schedule;
 use crate::types::{Natural, Rate, Real, Spread};
 use crate::utilities::null::Null;
 
-/// An ibor bond with one redemption and optional per-coupon caps and floors.
+/// An ibor bond retaining its coupons and inferred principal payments.
 ///
 /// Composes [`Bond`] rather than inheriting it. Floating coupon handles remain
 /// available after erasure into the base's cash-flow leg. Zero gearing produces
@@ -39,6 +40,109 @@ pub struct FloatingRateBond {
 }
 
 impl FloatingRateBond {
+    /// Builds a plain ibor bond with exact per-period outstanding balances.
+    ///
+    /// Balances must be positive, finite and nonincreasing. Principal is repaid
+    /// at par on the preceding coupon payment date when a balance changes,
+    /// with the remaining balance repaid at maturity. The existing [`Bond`]
+    /// near-equality rule can coalesce numerically close balance changes.
+    /// Empty spreads default to zero; shorter spreads repeat the last value.
+    /// Coupons use unit gearing, the default Black pricer and no optionality.
+    ///
+    /// # Errors
+    ///
+    /// Rejects invalid balances, dates, spreads or settings identity. Settlement,
+    /// effective coupon fixing and index fixing lags cannot exceed the supported
+    /// maximum-minus-minimum Date span. Propagates [`IborLeg`] and [`Bond`] errors.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_amortizing(
+        settlement_days: Natural,
+        notionals: Vec<Real>,
+        schedule: Schedule,
+        index: Shared<IborIndex>,
+        accrual_day_counter: DayCounter,
+        payment_convention: BusinessDayConvention,
+        fixing_days: Option<Natural>,
+        spreads: Vec<Spread>,
+        issue_date: Option<Date>,
+        ex_coupon_period: Option<Period>,
+        ex_coupon_calendar: Calendar,
+        ex_coupon_convention: BusinessDayConvention,
+        ex_coupon_end_of_month: bool,
+        fixing_convention: BusinessDayConvention,
+        settings: Shared<Settings<Date>>,
+    ) -> QlResult<Self> {
+        require!(schedule.len() >= 2, "schedule spans no period");
+        let supported_days = (Date::max_date() - Date::min_date()) as u32;
+        require!(
+            settlement_days <= supported_days
+                && fixing_days.unwrap_or(index.fixing_days()) <= supported_days
+                && index.fixing_days() <= supported_days,
+            "bond or index fixing days exceed supported date range"
+        );
+        require!(
+            notionals.len() == schedule.len() - 1,
+            "one notional per schedule period required"
+        );
+        require!(
+            notionals.iter().all(|n| n.is_finite() && *n > 0.0)
+                && notionals.windows(2).all(|n| n[1] <= n[0]),
+            "notionals must be positive finite and nonincreasing"
+        );
+        require!(
+            spreads.len() <= notionals.len() && spreads.iter().all(|s| s.is_finite()),
+            "finite spreads must not exceed schedule periods"
+        );
+        require!(
+            std::ptr::eq(&*settings, Index::settings(&*index)),
+            "bond and index must share settings"
+        );
+        require!(
+            schedule.dates().iter().all(|d| *d != Date::null())
+                && schedule.dates().windows(2).all(|d| d[0] < d[1])
+                && issue_date.is_none_or(|d| d != Date::null()),
+            "non-null increasing schedule and issue dates required"
+        );
+        require!(
+            ex_coupon_period.is_none_or(|p| p.length() >= 0),
+            "ex-coupon period must be nonnegative"
+        );
+        let maturity = schedule.end_date();
+        let calendar = schedule.calendar().clone();
+        let mut leg = IborLeg::new(schedule, Shared::clone(&index))
+            .with_notionals(notionals)
+            .with_payment_day_counter(accrual_day_counter)
+            .with_payment_adjustment(payment_convention)
+            .with_spreads(spreads)
+            .with_fixing_convention(fixing_convention);
+        if let Some(days) = fixing_days {
+            leg = leg.with_fixing_days(days);
+        }
+        if let Some(period) = ex_coupon_period.filter(|p| p.length() != 0) {
+            leg = leg.with_ex_coupon_period(
+                period,
+                ex_coupon_calendar,
+                ex_coupon_convention,
+                ex_coupon_end_of_month,
+            );
+        }
+        let coupons = leg.coupons()?;
+        let ibor_coupons = coupons.iter().map(|c| Some(Shared::clone(c))).collect();
+        let cashflows = coupons
+            .into_iter()
+            .map(|c| c as Shared<dyn CashFlow>)
+            .collect();
+        let mut bond =
+            Bond::from_coupons(settlement_days, calendar, issue_date, cashflows, settings)?;
+        bond.set_maturity_date(maturity);
+        bond.base().register_with(Index::observable(&*index));
+        Ok(Self {
+            bond,
+            index,
+            ibor_coupons,
+        })
+    }
+
     /// Builds coupons in advance on the schedule's calendar and one redemption.
     ///
     /// Empty gearings and spreads default to 1 and 0; shorter vectors repeat
