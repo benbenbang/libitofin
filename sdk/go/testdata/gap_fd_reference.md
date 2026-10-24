@@ -6,7 +6,7 @@
 The tracked LF copy has SHA256
 `2d90130bb09080fae340d4fcd2743102a49244aee950b25efce05b7fa4d461b3`.
 Only CRLF became LF; every parsed header/data cell string is identical, with no
-numerical or tolerance change.
+numerical or tolerance change. The Python fixture copy has identical LF bytes.
 Actual360, evaluation/reference date
 2026-06-15, explicit elapsed days, Douglas, time/equity grids 100/200/400/800 and
 damping 0/2 are part of the recipe. No candidate implementation generated values.
