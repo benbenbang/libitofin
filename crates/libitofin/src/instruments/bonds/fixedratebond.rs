@@ -2,7 +2,9 @@
 //!
 //! Port of `ql/instruments/bonds/fixedratebond.{hpp,cpp}`: the concrete
 //! [`FixedRateBond`], a [`Bond`] whose cash flows are a
-//! [`FixedRateLeg`](crate::cashflows::FixedRateLeg) plus a single redemption.
+//! [`FixedRateLeg`](crate::cashflows::FixedRateLeg) plus principal payments.
+//! The scalar constructor requires one redemption; [`FixedRateBond::new_amortizing`]
+//! constructs bounded per-period amortization at par.
 //! Its constructor builds `cashflows_` as
 //! `FixedRateLeg(schedule).withNotionals(faceAmount).withCouponRates(coupons,
 //! accrualDayCounter)...` and then appends the redemption with
@@ -116,6 +118,99 @@ impl FixedRateBond {
             bond.redemptions().len() == 1,
             "multiple redemptions created"
         );
+
+        Ok(FixedRateBond {
+            bond,
+            frequency,
+            day_counter: accrual_day_counter,
+            first_period_day_counter,
+        })
+    }
+
+    /// Builds a par-amortizing fixed-rate bond from one balance per accrual period.
+    ///
+    /// Balances must be finite, positive and nonincreasing, with exactly
+    /// `schedule.len() - 1` entries. Equal adjacent balances are allowed.
+    /// Principal reductions are paid on the preceding coupon's payment date,
+    /// using the existing [`Bond`] notional-coalescing rules. The remaining
+    /// balance is redeemed at par on the last coupon payment date.
+    ///
+    /// # Errors
+    ///
+    /// Rejects invalid balances or nonfinite coupon rates and propagates the
+    /// [`FixedRateLeg`] and [`Bond`] preconditions.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_amortizing(
+        settlement_days: Natural,
+        notionals: Vec<Real>,
+        schedule: Schedule,
+        coupons: Vec<Rate>,
+        accrual_day_counter: DayCounter,
+        payment_convention: BusinessDayConvention,
+        issue_date: Option<Date>,
+        payment_calendar: Option<Calendar>,
+        ex_coupon_period: Option<Period>,
+        ex_coupon_calendar: Calendar,
+        ex_coupon_convention: BusinessDayConvention,
+        ex_coupon_end_of_month: bool,
+        first_period_day_counter: Option<DayCounter>,
+        settings: Shared<Settings<Date>>,
+    ) -> QlResult<FixedRateBond> {
+        require!(
+            schedule.len() >= 2 && notionals.len() == schedule.len() - 1,
+            "one notional per accrual period required"
+        );
+        require!(
+            notionals.iter().all(|n| n.is_finite() && *n > 0.0)
+                && notionals.windows(2).all(|n| n[1] <= n[0]),
+            "finite positive nonincreasing notionals required"
+        );
+        require!(
+            coupons.iter().all(|r| r.is_finite()),
+            "finite coupon rates required"
+        );
+        let calendar = payment_calendar.unwrap_or_else(|| schedule.calendar().clone());
+        let maturity = schedule.end_date();
+        let frequency = if schedule.has_tenor() {
+            schedule.tenor().frequency()
+        } else {
+            Frequency::NoFrequency
+        };
+
+        let mut leg = FixedRateLeg::new(schedule)
+            .with_notionals(notionals)
+            .with_coupon_rates(
+                coupons,
+                accrual_day_counter.clone(),
+                Compounding::Simple,
+                Frequency::Annual,
+            )?
+            .with_payment_calendar(calendar.clone())
+            .with_payment_adjustment(payment_convention);
+        if let Some(day_counter) = &first_period_day_counter {
+            leg = leg.with_first_period_day_counter(day_counter.clone());
+        }
+        if let Some(period) = ex_coupon_period {
+            leg = leg.with_ex_coupon_period(
+                period,
+                ex_coupon_calendar,
+                ex_coupon_convention,
+                ex_coupon_end_of_month,
+            );
+        }
+        let cashflows = leg.build()?;
+
+        let mut bond = Bond::new(settlement_days, calendar, issue_date, cashflows, settings)?;
+        bond.add_redemptions_to_cashflows(&[])?;
+        bond.set_maturity_date(maturity);
+
+        require!(!bond.cashflows().is_empty(), "bond with no cashflows!");
+        for flow in bond.cashflows() {
+            require!(
+                flow.amount()?.is_finite(),
+                "finite bond cashflow amounts required"
+            );
+        }
 
         Ok(FixedRateBond {
             bond,
@@ -306,5 +401,66 @@ mod tests {
             maturity, last_payment,
             "the explicit schedule-end maturity wins over the derived last-payment date"
         );
+    }
+    fn amortizing(notionals: Vec<f64>) -> QlResult<FixedRateBond> {
+        FixedRateBond::new_amortizing(
+            0,
+            notionals,
+            annual_schedule(),
+            vec![0.05],
+            Actual360::new(),
+            BusinessDayConvention::Unadjusted,
+            None,
+            None,
+            None,
+            NullCalendar::new(),
+            BusinessDayConvention::Unadjusted,
+            false,
+            None,
+            settings_today(),
+        )
+    }
+
+    #[test]
+    fn amortizing_principal_and_current_notional_use_existing_bond_rules() {
+        let fixed = amortizing(vec![250.0, 100.0]).unwrap();
+        let bond = fixed.bond();
+        assert_eq!(bond.redemptions().len(), 2);
+        assert_eq!(bond.cashflows().len(), 4);
+        assert!((bond.redemptions()[0].amount().unwrap() - 150.0).abs() < 1e-13);
+        assert!((bond.redemptions()[1].amount().unwrap() - 100.0).abs() < 1e-13);
+        let payment = Date::new(30, Month::November, 2005);
+        assert!((bond.notional(Some(payment - 1)).unwrap() - 250.0).abs() < 1e-13);
+        assert!((bond.notional(Some(payment)).unwrap() - 100.0).abs() < 1e-13);
+        assert_eq!(bond.cashflows()[0].as_coupon().unwrap().nominal(), 250.0);
+        assert_eq!(bond.cashflows()[2].as_coupon().unwrap().nominal(), 100.0);
+        assert_eq!(
+            amortizing(vec![250.0, 250.0])
+                .unwrap()
+                .bond()
+                .redemptions()
+                .len(),
+            1
+        );
+        assert_eq!(plain_bond().bond().redemptions().len(), 1);
+    }
+
+    #[test]
+    fn amortizing_rejects_invalid_or_inexact_balance_vectors() {
+        for notionals in [
+            vec![],
+            vec![100.0],
+            vec![100.0, 90.0, 80.0],
+            vec![100.0, 101.0],
+            vec![100.0, 0.0],
+            vec![100.0, -1.0],
+            vec![100.0, f64::NAN],
+            vec![f64::INFINITY, 50.0],
+            vec![100.0, f64::NEG_INFINITY],
+        ] {
+            assert!(amortizing(notionals).is_err());
+        }
+        let near = amortizing(vec![100.0, 100.0 - 1e-13]).unwrap();
+        assert_eq!(near.bond().redemptions().len(), 1);
     }
 }
