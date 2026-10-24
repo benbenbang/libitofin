@@ -4,7 +4,8 @@ use crate::time_api::date;
 use libitofin::exercise::{AmericanExercise, EuropeanExercise, Exercise, ExerciseType};
 use libitofin::instrument::Instrument;
 use libitofin::instruments::{
-    AssetOrNothingPayoff, CashOrNothingPayoff, PlainVanillaPayoff, StrikedTypePayoff, VanillaOption,
+    AssetOrNothingPayoff, CashOrNothingPayoff, GapPayoff, PlainVanillaPayoff, StrikedTypePayoff,
+    VanillaOption,
 };
 use libitofin::models::HestonModel;
 use libitofin::option::OptionType;
@@ -128,6 +129,45 @@ pub unsafe extern "C" fn itofin_option_asset_or_nothing_new(
                 ));
             }
             let payoff = shared(AssetOrNothingPayoff::new(option_type(kind)?, strike))
+                as Shared<dyn StrikedTypePayoff>;
+            let exercise = shared(EuropeanExercise::new(date(expiry)?)) as Shared<dyn Exercise>;
+            let option =
+                VanillaOption::new(payoff, exercise, c.get::<Shared<Settings<Date>>>(settings)?);
+            output(out, c.insert(shared_mut(option))?)
+        })
+    }
+}
+
+/// Build a European gap option with a separate trigger and payment strike.
+/// Kind is 0 call or 1 put. The trigger strike must be finite and nonnegative;
+/// the payment strike must be finite and may be signed. Trigger equality is
+/// included and negative payments are not floored. Use the existing FD engine;
+/// the analytic European engine rejects this payoff.
+/// # Safety
+/// Follow the crate-level C caller contract. Output is written only on success.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn itofin_option_gap_new(
+    ctx: *mut Context,
+    kind: i32,
+    strike: f64,
+    second_strike: f64,
+    expiry: i32,
+    settings: u64,
+    out: *mut u64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            if !error.is_null() {
+                check_ptr(error)?;
+            }
+            check_ptr(out)?;
+            if !strike.is_finite() || strike < 0.0 || !second_strike.is_finite() {
+                return Err(BindingError::invalid(
+                    "trigger strike must be finite and nonnegative; payment strike must be finite",
+                ));
+            }
+            let payoff = shared(GapPayoff::new(option_type(kind)?, strike, second_strike))
                 as Shared<dyn StrikedTypePayoff>;
             let exercise = shared(EuropeanExercise::new(date(expiry)?)) as Shared<dyn Exercise>;
             let option =
@@ -430,3 +470,7 @@ mod tests {
 #[cfg(test)]
 #[path = "asset_digital_tests.rs"]
 mod asset_digital_tests;
+
+#[cfg(test)]
+#[path = "gap_option_tests.rs"]
+mod gap_option_tests;
