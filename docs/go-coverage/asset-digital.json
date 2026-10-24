@@ -9,7 +9,9 @@
       "tests": [
         "TestAssetDigitalDomains",
         "TestAssetDigitalQuantLibFdOrdinary",
-        "TestAssetDigitalFiniteBoundaryPolicy"
+        "TestAssetDigitalFiniteBoundaryPolicy",
+        "TestAssetDigitalLiveInputsRetainedAndConcurrent",
+        "TestAssetDigitalEngineErrorsAndSessionBoundaries"
       ]
     }
   ]
