@@ -733,6 +733,36 @@ impl PyBond {
                 .map_err(PyQlError::from)?,
         )
     }
+    /// Coupon rate repricing an explicit per-100 clean or dirty quote at settlement.
+    /// Uses current notional and live coupon amounts; the own-NPV ATM API is unchanged.
+    #[pyo3(signature=(discount_curve, price, *, price_type=PyBondPriceType::Clean, settlement=None))]
+    fn atm_rate_from_price(
+        &self,
+        discount_curve: &PyYieldTermStructure,
+        price: f64,
+        price_type: PyBondPriceType,
+        settlement: Option<&PyDate>,
+    ) -> PyResult<f64> {
+        if !matches!(self.inner, BondBacking::Plain(_)) {
+            return Err(ItofinError::new_err("ordinary noncallable bond required"));
+        }
+        let price = analytical_price(finite(price)?, price_type);
+        let settlement =
+            self.analytical_settlement(settlement, matches!(price, BondPrice::Clean(_)))?;
+        let curve = discount_curve
+            .handle()
+            .current_link()
+            .map_err(PyQlError::from)?;
+        finite(
+            BondFunctions::atm_rate_from_price(
+                &self.inner.borrow(),
+                &*curve,
+                price,
+                Some(settlement),
+            )
+            .map_err(PyQlError::from)?,
+        )
+    }
     /// Flat-yield duration, independent of pricing engines. Macaulay requires compounded yield.
     #[pyo3(signature=(yield_rate, day_counter, compounding, frequency, *, duration_type=PyDuration::Modified, settlement=None))]
     fn duration(

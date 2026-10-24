@@ -239,6 +239,11 @@ class Bond:
         r"""
         The coupon rate repricing the bond's own curve NPV, not a par-price target.
         """
+    def atm_rate_from_price(self, discount_curve: termstructures.YieldTermStructure, price: builtins.float, *, price_type: termstructures.BondPriceType = termstructures.BondPriceType.Clean, settlement: typing.Optional[time.Date] = None) -> builtins.float:
+        r"""
+        Coupon rate repricing an explicit per-100 clean or dirty quote at settlement.
+        Uses current notional and live coupon amounts; the own-NPV ATM API is unchanged.
+        """
     def duration(self, yield_rate: builtins.float, day_counter: time.DayCounter, compounding: time.Compounding, frequency: time.Frequency, *, duration_type: Duration = Duration.Modified, settlement: typing.Optional[time.Date] = None) -> builtins.float:
         r"""
         Flat-yield duration, independent of pricing engines. Macaulay requires compounded yield.

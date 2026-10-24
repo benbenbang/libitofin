@@ -2461,6 +2461,23 @@ int32_t itofin_bond_atm_rate_from_curve(struct ItofinContext *ctx,
                                         struct ItofinError *error);
 
 /**
+ * Coupon rate repricing an explicit quote per 100 of current settlement notional.
+ * Price kind is Clean=0 or Dirty=1. Clean includes settlement accrued interest.
+ * Reads live coupon amounts, excludes settlement-date and ex-coupon flows.
+ * Ordinary bonds only; the existing own-NPV ATM API is unchanged.
+ * # Safety
+ * Pointers and thread ownership must satisfy the crate-level C caller contract.
+ */
+int32_t itofin_bond_atm_rate_from_price(struct ItofinContext *ctx,
+                                        uint64_t id,
+                                        uint64_t discount,
+                                        double amount,
+                                        int32_t price_kind,
+                                        int32_t serial,
+                                        double *out,
+                                        struct ItofinError *error);
+
+/**
  * # Safety
  * Pointers and thread ownership must satisfy the crate-level C caller contract.
  */
