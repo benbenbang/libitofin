@@ -1,0 +1,58 @@
+{
+  "domain": "amortizing-fixed-bond",
+  "entries": [
+    {
+      "c": [
+        "itofin_amortizing_fixed_rate_bond_new"
+      ],
+      "go": [
+        "Session.NewAmortizingFixedRateBond"
+      ],
+      "python": "itofin.instruments.AmortizingFixedRateBond.__new__",
+      "status": "implemented",
+      "tests": [
+        "TestAmortizingFixedNativeOracle",
+        "TestAmortizingFixedDomainsRetentionAndConsumers"
+      ]
+    },
+    {
+      "c": [
+        "itofin_bond_integer"
+      ],
+      "go": [
+        "FixedRateBond.Frequency"
+      ],
+      "python": "itofin.instruments.AmortizingFixedRateBond.frequency",
+      "status": "implemented",
+      "tests": [
+        "TestAmortizingFixedNativeOracle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_bond_handle"
+      ],
+      "go": [
+        "FixedRateBond.DayCounter"
+      ],
+      "python": "itofin.instruments.AmortizingFixedRateBond.day_counter",
+      "status": "implemented",
+      "tests": [
+        "TestAmortizingFixedNativeOracle"
+      ]
+    },
+    {
+      "c": [
+        "itofin_bond_handle"
+      ],
+      "go": [
+        "FixedRateBond.FirstPeriodDayCounter"
+      ],
+      "python": "itofin.instruments.AmortizingFixedRateBond.first_period_day_counter",
+      "status": "implemented",
+      "tests": [
+        "TestAmortizingFixedNativeOracle"
+      ]
+    }
+  ]
+}

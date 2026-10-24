@@ -14,6 +14,7 @@ from itofin import termstructures
 from itofin import time
 import typing
 __all__ = [
+    "AmortizingFixedRateBond",
     "AssetSwap",
     "BMASwap",
     "BermudanExercise",
@@ -57,6 +58,16 @@ __all__ = [
     "ZeroCouponBond",
     "ZeroCouponInflationSwap",
 ]
+
+@typing.final
+class AmortizingFixedRateBond(Bond):
+    r"""
+    Par-amortizing fixed bond with one positive nonincreasing balance per period.
+    """
+    def __new__(cls, settlement_days: builtins.int, notionals: typing.Sequence[builtins.float], schedule: time.Schedule, coupons: typing.Sequence[builtins.float], accrual_day_counter: time.DayCounter, settings: itofin.Settings, payment_convention: time.BusinessDayConvention = time.BusinessDayConvention.Following, issue_date: typing.Optional[time.Date] = None, payment_calendar: typing.Optional[time.Calendar] = None, ex_coupon_period: typing.Optional[time.Period] = None, ex_coupon_calendar: typing.Optional[time.Calendar] = None, ex_coupon_convention: time.BusinessDayConvention = time.BusinessDayConvention.Unadjusted, ex_coupon_end_of_month: builtins.bool = False, first_period_day_counter: typing.Optional[time.DayCounter] = None) -> AmortizingFixedRateBond: ...
+    def frequency(self) -> time.Frequency: ...
+    def day_counter(self) -> time.DayCounter: ...
+    def first_period_day_counter(self) -> typing.Optional[time.DayCounter]: ...
 
 @typing.final
 class AssetSwap:
