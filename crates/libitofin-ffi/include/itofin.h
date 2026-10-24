@@ -298,6 +298,35 @@ typedef struct ItofinFixedBondConfig {
   uint8_t ex_coupon_end_of_month;
 } ItofinFixedBondConfig;
 
+/**
+ * Configuration for a par-amortizing fixed-rate bond with per-period balances.
+ */
+typedef struct ItofinAmortizingFixedBondConfig {
+  uint32_t settlement_days;
+  uint64_t settings;
+  /**
+   * Zero means no issue date.
+   */
+  int32_t issue_date;
+  int32_t payment_convention;
+  /**
+   * Zero selects the schedule calendar.
+   */
+  uint64_t calendar;
+  uint64_t schedule;
+  uint64_t day_counter;
+  /**
+   * Zero means no first-period override.
+   */
+  uint64_t first_period_day_counter;
+  uint64_t ex_coupon_calendar;
+  int32_t ex_coupon_length;
+  int32_t ex_coupon_unit;
+  int32_t ex_coupon_convention;
+  uint8_t has_ex_coupon;
+  uint8_t ex_coupon_end_of_month;
+} ItofinAmortizingFixedBondConfig;
+
 typedef struct ItofinBondForwardConfig {
   uint64_t bond;
   int32_t value_date;
@@ -2612,6 +2641,23 @@ int32_t itofin_fixed_rate_bond_new(struct ItofinContext *ctx,
                                    size_t count,
                                    uint64_t *out,
                                    struct ItofinError *error);
+
+/**
+ * Builds a par-amortizing fixed-rate bond from exact per-period balances.
+ *
+ * Notionals must be finite, positive, nonincreasing and have exactly one
+ * entry for each schedule accrual period. Equal adjacent balances are allowed.
+ * # Safety
+ * Pointers and thread ownership must satisfy the crate-level C caller contract.
+ */
+int32_t itofin_amortizing_fixed_rate_bond_new(struct ItofinContext *ctx,
+                                              struct ItofinAmortizingFixedBondConfig a,
+                                              const double *notionals,
+                                              size_t notional_count,
+                                              const double *coupons,
+                                              size_t coupon_count,
+                                              uint64_t *out,
+                                              struct ItofinError *error);
 
 /**
  * include_flows is -1 for settings default, 0 false or 1 true.
