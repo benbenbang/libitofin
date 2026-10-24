@@ -1715,6 +1715,16 @@ class VanillaOption:
         Existing zero-volatility and zero-strike numerical behavior is retained.
         """
     @classmethod
+    def asset_or_nothing(cls, option_type: OptionType, strike: builtins.float, expiry: time.Date, settings: itofin.Settings) -> VanillaOption:
+        r"""
+        Build a European asset-or-nothing option for the existing FD engine.
+
+        The finite nonnegative strike triggers a terminal asset-price payment
+        strictly in the money; equality pays zero. Attach set_fd_engine(engine)
+        or use price_fd(engine). The analytic Black engine rejects this payoff.
+        Grid convergence and the existing log-FD market domain still apply.
+        """
+    @classmethod
     def american(cls, option_type: OptionType, strike: builtins.float, earliest: time.Date, latest: time.Date, settings: itofin.Settings) -> VanillaOption:
         r"""
         Build the option exercisable at any time over [earliest, latest].
