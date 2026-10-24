@@ -15,6 +15,7 @@ from itofin import time
 import typing
 __all__ = [
     "AmortizingFixedRateBond",
+    "AmortizingFloatingRateBond",
     "AssetSwap",
     "BMASwap",
     "BermudanExercise",
@@ -68,6 +69,22 @@ class AmortizingFixedRateBond(Bond):
     def frequency(self) -> time.Frequency: ...
     def day_counter(self) -> time.DayCounter: ...
     def first_period_day_counter(self) -> typing.Optional[time.DayCounter]: ...
+
+@typing.final
+class AmortizingFloatingRateBond(Bond):
+    r"""
+    Plain ibor amortization with one positive balance per coupon period and par principal.
+    Settlement, coupon and index fixing lags are bounded by the supported Date span.
+    """
+    def __new__(cls, settlement_days: builtins.int, notionals: typing.Sequence[builtins.float], schedule: time.Schedule, index: indexes.IborIndex, accrual_day_counter: time.DayCounter, settings: itofin.Settings, *, payment_convention: time.BusinessDayConvention = time.BusinessDayConvention.Following, fixing_days: typing.Optional[builtins.int] = None, spreads: typing.Optional[typing.Sequence[builtins.float]] = None, issue_date: typing.Optional[time.Date] = None, ex_coupon_period: typing.Optional[time.Period] = None, ex_coupon_calendar: typing.Optional[time.Calendar] = None, ex_coupon_convention: time.BusinessDayConvention = time.BusinessDayConvention.Unadjusted, ex_coupon_end_of_month: builtins.bool = False, fixing_convention: time.BusinessDayConvention = time.BusinessDayConvention.Preceding) -> AmortizingFloatingRateBond: ...
+    def index(self) -> indexes.IborIndex:
+        r"""
+        Return the retained live ibor index with its original calendar bounds.
+        """
+    def set_coupon_pricer(self, pricer: cashflows.BlackIborCouponPricer) -> None:
+        r"""
+        Replace the retained plain coupon pricer without changing principal flows.
+        """
 
 @typing.final
 class AssetSwap:

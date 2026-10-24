@@ -1,0 +1,42 @@
+{
+  "domain": "plain-ibor-amortizing-bond",
+  "entries": [
+    {
+      "c": "itofin_amortizing_floating_rate_bond_new",
+      "go": "Session.NewAmortizingFloatingRateBond",
+      "python": "itofin.instruments.AmortizingFloatingRateBond",
+      "status": "implemented",
+      "tests": [
+        "TestAmortizingFloatingPrincipalBalancesAndLiveGraph",
+        "TestAmortizingFloatingDomainsSessionsAndClosedObjects"
+      ]
+    },
+    {
+      "c": "itofin_amortizing_floating_rate_bond_new",
+      "go": "Session.NewAmortizingFloatingRateBond",
+      "python": "itofin.instruments.AmortizingFloatingRateBond.__new__",
+      "status": "implemented",
+      "tests": [
+        "TestAmortizingFloatingPrincipalBalancesAndLiveGraph"
+      ]
+    },
+    {
+      "c": "itofin_floating_bond_index",
+      "go": "FloatingRateBond.Index",
+      "python": "itofin.instruments.AmortizingFloatingRateBond.index",
+      "status": "implemented",
+      "tests": [
+        "TestAmortizingFloatingRetainedPrincipalGuardGeometry"
+      ]
+    },
+    {
+      "c": "itofin_floating_bond_set_pricer",
+      "go": "FloatingRateBond.SetCouponPricer",
+      "python": "itofin.instruments.AmortizingFloatingRateBond.set_coupon_pricer",
+      "status": "implemented",
+      "tests": [
+        "TestAmortizingFloatingPrincipalBalancesAndLiveGraph"
+      ]
+    }
+  ]
+}
