@@ -7,7 +7,9 @@
       "python": "itofin.instruments.VanillaOption.asset_or_nothing",
       "status": "implemented",
       "tests": [
-        "TestAssetDigitalDomains"
+        "TestAssetDigitalDomains",
+        "TestAssetDigitalQuantLibFdOrdinary",
+        "TestAssetDigitalFiniteBoundaryPolicy"
       ]
     }
   ]
