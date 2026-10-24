@@ -36,7 +36,17 @@
         "TestBondCouponAnalyticsFloatingAmountGuardAndFrozenLifecycle",
         "TestBondCouponAnalyticsDefaultsAndYieldDomains"
       ]
+    },
+    {
+      "c": "itofin_bond_atm_rate_from_price",
+      "go": "Bond.ATMRateFromPrice",
+      "python": "itofin.instruments.Bond.atm_rate_from_price",
+      "status": "implemented",
+      "tests": [
+        "TestBondPriceATMUnitsDefaultsAndLifecycle",
+        "TestBondPriceATMFloatingGuardsAndFrozenGraph"
+      ]
     }
   ],
-  "scope": "Coupon-rate BPS per100 and default own-NPV ATM rate; not signed yield BPV or every BondFunctions overload."
+  "scope": "Coupon-rate BPS per100, preserved own-NPV ATM and additive explicit clean/dirty price-fed ATM; not signed yield BPV or every BondFunctions overload."
 }

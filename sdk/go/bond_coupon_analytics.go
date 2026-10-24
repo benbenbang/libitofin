@@ -47,3 +47,22 @@ func (b *Bond) ATMRateFromCurve(discount *YieldTermStructure, settlement *Date) 
 		return C.itofin_bond_atm_rate_from_curve(ctx, id, C.uint64_t(discount.id), serial, out, e)
 	})
 }
+
+// ATMRateFromPrice returns the coupon rate repricing an explicit per-100 quote.
+// Clean quotes include accrued interest; scaling uses current settlement notional.
+// Live coupon amounts are read, even for Dirty. The own-NPV ATM method is unchanged.
+func (b *Bond) ATMRateFromPrice(discount *YieldTermStructure, price float64, priceType BondPriceType, settlement *Date) (float64, error) {
+	if discount == nil {
+		return 0, fmt.Errorf("discount curve required")
+	}
+	if priceType != Clean && priceType != Dirty {
+		return 0, fmt.Errorf("invalid bond price type")
+	}
+	serial, err := bondDate(settlement)
+	if err != nil {
+		return 0, err
+	}
+	return b.analytics([]object{discount.object}, func(ctx *C.ItofinContext, id C.uint64_t, out *C.double, e *C.ItofinError) C.int32_t {
+		return C.itofin_bond_atm_rate_from_price(ctx, id, C.uint64_t(discount.id), C.double(price), C.int32_t(priceType), serial, out, e)
+	})
+}

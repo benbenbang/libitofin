@@ -279,6 +279,44 @@ pub unsafe extern "C" fn itofin_bond_atm_rate_from_curve(
     }
 }
 #[unsafe(no_mangle)]
+/// Coupon rate repricing an explicit quote per 100 of current settlement notional.
+/// Price kind is Clean=0 or Dirty=1. Clean includes settlement accrued interest.
+/// Reads live coupon amounts, excludes settlement-date and ex-coupon flows.
+/// Ordinary bonds only; the existing own-NPV ATM API is unchanged.
+/// # Safety
+/// Pointers and thread ownership must satisfy the crate-level C caller contract.
+pub unsafe extern "C" fn itofin_bond_atm_rate_from_price(
+    ctx: *mut Context,
+    id: u64,
+    discount: u64,
+    amount: f64,
+    price_kind: i32,
+    serial: i32,
+    out: *mut f64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            if !error.is_null() {
+                check_ptr(error)?;
+            }
+            check_ptr(out)?;
+            let price = price(amount, price_kind)?;
+            let bond = c.get::<NativeBond>(id)?;
+            bond.bond.plain()?;
+            let actual = settlement(&bond, serial, matches!(price, BondPrice::Clean(_)))?;
+            let discount = curve(c, discount)?.current_link()?;
+            let value = BondFunctions::atm_rate_from_price(
+                &bond.bond.borrow(),
+                &*discount,
+                price,
+                Some(actual),
+            )?;
+            output(out, finite(value)?)
+        })
+    }
+}
+#[unsafe(no_mangle)]
 /// # Safety
 /// Pointers and thread ownership must satisfy the crate-level C caller contract.
 pub unsafe extern "C" fn itofin_bond_clean_price_from_curve(
