@@ -1,0 +1,14 @@
+{
+  "domain": "european-asset-or-nothing-option-factory",
+  "entries": [
+    {
+      "c": "itofin_option_asset_or_nothing_new",
+      "go": "Session.NewAssetOrNothingOption",
+      "python": "itofin.instruments.VanillaOption.asset_or_nothing",
+      "status": "implemented",
+      "tests": [
+        "TestAssetDigitalDomains"
+      ]
+    }
+  ]
+}

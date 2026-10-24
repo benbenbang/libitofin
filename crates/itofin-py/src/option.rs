@@ -18,7 +18,7 @@ use crate::treeswaption::PyBermudanExercise;
 use libitofin::exercise::{AmericanExercise, EuropeanExercise, Exercise};
 use libitofin::instrument::Instrument;
 use libitofin::instruments::{
-    CashOrNothingPayoff, PlainVanillaPayoff, StrikedTypePayoff, VanillaOption,
+    AssetOrNothingPayoff, CashOrNothingPayoff, PlainVanillaPayoff, StrikedTypePayoff, VanillaOption,
 };
 use libitofin::option::OptionType;
 use libitofin::pricingengine::PricingEngine;
@@ -118,6 +118,33 @@ impl PyVanillaOption {
             strike,
             cash_payoff,
         )) as Shared<dyn StrikedTypePayoff>;
+        let exercise = shared(EuropeanExercise::new(expiry.inner())) as Shared<dyn Exercise>;
+        Ok(Self {
+            inner: VanillaOption::new(payoff, exercise, settings.inner()),
+        })
+    }
+
+    /// Build a European asset-or-nothing option for the existing FD engine.
+    ///
+    /// The finite nonnegative strike triggers a terminal asset-price payment
+    /// strictly in the money; equality pays zero. Attach set_fd_engine(engine)
+    /// or use price_fd(engine). The analytic Black engine rejects this payoff.
+    /// Grid convergence and the existing log-FD market domain still apply.
+    #[classmethod]
+    fn asset_or_nothing(
+        _cls: &Bound<'_, PyType>,
+        option_type: PyOptionType,
+        strike: f64,
+        expiry: &PyDate,
+        settings: &PySettings,
+    ) -> PyResult<Self> {
+        if !strike.is_finite() || strike < 0.0 {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "strike must be finite and nonnegative",
+            ));
+        }
+        let payoff = shared(AssetOrNothingPayoff::new(option_type.inner(), strike))
+            as Shared<dyn StrikedTypePayoff>;
         let exercise = shared(EuropeanExercise::new(expiry.inner())) as Shared<dyn Exercise>;
         Ok(Self {
             inner: VanillaOption::new(payoff, exercise, settings.inner()),

@@ -4,7 +4,7 @@ use crate::time_api::date;
 use libitofin::exercise::{AmericanExercise, EuropeanExercise, Exercise, ExerciseType};
 use libitofin::instrument::Instrument;
 use libitofin::instruments::{
-    CashOrNothingPayoff, PlainVanillaPayoff, StrikedTypePayoff, VanillaOption,
+    AssetOrNothingPayoff, CashOrNothingPayoff, PlainVanillaPayoff, StrikedTypePayoff, VanillaOption,
 };
 use libitofin::models::HestonModel;
 use libitofin::option::OptionType;
@@ -92,6 +92,43 @@ pub unsafe extern "C" fn itofin_option_cash_or_nothing_new(
                 strike,
                 cash_payoff,
             )) as Shared<dyn StrikedTypePayoff>;
+            let exercise = shared(EuropeanExercise::new(date(expiry)?)) as Shared<dyn Exercise>;
+            let option =
+                VanillaOption::new(payoff, exercise, c.get::<Shared<Settings<Date>>>(settings)?);
+            output(out, c.insert(shared_mut(option))?)
+        })
+    }
+}
+
+/// Build a European asset-or-nothing option retaining the supplied settings.
+/// Kind is 0 call or 1 put; strike must be finite and nonnegative. The payoff
+/// pays the terminal asset price strictly beyond strike, and zero at equality.
+/// Attach the existing FD Black-Scholes engine; the analytic engine rejects it.
+/// # Safety
+/// Follow the crate-level C caller contract. Output is written only on success.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn itofin_option_asset_or_nothing_new(
+    ctx: *mut Context,
+    kind: i32,
+    strike: f64,
+    expiry: i32,
+    settings: u64,
+    out: *mut u64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            if !error.is_null() {
+                check_ptr(error)?;
+            }
+            check_ptr(out)?;
+            if !strike.is_finite() || strike < 0.0 {
+                return Err(BindingError::invalid(
+                    "strike must be finite and nonnegative",
+                ));
+            }
+            let payoff = shared(AssetOrNothingPayoff::new(option_type(kind)?, strike))
+                as Shared<dyn StrikedTypePayoff>;
             let exercise = shared(EuropeanExercise::new(date(expiry)?)) as Shared<dyn Exercise>;
             let option =
                 VanillaOption::new(payoff, exercise, c.get::<Shared<Settings<Date>>>(settings)?);
@@ -389,3 +426,7 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "asset_digital_tests.rs"]
+mod asset_digital_tests;
