@@ -347,6 +347,213 @@ pub struct ItofinFloatingBondVectors {
     pub floors: *const f64,
     pub floors_count: usize,
 }
+#[repr(C)]
+/// Plain ibor amortization, with par principal and no optional payoff terms.
+pub struct ItofinAmortizingFloatingBondConfig {
+    pub settlement_days: u32,
+    pub schedule: u64,
+    pub index: u64,
+    pub day_counter: u64,
+    pub settings: u64,
+    pub payment_convention: i32,
+    /// Zero means no issue date.
+    pub issue_date: i32,
+    pub fixing_days: u32,
+    pub has_fixing_days: u8,
+    pub fixing_convention: i32,
+    /// Zero selects NullCalendar when an ex-coupon period is present.
+    pub ex_coupon_calendar: u64,
+    pub ex_coupon_length: i32,
+    pub ex_coupon_unit: i32,
+    pub ex_coupon_convention: i32,
+    pub has_ex_coupon: u8,
+    pub ex_coupon_end_of_month: u8,
+}
+
+#[unsafe(no_mangle)]
+/// Copy one positive nonincreasing balance per schedule period; repay principal at par.
+/// Empty spreads mean zero and shorter spread vectors repeat their last entry.
+/// Construction does not require historical fixings or a separate coupon pricer.
+/// Date lags cannot exceed the supported maximum-minus-minimum Date span.
+/// # Safety
+/// Pointers and thread ownership must satisfy the crate-level C caller contract.
+pub unsafe extern "C" fn itofin_amortizing_floating_rate_bond_new(
+    ctx: *mut Context,
+    a: ItofinAmortizingFloatingBondConfig,
+    notionals: *const f64,
+    count: usize,
+    spreads: *const f64,
+    spreads_count: usize,
+    out: *mut u64,
+    error: *mut ItofinError,
+) -> i32 {
+    if !error.is_null() && check_ptr(error).is_err() {
+        return INVALID_ARGUMENT;
+    }
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(out)?;
+            let supported_days = (Date::max_date() - Date::min_date()) as u32;
+            if a.has_fixing_days > 1
+                || a.has_ex_coupon > 1
+                || a.ex_coupon_end_of_month > 1
+                || a.settlement_days > supported_days
+            {
+                return Err(BindingError::invalid("invalid amortizing bond option"));
+            }
+            let schedule = c.get::<Schedule>(a.schedule)?;
+            let periods = schedule
+                .len()
+                .checked_sub(1)
+                .filter(|n| *n > 0)
+                .ok_or_else(|| BindingError::invalid("schedule spans no period"))?;
+            if count != periods || spreads_count > periods {
+                return Err(BindingError::invalid(
+                    "one notional per schedule period required",
+                ));
+            }
+            let notionals = input_slice(notionals, count)?.to_vec();
+            let spreads = input_slice(spreads, spreads_count)?
+                .iter()
+                .map(|&x| finite(x))
+                .collect::<BindingResult<Vec<_>>>()?;
+            let calendar = crate::time_api::schedule_calendar(c, a.schedule)?;
+            let index = c.get::<NativeIbor>(a.index)?;
+            let shared_settings = settings(c, a.settings)?;
+            if !std::ptr::eq(&*shared_settings, Index::settings(&*index.inner)) {
+                return Err(BindingError::invalid("bond and index settings differ"));
+            }
+            let fixing_days = (a.has_fixing_days == 1).then_some(a.fixing_days);
+            if fixing_days.unwrap_or(index.inner.fixing_days()) > supported_days
+                || index.inner.fixing_days() > supported_days
+            {
+                return Err(BindingError::invalid(
+                    "fixing days exceed supported date range",
+                ));
+            }
+            let days = i32::try_from(fixing_days.unwrap_or(index.inner.fixing_days()))
+                .map_err(|_| BindingError::invalid("fixing days overflow"))?;
+            i32::try_from(index.inner.fixing_days())
+                .map_err(|_| BindingError::invalid("index fixing days overflow"))?;
+            let fixing_rule = convention(a.fixing_convention)?;
+            let payment_rule = convention(a.payment_convention)?;
+            let ex_rule = convention(a.ex_coupon_convention)?;
+            let ex = if a.has_ex_coupon == 1 {
+                if a.ex_coupon_length < 0 {
+                    return Err(BindingError::invalid(
+                        "ex-coupon period must be nonnegative",
+                    ));
+                }
+                Some(Period::new(
+                    a.ex_coupon_length,
+                    time_unit(a.ex_coupon_unit)?,
+                ))
+            } else {
+                None
+            };
+            let ex_calendar = if ex.is_some_and(|p| p.length() != 0) && a.ex_coupon_calendar != 0 {
+                c.get::<crate::calendar_api::NativeCalendar>(a.ex_coupon_calendar)?
+            } else {
+                crate::calendar_api::NativeCalendar {
+                    inner: libitofin::time::calendars::NullCalendar::new(),
+                    horizon: None,
+                    first_year: 1901,
+                }
+            };
+            for i in 0..periods {
+                let start = schedule.date(i);
+                let end = schedule.date(i + 1);
+                let payment = adjust(&calendar, end, payment_rule)?;
+                if let Some(p) = ex.filter(|p| p.length() != 0) {
+                    advance(
+                        &ex_calendar,
+                        payment,
+                        -p.length(),
+                        p.units(),
+                        ex_rule,
+                        a.ex_coupon_end_of_month == 1,
+                    )?;
+                }
+                advance(
+                    &index.fixing_calendar,
+                    start,
+                    -days,
+                    TimeUnit::Days,
+                    fixing_rule,
+                    false,
+                )?;
+                if schedule.has_tenor() && schedule.has_is_regular() {
+                    let p = schedule.tenor();
+                    if i == 0 && !schedule.is_regular_at(1) {
+                        advance(
+                            &calendar,
+                            end,
+                            -p.length(),
+                            p.units(),
+                            schedule.business_day_convention(),
+                            false,
+                        )?;
+                    }
+                    if i == periods - 1 && !schedule.is_regular_at(i + 1) {
+                        advance(
+                            &calendar,
+                            start,
+                            p.length(),
+                            p.units(),
+                            schedule.business_day_convention(),
+                            false,
+                        )?;
+                    }
+                }
+            }
+            let bond = FloatingRateBond::new_amortizing(
+                a.settlement_days,
+                notionals,
+                schedule,
+                index.inner.clone(),
+                day_counter(c, a.day_counter)?,
+                payment_rule,
+                fixing_days,
+                spreads,
+                optional_date(a.issue_date)?,
+                ex,
+                ex_calendar.inner,
+                ex_rule,
+                a.ex_coupon_end_of_month == 1,
+                fixing_rule,
+                shared_settings.clone(),
+            )?;
+            let by_flow: std::collections::HashMap<_, _> = bond
+                .ibor_coupons()
+                .iter()
+                .flatten()
+                .map(|coupon| (Shared::as_ptr(coupon) as *const (), coupon.clone()))
+                .collect();
+            let coupons: Vec<_> = bond
+                .bond()
+                .cashflows()
+                .iter()
+                .map(|flow| by_flow.get(&(Shared::as_ptr(flow) as *const ())).cloned())
+                .collect();
+            let optionlets = vec![false; coupons.len()];
+            let metadata = NativeFloating {
+                index,
+                coupons: shared(coupons),
+                optionlets: shared(optionlets),
+                fixing_days: days,
+                fixing_convention: fixing_rule,
+                policy: shared(Cell::new(shared_settings.using_at_par_coupons())),
+                pricer_guard: shared(RefCell::new(None)),
+                engine_guard: shared(RefCell::new(None)),
+                frozen: shared(Cell::new(false)),
+            };
+            let mut native = NativeBond::new_unpriced(bond.into_bond(), calendar, None);
+            native.floating = Some(metadata);
+            output(out, c.insert(native)?)
+        })
+    }
+}
+
 #[unsafe(no_mangle)]
 /// Construct without requiring coupon histories or a cap/floor pricer.
 /// The common calendar field must be zero: floating bonds use their schedule calendar.

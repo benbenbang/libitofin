@@ -91,6 +91,134 @@ fn vectors() -> ItofinFloatingBondVectors {
     }
 }
 
+fn amortizing_config(f: &Fixture) -> ItofinAmortizingFloatingBondConfig {
+    ItofinAmortizingFloatingBondConfig {
+        settlement_days: 0,
+        schedule: f.schedule,
+        index: f.index,
+        day_counter: f.counter,
+        settings: f.settings,
+        payment_convention: 1,
+        issue_date: 0,
+        fixing_days: 0,
+        has_fixing_days: 0,
+        fixing_convention: 3,
+        ex_coupon_calendar: 0,
+        ex_coupon_length: 0,
+        ex_coupon_unit: 0,
+        ex_coupon_convention: 2,
+        has_ex_coupon: 0,
+        ex_coupon_end_of_month: 0,
+    }
+}
+
+#[test]
+fn amortizing_bad_error_alignment_does_not_allocate_or_write_output() {
+    let mut f = Fixture::new(4, 46_500);
+    let index = f.c.get::<NativeIbor>(f.index).unwrap().inner;
+    let settings = f.c.get::<Shared<Settings<Date>>>(f.settings).unwrap();
+    let owners = (
+        Shared::strong_count(&index),
+        Shared::strong_count(&settings),
+    );
+    let mut bytes =
+        vec![0u8; std::mem::size_of::<ItofinError>() + std::mem::align_of::<ItofinError>()];
+    let alignment = std::mem::align_of::<ItofinError>();
+    let offset = (alignment - bytes.as_ptr() as usize % alignment) % alignment + 1;
+    let error = bytes.as_mut_ptr().wrapping_add(offset) as *mut ItofinError;
+    let config = amortizing_config(&f);
+    let balances = [1000.; 4];
+    let mut output = 777;
+    unsafe {
+        assert_eq!(
+            itofin_amortizing_floating_rate_bond_new(
+                &mut f.c,
+                config,
+                balances.as_ptr(),
+                4,
+                null(),
+                0,
+                &mut output,
+                error
+            ),
+            INVALID_ARGUMENT
+        );
+    }
+    assert_eq!(output, 777);
+    assert!(bytes.iter().all(|&byte| byte == 0));
+    assert_eq!(
+        owners,
+        (
+            Shared::strong_count(&index),
+            Shared::strong_count(&settings)
+        )
+    );
+}
+
+#[test]
+fn amortizing_date_span_bounds_are_typed_errors_with_unchanged_outputs() {
+    let mut f = Fixture::new(4, 46_500);
+    let bound = (Date::max_date() - Date::min_date()) as u32;
+    let balances = [1000.; 4];
+    for (settlement, fixing) in [(bound + 1, 0), (u32::MAX, 0), (0, bound + 1), (0, u32::MAX)] {
+        let mut config = amortizing_config(&f);
+        config.settlement_days = settlement;
+        config.has_fixing_days = 1;
+        config.fixing_days = fixing;
+        let mut output = 777;
+        unsafe {
+            assert_eq!(
+                itofin_amortizing_floating_rate_bond_new(
+                    &mut f.c,
+                    config,
+                    balances.as_ptr(),
+                    4,
+                    null(),
+                    0,
+                    &mut output,
+                    null_mut()
+                ),
+                INVALID_ARGUMENT
+            );
+        }
+        assert_eq!(output, 777);
+    }
+    let settings = f.c.get::<Shared<Settings<Date>>>(f.settings).unwrap();
+    let index = shared(IborIndex::new(
+        "OversizedAmortizingNative".into(),
+        Period::new(6, TimeUnit::Months),
+        bound + 1,
+        Currency::usd(),
+        NullCalendar::new(),
+        BusinessDayConvention::Following,
+        false,
+        Actual360::new(),
+        Handle::empty(),
+        settings,
+    ));
+    let mut config = amortizing_config(&f);
+    config.index = f.c.insert(NativeIbor::builtin(index)).unwrap();
+    config.has_fixing_days = 1;
+    config.fixing_days = 0;
+    let mut output = 777;
+    unsafe {
+        assert_eq!(
+            itofin_amortizing_floating_rate_bond_new(
+                &mut f.c,
+                config,
+                balances.as_ptr(),
+                4,
+                null(),
+                0,
+                &mut output,
+                null_mut()
+            ),
+            INVALID_ARGUMENT
+        );
+    }
+    assert_eq!(output, 777);
+}
+
 #[test]
 fn floating_constructor_errors_preserve_outputs_and_healthy_context() {
     let mut f = Fixture::new(2, 45_500);
