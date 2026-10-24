@@ -75,6 +75,8 @@ nav:
   - Black FX delta conventions: black-delta-bindings.md
   - Plain-vanilla BlackCalculator: black-calculator-bindings.md
   - European analytic cash digitals: cash-digital-bindings.md
+  - European asset-or-nothing FD pricing: asset-digital-bindings.md
+  - European signed gap FD pricing: gap-option-bindings.md
   - Callable bond sensitivities: callable-bond-sensitivities.md
   - Callable OAS: callable-oas.md
   - Callable implied volatility: callable-implied-volatility.md
@@ -142,6 +144,9 @@ nav:
   - Go/Python callable bond bindings: callable-bond-bindings.md
   - Bond yield and Z-spread analytics: bond-analytics.md
   - Bond coupon BPS and ATM rate: bond-coupon-analytics.md
+  - Price-fed bond ATM: bond-price-atm-bindings.md
+  - Amortizing fixed-rate bonds: amortizing-fixed-bonds.md
+  - Amortizing plain-Ibor bonds: amortizing-floating-bond-bindings.md
   - Zero-coupon bonds: zero-coupon-bonds.md
   - Floating-rate bonds: floating-rate-bonds.md
   - Par asset swaps: asset-swaps.md
