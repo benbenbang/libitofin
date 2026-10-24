@@ -113,6 +113,213 @@ fn amortizing_config(f: &Fixture) -> ItofinAmortizingFloatingBondConfig {
 }
 
 #[test]
+fn amortizing_cashflow_positions_retain_coupon_guards_but_principal_has_none() {
+    let start = Date::new(5, libitofin::time::date::Month::October, 2026).serial_number();
+    let mut f = Fixture::new(4, start);
+    let mut index = f.c.get::<NativeIbor>(f.index).unwrap();
+    index.maturity_calendar.horizon = Some(2026);
+    f.index = f.c.insert(index).unwrap();
+    let balances = [1000., 800., 800., 500.];
+    let mut id = 0;
+    let config = amortizing_config(&f);
+    unsafe {
+        assert_eq!(
+            itofin_amortizing_floating_rate_bond_new(
+                &mut f.c,
+                config,
+                balances.as_ptr(),
+                balances.len(),
+                null(),
+                0,
+                &mut id,
+                null_mut()
+            ),
+            0
+        );
+    }
+    let native = f.c.get::<NativeBond>(id).unwrap();
+    let mapping = &native.floating.as_ref().unwrap().coupons;
+    assert_eq!(
+        mapping.iter().map(Option::is_some).collect::<Vec<_>>(),
+        vec![true, false, true, true, false, true, false]
+    );
+    let mut leg = 0;
+    unsafe {
+        assert_eq!(itofin_bond_handle(&mut f.c, id, 1, &mut leg, null_mut()), 0);
+        for handle in [id, f.index, f.schedule, f.counter] {
+            assert_eq!(itofin_handle_release(&mut f.c, handle, null_mut()), 0);
+        }
+        for (position, expected) in [(1, 200.), (4, 300.), (6, 500.)] {
+            let mut flow = 0;
+            let mut amount: f64 = -91.;
+            assert_eq!(
+                itofin_leg_item(&mut f.c, leg, position, &mut flow, null_mut()),
+                0
+            );
+            assert_eq!(
+                itofin_cashflow_amount(&mut f.c, flow, &mut amount, null_mut()),
+                0
+            );
+            assert!(amount.is_finite() && (amount - expected).abs() <= 1e-12);
+        }
+        for position in [0, 2, 3, 5] {
+            let mut flow = 0;
+            let mut amount = -91.;
+            assert_eq!(
+                itofin_leg_item(&mut f.c, leg, position, &mut flow, null_mut()),
+                0
+            );
+            assert_eq!(
+                itofin_cashflow_amount(&mut f.c, flow, &mut amount, null_mut()),
+                INVALID_ARGUMENT
+            );
+            assert_eq!(amount, -91.);
+        }
+    }
+    let retained = native.floating.unwrap().index;
+    let settings = f.c.get::<Shared<Settings<Date>>>(f.settings).unwrap();
+    settings.set_evaluation_date(Date::new(1, libitofin::time::date::Month::January, 2028));
+    for (i, balance) in balances.into_iter().enumerate() {
+        retained
+            .inner
+            .add_fixing(
+                crate::time_api::date(start + i as i32 * 30 - 2).unwrap(),
+                0.037,
+            )
+            .unwrap();
+        let position = [0, 2, 3, 5][i];
+        let mut flow = 0;
+        let mut amount: f64 = -91.;
+        unsafe {
+            assert_eq!(
+                itofin_leg_item(&mut f.c, leg, position, &mut flow, null_mut()),
+                0
+            );
+            assert_eq!(
+                itofin_cashflow_amount(&mut f.c, flow, &mut amount, null_mut()),
+                0
+            );
+        }
+        assert!(amount.is_finite() && (amount - balance * 0.037 * 30. / 360.).abs() < 3e-12);
+    }
+}
+
+#[test]
+fn amortizing_constructor_rejects_invalid_inputs_without_writing_output() {
+    let mut f = Fixture::new(4, 46_500);
+    for balances in [
+        vec![],
+        vec![1000.],
+        vec![1000.; 5],
+        vec![1000., 0., 800., 500.],
+        vec![1000., -1., 800., 500.],
+        vec![1000., 1100., 800., 500.],
+        vec![1000., f64::NAN, 800., 500.],
+        vec![f64::INFINITY, 800., 800., 500.],
+    ] {
+        let mut output = 777;
+        let config = amortizing_config(&f);
+        unsafe {
+            assert_ne!(
+                itofin_amortizing_floating_rate_bond_new(
+                    &mut f.c,
+                    config,
+                    balances.as_ptr(),
+                    balances.len(),
+                    null(),
+                    0,
+                    &mut output,
+                    null_mut()
+                ),
+                0
+            );
+        }
+        assert_eq!(output, 777);
+    }
+    let balances = [1000.; 4];
+    let mut output = 777;
+    let config = amortizing_config(&f);
+    unsafe {
+        assert_eq!(
+            itofin_amortizing_floating_rate_bond_new(
+                &mut f.c,
+                config,
+                null(),
+                4,
+                null(),
+                0,
+                &mut output,
+                null_mut()
+            ),
+            INVALID_ARGUMENT
+        );
+    }
+    assert_eq!(output, 777);
+    let config = amortizing_config(&f);
+    unsafe {
+        assert_eq!(
+            itofin_amortizing_floating_rate_bond_new(
+                &mut f.c,
+                config,
+                balances.as_ptr(),
+                4,
+                null(),
+                0,
+                null_mut(),
+                null_mut()
+            ),
+            INVALID_ARGUMENT
+        );
+    }
+    let mut config = amortizing_config(&f);
+    config.index = f.settings;
+    unsafe {
+        assert_eq!(
+            itofin_amortizing_floating_rate_bond_new(
+                &mut f.c,
+                config,
+                balances.as_ptr(),
+                4,
+                null(),
+                0,
+                &mut output,
+                null_mut()
+            ),
+            INVALID_HANDLE
+        );
+    }
+    assert_eq!(output, 777);
+}
+
+#[test]
+fn amortizing_constructor_confines_the_context_to_its_owner_thread() {
+    let mut f = Fixture::new(4, 46_500);
+    let config = amortizing_config(&f);
+    let address = (&mut f.c as *mut Context) as usize;
+    let (status, output) = std::thread::spawn(move || {
+        let balances = [1000.; 4];
+        let mut output = 777;
+        let status = unsafe {
+            itofin_amortizing_floating_rate_bond_new(
+                address as *mut Context,
+                config,
+                balances.as_ptr(),
+                4,
+                null(),
+                0,
+                &mut output,
+                null_mut(),
+            )
+        };
+        (status, output)
+    })
+    .join()
+    .unwrap();
+    assert_eq!(status, WRONG_THREAD);
+    assert_eq!(output, 777);
+}
+
+#[test]
 fn amortizing_bad_error_alignment_does_not_allocate_or_write_output() {
     let mut f = Fixture::new(4, 46_500);
     let index = f.c.get::<NativeIbor>(f.index).unwrap().inner;
@@ -217,6 +424,70 @@ fn amortizing_date_span_bounds_are_typed_errors_with_unchanged_outputs() {
         );
     }
     assert_eq!(output, 777);
+}
+
+#[test]
+fn amortizing_same_date_coupons_and_principals_keep_allocation_identity() {
+    use libitofin::time::{calendars::WeekendsOnly, date::Month};
+    let mut f = Fixture::new(3, 46_500);
+    let calendar = crate::calendar_api::NativeCalendar {
+        inner: WeekendsOnly::new(),
+        horizon: None,
+        first_year: 1901,
+    };
+    let schedule = Schedule::with_metadata(
+        (2..=5)
+            .map(|day| Date::new(day, Month::October, 2026))
+            .collect(),
+        calendar.inner.clone(),
+        BusinessDayConvention::Unadjusted,
+        None,
+        None,
+        None,
+        None,
+        vec![],
+    );
+    f.schedule = f.c.insert_with_metadata(schedule, calendar).unwrap();
+    let config = amortizing_config(&f);
+    let balances = [1000., 800., 500.];
+    let mut id = 0;
+    unsafe {
+        assert_eq!(
+            itofin_amortizing_floating_rate_bond_new(
+                &mut f.c,
+                config,
+                balances.as_ptr(),
+                3,
+                null(),
+                0,
+                &mut id,
+                null_mut()
+            ),
+            0
+        );
+    }
+    let native = f.c.get::<NativeBond>(id).unwrap();
+    let bond = native.bond.borrow();
+    assert!(
+        bond.cashflows()
+            .iter()
+            .all(|f| f.date() == Date::new(5, Month::October, 2026))
+    );
+    let mapping = &native.floating.as_ref().unwrap().coupons;
+    assert_eq!(
+        mapping.iter().map(Option::is_some).collect::<Vec<_>>(),
+        vec![true, true, true, false, false, false]
+    );
+    for (i, expected) in [1000., 800., 500.].into_iter().enumerate() {
+        assert_eq!(mapping[i].as_ref().unwrap().nominal(), expected);
+        assert_eq!(
+            mapping[i].as_ref().unwrap().accrual_start_date(),
+            Date::new(i as i32 + 2, Month::October, 2026)
+        );
+    }
+    for (i, expected) in [200., 300., 500.].into_iter().enumerate() {
+        assert_eq!(bond.cashflows()[i + 3].amount().unwrap(), expected);
+    }
 }
 
 #[test]
