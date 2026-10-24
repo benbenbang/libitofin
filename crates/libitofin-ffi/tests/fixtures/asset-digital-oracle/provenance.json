@@ -1,0 +1,68 @@
+{
+  "actual_evidence": {
+    "actual-loader.json": "d614d786164f3e49b65e2e030133f1b14bac93a7017e80fcb1e5a0555be0b390",
+    "input-barriers.json": "9789186072211ecb66a770b6c955c8e58fe8eaed9690f87f2b68ae47a03389f9",
+    "native-log-cells.json": "eb7715a914d318930c306d65fda8b9a1d16b1c890b6cbae1eed0b0d3eb69f42c",
+    "observations.json": "0c72771ef54d5e75adef25f7e3603893f43ae3e7b89913493bd22457ceb5c421",
+    "payoff-points.json": "40d5b19a54e6854d50572e97248c68cadc4895ce64732e7edb28697ac80914ba",
+    "receipt.json": "f1922acbcc406914da37c67de9c2ef9eec16053e239d1da35350c7230cd8c157"
+  },
+  "actual_generator_portability_qualification": "Executed generator is preserved byte-exact with original absolute local evidence/oracle paths. A future portable wrapper would be a distinct unexecuted successor, not this executed generator.",
+  "actual_native_process_exit": 0,
+  "binary64_scalar_export_checks": 1216,
+  "candidate_dependency": false,
+  "compiled_wheel_not_claimed_same_source_build": true,
+  "compiled_wheel_version": "1.43",
+  "decimal_closed_form_string_export_checks": 304,
+  "edge_qualification": [
+    "zeroVol-flat r=q=0 at trigger: native FD end must be larger than start; analytic halfmass is not deterministic strict/inclusive point law.",
+    "zeroVol-drift, zeroStrike and expiry-today finite rows are separate observed edge-policy diagnostics, not ordinary positive-vol convergence promises.",
+    "Nonpositive stock FD errors are preserved, negative stock scalar payoff probes do not extend positive-stock public FD domain.",
+    "Signed/cancelling gap cell Simpson nonpositive accuracy falls back to native grid point, not true cell integral; original native observation and independent integral both retained.",
+    "FD grid error versus analytic moment may be nonmonotonic/substantial. No candidate tolerance selected, relaxed or clamped from these outputs."
+  ],
+  "fd_query_slots": 1440,
+  "files": {
+    "export_fd_csv_v1.py": "f736bb423b20aa78777a3e9523620c2d444a7a209fb524d79c89030339bc8474",
+    "fd-cases-v1.json": "178a30f8183447bca1f695096e53d9aafd8756a8c27521e071ed829a96d533ce",
+    "generate_fd_wheel_v1.py": "c3536ebc6dd054105a5b0d675fb6d805f9d899e3b3a62ecccc0b963519ac8b56",
+    "independent_payoff_laws.py": "1f6d862f7c2193286e0aba73e5c566d1c69f1a09ed638717ed81514c4ab8a262",
+    "oracle-metadata-v1.json": "b59188edbc218455e73c5ce650e038b059834cb81f85786a162a9a6dd89f78e2"
+  },
+  "fixtures": {
+    "asset_fd_reference.csv": "a01b0b1e7e88d4327ad7fc5299cd139c3d8d629d487cb10de960b4499b514d1a",
+    "edge-errors.json": "e7e6101a3a974675ff3fc7b3c0600c0c6b58be2af2336f52002c3a1879e92f63",
+    "gap_fd_reference.csv": "b323c65fbdcceb235dbbbd6a7e9ff7cbd3b332997d8136537aae968e5e54ae87"
+  },
+  "independent_formula": "Truncated lognormal first/zeroth moments, 100-digit Decimal with 240-digit normal CDF work context; native analytic NPV crosscheck budget fixed before candidate observations at 2e-12*max(1,S,abs(H)).",
+  "input_and_source_byte_mode_metadata_barriers": "Unchanged before/after actual oracle run; no bytecode writes; no old oracle/source mutation observed.",
+  "input_case_count": 56,
+  "native_point_probe_count": 20,
+  "numeric_rows": {
+    "asset": 64,
+    "gap": 240
+  },
+  "oracle_venv_python": "3.13.16",
+  "preserved_edge_error_rows": 56,
+  "row_classification": {
+    "asset": {
+      "edge_finite_diagnostic_only": 24,
+      "ordinary_positive_vol_nonexpired": 40
+    },
+    "gap": {
+      "edge_finite_diagnostic_only": 48,
+      "ordinary_positive_vol_nonexpired": 192
+    }
+  },
+  "runtime_native_module_verified": "QuantLib._QuantLib.abi3.so exact SHA and dyld image path recorded in immutable local evidence",
+  "schema_version": 1,
+  "scope": "Existing Douglas FD engine, asset strict trigger, gap inclusive trigger with signed payouts. Not a new analytic product engine or complete payoff family.",
+  "source_revision": "9863b578af0caa4cecabf697196533e84a8308b6",
+  "status": "GENUINE_SEPARATE_COMPILED_QUANTLIB_ORACLE_LOSSLESS_BINARY64_EXPORT",
+  "tracked_representation": {
+    "asset_csv_sha256": "735f397e072e9dad27b3f824cf27ab0c8aa623da59b7e32fcd181c1a7784e44a",
+    "original_asset_csv_sha256": "a01b0b1e7e88d4327ad7fc5299cd139c3d8d629d487cb10de960b4499b514d1a",
+    "transformation": "CRLF to LF only; all CSV cell strings identical"
+  },
+  "wheel_tag": "cp39-abi3-macosx_11_0_arm64"
+}
