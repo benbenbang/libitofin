@@ -52,7 +52,8 @@ Use `-tags itofin_external` for builds, runs, tests, and vet outside this checko
 | Standalone currencies | [Constructor and fields](docs/docs/currency-bindings.md) · [Presets including TWD](docs/docs/currency-presets.md) |
 | FX delta helpers | [Black delta conventions](docs/docs/black-delta-bindings.md) |
 | Vanilla pricing and risk | [BlackCalculator](docs/docs/black-calculator-bindings.md) · [Bond risk analytics](docs/docs/bond-analytics.md) · [Coupon BPS and ATM rate](docs/docs/bond-coupon-analytics.md) |
-| European cash digitals | [Cash-or-nothing analytic pricing](docs/docs/cash-digital-bindings.md) |
+| European digital and gap options | [Cash-or-nothing analytic pricing](docs/docs/cash-digital-bindings.md) · [Asset-or-nothing FD pricing](docs/docs/asset-digital-bindings.md) · [Signed gap FD pricing](docs/docs/gap-option-bindings.md) |
+| Bond price and principal schedules | [Price-fed ATM](docs/docs/bond-price-atm-bindings.md) · [Amortizing fixed bonds](docs/docs/amortizing-fixed-bonds.md) · [Amortizing Ibor bonds](docs/docs/amortizing-floating-bond-bindings.md) |
 | Retained instruments | [Par asset swaps](docs/docs/asset-swap-bindings.md) · [Fixed-date FX forwards](docs/docs/fx-forward-bindings.md) · [Constant-notional Ibor Xccy](docs/docs/xccy-basis-bindings.md) |
 | Standalone Gaussian processes | [Constant-parameter GSR](docs/docs/gsr-process-bindings.md) · [Hull-White forward](docs/docs/hw-forward-process-bindings.md) · [MF state](docs/docs/mf-state-process-bindings.md) |
 | Worked pricing walkthrough | [Python, Rust, and Go](https://benbenbang.github.io/libitofin/getting-started/) |
@@ -62,7 +63,9 @@ Use `-tags itofin_external` for builds, runs, tests, and vet outside this checko
 | Deliberate differences from QuantLib | [Compatibility notes](wiki/compatibility.md) |
 
 Process bindings are not fitted models. Coupon BPS/ATM covers selected
-ordinary-bond helpers, not the wider `BondFunctions` overload set.
+ordinary-bond helpers, not the wider `BondFunctions` overload set. Asset/gap FD
+pricing retains documented grid limitations. Amortizing constructors cover only
+positive, nonincreasing balances.
 
 The tracked `wiki/` pages hold detailed guides; the
 [MkDocs site](https://benbenbang.github.io/libitofin/) provides language tabs and

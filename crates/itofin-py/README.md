@@ -17,6 +17,11 @@ bindings expose forward-measure transitions, not a fitted GSR model.
 | Scope | Guide | Example |
 | --- | --- | --- |
 | Ordinary bond coupon helpers | [BPS and ATM rate](https://github.com/benbenbang/libitofin/blob/main/docs/docs/bond-coupon-analytics.md) | [Example](https://github.com/benbenbang/libitofin/blob/main/example/python/bond_coupon_analytics.py) |
+| Price-fed bond ATM | [Price-fed ATM](https://github.com/benbenbang/libitofin/blob/main/docs/docs/bond-price-atm-bindings.md) | [Example](https://github.com/benbenbang/libitofin/blob/main/example/python/bond_price_atm.py) |
+| European asset-or-nothing FD pricing | [Asset digitals](https://github.com/benbenbang/libitofin/blob/main/docs/docs/asset-digital-bindings.md) | [Example](https://github.com/benbenbang/libitofin/blob/main/example/python/asset_digital.py) |
+| European signed gap FD pricing | [Gap options](https://github.com/benbenbang/libitofin/blob/main/docs/docs/gap-option-bindings.md) | [Example](https://github.com/benbenbang/libitofin/blob/main/example/python/gap_option.py) |
+| Amortizing fixed-rate bonds | [Fixed amortization](https://github.com/benbenbang/libitofin/blob/main/docs/docs/amortizing-fixed-bonds.md) | [Example](https://github.com/benbenbang/libitofin/blob/main/example/python/amortizing_fixed_bond.py) |
+| Amortizing plain-Ibor bonds | [Ibor amortization](https://github.com/benbenbang/libitofin/blob/main/docs/docs/amortizing-floating-bond-bindings.md) | [Example](https://github.com/benbenbang/libitofin/blob/main/example/python/amortizing_floating_bond.py) |
 | European analytic cash digitals | [Cash-or-nothing](https://github.com/benbenbang/libitofin/blob/main/docs/docs/cash-digital-bindings.md) | [Example](https://github.com/benbenbang/libitofin/blob/main/example/python/cash_digital.py) |
 | Standalone Gaussian state process | [MF state](https://github.com/benbenbang/libitofin/blob/main/docs/docs/mf-state-process-bindings.md) | [Example](https://github.com/benbenbang/libitofin/blob/main/example/python/mf_state_process.py) |
 | Standalone live-curve forward process | [Hull-White forward](https://github.com/benbenbang/libitofin/blob/main/docs/docs/hw-forward-process-bindings.md) | [Example](https://github.com/benbenbang/libitofin/blob/main/example/python/hw_forward_process.py) |
@@ -24,7 +29,9 @@ bindings expose forward-measure transitions, not a fitted GSR model.
 
 These helpers do not complete the wider `BondFunctions` overload set. The
 process facades are not fitted models; cash digitals cover European analytic
-Black-Scholes pricing, and Xccy spot is an immutable snapshot.
+Black-Scholes pricing, and Xccy spot is an immutable snapshot. Asset/gap FD
+pricing retains documented grid limitations. Amortizing constructors cover only
+positive, nonincreasing balances.
 
 ## Install
 
