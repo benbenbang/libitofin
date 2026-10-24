@@ -1,0 +1,15 @@
+{
+  "domain": "european-gap-option-factory",
+  "entries": [
+    {
+      "c": "itofin_option_gap_new",
+      "go": "Session.NewGapOption",
+      "python": "itofin.instruments.VanillaOption.gap",
+      "status": "implemented",
+      "tests": [
+        "TestGapFactoryPricingAndUnsupportedAnalytic",
+        "TestGapNativeGridLadder"
+      ]
+    }
+  ]
+}

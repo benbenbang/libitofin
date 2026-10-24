@@ -1725,6 +1725,17 @@ class VanillaOption:
         Grid convergence and the existing log-FD market domain still apply.
         """
     @classmethod
+    def gap(cls, option_type: OptionType, strike: builtins.float, second_strike: builtins.float, expiry: time.Date, settings: itofin.Settings) -> VanillaOption:
+        r"""
+        Build a European gap option with separate trigger and payment strikes.
+
+        The trigger strike must be finite and nonnegative, and second_strike
+        finite (signed values are accepted). Trigger equality is included and
+        negative payments are retained. Attach an existing finite-difference
+        engine with set_fd_engine; set_engine's analytic Black path rejects Gap.
+        FD cell averaging preserves its existing signed/cancelling-value fallback.
+        """
+    @classmethod
     def american(cls, option_type: OptionType, strike: builtins.float, earliest: time.Date, latest: time.Date, settings: itofin.Settings) -> VanillaOption:
         r"""
         Build the option exercisable at any time over [earliest, latest].
