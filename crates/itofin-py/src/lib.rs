@@ -392,6 +392,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     instruments.add_class::<callable_bonds::PyCallableFixedRateBond>()?;
     instruments.add_class::<callable_bonds::PyCallableZeroCouponBond>()?;
     instruments.add_class::<floating_bonds::PyFloatingRateBond>()?;
+    instruments.add_class::<floating_bonds::PyAmortizingFloatingRateBond>()?;
     instruments.add_class::<bonds::PyFixedRateBond>()?;
     instruments.add_class::<amortizing_fixed_bond::PyAmortizingFixedRateBond>()?;
     instruments.add_class::<bonds::PyZeroCouponBond>()?;

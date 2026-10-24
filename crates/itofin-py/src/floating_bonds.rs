@@ -342,3 +342,184 @@ impl PyFloatingRateBond {
         Ok(())
     }
 }
+
+/// Plain ibor amortization with one positive balance per coupon period and par principal.
+/// Settlement, coupon and index fixing lags are bounded by the supported Date span.
+#[gen_stub_pyclass]
+#[pyclass(name="AmortizingFloatingRateBond", extends=PyBond, unsendable, module="itofin.instruments")]
+pub struct PyAmortizingFloatingRateBond {
+    floating: PyFloatingRateBond,
+}
+#[gen_stub_pymethods]
+#[pymethods]
+impl PyAmortizingFloatingRateBond {
+    #[new]
+    #[gen_stub(override_return_type(type_repr = "AmortizingFloatingRateBond"))]
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature=(settlement_days, notionals, schedule, index, accrual_day_counter, settings, *, payment_convention=PyBusinessDayConvention::Following, fixing_days=None, spreads=None, issue_date=None, ex_coupon_period=None, ex_coupon_calendar=None, ex_coupon_convention=PyBusinessDayConvention::Unadjusted, ex_coupon_end_of_month=false, fixing_convention=PyBusinessDayConvention::Preceding))]
+    fn new(
+        settlement_days: u32,
+        notionals: Vec<f64>,
+        schedule: &PySchedule,
+        index: &PyIborIndex,
+        accrual_day_counter: &PyDayCounter,
+        settings: &PySettings,
+        payment_convention: PyBusinessDayConvention,
+        fixing_days: Option<u32>,
+        spreads: Option<Vec<f64>>,
+        issue_date: Option<&PyDate>,
+        ex_coupon_period: Option<&PyPeriod>,
+        ex_coupon_calendar: Option<&PyCalendar>,
+        ex_coupon_convention: PyBusinessDayConvention,
+        ex_coupon_end_of_month: bool,
+        fixing_convention: PyBusinessDayConvention,
+    ) -> PyResult<PyClassInitializer<Self>> {
+        let calendar = schedule.retained_calendar();
+        let schedule = schedule.inner();
+        if schedule.len() < 2 || notionals.len() != schedule.len() - 1 {
+            return Err(ItofinError::new_err(
+                "one notional per schedule period required",
+            ));
+        }
+        for &notional in &notionals {
+            positive(notional)?;
+        }
+        if notionals.windows(2).any(|n| n[1] > n[0]) {
+            return Err(ItofinError::new_err("notionals must be nonincreasing"));
+        }
+        let spreads = spreads.unwrap_or_default();
+        if spreads.len() > notionals.len() {
+            return Err(ItofinError::new_err(
+                "spread vector exceeds schedule periods",
+            ));
+        }
+        for &spread in &spreads {
+            finite(spread)?;
+        }
+        let index_inner = index.inner();
+        let effective_fixing_days = fixing_days.unwrap_or_else(|| index_inner.fixing_days());
+        let date_span = (Date::max_date() - Date::min_date()) as u32;
+        if settlement_days > date_span
+            || effective_fixing_days > date_span
+            || index_inner.fixing_days() > date_span
+        {
+            return Err(ItofinError::new_err(
+                "bond or index fixing days exceed supported date range",
+            ));
+        }
+        if issue_date.is_some_and(|d| d.inner() == Date::null())
+            || ex_coupon_period.is_some_and(|p| p.inner().length() < 0)
+        {
+            return Err(ItofinError::new_err(
+                "invalid issue date or ex-coupon period",
+            ));
+        }
+        let ex_calendar = ex_coupon_calendar.cloned().unwrap_or_else(|| {
+            PyCalendar::from_inner(libitofin::time::calendars::NullCalendar::new())
+        });
+        for &date in schedule.dates().iter().skip(1) {
+            let payment = adjust(&calendar, date, payment_convention.inner())?;
+            if let Some(period) = ex_coupon_period
+                .map(PyPeriod::inner)
+                .filter(|p| p.length() != 0)
+            {
+                advance(
+                    &ex_calendar,
+                    payment,
+                    -i64::from(period.length()),
+                    period.units(),
+                    ex_coupon_convention.inner(),
+                    ex_coupon_end_of_month,
+                )?;
+            }
+        }
+        if schedule.has_tenor() && schedule.has_is_regular() {
+            let p = schedule.tenor();
+            if !schedule.is_regular_at(1) {
+                advance(
+                    &calendar,
+                    schedule.date(1),
+                    -i64::from(p.length()),
+                    p.units(),
+                    schedule.business_day_convention(),
+                    false,
+                )?;
+            }
+            if !schedule.is_regular_at(schedule.len() - 1) {
+                advance(
+                    &calendar,
+                    schedule.date(schedule.len() - 2),
+                    i64::from(p.length()),
+                    p.units(),
+                    schedule.business_day_convention(),
+                    false,
+                )?;
+            }
+        }
+        let dates: Vec<_> = schedule.dates().windows(2).map(|d| (d[0], d[1])).collect();
+        let guard = shared(FloatingGuard {
+            index: Shared::clone(&index_inner),
+            calendars: index.retained_calendars(),
+            floating: vec![true; dates.len()],
+            optionlets: vec![false; dates.len()],
+            dates,
+            fixing_days: effective_fixing_days,
+            convention: fixing_convention.inner(),
+            moving: RefCell::new(None),
+        });
+        guard.check_inner(None, true)?;
+        let bond = FloatingRateBond::new_amortizing(
+            settlement_days,
+            notionals,
+            schedule,
+            index_inner,
+            accrual_day_counter.inner(),
+            payment_convention.inner(),
+            fixing_days,
+            spreads,
+            issue_date.map(PyDate::inner),
+            ex_coupon_period.map(PyPeriod::inner),
+            ex_calendar.inner(),
+            ex_coupon_convention.inner(),
+            ex_coupon_end_of_month,
+            fixing_convention.inner(),
+            settings.inner(),
+        )
+        .map_err(PyQlError::from)?;
+        let coupons = bond.ibor_coupons().to_vec();
+        let by_flow: std::collections::HashMap<_, _> = coupons
+            .iter()
+            .enumerate()
+            .filter_map(|(i, coupon)| coupon.as_ref().map(|c| (Shared::as_ptr(c) as *const (), i)))
+            .collect();
+        let positions: Vec<_> = bond
+            .bond()
+            .cashflows()
+            .iter()
+            .map(|flow| by_flow.get(&(Shared::as_ptr(flow) as *const ())).copied())
+            .collect();
+        let retained = Shared::clone(&guard);
+        let base = PyBond::from_floating(
+            bond.into_bond(),
+            calendar,
+            shared(move |position| match position {
+                None => retained.check(None),
+                Some(i) => match positions.get(i).copied().flatten() {
+                    Some(coupon) => retained.check(Some(coupon)),
+                    None => Ok(()),
+                },
+            }),
+        );
+        Ok(PyClassInitializer::from(base).add_subclass(Self {
+            floating: PyFloatingRateBond { guard, coupons },
+        }))
+    }
+    /// Return the retained live ibor index with its original calendar bounds.
+    fn index(&self) -> PyIborIndex {
+        self.floating.index()
+    }
+    /// Replace the retained plain coupon pricer without changing principal flows.
+    fn set_coupon_pricer(&self, pricer: &PyBlackIborCouponPricer) -> PyResult<()> {
+        self.floating.set_coupon_pricer(pricer)
+    }
+}
