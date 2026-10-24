@@ -92,3 +92,14 @@ Copyright (C) 2005 Charles Whitmore; Copyright (C) 2007, 2008, 2009, 2010, 2011,
 2012 Ferdinando Ametrano; Copyright (C) 2008 Toyin Akin.
 The complete QuantLib license and contributor notices are included in
 [QUANTLIB_LICENSE.txt](QUANTLIB_LICENSE.txt).
+
+## QuantLib price-fed bond ATM helper
+
+The additive `BondFunctions::atm_rate_from_price` boundary adapts the explicit
+price branch of QuantLib `ql/pricingengines/bond/bondfunctions.cpp`,
+`BondFunctions::atmRate`, revision `9863b578af0caa4cecabf697196533e84a8308b6`.
+It delegates the existing cash-flow calculation without changing its formulas.
+Copyright (C) 2009 Nathan Abbott; 2007-2010 Ferdinando Ametrano; 2007 Chiara
+Fornarola; 2008 Simon Ibbotson; 2004 M-Dimension Consulting Inc.; 2005-2009
+StatPro Italia srl; 2004 Jeff Yu. The complete license and contributor notices
+are included in `QUANTLIB_LICENSE.txt`.
