@@ -654,3 +654,7 @@ pub unsafe extern "C" fn itofin_cashflows_z_spread(
 #[cfg(test)]
 #[path = "bond_analytics_api_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "bond_price_atm_api_tests.rs"]
+mod price_atm_tests;
