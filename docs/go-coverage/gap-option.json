@@ -8,6 +8,9 @@
       "status": "implemented",
       "tests": [
         "TestGapFactoryPricingAndUnsupportedAnalytic",
+        "TestGapSignedPaymentsAndRetainedGraph",
+        "TestGapFactoryDomainsAndSessions",
+        "TestGapLiveCurvesAndMixedEngineSessions",
         "TestGapNativeGridLadder"
       ]
     }
