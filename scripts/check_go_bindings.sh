@@ -124,13 +124,19 @@ cc -std=c11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
 c++ -x c++ -std=c++11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
   crates/libitofin-ffi/tests/g2_process.c -Ltarget/release -litofin_ffi -lm -o target/cpp-g2-process
 ./target/cpp-g2-process
-for probe in c_currency black_delta black_calculator bond_risk bond_price_atm fx_forward gsr_process cash_digital gap_option gap_option_native mf_state_process hw_forward_process xccy_basis asset_digital; do
+for probe in c_currency black_delta black_calculator bond_risk bond_price_atm fx_forward gsr_process cash_digital gap_option gap_option_native mf_state_process hw_forward_process xccy_basis asset_digital amortizing_floating_bond; do
   cc -std=c11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
     "crates/libitofin-ffi/tests/$probe.c" -Ltarget/release -litofin_ffi -lm -o "target/c-$probe"
   "./target/c-$probe"
   c++ -x c++ -std=c++11 -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
     "crates/libitofin-ffi/tests/$probe.c" -Ltarget/release -litofin_ffi -lm -o "target/cpp-$probe"
   "./target/cpp-$probe"
+done
+for compiler in cc c++; do
+  if [[ "$compiler" == cc ]]; then standard=c11; else standard=c++11; fi
+  "$compiler" -x "${standard%%11}" -std="$standard" -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
+    crates/libitofin-ffi/tests/amortizing_floating_oracle.c -Ltarget/release -litofin_ffi -lm -o "target/$compiler-amortizing-floating-oracle"
+  "./target/$compiler-amortizing-floating-oracle" scripts/fixtures/amortizing_floating_bond/values.tsv
 done
 cargo build -p libitofin-ffi --release --features optimization-method-oracle
 cd sdk/go
@@ -161,3 +167,4 @@ go run ./examples/bond-forward
 go run ./examples/float-float-swap
 
 go run ./examples/xccy_basis
+go run ./examples/amortizing_floating_bond
