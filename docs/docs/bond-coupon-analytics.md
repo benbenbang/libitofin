@@ -19,7 +19,8 @@ change these per 100 results. In contrast, `basis_point_value` / `BasisPointValu
 is the existing signed, unscaled currency yield sensitivity.
 
 ATM uses the existing core default target: the bond's own curve-discounted NPV.
-It is not a par-price target and has no caller-supplied price overload. With a
+It is not a par-price target. The additive [price-fed ATM helper](bond-price-atm-bindings.md)
+accepts an explicit quote under a separate name, without changing this default. With a
 single fixed coupon rate, the result recovers that coupon rate. With differing
 coupon rates, it is their discounted-accrual-weighted rate. Redemptions are not
 coupons and do not create BPS. A zero-coupon bond returns zero for all three
