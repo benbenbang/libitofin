@@ -5,6 +5,7 @@
 //! ItofinError exception. The pricing facades land in follow-up tickets
 //! (#485-#487).
 
+mod amortizing_fixed_bond;
 mod asset_swap;
 mod bates;
 mod benchmark_beta;
@@ -392,6 +393,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     instruments.add_class::<callable_bonds::PyCallableZeroCouponBond>()?;
     instruments.add_class::<floating_bonds::PyFloatingRateBond>()?;
     instruments.add_class::<bonds::PyFixedRateBond>()?;
+    instruments.add_class::<amortizing_fixed_bond::PyAmortizingFixedRateBond>()?;
     instruments.add_class::<bonds::PyZeroCouponBond>()?;
     instruments.add_class::<variance_swap::PyVarianceSwap>()?;
     instruments.add_class::<PyOptionType>()?;
