@@ -4080,6 +4080,26 @@ int32_t itofin_cpi_capfloor_dates(struct ItofinContext *ctx,
 
 /**
  * # Safety
+ * Pointers must be aligned, live and disjoint. Context and handles belong to
+ * this thread. Serialize all calls including destruction.
+ */
+int32_t itofin_cpi_price_surface_reference_date(struct ItofinContext *ctx,
+                                                uint64_t id,
+                                                int32_t *out,
+                                                struct ItofinError *error);
+
+/**
+ * # Safety
+ * Pointers must be aligned, live and disjoint. Context and handles belong to
+ * this thread. Serialize all calls including destruction.
+ */
+int32_t itofin_cpi_capfloor_is_expired(struct ItofinContext *ctx,
+                                       uint64_t id,
+                                       int32_t *out,
+                                       struct ItofinError *error);
+
+/**
+ * # Safety
  * Pointers must be aligned and valid; outputs must not overlap. The context
  * and handles belong to the calling thread. Serialize all context calls.
  */

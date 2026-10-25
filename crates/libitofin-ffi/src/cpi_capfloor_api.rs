@@ -330,3 +330,169 @@ pub unsafe extern "C" fn itofin_cpi_capfloor_dates(
         })
     }
 }
+
+#[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and disjoint. Context and handles belong to
+/// this thread. Serialize all calls including destruction.
+pub unsafe extern "C" fn itofin_cpi_price_surface_reference_date(
+    ctx: *mut Context,
+    id: u64,
+    out: *mut i32,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            if !error.is_null() {
+                check_ptr(error)?;
+            }
+            check_ptr(out)?;
+            let surface = c.get::<Shared<CpiCapFloorTermPriceSurface>>(id)?;
+            output(out, surface.reference_date().serial_number())
+        })
+    }
+}
+#[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and disjoint. Context and handles belong to
+/// this thread. Serialize all calls including destruction.
+pub unsafe extern "C" fn itofin_cpi_capfloor_is_expired(
+    ctx: *mut Context,
+    id: u64,
+    out: *mut i32,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            if !error.is_null() {
+                check_ptr(error)?;
+            }
+            check_ptr(out)?;
+            let instrument = c.get::<CpiInstrument>(id)?;
+            let expired = instrument.inner.borrow().is_expired()?;
+            output(out, i32::from(expired))
+        })
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn cpi_capfloor_errors_preserve_outputs_and_context() {
+        let mut c = Context::new();
+        let mut error = ItofinError {
+            code: 0,
+            message: [0; 1024],
+        };
+        let mut out = 12345_u64;
+        let mut value = 456.0;
+        let mut fixing = 1000;
+        let mut payment = 2000;
+        unsafe {
+            let a = std::mem::zeroed::<ItofinCpiPriceSurfaceConfig>();
+            assert_ne!(
+                itofin_cpi_price_surface_new(&mut c, a, &mut out, &mut error),
+                0
+            );
+            assert_eq!(out, 12345);
+            assert_ne!(
+                itofin_cpi_price_surface_price(&mut c, 999, 0, 45000, 0.03, &mut value, &mut error),
+                0
+            );
+            assert_eq!(value, 456.0);
+            assert_ne!(
+                itofin_cpi_capfloor_engine_new(&mut c, 999, &mut out, &mut error),
+                0
+            );
+            assert_eq!(out, 12345);
+            let a = std::mem::zeroed::<ItofinCpiCapFloorConfig>();
+            assert_ne!(itofin_cpi_capfloor_new(&mut c, a, &mut out, &mut error), 0);
+            assert_eq!(out, 12345);
+            assert_ne!(
+                itofin_cpi_capfloor_npv(&mut c, 999, &mut value, &mut error),
+                0
+            );
+            assert_eq!(value, 456.0);
+            assert_ne!(
+                itofin_cpi_capfloor_dates(&mut c, 999, &mut fixing, &mut payment, &mut error),
+                0
+            );
+            assert_ne!(
+                itofin_cpi_price_surface_reference_date(&mut c, 999, &mut fixing, &mut error),
+                0
+            );
+            assert_ne!(
+                itofin_cpi_capfloor_is_expired(&mut c, 999, &mut payment, &mut error),
+                0
+            );
+            assert_eq!((fixing, payment), (1000, 2000));
+        }
+        let foreign = Context::new();
+        let wrong_type = c.insert(17_i32).unwrap();
+        let mut foreign = foreign;
+        unsafe {
+            assert_ne!(
+                itofin_cpi_price_surface_reference_date(
+                    &mut c,
+                    wrong_type,
+                    &mut fixing,
+                    &mut error
+                ),
+                0
+            );
+            assert_ne!(
+                itofin_cpi_capfloor_is_expired(&mut foreign, wrong_type, &mut payment, &mut error),
+                0
+            );
+        }
+        assert_eq!((fixing, payment), (1000, 2000));
+        let id = c.insert(17_i32).unwrap();
+        assert_eq!(c.get::<i32>(id).unwrap(), 17);
+    }
+    #[test]
+    fn cpi_capfloor_misaligned_error_precedes_all_writes() {
+        let mut c = Context::new();
+        let mut storage = std::mem::MaybeUninit::<ItofinError>::uninit();
+        let mut out = 12345_u64;
+        let mut value = 456.0;
+        let mut fixing = 1000;
+        let mut payment = 2000;
+        unsafe {
+            let error = storage
+                .as_mut_ptr()
+                .cast::<u8>()
+                .add(1)
+                .cast::<ItofinError>();
+            let a = std::mem::zeroed::<ItofinCpiPriceSurfaceConfig>();
+            assert_ne!(itofin_cpi_price_surface_new(&mut c, a, &mut out, error), 0);
+            assert_ne!(
+                itofin_cpi_price_surface_price(&mut c, 999, 0, 45000, 0.03, &mut value, error),
+                0
+            );
+            assert_ne!(
+                itofin_cpi_capfloor_engine_new(&mut c, 999, &mut out, error),
+                0
+            );
+            let a = std::mem::zeroed::<ItofinCpiCapFloorConfig>();
+            assert_ne!(itofin_cpi_capfloor_new(&mut c, a, &mut out, error), 0);
+            assert_ne!(itofin_cpi_capfloor_npv(&mut c, 999, &mut value, error), 0);
+            assert_ne!(
+                itofin_cpi_capfloor_dates(&mut c, 999, &mut fixing, &mut payment, error),
+                0
+            );
+            assert_ne!(
+                itofin_cpi_price_surface_reference_date(&mut c, 999, &mut fixing, error),
+                0
+            );
+            assert_ne!(
+                itofin_cpi_capfloor_is_expired(&mut c, 999, &mut payment, error),
+                0
+            );
+        }
+        assert_eq!(out, 12345);
+        assert_eq!(value, 456.0);
+        assert_eq!((fixing, payment), (1000, 2000));
+        let id = c.insert(17_i32).unwrap();
+        assert_eq!(c.get::<i32>(id).unwrap(), 17);
+    }
+}
