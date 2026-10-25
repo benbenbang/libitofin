@@ -112,6 +112,17 @@ class CPICoupon:
         Raises:
             ItofinError: On invalid terms, dates, lags or a non-finite parameter.
         """
+    @staticmethod
+    def from_base_date(base_date: time.Date, payment_date: time.Date, nominal: builtins.float, start_date: time.Date, end_date: time.Date, index: indexes.ZeroInflationIndex, observation_lag: time.Period, interpolation: indexes.CpiInterpolationType, day_counter: time.DayCounter, fixed_rate: builtins.float, reference_start: typing.Optional[time.Date] = None, reference_end: typing.Optional[time.Date] = None, ex_coupon_date: typing.Optional[time.Date] = None) -> CPICoupon:
+        r"""
+        Build a coupon with a lazy, live CPI denominator observed from base_date.
+        Existing explicit-base construction is unchanged. Use base_fixing(), not
+        the native stored-base MAX sentinel, for the effective denominator.
+        """
+    def base_fixing(self) -> builtins.float:
+        r"""
+        Effective denominator, read live for a date-based coupon.
+        """
     def set_pricer(self, pricer: CPICouponPricer) -> None: ...
     def rate(self) -> builtins.float: ...
     def amount(self) -> builtins.float: ...
@@ -152,6 +163,13 @@ class CPILeg:
 
         Raises:
             ItofinError: On invalid terms, calendars, dates or leg parameters.
+        """
+    @staticmethod
+    def from_base_date(schedule: time.Schedule, index: indexes.ZeroInflationIndex, observation_lag: time.Period, notionals: typing.Sequence[builtins.float], fixed_rates: typing.Sequence[builtins.float], day_counter: time.DayCounter, payment_calendar: time.Calendar, payment_adjustment: time.BusinessDayConvention, base_date: typing.Optional[time.Date] = None, interpolation: indexes.CpiInterpolationType = indexes.CpiInterpolationType.Flat, growth_only: builtins.bool = True, ex_coupon_period: typing.Optional[time.Period] = None, ex_coupon_calendar: typing.Optional[time.Calendar] = None, ex_coupon_adjustment: time.BusinessDayConvention = time.BusinessDayConvention.Unadjusted, ex_coupon_end_of_month: builtins.bool = False) -> CPILeg:
+        r"""
+        Build CPI coupons with a live base date and native terminal observation.
+        Omitted base_date uses schedule start minus observation_lag. No fixings
+        are read while constructing the retained, fixed-payment-date graph.
         """
     def build(self) -> Leg: ...
 
