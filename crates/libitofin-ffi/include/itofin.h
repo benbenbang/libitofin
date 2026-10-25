@@ -465,6 +465,55 @@ typedef struct ItofinCpiBondConfig {
 } ItofinCpiBondConfig;
 
 /**
+ * Prices are row-major, strike rows by maturity columns. Maturities are years.
+ */
+typedef struct ItofinCpiPriceSurfaceConfig {
+  double nominal;
+  double base_rate;
+  int32_t lag_length;
+  int32_t lag_unit;
+  uint64_t calendar;
+  int32_t convention;
+  uint64_t day_counter;
+  uint64_t index;
+  int32_t interpolation;
+  uint64_t discount;
+  const double *cap_strikes;
+  size_t cap_strike_count;
+  const double *floor_strikes;
+  size_t floor_strike_count;
+  const int32_t *maturity_years;
+  size_t maturity_count;
+  const double *cap_prices;
+  size_t cap_price_count;
+  const double *floor_prices;
+  size_t floor_price_count;
+  uint64_t settings;
+} ItofinCpiPriceSurfaceConfig;
+
+/**
+ * Contract nominal/base CPI/start date do not rescale the quoted surface price.
+ */
+typedef struct ItofinCpiCapFloorConfig {
+  int32_t kind;
+  double nominal;
+  int32_t start;
+  double base_cpi;
+  int32_t maturity;
+  uint64_t fixing_calendar;
+  int32_t fixing_convention;
+  uint64_t payment_calendar;
+  int32_t payment_convention;
+  double strike;
+  uint64_t index;
+  int32_t lag_length;
+  int32_t lag_unit;
+  int32_t interpolation;
+  uint64_t settings;
+  uint64_t engine;
+} ItofinCpiCapFloorConfig;
+
+/**
  * Plain same-currency paid and received Ibor legs. Flag zero preserves native defaults.
  */
 typedef struct ItofinFloatFloatSwapConfig {
@@ -637,55 +686,6 @@ typedef struct ItofinCapHelperConfig {
   int32_t volatility_type;
   double shift;
 } ItofinCapHelperConfig;
-
-/**
- * Prices are row-major, strike rows by maturity columns. Maturities are years.
- */
-typedef struct ItofinCpiPriceSurfaceConfig {
-  double nominal;
-  double base_rate;
-  int32_t lag_length;
-  int32_t lag_unit;
-  uint64_t calendar;
-  int32_t convention;
-  uint64_t day_counter;
-  uint64_t index;
-  int32_t interpolation;
-  uint64_t discount;
-  const double *cap_strikes;
-  size_t cap_strike_count;
-  const double *floor_strikes;
-  size_t floor_strike_count;
-  const int32_t *maturity_years;
-  size_t maturity_count;
-  const double *cap_prices;
-  size_t cap_price_count;
-  const double *floor_prices;
-  size_t floor_price_count;
-  uint64_t settings;
-} ItofinCpiPriceSurfaceConfig;
-
-/**
- * Contract nominal/base CPI/start date do not rescale the quoted surface price.
- */
-typedef struct ItofinCpiCapFloorConfig {
-  int32_t kind;
-  double nominal;
-  int32_t start;
-  double base_cpi;
-  int32_t maturity;
-  uint64_t fixing_calendar;
-  int32_t fixing_convention;
-  uint64_t payment_calendar;
-  int32_t payment_convention;
-  double strike;
-  uint64_t index;
-  int32_t lag_length;
-  int32_t lag_unit;
-  int32_t interpolation;
-  uint64_t settings;
-  uint64_t engine;
-} ItofinCpiCapFloorConfig;
 
 typedef struct ItofinCpiLegConfig {
   uint64_t schedule;
@@ -3435,6 +3435,90 @@ int32_t itofin_cpi_bond_new(struct ItofinContext *ctx,
                             struct ItofinError *error);
 
 /**
+ * # Safety
+ * Pointers must be aligned, live and valid for stated lengths, with disjoint
+ * outputs. Context and handles belong to this thread. Serialize all calls.
+ */
+int32_t itofin_cpi_price_surface_new(struct ItofinContext *ctx,
+                                     struct ItofinCpiPriceSurfaceConfig a,
+                                     uint64_t *out,
+                                     struct ItofinError *error);
+
+/**
+ * # Safety
+ * Pointers must be aligned, live and disjoint. Context and handles belong to
+ * this thread. Serialize all calls including destruction.
+ */
+int32_t itofin_cpi_price_surface_price(struct ItofinContext *ctx,
+                                       uint64_t id,
+                                       int32_t kind,
+                                       int32_t maturity,
+                                       double strike,
+                                       double *out,
+                                       struct ItofinError *error);
+
+/**
+ * # Safety
+ * Pointers must be aligned, live and disjoint. Context and handles belong to
+ * this thread. Serialize all calls including destruction.
+ */
+int32_t itofin_cpi_capfloor_engine_new(struct ItofinContext *ctx,
+                                       uint64_t surface,
+                                       uint64_t *out,
+                                       struct ItofinError *error);
+
+/**
+ * # Safety
+ * Pointers must be aligned, live and disjoint. Context and handles belong to
+ * this thread. Serialize all calls including destruction.
+ */
+int32_t itofin_cpi_capfloor_new(struct ItofinContext *ctx,
+                                struct ItofinCpiCapFloorConfig a,
+                                uint64_t *out,
+                                struct ItofinError *error);
+
+/**
+ * # Safety
+ * Pointers must be aligned, live and disjoint. Context and handles belong to
+ * this thread. Serialize all calls including destruction.
+ */
+int32_t itofin_cpi_capfloor_npv(struct ItofinContext *ctx,
+                                uint64_t id,
+                                double *out,
+                                struct ItofinError *error);
+
+/**
+ * # Safety
+ * Pointers must be aligned, live and disjoint. Context and handles belong to
+ * this thread. Serialize all calls including destruction.
+ */
+int32_t itofin_cpi_capfloor_dates(struct ItofinContext *ctx,
+                                  uint64_t id,
+                                  int32_t *fixing,
+                                  int32_t *payment,
+                                  struct ItofinError *error);
+
+/**
+ * # Safety
+ * Pointers must be aligned, live and disjoint. Context and handles belong to
+ * this thread. Serialize all calls including destruction.
+ */
+int32_t itofin_cpi_price_surface_reference_date(struct ItofinContext *ctx,
+                                                uint64_t id,
+                                                int32_t *out,
+                                                struct ItofinError *error);
+
+/**
+ * # Safety
+ * Pointers must be aligned, live and disjoint. Context and handles belong to
+ * this thread. Serialize all calls including destruction.
+ */
+int32_t itofin_cpi_capfloor_is_expired(struct ItofinContext *ctx,
+                                       uint64_t id,
+                                       int32_t *out,
+                                       struct ItofinError *error);
+
+/**
  * Construct and retain the original native instrument, Settings and both indexes.
  * # Safety
  * Follow the crate-level pointer and thread contract.
@@ -4013,90 +4097,6 @@ int32_t itofin_convergence_statistics_table(struct ItofinContext *ctx,
                                             ItofinReal *out_means,
                                             size_t out_len,
                                             struct ItofinError *error);
-
-/**
- * # Safety
- * Pointers must be aligned, live and valid for stated lengths, with disjoint
- * outputs. Context and handles belong to this thread. Serialize all calls.
- */
-int32_t itofin_cpi_price_surface_new(struct ItofinContext *ctx,
-                                     struct ItofinCpiPriceSurfaceConfig a,
-                                     uint64_t *out,
-                                     struct ItofinError *error);
-
-/**
- * # Safety
- * Pointers must be aligned, live and disjoint. Context and handles belong to
- * this thread. Serialize all calls including destruction.
- */
-int32_t itofin_cpi_price_surface_price(struct ItofinContext *ctx,
-                                       uint64_t id,
-                                       int32_t kind,
-                                       int32_t maturity,
-                                       double strike,
-                                       double *out,
-                                       struct ItofinError *error);
-
-/**
- * # Safety
- * Pointers must be aligned, live and disjoint. Context and handles belong to
- * this thread. Serialize all calls including destruction.
- */
-int32_t itofin_cpi_capfloor_engine_new(struct ItofinContext *ctx,
-                                       uint64_t surface,
-                                       uint64_t *out,
-                                       struct ItofinError *error);
-
-/**
- * # Safety
- * Pointers must be aligned, live and disjoint. Context and handles belong to
- * this thread. Serialize all calls including destruction.
- */
-int32_t itofin_cpi_capfloor_new(struct ItofinContext *ctx,
-                                struct ItofinCpiCapFloorConfig a,
-                                uint64_t *out,
-                                struct ItofinError *error);
-
-/**
- * # Safety
- * Pointers must be aligned, live and disjoint. Context and handles belong to
- * this thread. Serialize all calls including destruction.
- */
-int32_t itofin_cpi_capfloor_npv(struct ItofinContext *ctx,
-                                uint64_t id,
-                                double *out,
-                                struct ItofinError *error);
-
-/**
- * # Safety
- * Pointers must be aligned, live and disjoint. Context and handles belong to
- * this thread. Serialize all calls including destruction.
- */
-int32_t itofin_cpi_capfloor_dates(struct ItofinContext *ctx,
-                                  uint64_t id,
-                                  int32_t *fixing,
-                                  int32_t *payment,
-                                  struct ItofinError *error);
-
-/**
- * # Safety
- * Pointers must be aligned, live and disjoint. Context and handles belong to
- * this thread. Serialize all calls including destruction.
- */
-int32_t itofin_cpi_price_surface_reference_date(struct ItofinContext *ctx,
-                                                uint64_t id,
-                                                int32_t *out,
-                                                struct ItofinError *error);
-
-/**
- * # Safety
- * Pointers must be aligned, live and disjoint. Context and handles belong to
- * this thread. Serialize all calls including destruction.
- */
-int32_t itofin_cpi_capfloor_is_expired(struct ItofinContext *ctx,
-                                       uint64_t id,
-                                       int32_t *out,
-                                       struct ItofinError *error);
 
 /**
  * # Safety
