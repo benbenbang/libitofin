@@ -1,0 +1,145 @@
+{
+  "domain": "standalone-inflation-principal",
+  "entries": [
+    {
+      "c": "itofin_cpi_cashflow_new",
+      "go": "Session.NewCPICashFlow",
+      "python": "itofin.cashflows.CPICashFlow.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestInflationPrincipalNativeValuesConversionsAndLiveRelinking",
+        "TestInflationPrincipalDomainsSessionsNilAndConcurrency"
+      ]
+    },
+    {
+      "c": "itofin_zero_inflation_cashflow_new",
+      "go": "Session.NewZeroInflationCashFlow",
+      "python": "itofin.cashflows.ZeroInflationCashFlow.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestInflationPrincipalNativeValuesConversionsAndLiveRelinking",
+        "TestInflationPrincipalDomainsSessionsNilAndConcurrency"
+      ]
+    },
+    {
+      "c": "itofin_inflation_cashflow_value",
+      "go": "InflationCashFlow.Amount",
+      "python": "itofin.cashflows.CPICashFlow.amount",
+      "status": "implemented",
+      "tests": [
+        "TestInflationPrincipalNativeValuesConversionsAndLiveRelinking",
+        "TestInflationPrincipalLazyAndReadTimeGuards"
+      ]
+    },
+    {
+      "c": "itofin_inflation_cashflow_value",
+      "go": "InflationCashFlow.Amount",
+      "python": "itofin.cashflows.ZeroInflationCashFlow.amount",
+      "status": "implemented",
+      "tests": [
+        "TestInflationPrincipalNativeValuesConversionsAndLiveRelinking",
+        "TestInflationPrincipalLazyAndReadTimeGuards"
+      ]
+    },
+    {
+      "c": "itofin_inflation_cashflow_value",
+      "go": "InflationCashFlow.BaseFixing",
+      "python": "itofin.cashflows.CPICashFlow.base_fixing",
+      "status": "implemented",
+      "tests": [
+        "TestInflationPrincipalNativeValuesConversionsAndLiveRelinking",
+        "TestInflationPrincipalLazyAndReadTimeGuards"
+      ]
+    },
+    {
+      "c": "itofin_inflation_cashflow_value",
+      "go": "InflationCashFlow.BaseFixing",
+      "python": "itofin.cashflows.ZeroInflationCashFlow.base_fixing",
+      "status": "implemented",
+      "tests": [
+        "TestInflationPrincipalNativeValuesConversionsAndLiveRelinking",
+        "TestInflationPrincipalLazyAndReadTimeGuards"
+      ]
+    },
+    {
+      "c": "itofin_inflation_cashflow_value",
+      "go": "InflationCashFlow.IndexFixing",
+      "python": "itofin.cashflows.CPICashFlow.index_fixing",
+      "status": "implemented",
+      "tests": [
+        "TestInflationPrincipalNativeValuesConversionsAndLiveRelinking",
+        "TestInflationPrincipalLazyAndReadTimeGuards"
+      ]
+    },
+    {
+      "c": "itofin_inflation_cashflow_value",
+      "go": "InflationCashFlow.IndexFixing",
+      "python": "itofin.cashflows.ZeroInflationCashFlow.index_fixing",
+      "status": "implemented",
+      "tests": [
+        "TestInflationPrincipalNativeValuesConversionsAndLiveRelinking",
+        "TestInflationPrincipalLazyAndReadTimeGuards"
+      ]
+    },
+    {
+      "c": "itofin_inflation_cashflow_date",
+      "go": "InflationCashFlow.Date",
+      "python": "itofin.cashflows.CPICashFlow.date",
+      "status": "implemented",
+      "tests": [
+        "TestInflationPrincipalNativeValuesConversionsAndLiveRelinking",
+        "TestInflationPrincipalLazyAndReadTimeGuards"
+      ]
+    },
+    {
+      "c": "itofin_inflation_cashflow_date",
+      "go": "InflationCashFlow.Date",
+      "python": "itofin.cashflows.ZeroInflationCashFlow.date",
+      "status": "implemented",
+      "tests": [
+        "TestInflationPrincipalNativeValuesConversionsAndLiveRelinking",
+        "TestInflationPrincipalLazyAndReadTimeGuards"
+      ]
+    },
+    {
+      "c": "itofin_inflation_cashflow_convert",
+      "go": "InflationCashFlow.AsCashFlow",
+      "python": "itofin.cashflows.CPICashFlow.as_cashflow",
+      "status": "implemented",
+      "tests": [
+        "TestInflationPrincipalNativeValuesConversionsAndLiveRelinking",
+        "TestInflationPrincipalLazyAndReadTimeGuards"
+      ]
+    },
+    {
+      "c": "itofin_inflation_cashflow_convert",
+      "go": "InflationCashFlow.AsCashFlow",
+      "python": "itofin.cashflows.ZeroInflationCashFlow.as_cashflow",
+      "status": "implemented",
+      "tests": [
+        "TestInflationPrincipalNativeValuesConversionsAndLiveRelinking",
+        "TestInflationPrincipalLazyAndReadTimeGuards"
+      ]
+    },
+    {
+      "c": "itofin_inflation_cashflow_convert",
+      "go": "InflationCashFlow.AsLeg",
+      "python": "itofin.cashflows.CPICashFlow.as_leg",
+      "status": "implemented",
+      "tests": [
+        "TestInflationPrincipalNativeValuesConversionsAndLiveRelinking",
+        "TestInflationPrincipalLazyAndReadTimeGuards"
+      ]
+    },
+    {
+      "c": "itofin_inflation_cashflow_convert",
+      "go": "InflationCashFlow.AsLeg",
+      "python": "itofin.cashflows.ZeroInflationCashFlow.as_leg",
+      "status": "implemented",
+      "tests": [
+        "TestInflationPrincipalNativeValuesConversionsAndLiveRelinking",
+        "TestInflationPrincipalLazyAndReadTimeGuards"
+      ]
+    }
+  ]
+}

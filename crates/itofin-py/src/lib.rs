@@ -62,6 +62,7 @@ mod hullwhite;
 mod hw_forward_process;
 mod incremental_statistics;
 mod inflation;
+mod inflation_principal;
 mod iterativebootstrap;
 mod jointcurves;
 mod makeswaption;
@@ -385,6 +386,8 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     cashflows.add_class::<cpi_cashflows::PyCpiCoupon>()?;
     cashflows.add_class::<cpi_cashflows::PyCpiCouponPricer>()?;
     cashflows.add_class::<cpi_cashflows::PyCpiLeg>()?;
+    cashflows.add_class::<inflation_principal::PyCpiCashFlow>()?;
+    cashflows.add_class::<inflation_principal::PyZeroInflationCashFlow>()?;
     cashflows.add_class::<bma::PyAverageBMACoupon>()?;
     cashflows.add_class::<PyCashFlow>()?;
     cashflows.add_class::<PyLeg>()?;
