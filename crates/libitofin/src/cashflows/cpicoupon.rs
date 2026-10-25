@@ -449,3 +449,7 @@ impl CashFlow for CpiCashFlow {
         None
     }
 }
+
+#[cfg(test)]
+#[path = "cpicoupon_tests.rs"]
+mod tests;
