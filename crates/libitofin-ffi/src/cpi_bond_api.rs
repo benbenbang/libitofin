@@ -126,3 +126,336 @@ pub unsafe extern "C" fn itofin_cpi_bond_new(
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::inflation_api::ZeroIndex;
+    use libitofin::handle::RelinkableHandle;
+    use libitofin::indexes::inflation::UkRpi;
+    use libitofin::settings::Settings;
+    use libitofin::shared::shared;
+    use libitofin::time::{
+        calendars::NullCalendar,
+        date::{Date, Month::*},
+        daycounters::actual365fixed::Actual365Fixed,
+    };
+    use std::ptr::{null, null_mut};
+
+    fn setup() -> (Context, ItofinCpiBondConfig) {
+        let mut context = Context::new();
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(Date::new(15, June, 2025));
+        let index = shared(UkRpi::new(settings.clone()));
+        let index = context
+            .insert(ZeroIndex {
+                inner: index,
+                curve: RelinkableHandle::empty(),
+            })
+            .unwrap();
+        let settings = context.insert(settings).unwrap();
+        let calendar = NativeCalendar {
+            inner: NullCalendar::new(),
+            horizon: None,
+            first_year: 1901,
+        };
+        let schedule = context
+            .insert_with_metadata(
+                Schedule::from_dates(vec![
+                    Date::new(15, January, 2025),
+                    Date::new(15, July, 2025),
+                ]),
+                calendar,
+            )
+            .unwrap();
+        let day_counter = context.insert(Actual365Fixed::new()).unwrap();
+        (
+            context,
+            ItofinCpiBondConfig {
+                settlement_days: 2,
+                face_amount: 1000.0,
+                base_cpi: 100.0,
+                observation_lag_length: 3,
+                observation_lag_unit: 2,
+                index,
+                observation_interpolation: 0,
+                schedule,
+                day_counter,
+                settings,
+                payment_convention: 2,
+                payment_calendar: 0,
+                issue_date: 0,
+                ex_coupon_calendar: 0,
+                ex_coupon_length: 0,
+                ex_coupon_unit: 0,
+                ex_coupon_convention: 2,
+                has_ex_coupon: 0,
+                ex_coupon_end_of_month: 0,
+            },
+        )
+    }
+    #[test]
+    fn cpi_bond_lazy_construction_and_invalid_inputs_preserve_outputs() {
+        let (mut context, config) = setup();
+        let mut output = 777;
+        unsafe {
+            assert_eq!(
+                itofin_cpi_bond_new(
+                    &mut context,
+                    config,
+                    [0.02].as_ptr(),
+                    1,
+                    &mut output,
+                    null_mut()
+                ),
+                0
+            );
+        }
+        let native = context.get::<NativeBond>(output).unwrap();
+        assert!(native.indexed);
+        assert_eq!(native.bond.borrow().cashflows().len(), 2);
+        assert_eq!(native.bond.borrow().redemptions().len(), 1);
+        assert!(native.bond.borrow().redemptions()[0].amount().is_err());
+        for value in [0.0, -1.0, f64::NAN, f64::INFINITY] {
+            let (mut context, mut config) = setup();
+            config.base_cpi = value;
+            let mut output = 777;
+            unsafe {
+                assert_ne!(
+                    itofin_cpi_bond_new(
+                        &mut context,
+                        config,
+                        [0.02].as_ptr(),
+                        1,
+                        &mut output,
+                        null_mut()
+                    ),
+                    0
+                );
+            }
+            assert_eq!(output, 777);
+        }
+        let (mut context, config) = setup();
+        let mut output = 777;
+        unsafe {
+            assert_ne!(
+                itofin_cpi_bond_new(&mut context, config, null(), 1, &mut output, null_mut()),
+                0
+            );
+        }
+        assert_eq!(output, 777);
+    }
+    #[test]
+    fn cpi_bond_pointer_preflight_precedes_output_and_handle_creation() {
+        let (mut context, config) = setup();
+        let misaligned = std::ptr::without_provenance_mut::<ItofinError>(1);
+        let mut output = 777;
+        unsafe {
+            assert_eq!(
+                itofin_cpi_bond_new(
+                    &mut context,
+                    config,
+                    [0.02].as_ptr(),
+                    1,
+                    &mut output,
+                    misaligned
+                ),
+                INVALID_ARGUMENT
+            );
+        }
+        assert_eq!(output, 777);
+        let (mut context, config) = setup();
+        unsafe {
+            assert_eq!(
+                itofin_cpi_bond_new(
+                    &mut context,
+                    config,
+                    [0.02].as_ptr(),
+                    1,
+                    null_mut(),
+                    null_mut()
+                ),
+                INVALID_ARGUMENT
+            );
+        }
+    }
+    #[test]
+    fn cpi_bond_bad_handles_enums_flags_and_oversized_lag_are_recoverable() {
+        for case in 0..8 {
+            let (mut context, mut config) = setup();
+            match case {
+                0 => config.index = config.day_counter,
+                1 => config.schedule = u64::MAX,
+                2 => config.observation_interpolation = 27,
+                3 => config.payment_convention = 27,
+                4 => config.has_ex_coupon = 2,
+                5 => config.observation_lag_length = i32::MAX,
+                6 => config.ex_coupon_end_of_month = 2,
+                _ => config.issue_date = i32::MAX,
+            }
+            let mut output = 777;
+            unsafe {
+                assert_ne!(
+                    itofin_cpi_bond_new(
+                        &mut context,
+                        config,
+                        [0.02].as_ptr(),
+                        1,
+                        &mut output,
+                        null_mut()
+                    ),
+                    0
+                );
+            }
+            assert_eq!(output, 777);
+            assert!(context.insert(123_u32).is_ok());
+        }
+    }
+    #[test]
+    fn cpi_bond_settlement_overflow_is_rejected_without_poisoning() {
+        let (mut context, mut config) = setup();
+        config.settlement_days = (Date::max_date() - Date::min_date()) as u32;
+        let mut bond = 0;
+        unsafe {
+            assert_eq!(
+                itofin_cpi_bond_new(
+                    &mut context,
+                    config,
+                    [0.02].as_ptr(),
+                    1,
+                    &mut bond,
+                    null_mut()
+                ),
+                0
+            );
+            let mut output = 777.0;
+            assert_ne!(
+                crate::bond_api::itofin_bond_real(
+                    &mut context,
+                    bond,
+                    0,
+                    0,
+                    &mut output,
+                    null_mut()
+                ),
+                0
+            );
+            assert_eq!(output, 777.0);
+        }
+        assert!(context.insert(123_u32).is_ok());
+    }
+    #[test]
+    fn cpi_bond_asset_swap_rejects_before_missing_fixings() {
+        let (mut context, config) = setup();
+        let mut bond = 0;
+        unsafe {
+            assert_eq!(
+                itofin_cpi_bond_new(
+                    &mut context,
+                    config,
+                    [0.02].as_ptr(),
+                    1,
+                    &mut bond,
+                    null_mut()
+                ),
+                0
+            );
+            let config = crate::asset_swap_api::ItofinAssetSwapConfig {
+                bond,
+                index: 0,
+                floating_schedule: 0,
+                floating_day_counter: 0,
+                clean_price: 100.0,
+                spread: 0.0,
+                pay_bond_coupon: 1,
+            };
+            let mut output = 777;
+            assert_eq!(
+                crate::asset_swap_api::itofin_asset_swap_new(
+                    &mut context,
+                    &config,
+                    &mut output,
+                    null_mut()
+                ),
+                INVALID_ARGUMENT
+            );
+            assert_eq!(output, 777);
+        }
+    }
+    #[test]
+    fn cpi_bond_raw_coupon_analytics_reject_before_fixing_or_curve_reads() {
+        let (mut context, config) = setup();
+        let day_counter = config.day_counter;
+        let mut bond = 0;
+        let mut output = 777.0;
+        unsafe {
+            assert_eq!(
+                itofin_cpi_bond_new(
+                    &mut context,
+                    config,
+                    [0.02].as_ptr(),
+                    1,
+                    &mut bond,
+                    null_mut()
+                ),
+                0
+            );
+            assert_eq!(
+                crate::bond_analytics_api::itofin_bond_bps_from_curve(
+                    &mut context,
+                    bond,
+                    0,
+                    0,
+                    &mut output,
+                    null_mut()
+                ),
+                INVALID_ARGUMENT
+            );
+            assert_eq!(output, 777.0);
+            let config = crate::bond_analytics_api::ItofinBondYieldAnalyticsConfig {
+                day_counter,
+                compounding: 2,
+                frequency: 0,
+                settlement: 0,
+            };
+            assert_eq!(
+                crate::bond_analytics_api::itofin_bond_bps_from_yield(
+                    &mut context,
+                    bond,
+                    0.04,
+                    config,
+                    &mut output,
+                    null_mut()
+                ),
+                INVALID_ARGUMENT
+            );
+            assert_eq!(output, 777.0);
+            assert_eq!(
+                crate::bond_analytics_api::itofin_bond_atm_rate_from_curve(
+                    &mut context,
+                    bond,
+                    0,
+                    0,
+                    &mut output,
+                    null_mut()
+                ),
+                INVALID_ARGUMENT
+            );
+            assert_eq!(output, 777.0);
+            assert_eq!(
+                crate::bond_analytics_api::itofin_bond_atm_rate_from_price(
+                    &mut context,
+                    bond,
+                    0,
+                    100.0,
+                    0,
+                    0,
+                    &mut output,
+                    null_mut()
+                ),
+                INVALID_ARGUMENT
+            );
+            assert_eq!(output, 777.0);
+        }
+    }
+}
