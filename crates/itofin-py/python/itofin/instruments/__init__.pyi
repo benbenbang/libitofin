@@ -46,9 +46,11 @@ __all__ = [
     "OptionType",
     "OvernightIndexFuture",
     "OvernightIndexedSwap",
+    "PayoffKind",
     "Position",
     "PricingModel",
     "ProtectionSide",
+    "ScalarPayoff",
     "SettlementMethod",
     "SettlementType",
     "SwapType",
@@ -1697,6 +1699,63 @@ class OvernightIndexedSwap:
         """
 
 @typing.final
+class ScalarPayoff:
+    r"""
+    Immutable payoff terms and evaluation at a finite signed underlying price.
+    Signed strikes and amounts are allowed. Factories copy all input values.
+    This object cannot be passed to existing option constructors or engines.
+    """
+    @staticmethod
+    def plain_vanilla(option_type: OptionType, strike: builtins.float) -> ScalarPayoff:
+        r"""
+        Vanilla intrinsic value, floored at zero.
+        """
+    @staticmethod
+    def cash_or_nothing(option_type: OptionType, strike: builtins.float, cash_payoff: builtins.float) -> ScalarPayoff:
+        r"""
+        Fixed cash amount strictly beyond the strike; zero at equality.
+        """
+    @staticmethod
+    def asset_or_nothing(option_type: OptionType, strike: builtins.float) -> ScalarPayoff:
+        r"""
+        Underlying price strictly beyond the strike; zero at equality.
+        """
+    @staticmethod
+    def gap(option_type: OptionType, strike: builtins.float, second_strike: builtins.float) -> ScalarPayoff:
+        r"""
+        Inclusive trigger strike and separate payment strike; no payout floor.
+        """
+    @staticmethod
+    def percentage_strike(option_type: OptionType, moneyness: builtins.float) -> ScalarPayoff:
+        r"""
+        Dimensionless ratio, not percent points or an absolute monetary strike.
+        """
+    def value(self, price: builtins.float) -> builtins.float:
+        r"""
+        Evaluate at a finite signed price. Nonfinite computed results raise.
+        """
+    def kind(self) -> PayoffKind:
+        r"""
+        Stored payoff family.
+        """
+    def option_type(self) -> OptionType:
+        r"""
+        Stored call or put flag.
+        """
+    def strike(self) -> builtins.float:
+        r"""
+        Stored trigger strike, or dimensionless ratio for percentage-strike.
+        """
+    def cash_payoff(self) -> typing.Optional[builtins.float]:
+        r"""
+        Stored cash amount for cash-or-nothing, otherwise None.
+        """
+    def second_strike(self) -> typing.Optional[builtins.float]:
+        r"""
+        Stored payment strike for gap, otherwise None.
+        """
+
+@typing.final
 class Swaption:
     r"""
     An option to enter a vanilla or overnight swap.
@@ -3166,6 +3225,20 @@ class OptionType:
     Call: typing.ClassVar[OptionType]
     Put: typing.ClassVar[OptionType]
     def __new__(cls, _unconstructible: typing.NoReturn) -> OptionType: ...
+    def __int__(self) -> builtins.int: ...
+    __hash__: typing.ClassVar[None]  # type: ignore[assignment]
+
+@typing.final
+class PayoffKind:
+    r"""
+    Safe scalar payoff family, not an engine compatibility promise.
+    """
+    PlainVanilla: typing.ClassVar[PayoffKind]
+    CashOrNothing: typing.ClassVar[PayoffKind]
+    AssetOrNothing: typing.ClassVar[PayoffKind]
+    Gap: typing.ClassVar[PayoffKind]
+    PercentageStrike: typing.ClassVar[PayoffKind]
+    def __new__(cls, _unconstructible: typing.NoReturn) -> PayoffKind: ...
     def __int__(self) -> builtins.int: ...
     __hash__: typing.ClassVar[None]  # type: ignore[assignment]
 

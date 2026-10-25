@@ -1,0 +1,137 @@
+{
+  "domain": "immutable-standalone-scalar-payoffs",
+  "entries": [
+    {
+      "c": "itofin_scalar_payoff_new",
+      "go": "Session.NewPlainVanillaPayoff",
+      "python": "itofin.instruments.ScalarPayoff.plain_vanilla",
+      "status": "implemented",
+      "tests": "TestScalarPayoffNativeFixtures"
+    },
+    {
+      "c": "itofin_scalar_payoff_new",
+      "go": "Session.NewCashOrNothingPayoff",
+      "python": "itofin.instruments.ScalarPayoff.cash_or_nothing",
+      "status": "implemented",
+      "tests": "TestScalarPayoffNativeFixtures"
+    },
+    {
+      "c": "itofin_scalar_payoff_new",
+      "go": "Session.NewAssetOrNothingPayoff",
+      "python": "itofin.instruments.ScalarPayoff.asset_or_nothing",
+      "status": "implemented",
+      "tests": "TestScalarPayoffNativeFixtures"
+    },
+    {
+      "c": "itofin_scalar_payoff_new",
+      "go": "Session.NewGapPayoff",
+      "python": "itofin.instruments.ScalarPayoff.gap",
+      "status": "implemented",
+      "tests": "TestScalarPayoffNativeFixtures"
+    },
+    {
+      "c": "itofin_scalar_payoff_new",
+      "go": "Session.NewPercentageStrikePayoff",
+      "python": "itofin.instruments.ScalarPayoff.percentage_strike",
+      "status": "implemented",
+      "tests": "TestScalarPayoffNativeFixtures"
+    },
+    {
+      "c": "itofin_scalar_payoff_value",
+      "go": "ScalarPayoff.Value",
+      "python": "itofin.instruments.ScalarPayoff.value",
+      "status": "implemented",
+      "tests": "TestScalarPayoffNativeFixtures"
+    },
+    {
+      "c": "itofin_scalar_payoff_info",
+      "go": "ScalarPayoff.Parameters",
+      "python": "itofin.instruments.ScalarPayoff.kind",
+      "status": "implemented",
+      "tests": "TestScalarPayoffTermsTriggersAndSignedValues"
+    },
+    {
+      "c": "itofin_scalar_payoff_info",
+      "go": "ScalarPayoff.Parameters",
+      "python": "itofin.instruments.ScalarPayoff.option_type",
+      "status": "implemented",
+      "tests": "TestScalarPayoffTermsTriggersAndSignedValues"
+    },
+    {
+      "c": "itofin_scalar_payoff_info",
+      "go": "ScalarPayoff.Parameters",
+      "python": "itofin.instruments.ScalarPayoff.strike",
+      "status": "implemented",
+      "tests": "TestScalarPayoffTermsTriggersAndSignedValues"
+    },
+    {
+      "c": "itofin_scalar_payoff_info",
+      "go": "ScalarPayoff.Parameters",
+      "python": "itofin.instruments.ScalarPayoff.cash_payoff",
+      "status": "implemented",
+      "tests": "TestScalarPayoffTermsTriggersAndSignedValues"
+    },
+    {
+      "c": "itofin_scalar_payoff_info",
+      "go": "ScalarPayoff.Parameters",
+      "python": "itofin.instruments.ScalarPayoff.second_strike",
+      "status": "implemented",
+      "tests": "TestScalarPayoffTermsTriggersAndSignedValues"
+    },
+    {
+      "go": "PayoffKind",
+      "python": "itofin.instruments.PayoffKind",
+      "status": "implemented",
+      "tests": "TestScalarPayoffTermsTriggersAndSignedValues"
+    },
+    {
+      "go": "PayoffKind: explicit integer conversion",
+      "python": "itofin.instruments.PayoffKind.__int__",
+      "status": "implemented",
+      "tests": "TestScalarPayoffTermsTriggersAndSignedValues"
+    },
+    {
+      "c": "int32 discriminant 0",
+      "go": "PayoffPlainVanilla",
+      "python": "itofin.instruments.PayoffKind.PlainVanilla",
+      "status": "implemented",
+      "tests": "TestScalarPayoffTermsTriggersAndSignedValues"
+    },
+    {
+      "c": "int32 discriminant 1",
+      "go": "PayoffCashOrNothing",
+      "python": "itofin.instruments.PayoffKind.CashOrNothing",
+      "status": "implemented",
+      "tests": "TestScalarPayoffTermsTriggersAndSignedValues"
+    },
+    {
+      "c": "int32 discriminant 2",
+      "go": "PayoffAssetOrNothing",
+      "python": "itofin.instruments.PayoffKind.AssetOrNothing",
+      "status": "implemented",
+      "tests": "TestScalarPayoffTermsTriggersAndSignedValues"
+    },
+    {
+      "c": "int32 discriminant 3",
+      "go": "PayoffGap",
+      "python": "itofin.instruments.PayoffKind.Gap",
+      "status": "implemented",
+      "tests": "TestScalarPayoffTermsTriggersAndSignedValues"
+    },
+    {
+      "c": "int32 discriminant 4",
+      "go": "PayoffPercentageStrike",
+      "python": "itofin.instruments.PayoffKind.PercentageStrike",
+      "status": "implemented",
+      "tests": "TestScalarPayoffTermsTriggersAndSignedValues"
+    },
+    {
+      "classification": "nonconstructible-enum",
+      "go": "PayoffKind",
+      "python": "itofin.instruments.PayoffKind.__new__",
+      "reason": "Python PayoffKind forbids construction; Go uses typed integer constants and casts. C constructor validates discriminants.",
+      "status": "language-specific"
+    }
+  ],
+  "scope": "Five immutable finite-input scalar payoff families and stored terms; not engine/exercise composition or full QuantLib parity."
+}

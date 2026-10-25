@@ -81,6 +81,7 @@ mod performance_ratios;
 mod poissonrng;
 mod randomnumbers;
 mod results;
+mod scalar_payoff;
 mod sequence_statistics;
 mod settings;
 mod simulation;
@@ -410,6 +411,8 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     instruments.add_class::<bonds::PyZeroCouponBond>()?;
     instruments.add_class::<variance_swap::PyVarianceSwap>()?;
     instruments.add_class::<PyOptionType>()?;
+    instruments.add_class::<scalar_payoff::PyPayoffKind>()?;
+    instruments.add_class::<scalar_payoff::PyScalarPayoff>()?;
     instruments.add_class::<PyVanillaOption>()?;
     instruments.add_class::<PySwapType>()?;
     instruments.add_class::<PyVanillaSwap>()?;
