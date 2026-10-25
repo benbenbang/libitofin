@@ -18,8 +18,8 @@ use crate::treeswaption::PyBermudanExercise;
 use libitofin::exercise::{AmericanExercise, EuropeanExercise, Exercise};
 use libitofin::instrument::Instrument;
 use libitofin::instruments::{
-    AssetOrNothingPayoff, CashOrNothingPayoff, GapPayoff, PlainVanillaPayoff, StrikedTypePayoff,
-    VanillaOption,
+    AssetOrNothingPayoff, CashOrNothingPayoff, GapPayoff, PercentageStrikePayoff,
+    PlainVanillaPayoff, StrikedTypePayoff, VanillaOption,
 };
 use libitofin::option::OptionType;
 use libitofin::pricingengine::PricingEngine;
@@ -174,6 +174,35 @@ impl PyVanillaOption {
             ));
         }
         let payoff = shared(GapPayoff::new(option_type.inner(), strike, second_strike))
+            as Shared<dyn StrikedTypePayoff>;
+        let exercise = shared(EuropeanExercise::new(expiry.inner())) as Shared<dyn Exercise>;
+        Ok(Self {
+            inner: VanillaOption::new(payoff, exercise, settings.inner()),
+        })
+    }
+
+    /// Build a European percentage-strike option for the existing FD engine.
+    ///
+    /// Moneyness is a finite dimensionless ratio, not a percent scaled by 100
+    /// or an absolute strike. Signed ratios are accepted. A call pays
+    /// S*max(1-m,0), a put S*max(m-1,0). Use set_fd_engine or price_fd;
+    /// analytic Black rejects this payoff. The FD volatility lookup receives m
+    /// unchanged, so strike-smile surfaces can reject it. Constant-vol use is
+    /// the validated path; existing grid and market-domain limits apply.
+    #[classmethod]
+    fn percentage_strike(
+        _cls: &Bound<'_, PyType>,
+        option_type: PyOptionType,
+        moneyness: f64,
+        expiry: &PyDate,
+        settings: &PySettings,
+    ) -> PyResult<Self> {
+        if !moneyness.is_finite() {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "moneyness must be finite",
+            ));
+        }
+        let payoff = shared(PercentageStrikePayoff::new(option_type.inner(), moneyness))
             as Shared<dyn StrikedTypePayoff>;
         let exercise = shared(EuropeanExercise::new(expiry.inner())) as Shared<dyn Exercise>;
         Ok(Self {
