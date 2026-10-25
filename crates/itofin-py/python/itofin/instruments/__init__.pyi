@@ -21,6 +21,7 @@ __all__ = [
     "BermudanExercise",
     "Bond",
     "BondForward",
+    "CPIBond",
     "Callability",
     "CallabilityType",
     "CallableFixedRateBond",
@@ -357,6 +358,13 @@ class BondForward:
     def freeze(self) -> None: ...
     def unfreeze(self) -> None: ...
     def recalculate(self) -> None: ...
+
+@typing.final
+class CPIBond(Bond):
+    r"""
+    Plain CPI-indexed coupon bond with explicit base CPI and indexed principal.
+    """
+    def __new__(cls, settlement_days: builtins.int, face_amount: builtins.float, base_cpi: builtins.float, observation_lag: time.Period, index: indexes.ZeroInflationIndex, observation_interpolation: indexes.CpiInterpolationType, schedule: time.Schedule, coupons: typing.Sequence[builtins.float], accrual_day_counter: time.DayCounter, settings: itofin.Settings, *, payment_convention: time.BusinessDayConvention = time.BusinessDayConvention.ModifiedFollowing, issue_date: typing.Optional[time.Date] = None, payment_calendar: typing.Optional[time.Calendar] = None, ex_coupon_period: typing.Optional[time.Period] = None, ex_coupon_calendar: typing.Optional[time.Calendar] = None, ex_coupon_convention: time.BusinessDayConvention = time.BusinessDayConvention.Unadjusted, ex_coupon_end_of_month: builtins.bool = False) -> CPIBond: ...
 
 @typing.final
 class Callability:

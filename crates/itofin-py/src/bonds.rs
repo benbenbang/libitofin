@@ -285,6 +285,7 @@ impl PyDuration {
 #[gen_stub_pyclass]
 #[pyclass(name = "Bond", subclass, unsendable, module = "itofin.instruments")]
 pub struct PyBond {
+    indexed: bool,
     inner: BondBacking,
     calendar: PyCalendar,
     flags: (bool, Option<bool>, Option<bool>),
@@ -293,8 +294,17 @@ pub struct PyBond {
     frozen: Cell<bool>,
 }
 impl PyBond {
+    fn require_unindexed_coupon_analytics(&self) -> PyResult<()> {
+        if self.indexed {
+            Err(ItofinError::new_err(
+                "CPI raw-coupon BPS and ATM analytics are unsupported",
+            ))
+        } else {
+            Ok(())
+        }
+    }
     pub(crate) fn forward_plain(&self) -> PyResult<SharedMut<Bond>> {
-        if self.guard.is_some() {
+        if self.guard.is_some() || self.indexed {
             return Err(ItofinError::new_err("fixed or zero plain bond required"));
         }
         match &self.inner {
@@ -308,6 +318,11 @@ impl PyBond {
     pub(crate) fn from_inner(inner: Bond, calendar: PyCalendar) -> Self {
         Self::from_backing(BondBacking::Plain(shared_mut(inner)), calendar)
     }
+    pub(crate) fn from_indexed(inner: Bond, calendar: PyCalendar) -> Self {
+        let mut base = Self::from_inner(inner, calendar);
+        base.indexed = true;
+        base
+    }
     pub(crate) fn from_backing(inner: BondBacking, calendar: PyCalendar) -> Self {
         let bond = inner.borrow();
         let flags = (
@@ -317,6 +332,7 @@ impl PyBond {
         );
         drop(bond);
         Self {
+            indexed: false,
             inner,
             calendar,
             flags,
@@ -683,6 +699,7 @@ impl PyBond {
         discount_curve: &PyYieldTermStructure,
         settlement: Option<&PyDate>,
     ) -> PyResult<f64> {
+        self.require_unindexed_coupon_analytics()?;
         let settlement = self.coupon_sensitivity_settlement(settlement)?;
         let curve = discount_curve
             .handle()
@@ -703,6 +720,7 @@ impl PyBond {
         frequency: &PyFrequency,
         settlement: Option<&PyDate>,
     ) -> PyResult<f64> {
+        self.require_unindexed_coupon_analytics()?;
         let rate = libitofin::interestrate::InterestRate::new(
             finite(yield_rate)?,
             day_counter.inner(),
@@ -723,6 +741,7 @@ impl PyBond {
         discount_curve: &PyYieldTermStructure,
         settlement: Option<&PyDate>,
     ) -> PyResult<f64> {
+        self.require_unindexed_coupon_analytics()?;
         let settlement = self.risk_settlement(settlement)?;
         let curve = discount_curve
             .handle()
@@ -743,6 +762,7 @@ impl PyBond {
         price_type: PyBondPriceType,
         settlement: Option<&PyDate>,
     ) -> PyResult<f64> {
+        self.require_unindexed_coupon_analytics()?;
         if !matches!(self.inner, BondBacking::Plain(_)) {
             return Err(ItofinError::new_err("ordinary noncallable bond required"));
         }
@@ -1051,9 +1071,18 @@ impl PyBond {
         self.inner.borrow().issue_date().map(PyDate::from_inner)
     }
     fn cashflows(&self) -> PyLeg {
-        PyLeg::with_guard(self.inner.borrow().cashflows().clone(), self.guard.clone())
+        let bond = self.inner.borrow();
+        if self.indexed {
+            PyLeg::with_cpi_settings(bond.cashflows().clone(), bond.settings_handle())
+        } else {
+            PyLeg::with_guard(bond.cashflows().clone(), self.guard.clone())
+        }
     }
     fn redemptions(&self) -> PyLeg {
+        if self.indexed {
+            let bond = self.inner.borrow();
+            return PyLeg::with_cpi_settings(bond.redemptions().clone(), bond.settings_handle());
+        }
         let guard = self
             .guard
             .as_ref()
