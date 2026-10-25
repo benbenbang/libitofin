@@ -109,6 +109,35 @@ pub unsafe extern "C" fn itofin_cpi_leg_new(
     out: *mut u64,
     error: *mut ItofinError,
 ) -> i32 {
+    unsafe { cpi_leg_new(ctx, a, None, out, error) }
+}
+
+#[unsafe(no_mangle)]
+/// Build a live-base-date CPI leg. Config `base_cpi` is ignored, not snapshotted.
+/// A zero base date selects schedule start minus observation lag.
+/// # Safety
+/// Pointers must be aligned and valid; outputs must not overlap. The context
+/// and handles belong to the calling thread. Serialize all context calls.
+pub unsafe extern "C" fn itofin_cpi_leg_from_base_date(
+    ctx: *mut Context,
+    a: ItofinCpiLegConfig,
+    base_date: i32,
+    out: *mut u64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe { cpi_leg_new(ctx, a, Some(base_date), out, error) }
+}
+
+/// # Safety
+/// Pointers must be aligned and valid; outputs must not overlap. The context
+/// and handles belong to the calling thread. Serialize all context calls.
+unsafe fn cpi_leg_new(
+    ctx: *mut Context,
+    a: ItofinCpiLegConfig,
+    base_date: Option<i32>,
+    out: *mut u64,
+    error: *mut ItofinError,
+) -> i32 {
     unsafe {
         with_context(ctx, error, |c| {
             if !error.is_null() {
@@ -127,19 +156,24 @@ pub unsafe extern "C" fn itofin_cpi_leg_new(
             )?;
             let notionals = input_slice(a.notionals, a.notionals_len)?.to_vec();
             let rates = input_slice(a.fixed_rates, a.fixed_rates_len)?.to_vec();
-            let mut leg = CpiLeg::new(
-                schedule.clone(),
-                index.clone(),
-                finite(a.base_cpi)?,
-                period(a.lag_length, a.lag_unit)?,
-            )
-            .with_notionals(notionals)
-            .with_fixed_rates(rates)
-            .with_payment_day_counter(day_counter(c, a.day_counter)?)
-            .with_payment_calendar(payment.inner)
-            .with_payment_adjustment(adjustment)
-            .with_observation_interpolation(cpi_interpolation(a.interpolation)?)
-            .with_subtract_inflation_nominal(bool_value(a.growth_only)?);
+            let lag = period(a.lag_length, a.lag_unit)?;
+            let builder = match base_date {
+                Some(base) => CpiLeg::from_base_date(
+                    schedule.clone(),
+                    index.clone(),
+                    if base == 0 { None } else { Some(date(base)?) },
+                    lag,
+                ),
+                None => CpiLeg::new(schedule.clone(), index.clone(), finite(a.base_cpi)?, lag),
+            };
+            let mut leg = builder
+                .with_notionals(notionals)
+                .with_fixed_rates(rates)
+                .with_payment_day_counter(day_counter(c, a.day_counter)?)
+                .with_payment_calendar(payment.inner)
+                .with_payment_adjustment(adjustment)
+                .with_observation_interpolation(cpi_interpolation(a.interpolation)?)
+                .with_subtract_inflation_nominal(bool_value(a.growth_only)?);
             let eom = bool_value(a.ex_coupon_end_of_month)?;
             if a.ex_coupon_length != 0 {
                 let period = period(a.ex_coupon_length, a.ex_coupon_unit)?;
@@ -231,6 +265,35 @@ pub unsafe extern "C" fn itofin_cpi_coupon_new(
     out: *mut u64,
     error: *mut ItofinError,
 ) -> i32 {
+    unsafe { cpi_coupon_new(ctx, a, None, out, error) }
+}
+
+#[unsafe(no_mangle)]
+/// Build a coupon with a live base-date denominator. Config `base_cpi` is
+/// ignored, not snapshotted. Query field 6 for the fallible effective base CPI.
+/// # Safety
+/// Pointers must be aligned and valid; outputs must not overlap. The context
+/// and handles belong to the calling thread. Serialize all context calls.
+pub unsafe extern "C" fn itofin_cpi_coupon_from_base_date(
+    ctx: *mut Context,
+    a: ItofinCpiCouponConfig,
+    base_date: i32,
+    out: *mut u64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe { cpi_coupon_new(ctx, a, Some(base_date), out, error) }
+}
+
+/// # Safety
+/// Pointers must be aligned and valid; outputs must not overlap. The context
+/// and handles belong to the calling thread. Serialize all context calls.
+unsafe fn cpi_coupon_new(
+    ctx: *mut Context,
+    a: ItofinCpiCouponConfig,
+    base_date: Option<i32>,
+    out: *mut u64,
+    error: *mut ItofinError,
+) -> i32 {
     unsafe {
         with_context(ctx, error, |c| {
             if !error.is_null() {
@@ -244,21 +307,38 @@ pub unsafe extern "C" fn itofin_cpi_coupon_new(
                     date(value).map(Some)
                 }
             };
-            let coupon = CpiCoupon::new(
-                a.base_cpi,
-                date(a.payment)?,
-                a.nominal,
-                date(a.start)?,
-                date(a.end)?,
-                zero_index(c, a.index)?,
-                period(a.lag_length, a.lag_unit)?,
-                cpi_interpolation(a.interpolation)?,
-                day_counter(c, a.day_counter)?,
-                a.fixed_rate,
-                optional(a.reference_start)?,
-                optional(a.reference_end)?,
-                optional(a.ex_coupon)?,
-            )?;
+            let coupon = match base_date {
+                Some(base) => CpiCoupon::from_base_date(
+                    date(base)?,
+                    date(a.payment)?,
+                    a.nominal,
+                    date(a.start)?,
+                    date(a.end)?,
+                    zero_index(c, a.index)?,
+                    period(a.lag_length, a.lag_unit)?,
+                    cpi_interpolation(a.interpolation)?,
+                    day_counter(c, a.day_counter)?,
+                    a.fixed_rate,
+                    optional(a.reference_start)?,
+                    optional(a.reference_end)?,
+                    optional(a.ex_coupon)?,
+                ),
+                None => CpiCoupon::new(
+                    a.base_cpi,
+                    date(a.payment)?,
+                    a.nominal,
+                    date(a.start)?,
+                    date(a.end)?,
+                    zero_index(c, a.index)?,
+                    period(a.lag_length, a.lag_unit)?,
+                    cpi_interpolation(a.interpolation)?,
+                    day_counter(c, a.day_counter)?,
+                    a.fixed_rate,
+                    optional(a.reference_start)?,
+                    optional(a.reference_end)?,
+                    optional(a.ex_coupon)?,
+                ),
+            }?;
             output(out, c.insert(shared(coupon))?)
         })
     }
@@ -310,7 +390,7 @@ pub unsafe extern "C" fn itofin_cpi_coupon_set_pricer(
     }
 }
 /// Fields: 0 rate, 1 amount, 2 index fixing, 3 index ratio at date,
-/// 4 accrued amount at date, 5 accrual period.
+/// 4 accrued amount at date, 5 accrual period, 6 effective base fixing.
 #[unsafe(no_mangle)]
 /// # Safety
 /// Pointers must be aligned and valid; outputs must not overlap. The context
@@ -337,6 +417,7 @@ pub unsafe extern "C" fn itofin_cpi_coupon_value(
                 3 => coupon.index_ratio(date(serial)?)?,
                 4 => coupon.accrued_amount(date(serial)?)?,
                 5 => coupon.accrual_period(),
+                6 => coupon.base_fixing()?,
                 _ => return Err(BindingError::invalid("unknown CPI coupon query")),
             };
             output(out, finite(value)?)

@@ -4199,6 +4199,19 @@ int32_t itofin_cpi_leg_new(struct ItofinContext *ctx,
                            struct ItofinError *error);
 
 /**
+ * Build a live-base-date CPI leg. Config `base_cpi` is ignored, not snapshotted.
+ * A zero base date selects schedule start minus observation lag.
+ * # Safety
+ * Pointers must be aligned and valid; outputs must not overlap. The context
+ * and handles belong to the calling thread. Serialize all context calls.
+ */
+int32_t itofin_cpi_leg_from_base_date(struct ItofinContext *ctx,
+                                      struct ItofinCpiLegConfig a,
+                                      int32_t base_date,
+                                      uint64_t *out,
+                                      struct ItofinError *error);
+
+/**
  * # Safety
  * Pointers must be aligned and valid; outputs must not overlap. The context
  * and handles belong to the calling thread. Serialize all context calls.
@@ -4217,6 +4230,19 @@ int32_t itofin_cpi_coupon_new(struct ItofinContext *ctx,
                               struct ItofinCpiCouponConfig a,
                               uint64_t *out,
                               struct ItofinError *error);
+
+/**
+ * Build a coupon with a live base-date denominator. Config `base_cpi` is
+ * ignored, not snapshotted. Query field 6 for the fallible effective base CPI.
+ * # Safety
+ * Pointers must be aligned and valid; outputs must not overlap. The context
+ * and handles belong to the calling thread. Serialize all context calls.
+ */
+int32_t itofin_cpi_coupon_from_base_date(struct ItofinContext *ctx,
+                                         struct ItofinCpiCouponConfig a,
+                                         int32_t base_date,
+                                         uint64_t *out,
+                                         struct ItofinError *error);
 
 /**
  * # Safety
@@ -4240,7 +4266,7 @@ int32_t itofin_cpi_coupon_set_pricer(struct ItofinContext *ctx,
 
 /**
  * Fields: 0 rate, 1 amount, 2 index fixing, 3 index ratio at date,
- * 4 accrued amount at date, 5 accrual period.
+ * 4 accrued amount at date, 5 accrual period, 6 effective base fixing.
  * # Safety
  * Pointers must be aligned and valid; outputs must not overlap. The context
  * and handles belong to the calling thread. Serialize all context calls.
