@@ -99,3 +99,6 @@ pub use bonds::CpiBond;
 
 mod cpiswap;
 pub use cpiswap::CpiSwap;
+
+pub mod cpicapfloor;
+pub use cpicapfloor::{CpiCapFloor, CpiCapFloorArguments, CpiCapFloorConfig};
