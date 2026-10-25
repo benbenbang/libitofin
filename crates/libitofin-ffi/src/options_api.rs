@@ -4,8 +4,8 @@ use crate::time_api::date;
 use libitofin::exercise::{AmericanExercise, EuropeanExercise, Exercise, ExerciseType};
 use libitofin::instrument::Instrument;
 use libitofin::instruments::{
-    AssetOrNothingPayoff, CashOrNothingPayoff, GapPayoff, PlainVanillaPayoff, StrikedTypePayoff,
-    VanillaOption,
+    AssetOrNothingPayoff, CashOrNothingPayoff, GapPayoff, PercentageStrikePayoff,
+    PlainVanillaPayoff, StrikedTypePayoff, VanillaOption,
 };
 use libitofin::models::HestonModel;
 use libitofin::option::OptionType;
@@ -168,6 +168,42 @@ pub unsafe extern "C" fn itofin_option_gap_new(
                 ));
             }
             let payoff = shared(GapPayoff::new(option_type(kind)?, strike, second_strike))
+                as Shared<dyn StrikedTypePayoff>;
+            let exercise = shared(EuropeanExercise::new(date(expiry)?)) as Shared<dyn Exercise>;
+            let option =
+                VanillaOption::new(payoff, exercise, c.get::<Shared<Settings<Date>>>(settings)?);
+            output(out, c.insert(shared_mut(option))?)
+        })
+    }
+}
+
+/// Build a European percentage-strike option for the existing FD engine.
+/// Moneyness is a finite dimensionless ratio, not an absolute strike or percent
+/// scaled by 100. Signed ratios are accepted. Call pays S*max(1-m,0), put pays
+/// S*max(m-1,0). FD volatility lookup uses m unchanged; certify constant-vol use.
+/// The analytic Black engine rejects this payoff.
+/// # Safety
+/// Follow the crate-level C caller contract. Output is written only on success.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn itofin_option_percentage_strike_new(
+    ctx: *mut Context,
+    kind: i32,
+    moneyness: f64,
+    expiry: i32,
+    settings: u64,
+    out: *mut u64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            if !error.is_null() {
+                check_ptr(error)?;
+            }
+            check_ptr(out)?;
+            if !moneyness.is_finite() {
+                return Err(BindingError::invalid("moneyness must be finite"));
+            }
+            let payoff = shared(PercentageStrikePayoff::new(option_type(kind)?, moneyness))
                 as Shared<dyn StrikedTypePayoff>;
             let exercise = shared(EuropeanExercise::new(date(expiry)?)) as Shared<dyn Exercise>;
             let option =
@@ -474,3 +510,7 @@ mod asset_digital_tests;
 #[cfg(test)]
 #[path = "gap_option_tests.rs"]
 mod gap_option_tests;
+
+#[cfg(test)]
+#[path = "percentage_strike_tests.rs"]
+mod percentage_strike_tests;
