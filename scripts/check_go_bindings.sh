@@ -161,6 +161,7 @@ go run ./examples/percentage_strike
 go run ./examples/payment_inspection
 go run ./examples/scalar_payoffs
 go run ./examples/cash_digital_black_calculator
+go run ./examples/inflation_principal
 
 go run ./examples/drawdown
 go run ./examples/benchmark_beta
