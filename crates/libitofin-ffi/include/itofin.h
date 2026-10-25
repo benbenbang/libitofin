@@ -678,6 +678,31 @@ typedef struct ItofinCpiCouponConfig {
 } ItofinCpiCouponConfig;
 
 /**
+ * Constant nominal CPI-versus-Ibor swap. Payer pays Ibor and receives CPI.
+ */
+typedef struct ItofinCpiSwapConfig {
+  int32_t swap_type;
+  double nominal;
+  double inflation_nominal;
+  int32_t subtract_inflation_nominal;
+  double spread;
+  uint64_t float_schedule;
+  uint64_t float_index;
+  uint64_t float_day_counter;
+  int32_t float_convention;
+  double fixed_rate;
+  double base_cpi;
+  uint64_t fixed_schedule;
+  uint64_t fixed_index;
+  uint64_t fixed_day_counter;
+  int32_t fixed_convention;
+  int32_t lag_length;
+  int32_t lag_unit;
+  int32_t interpolation;
+  uint64_t settings;
+} ItofinCpiSwapConfig;
+
+/**
  * A zero quote handle selects `rate`; a nonzero settings handle selects moving dates.
  */
 typedef struct ItofinFlatHazardConfig {
@@ -4016,6 +4041,49 @@ int32_t itofin_cpi_pricer_value(struct ItofinContext *ctx,
                                 int32_t serial,
                                 double *out,
                                 struct ItofinError *error);
+
+/**
+ * Retain live indexes and construct both coupon legs plus terminal exchanges.
+ * # Safety
+ * Follow the crate-level pointer and thread contract.
+ */
+int32_t itofin_cpi_swap_new(struct ItofinContext *ctx,
+                            const struct ItofinCpiSwapConfig *cfg,
+                            uint64_t *out,
+                            struct ItofinError *error);
+
+/**
+ * Attach a live discount curve with native date/flow defaults and identical Settings.
+ * # Safety
+ * Follow the crate-level pointer and thread contract.
+ */
+int32_t itofin_cpi_swap_set_engine(struct ItofinContext *ctx,
+                                   uint64_t id,
+                                   uint64_t discount,
+                                   uint64_t settings_id,
+                                   struct ItofinError *error);
+
+/**
+ * Query 0 NPV, 1 CPI NPV, 2 Ibor NPV, 3 Ibor BPS, 4 fair Ibor spread,
+ * 5 cache state, 6 expiry. Failures leave output untouched.
+ * # Safety
+ * Follow the crate-level pointer and thread contract.
+ */
+int32_t itofin_cpi_swap_value(struct ItofinContext *ctx,
+                              uint64_t id,
+                              int32_t query,
+                              double *out,
+                              struct ItofinError *error);
+
+/**
+ * Action 0 calculate, 1 recalculate, 2 freeze, 3 unfreeze.
+ * # Safety
+ * Follow the crate-level pointer and thread contract.
+ */
+int32_t itofin_cpi_swap_action(struct ItofinContext *ctx,
+                               uint64_t id,
+                               int32_t action,
+                               struct ItofinError *error);
 
 /**
  * # Safety
