@@ -265,3 +265,7 @@ pub unsafe extern "C" fn itofin_inflation_cashflow_date(
 #[cfg(test)]
 #[path = "inflation_principal_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "inflation_principal_boundary_tests.rs"]
+mod boundary_tests;
