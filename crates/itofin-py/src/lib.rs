@@ -32,6 +32,7 @@ mod chart_williams;
 mod convergence_statistics;
 mod cpi_bond;
 mod cpi_cashflows;
+mod cpi_swap;
 mod credit;
 mod creditdensity;
 mod creditengine;
@@ -409,6 +410,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     instruments.add_class::<PyVanillaSwap>()?;
     instruments.add_class::<asset_swap::PyAssetSwap>()?;
     instruments.add_class::<float_float_swap::PyFloatFloatSwap>()?;
+    instruments.add_class::<cpi_swap::PyCpiSwap>()?;
     instruments.add_class::<bma::PyBMASwap>()?;
     instruments.add_class::<PyMakeVanillaSwap>()?;
     instruments.add_class::<makeswaption::PyMakeSwaption>()?;
