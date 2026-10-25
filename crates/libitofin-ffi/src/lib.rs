@@ -109,6 +109,8 @@ pub mod rng_gaussian_sobol;
 pub mod rng_low_discrepancy;
 pub mod rng_sequence_api;
 pub mod scalar_payoff_api;
+#[cfg(test)]
+mod scalar_payoff_tests;
 pub mod sequence_statistics_api;
 pub mod settings_api;
 pub mod smile_api;
