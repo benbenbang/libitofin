@@ -1,0 +1,99 @@
+{
+  "domain": "cumulative-cpi-quoted-price-interpolation",
+  "entries": [
+    {
+      "c": "itofin_cpi_price_surface_new",
+      "go": "Session.NewCpiCapFloorTermPriceSurface",
+      "python": "itofin.termstructures.CpiCapFloorTermPriceSurface.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestCpiCapFloorNativePriceSurfaceAndEngine",
+        "TestCpiCapFloorOwnershipErrorsSnapshotAndConcurrency",
+        "TestCpiCapFloorInputAndSessionGuards"
+      ]
+    },
+    {
+      "c": "itofin_cpi_price_surface_price",
+      "go": "CpiCapFloorTermPriceSurface.CapPrice",
+      "python": "itofin.termstructures.CpiCapFloorTermPriceSurface.cap_price",
+      "status": "implemented",
+      "tests": [
+        "TestCpiCapFloorNativePriceSurfaceAndEngine",
+        "TestCpiCapFloorOwnershipErrorsSnapshotAndConcurrency",
+        "TestCpiCapFloorInputAndSessionGuards"
+      ]
+    },
+    {
+      "c": "itofin_cpi_price_surface_price",
+      "go": "CpiCapFloorTermPriceSurface.FloorPrice",
+      "python": "itofin.termstructures.CpiCapFloorTermPriceSurface.floor_price",
+      "status": "implemented",
+      "tests": [
+        "TestCpiCapFloorNativePriceSurfaceAndEngine",
+        "TestCpiCapFloorOwnershipErrorsSnapshotAndConcurrency",
+        "TestCpiCapFloorInputAndSessionGuards"
+      ]
+    },
+    {
+      "c": "itofin_cpi_price_surface_reference_date",
+      "go": "CpiCapFloorTermPriceSurface.ReferenceDate",
+      "python": "itofin.termstructures.CpiCapFloorTermPriceSurface.reference_date",
+      "status": "implemented",
+      "tests": "TestCpiCapFloorOwnershipErrorsSnapshotAndConcurrency"
+    },
+    {
+      "c": "itofin_cpi_capfloor_engine_new",
+      "go": "Session.NewInterpolatingCpiCapFloorEngine",
+      "python": "itofin.pricingengines.InterpolatingCpiCapFloorEngine.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestCpiCapFloorNativePriceSurfaceAndEngine",
+        "TestCpiCapFloorOwnershipErrorsSnapshotAndConcurrency",
+        "TestCpiCapFloorInputAndSessionGuards"
+      ]
+    },
+    {
+      "c": "itofin_cpi_capfloor_new",
+      "go": "Session.NewCpiCapFloor",
+      "python": "itofin.instruments.CpiCapFloor.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestCpiCapFloorNativePriceSurfaceAndEngine",
+        "TestCpiCapFloorOwnershipErrorsSnapshotAndConcurrency",
+        "TestCpiCapFloorInputAndSessionGuards"
+      ]
+    },
+    {
+      "c": "itofin_cpi_capfloor_npv",
+      "go": "CpiCapFloor.NPV",
+      "python": "itofin.instruments.CpiCapFloor.npv",
+      "status": "implemented",
+      "tests": [
+        "TestCpiCapFloorNativePriceSurfaceAndEngine",
+        "TestCpiCapFloorOwnershipErrorsSnapshotAndConcurrency",
+        "TestCpiCapFloorInputAndSessionGuards"
+      ]
+    },
+    {
+      "c": "itofin_cpi_capfloor_dates",
+      "go": "CpiCapFloor.Dates",
+      "python": "itofin.instruments.CpiCapFloor.fixing_date",
+      "status": "implemented",
+      "tests": "TestCpiCapFloorOwnershipErrorsSnapshotAndConcurrency"
+    },
+    {
+      "c": "itofin_cpi_capfloor_dates",
+      "go": "CpiCapFloor.Dates",
+      "python": "itofin.instruments.CpiCapFloor.pay_date",
+      "status": "implemented",
+      "tests": "TestCpiCapFloorOwnershipErrorsSnapshotAndConcurrency"
+    },
+    {
+      "c": "itofin_cpi_capfloor_is_expired",
+      "go": "CpiCapFloor.IsExpired",
+      "python": "itofin.instruments.CpiCapFloor.is_expired",
+      "status": "implemented",
+      "tests": "TestCpiCapFloorOwnershipErrorsSnapshotAndConcurrency"
+    }
+  ]
+}

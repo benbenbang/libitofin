@@ -21,6 +21,7 @@ __all__ = [
     "ConstantOptionletVolatility",
     "ConstantSwaptionVolatility",
     "ConstantYoYOptionletVolatility",
+    "CpiCapFloorTermPriceSurface",
     "DefaultProbabilityHelper",
     "DefaultProbabilityTermStructure",
     "DepositRateHelper",
@@ -890,6 +891,33 @@ class ConstantYoYOptionletVolatility:
 
         Raises:
             ItofinError: On the same conditions volatility() reports.
+        """
+
+@typing.final
+class CpiCapFloorTermPriceSurface:
+    r"""
+    Frozen bilinear CPI quoted-price grid, with extrapolation enabled.
+
+    Rebuild after curve, fixing or evaluation-date changes. Nominal is metadata:
+    parity and the instrument engine return quote units without rescaling.
+    """
+    def __init__(self, nominal: builtins.float, base_rate: builtins.float, observation_lag: time.Period, calendar: time.Calendar, convention: time.BusinessDayConvention, day_counter: time.DayCounter, index: indexes.ZeroInflationIndex, interpolation: indexes.CpiInterpolationType, discount: YieldTermStructure, cap_strikes: typing.Sequence[builtins.float], floor_strikes: typing.Sequence[builtins.float], maturity_years: typing.Sequence[builtins.int], cap_prices: typing.Sequence[typing.Sequence[builtins.float]], floor_prices: typing.Sequence[typing.Sequence[builtins.float]], settings: itofin.Settings) -> None:
+        r"""
+        Build an immutable quote snapshot. Maturities are positive whole years;
+        price matrices have strike rows and maturity columns. Both axes must
+        increase. Flat/Linear are supported; deprecated AsIndex is not.
+        """
+    def cap_price(self, date: time.Date, strike: builtins.float) -> builtins.float:
+        r"""
+        Return the quoted cap price, with unrestricted bilinear extrapolation.
+        """
+    def floor_price(self, date: time.Date, strike: builtins.float) -> builtins.float:
+        r"""
+        Return the quoted floor price; extrapolated results may be negative.
+        """
+    def reference_date(self) -> time.Date:
+        r"""
+        The captured reference date, which never rolls with settings.
         """
 
 class DefaultProbabilityHelper:

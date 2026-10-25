@@ -31,6 +31,7 @@ mod chart_prices;
 mod chart_williams;
 mod convergence_statistics;
 mod cpi_bond;
+mod cpi_capfloor;
 mod cpi_cashflows;
 mod cpi_swap;
 mod credit;
@@ -107,6 +108,9 @@ use capfloortermvol::{PyCapFloorTermVolCurve, PyCapFloorTermVolSurface};
 use cashflows::{
     PyCappedFlooredYoYInflationCoupon, PyCashFlow, PyIborLeg, PyLeg, PyYoYInflationCoupon,
     PyYoYInflationLeg, PyYoYInflationOptionletCouponPricer,
+};
+use cpi_capfloor::{
+    PyCpiCapFloor, PyCpiCapFloorTermPriceSurface, PyInterpolatingCpiCapFloorEngine,
 };
 use credit::{
     PyCreditDefaultSwap, PyDefaultProbabilityTermStructure, PyFlatHazardRate,
@@ -337,6 +341,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     termstructures.add_class::<PyPiecewiseYoYInflationCurve>()?;
     termstructures.add_class::<PyConstantYoYOptionletVolatility>()?;
     termstructures.add_class::<PyYoYCapFloorTermPriceSurface>()?;
+    termstructures.add_class::<PyCpiCapFloorTermPriceSurface>()?;
     termstructures.add_class::<PyKInterpolatedYoYOptionletVolatilitySurface>()?;
 
     let processes = PyModule::new(py, "processes")?;
@@ -431,6 +436,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     instruments.add_class::<PyCreditDefaultSwap>()?;
     instruments.add_class::<PyMakeCreditDefaultSwap>()?;
     instruments.add_class::<PyZeroCouponInflationSwap>()?;
+    instruments.add_class::<PyCpiCapFloor>()?;
     instruments.add_class::<PyYearOnYearInflationSwap>()?;
     instruments.add_class::<PyMakeYoYInflationCapFloor>()?;
     instruments.add_class::<PyYoYInflationCapFloor>()?;
@@ -467,6 +473,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     pricingengines.add_class::<PyForwardsInCouponPeriod>()?;
     pricingengines.add_class::<PyDiscountingSwapEngine>()?;
     pricingengines.add_class::<PyYoYInflationCapFloorEngine>()?;
+    pricingengines.add_class::<PyInterpolatingCpiCapFloorEngine>()?;
     pricingengines.add_class::<fdengine::PyFdScheme>()?;
     pricingengines.add_class::<fdengine::PyFdBlackScholesVanillaEngine>()?;
     pricingengines.add_class::<PyMCEuropeanEngine>()?;
