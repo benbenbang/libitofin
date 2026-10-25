@@ -135,6 +135,12 @@ done
 for compiler in cc c++; do
   if [[ "$compiler" == cc ]]; then standard=c11; else standard=c++11; fi
   "$compiler" -x "${standard%%11}" -std="$standard" -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
+    crates/libitofin-ffi/tests/scalar_payoff.c -Ltarget/release -litofin_ffi -lm -o "target/$compiler-scalar-payoff"
+  "./target/$compiler-scalar-payoff" sdk/go/testdata/scalar_payoffs.tsv
+done
+for compiler in cc c++; do
+  if [[ "$compiler" == cc ]]; then standard=c11; else standard=c++11; fi
+  "$compiler" -x "${standard%%11}" -std="$standard" -Wall -Wextra -Werror -Icrates/libitofin-ffi/include \
     crates/libitofin-ffi/tests/amortizing_floating_oracle.c -Ltarget/release -litofin_ffi -lm -o "target/$compiler-amortizing-floating-oracle"
   "./target/$compiler-amortizing-floating-oracle" scripts/fixtures/amortizing_floating_bond/values.tsv
 done
@@ -153,6 +159,7 @@ go run ./examples/hw_forward_process
 go run ./examples/gap_option
 go run ./examples/percentage_strike
 go run ./examples/payment_inspection
+go run ./examples/scalar_payoffs
 
 go run ./examples/drawdown
 go run ./examples/benchmark_beta
