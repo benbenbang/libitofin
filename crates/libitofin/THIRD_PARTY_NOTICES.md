@@ -115,3 +115,14 @@ The independently selected JSONL fixture queries the QuantLib 1.43 Python wheel,
 not asserted to be a build of that source revision. No upstream test vectors
 are copied. The complete QuantLib license and contributor notices are included
 in [QUANTLIB_LICENSE.txt](QUANTLIB_LICENSE.txt).
+
+## QuantLib CPI cash flows
+
+The explicit-base CPI coupon, plain coupon pricer, indexed principal and CPI leg
+are adapted from QuantLib revision
+`9863b578af0caa4cecabf697196533e84a8308b6`,
+`ql/cashflows/cpicoupon.{hpp,cpp}` and `cpicouponpricer.{hpp,cpp}`.
+Copyright (C) 2009, 2011 Chris Kenyon; Copyright (C) 2022 Quaternion Risk
+Management Ltd. The complete QuantLib license and contributor notices are in
+`QUANTLIB_LICENSE.txt`. The bounded implementation omits base-date constructors,
+CPI coupon optionlets and convexity adjustments.
