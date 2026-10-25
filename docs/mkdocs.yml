@@ -152,6 +152,7 @@ nav:
   - Amortizing fixed-rate bonds: amortizing-fixed-bonds.md
   - Amortizing plain-Ibor bonds: amortizing-floating-bond-bindings.md
   - Plain CPI cash flows: cpi-cashflow-bindings.md
+  - Standalone inflation principal flows: inflation-principal-bindings.md
   - CPI bonds: cpi-bond-bindings.md
   - CPI versus Ibor swaps: cpi-swap-bindings.md
   - CPI cap/floor quoted-price interpolation: cpi-capfloor-bindings.md
