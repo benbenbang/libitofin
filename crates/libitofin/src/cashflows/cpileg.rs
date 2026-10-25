@@ -5,6 +5,7 @@
 //! Copyright (C) 2009 Chris Kenyon; Copyright (C) 2022 Quaternion Risk Management Ltd.
 //! See `THIRD_PARTY_NOTICES.md` and `QUANTLIB_LICENSE.txt`.
 
+use super::cpibasedate::CpiBaseDateCashFlow;
 use super::cpicoupon::{check_base_cpi, checked_cpi_offset, checked_cpi_shift, finite_cpi};
 use super::cpidates::{checked_cpi_adjust, checked_cpi_day};
 use super::{CpiCashFlow, CpiCoupon, CpiCouponPricer, FixedRateCoupon};
@@ -16,11 +17,18 @@ use crate::shared::{Shared, shared};
 use crate::time::{
     businessdayconvention::BusinessDayConvention,
     calendar::Calendar,
+    date::Date,
     daycounter::DayCounter,
     daycounters::thirty360::{Convention, Thirty360},
     period::Period,
     schedule::Schedule,
 };
+
+#[derive(Clone, Copy)]
+enum CpiLegBase {
+    Explicit(f64),
+    Date(Option<Date>),
+}
 
 /// CPI coupons followed by an indexed principal or inflation-growth payment.
 #[derive(Clone)]
@@ -28,7 +36,7 @@ use crate::time::{
 pub struct CpiLeg {
     schedule: Schedule,
     index: Shared<ZeroInflationIndex>,
-    base_cpi: f64,
+    base: CpiLegBase,
     lag: Period,
     interpolation: CpiInterpolationType,
     notionals: Vec<f64>,
@@ -51,7 +59,7 @@ impl CpiLeg {
         Self {
             schedule,
             index,
-            base_cpi,
+            base: CpiLegBase::Explicit(base_cpi),
             lag: observation_lag,
             interpolation: CpiInterpolationType::Flat,
             notionals: Vec::new(),
@@ -62,6 +70,20 @@ impl CpiLeg {
             growth_only: true,
             ex_coupon: None,
         }
+    }
+    /// Create a live base-date CPI leg, with no fixing lookup at construction.
+    ///
+    /// An omitted date uses the schedule start minus observation lag when built.
+    /// Coupons and principal retain their distinct native observation conventions.
+    pub fn from_base_date(
+        schedule: Schedule,
+        index: Shared<ZeroInflationIndex>,
+        base_date: Option<Date>,
+        observation_lag: Period,
+    ) -> Self {
+        let mut leg = Self::new(schedule, index, 1.0, observation_lag);
+        leg.base = CpiLegBase::Date(base_date);
+        leg
     }
     /// Use one notional for all coupons and the terminal indexed payment.
     pub fn with_notional(self, value: f64) -> Self {
@@ -127,8 +149,23 @@ impl CpiLeg {
     /// Returns an error for invalid inputs, unsupported dates, unavailable fixings
     /// or curves, and non-finite calculated values.
     pub fn build(&self) -> QlResult<Leg> {
-        check_base_cpi(self.base_cpi)?;
         require!(!self.schedule.is_empty(), "empty CPI schedule");
+        let base_date = match self.base {
+            CpiLegBase::Explicit(base) => {
+                check_base_cpi(base)?;
+                None
+            }
+            CpiLegBase::Date(date) => Some(match date {
+                Some(date) => date,
+                None => {
+                    require!(
+                        self.schedule.len() > 1,
+                        "base date required for a single-date CPI leg"
+                    );
+                    checked_cpi_shift(self.schedule.date(0), self.lag)?
+                }
+            }),
+        };
         require!(!self.notionals.is_empty(), "no CPI notional given");
         let periods = self.schedule.len() - 1;
         require!(
@@ -196,21 +233,43 @@ impl CpiLeg {
                     ex_coupon,
                 ))
             } else {
-                let coupon = CpiCoupon::new(
-                    self.base_cpi,
-                    payment,
-                    nominal,
-                    start,
-                    end,
-                    self.index.clone(),
-                    self.lag,
-                    self.interpolation,
-                    self.day_counter.clone(),
-                    rate,
-                    Some(ref_start),
-                    Some(ref_end),
-                    ex_coupon,
-                )?;
+                let constructor = |base| {
+                    CpiCoupon::new(
+                        base,
+                        payment,
+                        nominal,
+                        start,
+                        end,
+                        self.index.clone(),
+                        self.lag,
+                        self.interpolation,
+                        self.day_counter.clone(),
+                        rate,
+                        Some(ref_start),
+                        Some(ref_end),
+                        ex_coupon,
+                    )
+                };
+                let coupon = match self.base {
+                    CpiLegBase::Explicit(base) => constructor(base)?,
+                    CpiLegBase::Date(_) => CpiCoupon::from_base_date(
+                        base_date.ok_or_else(|| {
+                            crate::errors::QlError::new("missing CPI base date", file!(), line!())
+                        })?,
+                        payment,
+                        nominal,
+                        start,
+                        end,
+                        self.index.clone(),
+                        self.lag,
+                        self.interpolation,
+                        self.day_counter.clone(),
+                        rate,
+                        Some(ref_start),
+                        Some(ref_end),
+                        ex_coupon,
+                    )?,
+                };
                 coupon.set_pricer(pricer.clone());
                 shared(coupon)
             };
@@ -218,16 +277,31 @@ impl CpiLeg {
         }
         let observation = self.schedule.date(periods);
         let payment = checked_cpi_adjust(&self.payment_calendar, observation, self.adjustment)?;
-        flows.push(shared(CpiCashFlow::new(
-            last(&self.notionals, periods),
-            self.index.clone(),
-            self.base_cpi,
-            observation,
-            self.lag,
-            self.interpolation,
-            payment,
-            self.growth_only,
-        )?) as Shared<dyn CashFlow>);
+        let principal: Shared<dyn CashFlow> = match self.base {
+            CpiLegBase::Explicit(base) => shared(CpiCashFlow::new(
+                last(&self.notionals, periods),
+                self.index.clone(),
+                base,
+                observation,
+                self.lag,
+                self.interpolation,
+                payment,
+                self.growth_only,
+            )?),
+            CpiLegBase::Date(_) => shared(CpiBaseDateCashFlow::new(
+                last(&self.notionals, periods),
+                self.index.clone(),
+                base_date.ok_or_else(|| {
+                    crate::errors::QlError::new("missing CPI base date", file!(), line!())
+                })?,
+                observation,
+                self.lag,
+                self.interpolation,
+                payment,
+                self.growth_only,
+            )?),
+        };
+        flows.push(principal);
         Ok(flows)
     }
 }

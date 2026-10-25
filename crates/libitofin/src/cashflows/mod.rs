@@ -15,6 +15,7 @@ mod capflooredyoyinflationcoupon_oracle;
 mod cashflows;
 mod coupon;
 mod couponpricer;
+mod cpibasedate;
 pub(crate) mod cpicoupon;
 pub(crate) mod cpidates;
 mod cpileg;
