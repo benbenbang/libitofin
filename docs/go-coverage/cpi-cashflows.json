@@ -1,0 +1,131 @@
+{
+  "domain": "plain-explicit-base-cpi-cashflows",
+  "entries": [
+    {
+      "c": "itofin_cpi_coupon_new",
+      "go": "Session.NewCPICoupon",
+      "python": "itofin.cashflows.CPICoupon.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestCPICouponNativeAndLifetimes"
+      ]
+    },
+    {
+      "c": "itofin_cpi_coupon_set_pricer",
+      "go": "CPICoupon.SetPricer",
+      "python": "itofin.cashflows.CPICoupon.set_pricer",
+      "status": "implemented",
+      "tests": [
+        "TestCPICouponNativeAndLifetimes"
+      ]
+    },
+    {
+      "c": "itofin_cpi_coupon_value",
+      "go": "CPICoupon.Rate",
+      "python": "itofin.cashflows.CPICoupon.rate",
+      "status": "implemented",
+      "tests": [
+        "TestCPICouponNativeAndLifetimes"
+      ]
+    },
+    {
+      "c": "itofin_cpi_coupon_value",
+      "go": "CPICoupon.Amount",
+      "python": "itofin.cashflows.CPICoupon.amount",
+      "status": "implemented",
+      "tests": [
+        "TestCPICouponNativeAndLifetimes"
+      ]
+    },
+    {
+      "c": "itofin_cpi_coupon_value",
+      "go": "CPICoupon.IndexFixing",
+      "python": "itofin.cashflows.CPICoupon.index_fixing",
+      "status": "implemented",
+      "tests": [
+        "TestCPICouponNativeAndLifetimes"
+      ]
+    },
+    {
+      "c": "itofin_cpi_coupon_value",
+      "go": "CPICoupon.IndexRatio",
+      "python": "itofin.cashflows.CPICoupon.index_ratio",
+      "status": "implemented",
+      "tests": [
+        "TestCPICouponNativeAndLifetimes"
+      ]
+    },
+    {
+      "c": "itofin_cpi_coupon_value",
+      "go": "CPICoupon.AccruedAmount",
+      "python": "itofin.cashflows.CPICoupon.accrued_amount",
+      "status": "implemented",
+      "tests": [
+        "TestCPICouponNativeAndLifetimes"
+      ]
+    },
+    {
+      "c": "itofin_cpi_coupon_value",
+      "go": "CPICoupon.AccrualPeriod",
+      "python": "itofin.cashflows.CPICoupon.accrual_period",
+      "status": "implemented",
+      "tests": [
+        "TestCPICouponNativeAndLifetimes"
+      ]
+    },
+    {
+      "c": "itofin_cpi_coupon_pricer_new",
+      "go": "Session.NewCPICouponPricer",
+      "python": "itofin.cashflows.CPICouponPricer.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestCPICouponNativeAndLifetimes"
+      ]
+    },
+    {
+      "c": "itofin_cpi_pricer_value",
+      "go": "CPICouponPricer.SwapletRate",
+      "python": "itofin.cashflows.CPICouponPricer.swaplet_rate",
+      "status": "implemented",
+      "tests": [
+        "TestCPICouponNativeAndLifetimes"
+      ]
+    },
+    {
+      "c": "itofin_cpi_pricer_value",
+      "go": "CPICouponPricer.SwapletPrice",
+      "python": "itofin.cashflows.CPICouponPricer.swaplet_price",
+      "status": "implemented",
+      "tests": [
+        "TestCPICouponNativeAndLifetimes"
+      ]
+    },
+    {
+      "c": "itofin_cpi_pricer_value",
+      "go": "CPICouponPricer.AccruedRate",
+      "python": "itofin.cashflows.CPICouponPricer.accrued_rate",
+      "status": "implemented",
+      "tests": [
+        "TestCPICouponNativeAndLifetimes"
+      ]
+    },
+    {
+      "c": "itofin_cpi_leg_new",
+      "go": "Session.NewCPILeg",
+      "python": "itofin.cashflows.CPILeg.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestCPILegNativeNPVAndSettings"
+      ]
+    },
+    {
+      "c": "itofin_cpi_leg_build",
+      "go": "CPILeg.Build",
+      "python": "itofin.cashflows.CPILeg.build",
+      "status": "implemented",
+      "tests": [
+        "TestCPILegNativeNPVAndSettings"
+      ]
+    }
+  ]
+}
