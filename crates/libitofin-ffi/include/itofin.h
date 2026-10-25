@@ -1339,6 +1339,36 @@ typedef struct ItofinInflationHelperConfig {
   int32_t pillar;
 } ItofinInflationHelperConfig;
 
+/**
+ * Explicit base CPI is fixed; the observation remains live.
+ */
+typedef struct ItofinCpiCashFlowConfig {
+  uint64_t index;
+  double nominal;
+  double base_cpi;
+  int32_t observation_date;
+  int32_t lag_length;
+  int32_t lag_unit;
+  int32_t interpolation;
+  int32_t payment_date;
+  int32_t growth_only;
+} ItofinCpiCashFlowConfig;
+
+/**
+ * Both lagged start and end CPI observations remain live.
+ */
+typedef struct ItofinZeroInflationCashFlowConfig {
+  uint64_t index;
+  double nominal;
+  int32_t start_date;
+  int32_t end_date;
+  int32_t lag_length;
+  int32_t lag_unit;
+  int32_t interpolation;
+  int32_t payment_date;
+  int32_t growth_only;
+} ItofinZeroInflationCashFlowConfig;
+
 typedef struct ItofinZeroInflationSwapConfig {
   int32_t swap_type;
   double nominal;
@@ -6412,6 +6442,63 @@ int32_t itofin_inflation_helper_date(struct ItofinContext *ctx,
                                      int32_t query,
                                      int32_t *out,
                                      struct ItofinError *error);
+
+/**
+ * Construct a standalone explicit-base CPI principal without reading fixings.
+ * # Safety
+ * Pointers must be aligned and valid, and outputs must not overlap. Context
+ * and handles belong to the calling thread. Serialize all context calls.
+ */
+int32_t itofin_cpi_cashflow_new(struct ItofinContext *ctx,
+                                struct ItofinCpiCashFlowConfig a,
+                                uint64_t *out,
+                                struct ItofinError *error);
+
+/**
+ * Construct a standalone live-base inflation principal without reading fixings.
+ * # Safety
+ * Pointers must be aligned and valid, and outputs must not overlap. Context
+ * and handles belong to the calling thread. Serialize all context calls.
+ */
+int32_t itofin_zero_inflation_cashflow_new(struct ItofinContext *ctx,
+                                           struct ItofinZeroInflationCashFlowConfig a,
+                                           uint64_t *out,
+                                           struct ItofinError *error);
+
+/**
+ * Query 0 amount, 1 base fixing or 2 index fixing; fixings are read lazily.
+ * # Safety
+ * Pointers must be aligned and valid, and outputs must not overlap. Context
+ * and handles belong to the calling thread. Serialize all context calls.
+ */
+int32_t itofin_inflation_cashflow_value(struct ItofinContext *ctx,
+                                        uint64_t id,
+                                        int32_t field,
+                                        double *out,
+                                        struct ItofinError *error);
+
+/**
+ * Return a retained generic cash flow or, for as_leg=1, a one-flow CPI leg.
+ * # Safety
+ * Pointers must be aligned and valid, and outputs must not overlap. Context
+ * and handles belong to the calling thread. Serialize all context calls.
+ */
+int32_t itofin_inflation_cashflow_convert(struct ItofinContext *ctx,
+                                          uint64_t id,
+                                          int32_t as_leg,
+                                          uint64_t *out,
+                                          struct ItofinError *error);
+
+/**
+ * Return the principal payment date without reading inflation fixings.
+ * # Safety
+ * Pointers must be aligned and valid, and outputs must not overlap. Context
+ * and handles belong to the calling thread. Serialize all context calls.
+ */
+int32_t itofin_inflation_cashflow_date(struct ItofinContext *ctx,
+                                       uint64_t id,
+                                       int32_t *out,
+                                       struct ItofinError *error);
 
 /**
  * # Safety
