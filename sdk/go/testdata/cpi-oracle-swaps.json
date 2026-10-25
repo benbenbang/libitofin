@@ -1,0 +1,175 @@
+{
+  "generator": "scripts/generate_cpi_oracle.py",
+  "inputs": "cpi-oracle-inputs.json",
+  "schema": 1,
+  "swaps": [
+    {
+      "growth_only": false,
+      "inflation_nominal": 100000.0,
+      "interpolation": "flat",
+      "values": {
+        "payer": {
+          "cpi_leg_npv": 102610.22595463866,
+          "fair_spread": 0.0030305516457200315,
+          "floating_leg_bps": -28.455137873661137,
+          "floating_leg_npv": -102032.42968425313,
+          "npv": 577.7962703855301
+        },
+        "receiver": {
+          "cpi_leg_npv": -102610.22595463866,
+          "fair_spread": 0.0030305516457200315,
+          "floating_leg_bps": 28.455137873661137,
+          "floating_leg_npv": 102032.42968425313,
+          "npv": -577.7962703855301
+        }
+      }
+    },
+    {
+      "growth_only": false,
+      "inflation_nominal": 90000.0,
+      "interpolation": "flat",
+      "values": {
+        "payer": {
+          "cpi_leg_npv": 92349.20335917479,
+          "fair_spread": -0.033029799356696865,
+          "floating_leg_bps": -28.455137873661137,
+          "floating_leg_npv": -102032.42968425313,
+          "npv": -9683.226325078344
+        },
+        "receiver": {
+          "cpi_leg_npv": -92349.20335917479,
+          "fair_spread": -0.033029799356696865,
+          "floating_leg_bps": 28.455137873661137,
+          "floating_leg_npv": 102032.42968425313,
+          "npv": 9683.226325078344
+        }
+      }
+    },
+    {
+      "growth_only": true,
+      "inflation_nominal": 100000.0,
+      "interpolation": "flat",
+      "values": {
+        "payer": {
+          "cpi_leg_npv": 12438.300472596775,
+          "fair_spread": 0.0030305516457200185,
+          "floating_leg_bps": -28.455137873661137,
+          "floating_leg_npv": -11860.504202211248,
+          "npv": 577.7962703855264
+        },
+        "receiver": {
+          "cpi_leg_npv": -12438.300472596775,
+          "fair_spread": 0.0030305516457200185,
+          "floating_leg_bps": 28.455137873661137,
+          "floating_leg_npv": 11860.504202211248,
+          "npv": -577.7962703855264
+        }
+      }
+    },
+    {
+      "growth_only": true,
+      "inflation_nominal": 90000.0,
+      "interpolation": "flat",
+      "values": {
+        "payer": {
+          "cpi_leg_npv": 11194.470425337096,
+          "fair_spread": -0.03302979935669686,
+          "floating_leg_bps": -28.455137873661137,
+          "floating_leg_npv": -20877.696750415438,
+          "npv": -9683.226325078342
+        },
+        "receiver": {
+          "cpi_leg_npv": -11194.470425337096,
+          "fair_spread": -0.03302979935669686,
+          "floating_leg_bps": 28.455137873661137,
+          "floating_leg_npv": 20877.696750415438,
+          "npv": 9683.226325078342
+        }
+      }
+    },
+    {
+      "growth_only": false,
+      "inflation_nominal": 100000.0,
+      "interpolation": "linear",
+      "values": {
+        "payer": {
+          "cpi_leg_npv": 102707.4000031354,
+          "fair_spread": 0.003372050776485718,
+          "floating_leg_bps": -28.455137873661137,
+          "floating_leg_npv": -102032.42968425313,
+          "npv": 674.9703188822605
+        },
+        "receiver": {
+          "cpi_leg_npv": -102707.4000031354,
+          "fair_spread": 0.003372050776485718,
+          "floating_leg_bps": 28.455137873661137,
+          "floating_leg_npv": 102032.42968425313,
+          "npv": -674.9703188822605
+        }
+      }
+    },
+    {
+      "growth_only": false,
+      "inflation_nominal": 90000.0,
+      "interpolation": "linear",
+      "values": {
+        "payer": {
+          "cpi_leg_npv": 92436.66000282185,
+          "fair_spread": -0.03272245013900773,
+          "floating_leg_bps": -28.455137873661137,
+          "floating_leg_npv": -102032.42968425313,
+          "npv": -9595.76968143128
+        },
+        "receiver": {
+          "cpi_leg_npv": -92436.66000282185,
+          "fair_spread": -0.03272245013900773,
+          "floating_leg_bps": 28.455137873661137,
+          "floating_leg_npv": 102032.42968425313,
+          "npv": 9595.76968143128
+        }
+      }
+    },
+    {
+      "growth_only": true,
+      "inflation_nominal": 100000.0,
+      "interpolation": "linear",
+      "values": {
+        "payer": {
+          "cpi_leg_npv": 12535.474521093518,
+          "fair_spread": 0.0033720507764857495,
+          "floating_leg_bps": -28.455137873661137,
+          "floating_leg_npv": -11860.504202211248,
+          "npv": 674.9703188822696
+        },
+        "receiver": {
+          "cpi_leg_npv": -12535.474521093518,
+          "fair_spread": 0.0033720507764857495,
+          "floating_leg_bps": 28.455137873661137,
+          "floating_leg_npv": 11860.504202211248,
+          "npv": -674.9703188822696
+        }
+      }
+    },
+    {
+      "growth_only": true,
+      "inflation_nominal": 90000.0,
+      "interpolation": "linear",
+      "values": {
+        "payer": {
+          "cpi_leg_npv": 11281.927068984167,
+          "fair_spread": -0.032722450139007694,
+          "floating_leg_bps": -28.455137873661137,
+          "floating_leg_npv": -20877.696750415438,
+          "npv": -9595.769681431271
+        },
+        "receiver": {
+          "cpi_leg_npv": -11281.927068984167,
+          "fair_spread": -0.032722450139007694,
+          "floating_leg_bps": 28.455137873661137,
+          "floating_leg_npv": 20877.696750415438,
+          "npv": 9595.769681431271
+        }
+      }
+    }
+  ]
+}
