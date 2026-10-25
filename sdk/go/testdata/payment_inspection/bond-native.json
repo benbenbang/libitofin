@@ -1,0 +1,58 @@
+{
+  "fixture_sha256": "04e7db28caffa131dc6a6ae3e03c305b7d631d4596488a04926ff53451cc4e43",
+  "flows": [
+    {
+      "amount": 9.008333333333313,
+      "date": "2026-09-24"
+    },
+    {
+      "amount": 10.935416666666697,
+      "date": "2027-03-24"
+    },
+    {
+      "amount": 11.116666666666635,
+      "date": "2027-09-24"
+    },
+    {
+      "amount": 10.995833333333344,
+      "date": "2028-03-24"
+    },
+    {
+      "amount": 382.5,
+      "date": "2028-03-24"
+    }
+  ],
+  "inputs": {
+    "calendar": "NullCalendar",
+    "convention": "Unadjusted",
+    "day_counter": "Actual360",
+    "end": "2028-03-24",
+    "evaluation_date": "2026-09-24",
+    "ex_coupon_days": 7,
+    "frequency_months": 6,
+    "nominal": 375.0,
+    "rates": [
+      0.047,
+      0.058
+    ],
+    "redemption": 102.0,
+    "settlement_days": 2,
+    "start": "2026-03-24"
+  },
+  "maturity_date": "2028-03-24",
+  "provenance": {
+    "generator_sha256": "d8faf06f5083cc69161e37883cf2a13235ca5a9e1ef78a1246568baee1cbc488",
+    "native_sha256": "04a53b6f425e728083149241f77e9b9711db845614ce65d2544a09a0970597d8",
+    "native_version": "1.43",
+    "source_is_wheel_build_provenance": false,
+    "source_reference_revision": "9863b578af0caa4cecabf697196533e84a8308b6"
+  },
+  "qualifications": [
+    "No matching payment is encoded as '-' for both date and amount, distinct from actual zero payments.",
+    "Amounts are actual currency units and include all contiguous same-date principal and coupon flows, even ex-coupon.",
+    "includeTodaysCashFlows can override the explicit includeSettlementDateFlows argument when settlement equals today."
+  ],
+  "rows": 60,
+  "settlement_date": "2026-09-26",
+  "start_date": "2026-03-24"
+}
