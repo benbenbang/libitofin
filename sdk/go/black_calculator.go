@@ -5,7 +5,7 @@ package itofin
 */
 import "C"
 
-// BlackCalculator is an immutable plain-vanilla Black 1976 calculator, not an engine.
+// BlackCalculator is an immutable vanilla or cash-digital Black 1976 calculator, not an engine.
 // Native nonfinite scalar results are errors, including zero-strike Greek NaNs.
 type BlackCalculator struct{ object }
 
@@ -16,6 +16,22 @@ func (s *Session) NewBlackCalculator(option OptionType, strike, forward, stdDev,
 	err := s.invoke(func() error {
 		var e C.ItofinError
 		return ffiError(C.itofin_black_calculator_new(s.ctx, C.int32_t(option), C.double(strike), C.double(forward), C.double(stdDev), C.double(discount), &id, &e), &e)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &BlackCalculator{object{s, uint64(id)}}, nil
+}
+
+// NewCashDigitalBlackCalculator copies a cash-or-nothing payoff. Cash may be signed
+// and must be finite. stdDev must exceed f64::EPSILON (2^-52), excluding the core's
+// degenerate-volatility Greek shortcut. Other domains match NewBlackCalculator.
+// Finite elasticity sentinels remain.
+func (s *Session) NewCashDigitalBlackCalculator(option OptionType, strike, cashPayoff, forward, stdDev, discount float64) (*BlackCalculator, error) {
+	var id C.uint64_t
+	err := s.invoke(func() error {
+		var e C.ItofinError
+		return ffiError(C.itofin_black_calculator_cash_digital_new(s.ctx, C.int32_t(option), C.double(strike), C.double(cashPayoff), C.double(forward), C.double(stdDev), C.double(discount), &id, &e), &e)
 	})
 	if err != nil {
 		return nil, err
