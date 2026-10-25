@@ -79,6 +79,7 @@ pub mod inflation_capfloor_api;
 pub mod inflation_cashflows_api;
 pub mod inflation_curves_api;
 pub mod inflation_helpers_api;
+pub mod inflation_principal_api;
 pub mod inflation_products_api;
 pub mod inflation_seasonality_api;
 pub mod inflation_vol_api;
