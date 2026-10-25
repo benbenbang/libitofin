@@ -30,6 +30,9 @@ on:
         description: "Reuse complete successful wheel artifacts from this run instead of rebuilding"
         default: ''
         type: string
+  # Set the repository Actions variable ENABLE_SCHEDULED_RELEASES to 'true' to enable.
+  schedule:
+    - cron: '0 0 * * 2,6' # Tuesday and Saturday at 00:00 UTC
 
 concurrency:
   group: coordinated-release
@@ -38,7 +41,7 @@ concurrency:
 jobs:
   semantic-release:
     name: semantic-release
-    if: ${{ inputs.prompt == 'true' && inputs.release_tag == '' }}
+    if: ${{ (inputs.prompt == 'true' || (github.event_name == 'schedule' && vars.ENABLE_SCHEDULED_RELEASES == 'true')) && inputs.release_tag == '' }}
     uses: benbenbang/reusable-workflows/.github/workflows/semantic-release.yml@main
     permissions:
       contents: read
@@ -49,11 +52,11 @@ jobs:
     secrets: inherit
     with:
       new_version_title: "🧮 LibItoFin"
-      dry_run: ${{ inputs.dry_run }}
+      dry_run: ${{ inputs.dry_run || false }}
 
   resolve-release:
     needs: semantic-release
-    if: ${{ !cancelled() && inputs.prompt == 'true' && (needs.semantic-release.result == 'success' || needs.semantic-release.result == 'skipped') }}
+    if: ${{ !cancelled() && (inputs.prompt == 'true' || (github.event_name == 'schedule' && vars.ENABLE_SCHEDULED_RELEASES == 'true')) && (needs.semantic-release.result == 'success' || needs.semantic-release.result == 'skipped') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -80,7 +83,7 @@ jobs:
   publish-optimizer:
     name: publish itofin-optimize to crates.io
     needs: resolve-release
-    if: ${{ !cancelled() && needs.resolve-release.result == 'success' && needs.resolve-release.outputs.publish == 'true' && (inputs.publish_targets == 'all' || inputs.publish_targets == 'rust') }}
+    if: ${{ !cancelled() && needs.resolve-release.result == 'success' && needs.resolve-release.outputs.publish == 'true' && (github.event_name == 'schedule' || inputs.publish_targets == 'all' || inputs.publish_targets == 'rust') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -122,7 +125,7 @@ jobs:
   publish-crate:
     name: publish libitofin to crates.io
     needs: [resolve-release, publish-optimizer]
-    if: ${{ !cancelled() && needs.resolve-release.result == 'success' && needs.publish-optimizer.result == 'success' && needs.resolve-release.outputs.publish == 'true' && (inputs.publish_targets == 'all' || inputs.publish_targets == 'rust') }}
+    if: ${{ !cancelled() && needs.resolve-release.result == 'success' && needs.publish-optimizer.result == 'success' && needs.resolve-release.outputs.publish == 'true' && (github.event_name == 'schedule' || inputs.publish_targets == 'all' || inputs.publish_targets == 'rust') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -164,7 +167,7 @@ jobs:
   build-python-wheels:
     name: build itofin wheels
     needs: resolve-release
-    if: ${{ !cancelled() && needs.resolve-release.result == 'success' && needs.resolve-release.outputs.publish == 'true' && (inputs.publish_targets == 'all' || inputs.publish_targets == 'python') && inputs.python_artifact_run_id == '' }}
+    if: ${{ !cancelled() && needs.resolve-release.result == 'success' && needs.resolve-release.outputs.publish == 'true' && (github.event_name == 'schedule' || inputs.publish_targets == 'all' || inputs.publish_targets == 'python') && inputs.python_artifact_run_id == '' }}
     permissions:
       contents: read
     uses: ./.github/workflows/python-wheels.yml
@@ -175,7 +178,7 @@ jobs:
   publish-pypi:
     name: publish itofin to PyPI
     needs: [resolve-release, build-python-wheels]
-    if: ${{ !cancelled() && needs.resolve-release.result == 'success' && needs.resolve-release.outputs.publish == 'true' && (inputs.publish_targets == 'all' || inputs.publish_targets == 'python') && (needs.build-python-wheels.result == 'success' || (inputs.python_artifact_run_id != '' && needs.build-python-wheels.result == 'skipped')) }}
+    if: ${{ !cancelled() && needs.resolve-release.result == 'success' && needs.resolve-release.outputs.publish == 'true' && (github.event_name == 'schedule' || inputs.publish_targets == 'all' || inputs.publish_targets == 'python') && (needs.build-python-wheels.result == 'success' || (inputs.python_artifact_run_id != '' && needs.build-python-wheels.result == 'skipped')) }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -204,7 +207,7 @@ jobs:
   publish-go:
     name: Publish and verify Go bindings
     needs: resolve-release
-    if: ${{ !cancelled() && needs.resolve-release.result == 'success' && needs.resolve-release.outputs.publish == 'true' && (inputs.publish_targets == 'all' || inputs.publish_targets == 'go') }}
+    if: ${{ !cancelled() && needs.resolve-release.result == 'success' && needs.resolve-release.outputs.publish == 'true' && (github.event_name == 'schedule' || inputs.publish_targets == 'all' || inputs.publish_targets == 'go') }}
     permissions:
       contents: write
     uses: ./.github/workflows/go-release.yml
