@@ -54,6 +54,7 @@ Use `-tags itofin_external` for builds, runs, tests, and vet outside this checko
 | Vanilla pricing and risk | [BlackCalculator](docs/docs/black-calculator-bindings.md) · [Bond risk analytics](docs/docs/bond-analytics.md) · [Coupon BPS and ATM rate](docs/docs/bond-coupon-analytics.md) |
 | European digital and gap options | [Cash-or-nothing analytic pricing](docs/docs/cash-digital-bindings.md) · [Asset-or-nothing FD pricing](docs/docs/asset-digital-bindings.md) · [Signed gap FD pricing](docs/docs/gap-option-bindings.md) |
 | European percentage-strike options | [Dimensionless-ratio FD pricing](docs/docs/percentage-strike-bindings.md) |
+| CPI pricing | [Coupon and leg foundation](docs/docs/cpi-cashflow-bindings.md) · [CPI bonds](docs/docs/cpi-bond-bindings.md) · [CPI versus Ibor swaps](docs/docs/cpi-swap-bindings.md) · [Quoted-price cap/floor snapshots](docs/docs/cpi-capfloor-bindings.md) |
 | Bond price and principal schedules | [Price-fed ATM](docs/docs/bond-price-atm-bindings.md) · [Amortizing fixed bonds](docs/docs/amortizing-fixed-bonds.md) · [Amortizing Ibor bonds](docs/docs/amortizing-floating-bond-bindings.md) |
 | Retained instruments | [Par asset swaps](docs/docs/asset-swap-bindings.md) · [Fixed-date FX forwards](docs/docs/fx-forward-bindings.md) · [Constant-notional Ibor Xccy](docs/docs/xccy-basis-bindings.md) |
 | Standalone Gaussian processes | [Constant-parameter GSR](docs/docs/gsr-process-bindings.md) · [Hull-White forward](docs/docs/hw-forward-process-bindings.md) · [MF state](docs/docs/mf-state-process-bindings.md) |

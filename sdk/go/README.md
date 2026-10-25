@@ -143,3 +143,13 @@ Plain fixed/zero bullet-bond `AssetSwap` supports live discounting, signed leg
 values, floating BPS and fair spread/clean price. Market, amortizing, callable
 and overnight variants are excluded. See the [bounded scope and lifecycle
 contract](https://github.com/benbenbang/libitofin/blob/main/docs/docs/asset-swap-bindings.md).
+
+## Bounded CPI pricing
+
+- [CPI coupons, plain pricers and legs](https://github.com/benbenbang/libitofin/blob/main/docs/docs/cpi-cashflow-bindings.md)
+- [CPI bonds](https://github.com/benbenbang/libitofin/blob/main/docs/docs/cpi-bond-bindings.md)
+- [CPI versus Ibor swaps](https://github.com/benbenbang/libitofin/blob/main/docs/docs/cpi-swap-bindings.md)
+- [Cumulative CPI cap/floor quoted-price snapshots](https://github.com/benbenbang/libitofin/blob/main/docs/docs/cpi-capfloor-bindings.md)
+
+Read the native payer convention, indexed-principal fixing requirements and frozen
+price-snapshot units before use. Existing constructors remain unchanged.
