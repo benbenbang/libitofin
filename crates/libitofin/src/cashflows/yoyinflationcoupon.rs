@@ -19,7 +19,8 @@
 //! re-checks the pricer's type at `setPricer` (`yoyinflationcoupon.cpp:55-59`).
 //! Here the pricer slot is a `SharedMut<dyn YoYInflationCouponPricer>` keyed on
 //! the concrete coupon, so both checks are structural and neither downcast has a
-//! port. A base can be lifted out if a `CPICoupon` consumer ever lands.
+//! port. CPI coupons likewise use their own concrete pricer rather than an
+//! erased common inflation-coupon base.
 //!
 //! The C++ coupon is a `LazyObject` caching `rate_` (`inflationcoupon.cpp:63-66`).
 //! As elsewhere in the cash-flow layer the cache is omitted and the pricer is
