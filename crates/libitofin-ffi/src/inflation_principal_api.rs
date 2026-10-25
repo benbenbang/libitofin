@@ -8,8 +8,12 @@ use crate::time_api::date;
 use libitofin::cashflow::{CashFlow, Leg};
 use libitofin::cashflows::{CpiCashFlow, ZeroInflationCashFlow};
 use libitofin::indexes::inflationindex::InflationIndex;
+#[cfg(test)]
+use libitofin::settings::Settings;
 use libitofin::shared::{Shared, shared};
 use libitofin::time::businessdayconvention::BusinessDayConvention;
+#[cfg(test)]
+use libitofin::time::date::Date;
 
 #[path = "inflation_principal_flow.rs"]
 mod principal_flow;
@@ -257,3 +261,7 @@ pub unsafe extern "C" fn itofin_inflation_cashflow_date(
         })
     }
 }
+
+#[cfg(test)]
+#[path = "inflation_principal_tests.rs"]
+mod tests;
