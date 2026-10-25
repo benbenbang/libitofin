@@ -1,0 +1,11 @@
+{
+  "canonical_cells_sha256": "12347e8bcb243dfd2ea4a53a92f7ec13353c7a7dc0d6a3e3033bc9e6abdd26a4",
+  "generator": "generate.py",
+  "jsonl_sha256": "d5748a30f7b95fef4c2bc92e9459c56c0b2839060d75c79f632d6d7f4af830b6",
+  "profile": "constant-volatility, Actual360, Douglas, no damping; same-grid observations not continuum guarantees",
+  "quantlib_wheel_version": "1.43",
+  "rows": 48,
+  "source_reference_is_wheel_build_source": false,
+  "source_reference_revision": "9863b578af0caa4cecabf697196533e84a8308b6",
+  "wheel_native_module_sha256": "04a53b6f425e728083149241f77e9b9711db845614ce65d2544a09a0970597d8"
+}
