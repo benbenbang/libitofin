@@ -126,3 +126,11 @@ Copyright (C) 2009, 2011 Chris Kenyon; Copyright (C) 2022 Quaternion Risk
 Management Ltd. The complete QuantLib license and contributor notices are in
 `QUANTLIB_LICENSE.txt`. The bounded implementation omits base-date constructors,
 CPI coupon optionlets and convexity adjustments.
+
+## QuantLib CPI bond
+
+The explicit-base CPI bond constructor is adapted from
+`ql/instruments/bonds/cpibond.{hpp,cpp}` at QuantLib revision
+`9863b578af0caa4cecabf697196533e84a8308b6`.
+Copyright (C) 2010, 2011 Chris Kenyon.
+The complete QuantLib license is included in `QUANTLIB_LICENSE.txt`.
