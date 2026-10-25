@@ -1,0 +1,221 @@
+{
+  "coupons": [
+    {
+      "name": "flat_historical_excoupon",
+      "values": {
+        "accrual_period": 0.4958904109589041,
+        "accrued": [
+          {
+            "amount": 0.0,
+            "date": "2025-01-15"
+          },
+          {
+            "amount": 5.452054794520548,
+            "date": "2025-01-16"
+          },
+          {
+            "amount": 832.3616438356165,
+            "date": "2025-06-15"
+          },
+          {
+            "amount": 966.5753424657534,
+            "date": "2025-07-09"
+          },
+          {
+            "amount": -27.61643835616438,
+            "date": "2025-07-10"
+          },
+          {
+            "amount": -5.523287671232877,
+            "date": "2025-07-14"
+          },
+          {
+            "amount": -0.0,
+            "date": "2025-07-15"
+          },
+          {
+            "amount": 0.0,
+            "date": "2025-07-16"
+          }
+        ],
+        "amount": 999.7150684931507,
+        "fixing_date": "2025-04-15",
+        "index_fixing": 100.8,
+        "payment": "2025-07-15",
+        "rate": 0.02016
+      }
+    },
+    {
+      "name": "flat_historical_fixing_update",
+      "values": {
+        "accrual_period": 0.4958904109589041,
+        "accrued": [
+          {
+            "amount": 0.0,
+            "date": "2025-01-15"
+          },
+          {
+            "amount": 5.452054794520548,
+            "date": "2025-01-16"
+          },
+          {
+            "amount": 832.3616438356165,
+            "date": "2025-06-15"
+          },
+          {
+            "amount": 976.1643835616438,
+            "date": "2025-07-09"
+          },
+          {
+            "amount": -27.89041095890411,
+            "date": "2025-07-10"
+          },
+          {
+            "amount": -5.578082191780822,
+            "date": "2025-07-14"
+          },
+          {
+            "amount": -0.0,
+            "date": "2025-07-15"
+          },
+          {
+            "amount": 0.0,
+            "date": "2025-07-16"
+          }
+        ],
+        "amount": 1009.6328767123289,
+        "fixing_date": "2025-04-15",
+        "index_fixing": 101.8,
+        "payment": "2025-07-15",
+        "rate": 0.02036
+      }
+    },
+    {
+      "name": "flat_forecast",
+      "values": {
+        "amount": 1024.8293007849377,
+        "fixing_date": "2026-04-15",
+        "index_fixing": 103.33223612886802,
+        "rate": 0.020666447225773602
+      }
+    },
+    {
+      "name": "flat_forecast_relinked_3pct",
+      "values": {
+        "amount": 1031.064882766618,
+        "index_fixing": 103.96096193641314,
+        "rate": 0.020792192387282627
+      }
+    },
+    {
+      "name": "linear_historical_excoupon",
+      "values": {
+        "accrual_period": 0.4958904109589041,
+        "accrued": [
+          {
+            "amount": 0.0,
+            "date": "2025-01-15"
+          },
+          {
+            "amount": 5.460008837825895,
+            "date": "2025-01-16"
+          },
+          {
+            "amount": 833.1338812785389,
+            "date": "2025-06-15"
+          },
+          {
+            "amount": 967.0702607158637,
+            "date": "2025-07-09"
+          },
+          {
+            "amount": -27.63234644277508,
+            "date": "2025-07-10"
+          },
+          {
+            "amount": -5.527883340698187,
+            "date": "2025-07-14"
+          },
+          {
+            "amount": -0.0,
+            "date": "2025-07-15"
+          },
+          {
+            "amount": 0.0,
+            "date": "2025-07-16"
+          }
+        ],
+        "amount": 1000.6108705258507,
+        "fixing_date": "2025-04-15",
+        "index_fixing": 100.89032258064516,
+        "payment": "2025-07-15",
+        "rate": 0.020178064516129034
+      }
+    },
+    {
+      "name": "linear_historical_fixing_update",
+      "values": {
+        "accrual_period": 0.4958904109589041,
+        "accrued": [
+          {
+            "amount": 0.0,
+            "date": "2025-01-15"
+          },
+          {
+            "amount": 5.460008837825895,
+            "date": "2025-01-16"
+          },
+          {
+            "amount": 836.9950684931507,
+            "date": "2025-06-15"
+          },
+          {
+            "amount": 974.1847105612021,
+            "date": "2025-07-09"
+          },
+          {
+            "amount": -27.82677861246133,
+            "date": "2025-07-10"
+          },
+          {
+            "amount": -5.559699513919576,
+            "date": "2025-07-14"
+          },
+          {
+            "amount": -0.0,
+            "date": "2025-07-15"
+          },
+          {
+            "amount": 0.0,
+            "date": "2025-07-16"
+          }
+        ],
+        "amount": 1006.0496685815289,
+        "fixing_date": "2025-04-15",
+        "index_fixing": 101.43870967741935,
+        "payment": "2025-07-15",
+        "rate": 0.02028774193548387
+      }
+    },
+    {
+      "name": "linear_forecast",
+      "values": {
+        "amount": 1025.7695740543054,
+        "fixing_date": "2026-04-15",
+        "index_fixing": 103.42704268779596,
+        "rate": 0.020685408537559194
+      }
+    },
+    {
+      "name": "linear_forecast_relinked_3pct",
+      "values": {
+        "amount": 1032.1975314472284,
+        "index_fixing": 104.07516546360175,
+        "rate": 0.020815033092720352
+      }
+    }
+  ],
+  "generator": "scripts/generate_cpi_oracle.py",
+  "inputs": "cpi-oracle-inputs.json",
+  "schema": 1
+}
