@@ -1,0 +1,161 @@
+{
+  "domain": "bond-and-leg-payment-inspection",
+  "entries": [
+    {
+      "c": "itofin_leg_span_date",
+      "go": "Leg.StartDate",
+      "python": "itofin.cashflows.Leg.start_date",
+      "status": "implemented",
+      "tests": [
+        "TestPaymentInspectionIndependentNativeMatrix",
+        "TestPaymentInspectionBondActualUnitsAndRetainedLeg",
+        "TestPaymentInspectionTodayPolicyAndErrors",
+        "TestPaymentInspectionFrozenFloatingSelectedGuards",
+        "TestPaymentInspectionCPIIdentityMissingFixingAndRetainedLeg"
+      ]
+    },
+    {
+      "c": "itofin_leg_payment",
+      "go": "Leg.PreviousCashFlowDate",
+      "python": "itofin.cashflows.Leg.previous_cash_flow_date",
+      "status": "implemented",
+      "tests": [
+        "TestPaymentInspectionIndependentNativeMatrix",
+        "TestPaymentInspectionBondActualUnitsAndRetainedLeg",
+        "TestPaymentInspectionTodayPolicyAndErrors",
+        "TestPaymentInspectionFrozenFloatingSelectedGuards",
+        "TestPaymentInspectionCPIIdentityMissingFixingAndRetainedLeg"
+      ]
+    },
+    {
+      "c": "itofin_leg_payment",
+      "go": "Leg.NextCashFlowDate",
+      "python": "itofin.cashflows.Leg.next_cash_flow_date",
+      "status": "implemented",
+      "tests": [
+        "TestPaymentInspectionIndependentNativeMatrix",
+        "TestPaymentInspectionBondActualUnitsAndRetainedLeg",
+        "TestPaymentInspectionTodayPolicyAndErrors",
+        "TestPaymentInspectionFrozenFloatingSelectedGuards",
+        "TestPaymentInspectionCPIIdentityMissingFixingAndRetainedLeg"
+      ]
+    },
+    {
+      "c": "itofin_leg_payment",
+      "go": "Leg.PreviousCashFlowAmount",
+      "python": "itofin.cashflows.Leg.previous_cash_flow_amount",
+      "status": "implemented",
+      "tests": [
+        "TestPaymentInspectionIndependentNativeMatrix",
+        "TestPaymentInspectionBondActualUnitsAndRetainedLeg",
+        "TestPaymentInspectionTodayPolicyAndErrors",
+        "TestPaymentInspectionFrozenFloatingSelectedGuards",
+        "TestPaymentInspectionCPIIdentityMissingFixingAndRetainedLeg"
+      ]
+    },
+    {
+      "c": "itofin_leg_payment",
+      "go": "Leg.NextCashFlowAmount",
+      "python": "itofin.cashflows.Leg.next_cash_flow_amount",
+      "status": "implemented",
+      "tests": [
+        "TestPaymentInspectionIndependentNativeMatrix",
+        "TestPaymentInspectionBondActualUnitsAndRetainedLeg",
+        "TestPaymentInspectionTodayPolicyAndErrors",
+        "TestPaymentInspectionFrozenFloatingSelectedGuards",
+        "TestPaymentInspectionCPIIdentityMissingFixingAndRetainedLeg"
+      ]
+    },
+    {
+      "c": "itofin_leg_span_date",
+      "go": "Leg.MaturityDate",
+      "python": "itofin.cashflows.Leg.maturity_date",
+      "status": "implemented",
+      "tests": [
+        "TestPaymentInspectionIndependentNativeMatrix",
+        "TestPaymentInspectionBondActualUnitsAndRetainedLeg",
+        "TestPaymentInspectionTodayPolicyAndErrors",
+        "TestPaymentInspectionFrozenFloatingSelectedGuards",
+        "TestPaymentInspectionCPIIdentityMissingFixingAndRetainedLeg"
+      ]
+    },
+    {
+      "c": "itofin_bond_inspection",
+      "go": "Bond.StartDate",
+      "python": "itofin.instruments.Bond.start_date",
+      "status": "implemented",
+      "tests": [
+        "TestPaymentInspectionIndependentNativeMatrix",
+        "TestPaymentInspectionBondActualUnitsAndRetainedLeg",
+        "TestPaymentInspectionTodayPolicyAndErrors",
+        "TestPaymentInspectionFrozenFloatingSelectedGuards",
+        "TestPaymentInspectionCPIIdentityMissingFixingAndRetainedLeg"
+      ]
+    },
+    {
+      "c": "itofin_bond_payment",
+      "go": "Bond.PreviousCashFlowDate",
+      "python": "itofin.instruments.Bond.previous_cash_flow_date",
+      "status": "implemented",
+      "tests": [
+        "TestPaymentInspectionIndependentNativeMatrix",
+        "TestPaymentInspectionBondActualUnitsAndRetainedLeg",
+        "TestPaymentInspectionTodayPolicyAndErrors",
+        "TestPaymentInspectionFrozenFloatingSelectedGuards",
+        "TestPaymentInspectionCPIIdentityMissingFixingAndRetainedLeg"
+      ]
+    },
+    {
+      "c": "itofin_bond_payment",
+      "go": "Bond.NextCashFlowDate",
+      "python": "itofin.instruments.Bond.next_cash_flow_date",
+      "status": "implemented",
+      "tests": [
+        "TestPaymentInspectionIndependentNativeMatrix",
+        "TestPaymentInspectionBondActualUnitsAndRetainedLeg",
+        "TestPaymentInspectionTodayPolicyAndErrors",
+        "TestPaymentInspectionFrozenFloatingSelectedGuards",
+        "TestPaymentInspectionCPIIdentityMissingFixingAndRetainedLeg"
+      ]
+    },
+    {
+      "c": "itofin_bond_payment",
+      "go": "Bond.PreviousCashFlowAmount",
+      "python": "itofin.instruments.Bond.previous_cash_flow_amount",
+      "status": "implemented",
+      "tests": [
+        "TestPaymentInspectionIndependentNativeMatrix",
+        "TestPaymentInspectionBondActualUnitsAndRetainedLeg",
+        "TestPaymentInspectionTodayPolicyAndErrors",
+        "TestPaymentInspectionFrozenFloatingSelectedGuards",
+        "TestPaymentInspectionCPIIdentityMissingFixingAndRetainedLeg"
+      ]
+    },
+    {
+      "c": "itofin_bond_payment",
+      "go": "Bond.NextCashFlowAmount",
+      "python": "itofin.instruments.Bond.next_cash_flow_amount",
+      "status": "implemented",
+      "tests": [
+        "TestPaymentInspectionIndependentNativeMatrix",
+        "TestPaymentInspectionBondActualUnitsAndRetainedLeg",
+        "TestPaymentInspectionTodayPolicyAndErrors",
+        "TestPaymentInspectionFrozenFloatingSelectedGuards",
+        "TestPaymentInspectionCPIIdentityMissingFixingAndRetainedLeg"
+      ]
+    },
+    {
+      "c": "itofin_bond_inspection",
+      "go": "Bond.IsTradable",
+      "python": "itofin.instruments.Bond.is_tradable",
+      "status": "implemented",
+      "tests": [
+        "TestPaymentInspectionIndependentNativeMatrix",
+        "TestPaymentInspectionBondActualUnitsAndRetainedLeg",
+        "TestPaymentInspectionTodayPolicyAndErrors",
+        "TestPaymentInspectionFrozenFloatingSelectedGuards",
+        "TestPaymentInspectionCPIIdentityMissingFixingAndRetainedLeg"
+      ]
+    }
+  ]
+}

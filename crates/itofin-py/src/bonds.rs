@@ -294,6 +294,23 @@ pub struct PyBond {
     frozen: Cell<bool>,
 }
 impl PyBond {
+    fn inspection_payment(
+        &self,
+        settlement: Option<&PyDate>,
+        next: bool,
+        with_amount: bool,
+    ) -> PyResult<(Option<Date>, Option<f64>)> {
+        let settlement = analytical_date(settlement)?
+            .map_or_else(|| self.settlement_date(None).map(|date| date.inner()), Ok)?;
+        let bond = self.inner.borrow();
+        self.cashflows().inspection_payment(
+            bond.settings(),
+            Some(false),
+            Some(settlement),
+            next,
+            with_amount,
+        )
+    }
     fn require_unindexed_coupon_analytics(&self) -> PyResult<()> {
         if self.indexed {
             Err(ItofinError::new_err(
@@ -1088,6 +1105,48 @@ impl PyBond {
             .as_ref()
             .map(|_| libitofin::shared::shared(|_: Option<usize>| Ok(())) as CashFlowGuard);
         PyLeg::with_guard(self.inner.borrow().redemptions().clone(), guard)
+    }
+    /// Earliest coupon accrual start or non-coupon payment date; needs no engine.
+    fn start_date(&self) -> PyResult<PyDate> {
+        Ok(PyDate::from_inner(
+            CashFlows::start_date(self.inner.borrow().cashflows()).map_err(PyQlError::from)?,
+        ))
+    }
+    /// Whether outstanding notional is nonzero at settlement; omitted date uses bond settlement.
+    #[pyo3(signature=(settlement=None))]
+    fn is_tradable(&self, settlement: Option<&PyDate>) -> PyResult<bool> {
+        let settlement = analytical_date(settlement)?
+            .map_or_else(|| self.settlement_date(None).map(|date| date.inner()), Ok)?;
+        Ok(
+            BondFunctions::is_tradable(&self.inner.borrow(), Some(settlement))
+                .map_err(PyQlError::from)?,
+        )
+    }
+    /// Previous payment date, or None; excludes settlement flows unless today Settings override.
+    #[pyo3(signature=(settlement=None))]
+    fn previous_cash_flow_date(&self, settlement: Option<&PyDate>) -> PyResult<Option<PyDate>> {
+        Ok(self
+            .inspection_payment(settlement, false, false)?
+            .0
+            .map(PyDate::from_inner))
+    }
+    /// Next payment date, or None; today Settings can override settlement exclusion.
+    #[pyo3(signature=(settlement=None))]
+    fn next_cash_flow_date(&self, settlement: Option<&PyDate>) -> PyResult<Option<PyDate>> {
+        Ok(self
+            .inspection_payment(settlement, true, false)?
+            .0
+            .map(PyDate::from_inner))
+    }
+    /// Aggregate previous actual payment, including principal, or None; not a per-100 quote.
+    #[pyo3(signature=(settlement=None))]
+    fn previous_cash_flow_amount(&self, settlement: Option<&PyDate>) -> PyResult<Option<f64>> {
+        Ok(self.inspection_payment(settlement, false, true)?.1)
+    }
+    /// Aggregate next actual payment, including principal, or None; not a per-100 quote.
+    #[pyo3(signature=(settlement=None))]
+    fn next_cash_flow_amount(&self, settlement: Option<&PyDate>) -> PyResult<Option<f64>> {
+        Ok(self.inspection_payment(settlement, true, true)?.1)
     }
     fn is_expired(&self) -> PyResult<bool> {
         Ok(self
