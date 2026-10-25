@@ -10,6 +10,9 @@ import typing
 __all__ = [
     "AverageBMACoupon",
     "BlackIborCouponPricer",
+    "CPICoupon",
+    "CPICouponPricer",
+    "CPILeg",
     "CappedFlooredYoYInflationCoupon",
     "CashFlow",
     "IborLeg",
@@ -54,6 +57,64 @@ class BlackIborCouponPricer:
     Black or normal ibor coupon pricer using an optional retained optionlet surface.
     """
     def __new__(cls, volatility: typing.Optional[termstructures.OptionletVolatilityStructure] = None) -> BlackIborCouponPricer: ...
+
+@typing.final
+class CPICoupon:
+    r"""
+    Explicit-base CPI-scaled fixed coupon. Attach a plain pricer before pricing.
+    """
+    def __init__(self, base_cpi: builtins.float, payment_date: time.Date, nominal: builtins.float, start_date: time.Date, end_date: time.Date, index: indexes.ZeroInflationIndex, observation_lag: time.Period, interpolation: indexes.CpiInterpolationType, day_counter: time.DayCounter, fixed_rate: builtins.float, reference_start: typing.Optional[time.Date] = None, reference_end: typing.Optional[time.Date] = None, ex_coupon_date: typing.Optional[time.Date] = None) -> None:
+        r"""
+        Build a coupon using an explicit CPI denominator and lagged observation.
+
+        Attach a CPICouponPricer before rate or amount queries. The base CPI
+        must be finite and nonzero; its interpolation convention is caller-owned.
+
+        Raises:
+            ItofinError: On invalid terms, dates, lags or a non-finite parameter.
+        """
+    def set_pricer(self, pricer: CPICouponPricer) -> None: ...
+    def rate(self) -> builtins.float: ...
+    def amount(self) -> builtins.float: ...
+    def accrued_amount(self, date: time.Date) -> builtins.float: ...
+    def index_ratio(self, date: time.Date) -> builtins.float: ...
+    def index_fixing(self) -> builtins.float: ...
+    def accrual_period(self) -> builtins.float: ...
+
+@typing.final
+class CPICouponPricer:
+    r"""
+    Plain CPI swaplet pricer. Discounted prices are per unit nominal.
+    """
+    def __init__(self, nominal_curve: typing.Optional[termstructures.YieldTermStructure] = None) -> None:
+        r"""
+        Build a plain CPI swaplet pricer, optionally retaining a nominal curve.
+
+        Rate queries need no nominal curve; swaplet_price requires one and
+        returns a discounted value per unit nominal, not a currency amount.
+        """
+    def swaplet_rate(self, coupon: CPICoupon) -> builtins.float: ...
+    def swaplet_price(self, coupon: CPICoupon) -> builtins.float: ...
+    def accrued_rate(self, coupon: CPICoupon, date: time.Date) -> builtins.float: ...
+
+@typing.final
+class CPILeg:
+    r"""
+    Plain CPI coupons and one terminal indexed principal payment.
+    """
+    def __init__(self, schedule: time.Schedule, index: indexes.ZeroInflationIndex, base_cpi: builtins.float, observation_lag: time.Period, notionals: typing.Sequence[builtins.float], fixed_rates: typing.Sequence[builtins.float], day_counter: time.DayCounter, payment_calendar: time.Calendar, payment_adjustment: time.BusinessDayConvention, interpolation: indexes.CpiInterpolationType = indexes.CpiInterpolationType.Flat, growth_only: builtins.bool = True, ex_coupon_period: typing.Optional[time.Period] = None, ex_coupon_calendar: typing.Optional[time.Calendar] = None, ex_coupon_adjustment: time.BusinessDayConvention = time.BusinessDayConvention.Unadjusted, ex_coupon_end_of_month: builtins.bool = False) -> None:
+        r"""
+        Materialize plain CPI coupons and one indexed terminal payment.
+
+        Payment and ex-coupon dates are fixed at construction. CPI histories
+        and linked curves remain live; build clones the retained cash-flow graph.
+        A default plain pricer is attached, and growth_only selects whether the
+        uninflated terminal principal is subtracted.
+
+        Raises:
+            ItofinError: On invalid terms, calendars, dates or leg parameters.
+        """
+    def build(self) -> Leg: ...
 
 @typing.final
 class CappedFlooredYoYInflationCoupon:
