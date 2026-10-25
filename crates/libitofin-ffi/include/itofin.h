@@ -1864,6 +1864,18 @@ typedef struct ItofinResultsFields {
 } ItofinResultsFields;
 
 /**
+ * Stored scalar terms. Kinds: vanilla=0, cash=1, asset=2, gap=3, percentage=4.
+ * Option kind is call=0 or put=1. Extra is cash payoff for cash, payment strike
+ * for gap, and zero otherwise. Percentage strike is a dimensionless ratio.
+ */
+typedef struct ItofinScalarPayoffInfo {
+  int32_t kind;
+  int32_t option_kind;
+  double strike;
+  double extra;
+} ItofinScalarPayoffInfo;
+
+/**
  * Extended configuration; the original stripping ABI remains unchanged.
  */
 typedef struct ItofinOptionletStripperConfig {
@@ -8592,6 +8604,44 @@ int32_t itofin_rng_sequence_draw(struct ItofinContext *ctx,
                                  double *out,
                                  size_t capacity,
                                  struct ItofinError *error);
+
+/**
+ * Copy scalar terms into an immutable payoff. All inputs must be finite;
+ * signed prices, strikes and amounts are supported. Extra must be zero for
+ * vanilla, asset and percentage kinds. This handle is not an engine input.
+ * # Safety
+ * Follow the crate-level caller contract. Output is written only on success.
+ */
+int32_t itofin_scalar_payoff_new(struct ItofinContext *ctx,
+                                 int32_t kind,
+                                 int32_t option_kind,
+                                 double strike,
+                                 double extra,
+                                 uint64_t *out,
+                                 struct ItofinError *error);
+
+/**
+ * Evaluate at a finite signed price, rejecting nonfinite computed results.
+ * Cash/asset triggers are strict; gap triggers are inclusive and may pay negative.
+ * Percentage payoff multiplies its floored ratio factor by the signed price.
+ * # Safety
+ * Follow the crate-level caller contract. Output is written only on success.
+ */
+int32_t itofin_scalar_payoff_value(struct ItofinContext *ctx,
+                                   uint64_t payoff,
+                                   double price,
+                                   double *out,
+                                   struct ItofinError *error);
+
+/**
+ * Copy stored terms without evaluating the payoff.
+ * # Safety
+ * Follow the crate-level caller contract. Output is written only on success.
+ */
+int32_t itofin_scalar_payoff_info(struct ItofinContext *ctx,
+                                  uint64_t payoff,
+                                  struct ItofinScalarPayoffInfo *out,
+                                  struct ItofinError *error);
 
 /**
  * Evaluate weighted vector statistics into a caller-owned row-major buffer.
