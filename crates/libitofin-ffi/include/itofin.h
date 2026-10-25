@@ -607,6 +607,23 @@ typedef struct ItofinCapHelperConfig {
   double shift;
 } ItofinCapHelperConfig;
 
+typedef struct ItofinCpiCouponConfig {
+  uint64_t index;
+  double base_cpi;
+  double nominal;
+  double fixed_rate;
+  int32_t payment;
+  int32_t start;
+  int32_t end;
+  int32_t reference_start;
+  int32_t reference_end;
+  int32_t ex_coupon;
+  int32_t lag_length;
+  int32_t lag_unit;
+  int32_t interpolation;
+  uint64_t day_counter;
+} ItofinCpiCouponConfig;
+
 /**
  * A zero quote handle selects `rate`; a nonzero settings handle selects moving dates.
  */
@@ -3858,6 +3875,63 @@ int32_t itofin_convergence_statistics_table(struct ItofinContext *ctx,
                                             ItofinReal *out_means,
                                             size_t out_len,
                                             struct ItofinError *error);
+
+/**
+ * # Safety
+ * Pointers must be aligned and valid; outputs must not overlap. The context
+ * and handles belong to the calling thread. Serialize all context calls.
+ */
+int32_t itofin_cpi_coupon_new(struct ItofinContext *ctx,
+                              struct ItofinCpiCouponConfig a,
+                              uint64_t *out,
+                              struct ItofinError *error);
+
+/**
+ * # Safety
+ * Pointers must be aligned and valid; outputs must not overlap. The context
+ * and handles belong to the calling thread. Serialize all context calls.
+ */
+int32_t itofin_cpi_coupon_pricer_new(struct ItofinContext *ctx,
+                                     uint64_t discount,
+                                     uint64_t *out,
+                                     struct ItofinError *error);
+
+/**
+ * # Safety
+ * Pointers must be aligned and valid; outputs must not overlap. The context
+ * and handles belong to the calling thread. Serialize all context calls.
+ */
+int32_t itofin_cpi_coupon_set_pricer(struct ItofinContext *ctx,
+                                     uint64_t id,
+                                     uint64_t pricer,
+                                     struct ItofinError *error);
+
+/**
+ * Fields: 0 rate, 1 amount, 2 index fixing, 3 index ratio at date,
+ * 4 accrued amount at date, 5 accrual period.
+ * # Safety
+ * Pointers must be aligned and valid; outputs must not overlap. The context
+ * and handles belong to the calling thread. Serialize all context calls.
+ */
+int32_t itofin_cpi_coupon_value(struct ItofinContext *ctx,
+                                uint64_t id,
+                                int32_t field,
+                                int32_t serial,
+                                double *out,
+                                struct ItofinError *error);
+
+/**
+ * # Safety
+ * Pointers must be aligned and valid; outputs must not overlap. The context
+ * and handles belong to the calling thread. Serialize all context calls.
+ */
+int32_t itofin_cpi_pricer_value(struct ItofinContext *ctx,
+                                uint64_t pricer,
+                                uint64_t coupon,
+                                int32_t field,
+                                int32_t serial,
+                                double *out,
+                                struct ItofinError *error);
 
 /**
  * # Safety
