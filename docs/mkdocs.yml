@@ -149,6 +149,7 @@ nav:
   - Amortizing fixed-rate bonds: amortizing-fixed-bonds.md
   - Amortizing plain-Ibor bonds: amortizing-floating-bond-bindings.md
   - Plain CPI cash flows: cpi-cashflow-bindings.md
+  - CPI versus Ibor swaps: cpi-swap-bindings.md
   - Zero-coupon bonds: zero-coupon-bonds.md
   - Floating-rate bonds: floating-rate-bonds.md
   - Par asset swaps: asset-swaps.md
