@@ -269,6 +269,9 @@ pub unsafe extern "C" fn itofin_leg_npv(
 ) -> i32 {
     unsafe {
         with_context(ctx, error, |c| {
+            if !error.is_null() {
+                check_ptr(error)?;
+            }
             check_ptr(out)?;
             let include = match include_settlement {
                 -1 => None,
@@ -291,6 +294,13 @@ pub unsafe extern "C" fn itofin_leg_npv(
             if let Some(floating) = &floating {
                 floating.guard_leg(&leg, &*settings(c, settings_id)?, include, settlement)?;
             }
+            let cpi = c.optional_metadata::<crate::cpi_cashflows_api::CpiLegSettings>(id);
+            if let Some(cpi) = &cpi {
+                let settings = settings(c, settings_id)?;
+                if !std::ptr::eq(&*settings, &*cpi.0) {
+                    return Err(BindingError::invalid("CPI leg and NPV settings must match"));
+                }
+            }
             let curve = curve(c, discount)?.current_link()?;
             let value = CashFlows::npv(
                 &leg,
@@ -302,7 +312,7 @@ pub unsafe extern "C" fn itofin_leg_npv(
             )?;
             output(
                 out,
-                if floating.is_some() {
+                if floating.is_some() || cpi.is_some() {
                     finite(value)?
                 } else {
                     value

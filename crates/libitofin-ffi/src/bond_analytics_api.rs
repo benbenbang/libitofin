@@ -579,6 +579,9 @@ pub unsafe extern "C" fn itofin_cashflows_npv_at_z_spread(
 ) -> i32 {
     unsafe {
         with_context(ctx, error, |c| {
+            if !error.is_null() {
+                check_ptr(error)?;
+            }
             check_ptr(out)?;
             let value = finite(value)?;
             let discount = curve(c, a.discount)?;
@@ -590,6 +593,13 @@ pub unsafe extern "C" fn itofin_cashflows_npv_at_z_spread(
             let npv_date = optional_date(a.npv_date)?;
 
             let leg = c.get::<Leg>(id)?;
+            if let Some(cpi) = c.optional_metadata::<crate::cpi_cashflows_api::CpiLegSettings>(id)
+                && !std::ptr::eq(&*settings, &*cpi.0)
+            {
+                return Err(BindingError::invalid(
+                    "CPI leg and valuation settings differ",
+                ));
+            }
             if let Some(floating) =
                 c.optional_metadata::<crate::floating_bond_api::NativeFloating>(id)
             {
@@ -616,6 +626,9 @@ pub unsafe extern "C" fn itofin_cashflows_z_spread(
 ) -> i32 {
     unsafe {
         with_context(ctx, error, |c| {
+            if !error.is_null() {
+                check_ptr(error)?;
+            }
             check_ptr(out)?;
             let value = finite(value)?;
             let discount = curve(c, a.discount)?;
@@ -627,6 +640,13 @@ pub unsafe extern "C" fn itofin_cashflows_z_spread(
             let npv_date = optional_date(a.npv_date)?;
             let solve = solver(solve)?;
             let leg = c.get::<Leg>(id)?;
+            if let Some(cpi) = c.optional_metadata::<crate::cpi_cashflows_api::CpiLegSettings>(id)
+                && !std::ptr::eq(&*settings, &*cpi.0)
+            {
+                return Err(BindingError::invalid(
+                    "CPI leg and valuation settings differ",
+                ));
+            }
             if let Some(floating) =
                 c.optional_metadata::<crate::floating_bond_api::NativeFloating>(id)
             {

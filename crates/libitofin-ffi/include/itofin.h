@@ -607,6 +607,28 @@ typedef struct ItofinCapHelperConfig {
   double shift;
 } ItofinCapHelperConfig;
 
+typedef struct ItofinCpiLegConfig {
+  uint64_t schedule;
+  uint64_t index;
+  double base_cpi;
+  int32_t lag_length;
+  int32_t lag_unit;
+  int32_t interpolation;
+  uint64_t day_counter;
+  uint64_t payment_calendar;
+  int32_t payment_convention;
+  const double *notionals;
+  size_t notionals_len;
+  const double *fixed_rates;
+  size_t fixed_rates_len;
+  int32_t growth_only;
+  int32_t ex_coupon_length;
+  int32_t ex_coupon_unit;
+  uint64_t ex_coupon_calendar;
+  int32_t ex_coupon_convention;
+  int32_t ex_coupon_end_of_month;
+} ItofinCpiLegConfig;
+
 typedef struct ItofinCpiCouponConfig {
   uint64_t index;
   double base_cpi;
@@ -3875,6 +3897,26 @@ int32_t itofin_convergence_statistics_table(struct ItofinContext *ctx,
                                             ItofinReal *out_means,
                                             size_t out_len,
                                             struct ItofinError *error);
+
+/**
+ * # Safety
+ * Pointers must be aligned and valid; outputs must not overlap. The context
+ * and handles belong to the calling thread. Serialize all context calls.
+ */
+int32_t itofin_cpi_leg_new(struct ItofinContext *ctx,
+                           struct ItofinCpiLegConfig a,
+                           uint64_t *out,
+                           struct ItofinError *error);
+
+/**
+ * # Safety
+ * Pointers must be aligned and valid; outputs must not overlap. The context
+ * and handles belong to the calling thread. Serialize all context calls.
+ */
+int32_t itofin_cpi_leg_build(struct ItofinContext *ctx,
+                             uint64_t id,
+                             uint64_t *out,
+                             struct ItofinError *error);
 
 /**
  * # Safety
