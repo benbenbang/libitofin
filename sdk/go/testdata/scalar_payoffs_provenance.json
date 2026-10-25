@@ -1,0 +1,12 @@
+{
+  "native_sha256": "04a53b6f425e728083149241f77e9b9711db845614ce65d2544a09a0970597d8",
+  "native_version": "1.43",
+  "rows": 384,
+  "source_is_wheel_build_provenance": false,
+  "source_reference_revision": "9863b578af0caa4cecabf697196533e84a8308b6",
+  "transformation": "One TSV row per source row; kinds0..4 in named factory order, call0/put1, null extra to0; repr preserves binary float roundtrip",
+  "tsv_generator_sha256": "07b3548b84df3d1ea589069993f6532f2efb77cfd2dd53c21c912d1ff9ef8915",
+  "tsv_sha256": "e0812e12b0692082e8293ce3a762bebdb50110c840618a93c0989f993bcef43a",
+  "upstream_evidence_sha256": "d89bd00963977bc6e570592475f06fb552b7733ec6c88d5250c84d81fc25267d",
+  "upstream_generator_sha256": "a1c590f9f06c82e6affc60589ed23ed77bd6a10357ffa949a3fac841d9b1d6d6"
+}
