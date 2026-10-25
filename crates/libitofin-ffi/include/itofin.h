@@ -2242,6 +2242,25 @@ int32_t itofin_black_calculator_new(struct ItofinContext *ctx,
                                     struct ItofinError *error);
 
 /**
+ * Copy a cash-or-nothing call (0) or put (1) into the existing calculator type.
+ * All inputs must be finite. Cash payoff may be signed. std_dev must exceed
+ * f64::EPSILON, excluding the core's degenerate-volatility Greek shortcut.
+ * Other domains match itofin_black_calculator_new. No payoff handle is accepted.
+ * Finite elasticity sentinels are retained.
+ * # Safety
+ * Follow the crate-level C caller contract. Output is written only on success.
+ */
+int32_t itofin_black_calculator_cash_digital_new(struct ItofinContext *ctx,
+                                                 int32_t option_kind,
+                                                 double strike,
+                                                 double cash_payoff,
+                                                 double forward,
+                                                 double std_dev,
+                                                 double discount,
+                                                 uint64_t *out,
+                                                 struct ItofinError *error);
+
+/**
  * Present value.
  * Nonfinite native results are errors; finite native edge behavior is unchanged.
  * # Safety

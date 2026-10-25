@@ -1,6 +1,7 @@
-//! Immutable plain-vanilla Black 1976 scalar calculator.
+//! Immutable vanilla and cash-digital Black 1976 scalar calculator.
 use crate::option::PyOptionType;
 use crate::{ItofinError, PyQlError};
+use libitofin::instruments::CashOrNothingPayoff;
 use libitofin::pricingengines::BlackCalculator;
 use pyo3::prelude::*;
 use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
@@ -14,7 +15,7 @@ fn finite(value: f64) -> PyResult<f64> {
     Ok(value)
 }
 
-/// Immutable plain-vanilla standalone value and Greeks, not a pricing engine.
+/// Immutable vanilla or cash-digital standalone calculator, not a pricing engine.
 /// Every nonfinite result raises ItofinError, including native zero-strike NaNs.
 #[gen_stub_pyclass]
 #[pyclass(name = "BlackCalculator", frozen, module = "itofin.pricingengines")]
@@ -37,6 +38,34 @@ impl PyBlackCalculator {
     ) -> PyResult<Self> {
         Ok(Self {
             inner: BlackCalculator::new(option_type.inner(), strike, forward, std_dev, discount)
+                .map_err(PyQlError::from)?,
+        })
+    }
+    /// Copy a cash-or-nothing payoff into a standalone calculator.
+    /// Cash payoff may be signed and must be finite. std_dev must exceed
+    /// f64::EPSILON, excluding the core's degenerate-volatility Greek shortcut.
+    /// Other inputs use the vanilla constructor domains. std_dev is volatility
+    /// times sqrt(time). Finite elasticity sentinels remain.
+    #[staticmethod]
+    fn cash_digital(
+        option_type: PyOptionType,
+        strike: f64,
+        cash_payoff: f64,
+        forward: f64,
+        std_dev: f64,
+        discount: f64,
+    ) -> PyResult<Self> {
+        if !std_dev.is_finite() || std_dev <= f64::EPSILON {
+            return Err(ItofinError::new_err(
+                "cash-digital std_dev must exceed f64::EPSILON",
+            ));
+        }
+        if !cash_payoff.is_finite() {
+            return Err(ItofinError::new_err("cash payoff must be finite"));
+        }
+        let payoff = CashOrNothingPayoff::new(option_type.inner(), strike, cash_payoff);
+        Ok(Self {
+            inner: BlackCalculator::with_striked_payoff(&payoff, forward, std_dev, discount)
                 .map_err(PyQlError::from)?,
         })
     }

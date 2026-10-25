@@ -1,0 +1,16 @@
+{
+  "domain": "immutable-cash-digital-black-calculator",
+  "entries": [
+    {
+      "c": "itofin_black_calculator_cash_digital_new",
+      "go": "Session.NewCashDigitalBlackCalculator",
+      "python": "itofin.pricingengines.BlackCalculator.cash_digital",
+      "status": "implemented",
+      "tests": [
+        "TestCashDigitalBlackCalculatorAnalytic",
+        "TestCashDigitalBlackCalculatorDomainsAndLifecycle",
+        "TestCashDigitalBlackCalculatorNativeQueries"
+      ]
+    }
+  ]
+}

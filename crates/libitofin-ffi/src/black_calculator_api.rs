@@ -1,6 +1,7 @@
-//! Immutable plain-vanilla Black 1976 scalar calculator adapters.
+//! Immutable vanilla and cash-digital Black 1976 scalar calculator adapters.
 use crate::boundary::*;
 use crate::options_api::option_type;
+use libitofin::instruments::CashOrNothingPayoff;
 use libitofin::pricingengines::BlackCalculator;
 
 /// Copy finite parameters for a plain-vanilla call (0) or put (1).
@@ -32,6 +33,47 @@ pub unsafe extern "C" fn itofin_black_calculator_new(
                 std_dev,
                 discount,
             )?;
+            output(out, c.insert(calculator)?)
+        })
+    }
+}
+
+/// Copy a cash-or-nothing call (0) or put (1) into the existing calculator type.
+/// All inputs must be finite. Cash payoff may be signed. std_dev must exceed
+/// f64::EPSILON, excluding the core's degenerate-volatility Greek shortcut.
+/// Other domains match itofin_black_calculator_new. No payoff handle is accepted.
+/// Finite elasticity sentinels are retained.
+/// # Safety
+/// Follow the crate-level C caller contract. Output is written only on success.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn itofin_black_calculator_cash_digital_new(
+    ctx: *mut Context,
+    option_kind: i32,
+    strike: f64,
+    cash_payoff: f64,
+    forward: f64,
+    std_dev: f64,
+    discount: f64,
+    out: *mut u64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            if !error.is_null() {
+                check_ptr(error)?;
+            }
+            check_ptr(out)?;
+            if !std_dev.is_finite() || std_dev <= f64::EPSILON {
+                return Err(BindingError::invalid(
+                    "cash-digital std_dev must exceed f64::EPSILON",
+                ));
+            }
+            if !cash_payoff.is_finite() {
+                return Err(BindingError::invalid("cash payoff must be finite"));
+            }
+            let payoff = CashOrNothingPayoff::new(option_type(option_kind)?, strike, cash_payoff);
+            let calculator =
+                BlackCalculator::with_striked_payoff(&payoff, forward, std_dev, discount)?;
             output(out, c.insert(calculator)?)
         })
     }
