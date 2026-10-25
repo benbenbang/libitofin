@@ -101,6 +101,7 @@ fn native(
         fixed,
         flags: shared(Cell::new(flags)),
         floating: None,
+        indexed: false,
     })
 }
 #[unsafe(no_mangle)]

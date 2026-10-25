@@ -434,6 +434,37 @@ typedef struct ItofinCallableBondRiskConfig {
 } ItofinCallableBondRiskConfig;
 
 /**
+ * Modern CPI bond configuration. Principal pays the full CPI ratio.
+ */
+typedef struct ItofinCpiBondConfig {
+  uint32_t settlement_days;
+  double face_amount;
+  double base_cpi;
+  int32_t observation_lag_length;
+  int32_t observation_lag_unit;
+  uint64_t index;
+  int32_t observation_interpolation;
+  uint64_t schedule;
+  uint64_t day_counter;
+  uint64_t settings;
+  int32_t payment_convention;
+  /**
+   * Zero selects the schedule calendar.
+   */
+  uint64_t payment_calendar;
+  /**
+   * Zero means no issue date.
+   */
+  int32_t issue_date;
+  uint64_t ex_coupon_calendar;
+  int32_t ex_coupon_length;
+  int32_t ex_coupon_unit;
+  int32_t ex_coupon_convention;
+  uint8_t has_ex_coupon;
+  uint8_t ex_coupon_end_of_month;
+} ItofinCpiBondConfig;
+
+/**
  * Plain same-currency paid and received Ibor legs. Flag zero preserves native defaults.
  */
 typedef struct ItofinFloatFloatSwapConfig {
@@ -3317,6 +3348,17 @@ int32_t itofin_chart_volume_bars(const ItofinReal *open,
                                  int8_t *out_direction,
                                  size_t capacity,
                                  struct ItofinError *error);
+
+/**
+ * # Safety
+ * Pointers and thread ownership must satisfy the crate-level C caller contract.
+ */
+int32_t itofin_cpi_bond_new(struct ItofinContext *ctx,
+                            struct ItofinCpiBondConfig a,
+                            const double *coupons,
+                            size_t count,
+                            uint64_t *out,
+                            struct ItofinError *error);
 
 /**
  * Construct and retain the original native instrument, Settings and both indexes.

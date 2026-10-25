@@ -209,6 +209,11 @@ pub unsafe extern "C" fn itofin_bond_bps_from_curve(
             }
             check_ptr(out)?;
             let bond = c.get::<NativeBond>(id)?;
+            if bond.indexed {
+                return Err(BindingError::invalid(
+                    "CPI raw-coupon BPS and ATM analytics are unsupported",
+                ));
+            }
             bond.bond.plain()?;
             let actual = coupon_sensitivity_settlement(&bond, serial)?;
             let discount = curve(c, discount)?.current_link()?;
@@ -243,6 +248,11 @@ pub unsafe extern "C" fn itofin_bond_bps_from_yield(
                 frequency(a.frequency)?,
             )?;
             let bond = c.get::<NativeBond>(id)?;
+            if bond.indexed {
+                return Err(BindingError::invalid(
+                    "CPI raw-coupon BPS and ATM analytics are unsupported",
+                ));
+            }
             bond.bond.plain()?;
             let actual = coupon_sensitivity_settlement(&bond, a.settlement)?;
             let value = BondFunctions::bps_at_yield(&bond.bond.borrow(), &rate, Some(actual))?;
@@ -270,6 +280,11 @@ pub unsafe extern "C" fn itofin_bond_atm_rate_from_curve(
             }
             check_ptr(out)?;
             let bond = c.get::<NativeBond>(id)?;
+            if bond.indexed {
+                return Err(BindingError::invalid(
+                    "CPI raw-coupon BPS and ATM analytics are unsupported",
+                ));
+            }
             bond.bond.plain()?;
             let actual = settlement(&bond, serial, false)?;
             let discount = curve(c, discount)?.current_link()?;
@@ -303,6 +318,11 @@ pub unsafe extern "C" fn itofin_bond_atm_rate_from_price(
             check_ptr(out)?;
             let price = price(amount, price_kind)?;
             let bond = c.get::<NativeBond>(id)?;
+            if bond.indexed {
+                return Err(BindingError::invalid(
+                    "CPI raw-coupon BPS and ATM analytics are unsupported",
+                ));
+            }
             bond.bond.plain()?;
             let actual = settlement(&bond, serial, matches!(price, BondPrice::Clean(_)))?;
             let discount = curve(c, discount)?.current_link()?;

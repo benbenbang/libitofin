@@ -124,7 +124,7 @@ pub unsafe extern "C" fn itofin_asset_swap_new(
                 _ => return Err(BindingError::invalid("invalid pay-bond flag")),
             };
             let bond = c.get::<NativeBond>(a.bond)?;
-            if bond.floating.is_some() {
+            if bond.floating.is_some() || bond.indexed {
                 return Err(BindingError::invalid("fixed or zero plain bond required"));
             }
             let plain = bond.bond.plain()?.borrow();

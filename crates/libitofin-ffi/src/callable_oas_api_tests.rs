@@ -33,6 +33,7 @@ fn fixture(zero: bool, lag: u32) -> (Context, u64, u64, u64) {
         fixed: None,
         flags: shared(Cell::new((false, None))),
         floating: None,
+        indexed: false,
     };
     let bond = c.insert(b).unwrap();
     let engine = c.insert(e).unwrap();
