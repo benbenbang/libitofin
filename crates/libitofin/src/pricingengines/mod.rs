@@ -57,3 +57,5 @@ pub(crate) mod hull_fixture {
 
 pub mod forward;
 pub use forward::{MAX_VARIANCE_SWAP_STRIKES, MCVarianceSwapEngine, ReplicatingVarianceSwapEngine};
+
+pub use inflation::InterpolatingCpiCapFloorEngine;

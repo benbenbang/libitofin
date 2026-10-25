@@ -165,3 +165,7 @@ pub(crate) fn lag_months(lag: Period) -> QlResult<i32> {
         _ => fail!("CPI cap/floor observation lag must use months or years"),
     }
 }
+
+#[cfg(test)]
+#[path = "cpicapfloor_tests.rs"]
+mod tests;
