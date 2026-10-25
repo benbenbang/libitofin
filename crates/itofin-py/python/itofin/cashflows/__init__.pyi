@@ -10,6 +10,7 @@ import typing
 __all__ = [
     "AverageBMACoupon",
     "BlackIborCouponPricer",
+    "CPICashFlow",
     "CPICoupon",
     "CPICouponPricer",
     "CPILeg",
@@ -20,6 +21,7 @@ __all__ = [
     "YoYInflationCoupon",
     "YoYInflationLeg",
     "YoYInflationOptionletCouponPricer",
+    "ZeroInflationCashFlow",
     "npv",
     "npv_at_z_spread",
     "z_spread",
@@ -57,6 +59,43 @@ class BlackIborCouponPricer:
     Black or normal ibor coupon pricer using an optional retained optionlet surface.
     """
     def __new__(cls, volatility: typing.Optional[termstructures.OptionletVolatilityStructure] = None) -> BlackIborCouponPricer: ...
+
+@typing.final
+class CPICashFlow:
+    r"""
+    Principal scaled by a live CPI observation divided by a fixed explicit base.
+    """
+    def __init__(self, nominal: builtins.float, index: indexes.ZeroInflationIndex, base_cpi: builtins.float, observation_date: time.Date, observation_lag: time.Period, interpolation: indexes.CpiInterpolationType, payment_date: time.Date, growth_only: builtins.bool = True) -> None:
+        r"""
+        Build without reading fixings; growth_only subtracts the uninflated nominal.
+
+        The explicit finite nonzero denominator stays fixed. Observation, index
+        histories and linked curves remain live. Invalid dates and lags fail.
+        """
+    def amount(self) -> builtins.float:
+        r"""
+        Undiscounted payment; missing fixings, curves or non-finite results fail.
+        """
+    def base_fixing(self) -> builtins.float:
+        r"""
+        The fixed explicit denominator supplied at construction.
+        """
+    def index_fixing(self) -> builtins.float:
+        r"""
+        The live lagged CPI level used in the numerator.
+        """
+    def date(self) -> time.Date:
+        r"""
+        Payment date; no fixing is read.
+        """
+    def as_cashflow(self) -> CashFlow:
+        r"""
+        Return a retained generic flow; the original wrapper may be released.
+        """
+    def as_leg(self) -> Leg:
+        r"""
+        Return a one-flow leg requiring the index's identical Settings for NPV.
+        """
 
 @typing.final
 class CPICoupon:
@@ -650,6 +689,43 @@ class YoYInflationOptionletCouponPricer:
 
         Returns:
             YoYInflationOptionletCouponPricer: The normal pricer.
+        """
+
+@typing.final
+class ZeroInflationCashFlow:
+    r"""
+    Principal scaled by the ratio of two live lagged inflation observations.
+    """
+    def __init__(self, nominal: builtins.float, index: indexes.ZeroInflationIndex, start_date: time.Date, end_date: time.Date, observation_lag: time.Period, interpolation: indexes.CpiInterpolationType, payment_date: time.Date, growth_only: builtins.bool = True) -> None:
+        r"""
+        Build without reading fixings; both lagged start and end CPI remain live.
+
+        Unlike CPICashFlow, historical base-fixing corrections change this flow.
+        The observation lag is nonnegative and dates must remain within 1901-2199.
+        """
+    def amount(self) -> builtins.float:
+        r"""
+        Undiscounted payment; missing fixings, curves or non-finite results fail.
+        """
+    def base_fixing(self) -> builtins.float:
+        r"""
+        Read the live lagged start-date denominator, without taking a snapshot.
+        """
+    def index_fixing(self) -> builtins.float:
+        r"""
+        Read the live lagged end-date numerator.
+        """
+    def date(self) -> time.Date:
+        r"""
+        Payment date; no fixing is read.
+        """
+    def as_cashflow(self) -> CashFlow:
+        r"""
+        Return a retained finite-checked generic flow.
+        """
+    def as_leg(self) -> Leg:
+        r"""
+        Return a one-flow leg requiring the index's identical Settings for NPV.
         """
 
 def npv(leg: Leg, discount_curve: termstructures.YieldTermStructure, settings: itofin.Settings, include_settlement_date_flows: typing.Optional[builtins.bool] = None, settlement_date: typing.Optional[time.Date] = None, npv_date: typing.Optional[time.Date] = None) -> builtins.float:

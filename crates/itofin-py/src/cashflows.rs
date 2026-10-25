@@ -891,6 +891,16 @@ impl PyCashFlow {
     }
 }
 
+impl PyCashFlow {
+    pub(crate) fn from_inner(inner: Shared<dyn CashFlow>) -> Self {
+        Self {
+            inner,
+            guard: None,
+            position: 0,
+        }
+    }
+}
+
 /// A sequence of erased cash flows, built by a leg builder's build().
 ///
 /// Indexable and sized, which with CashFlow's two accessors is enough to
