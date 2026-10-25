@@ -30,6 +30,7 @@ mod chart_ohlc_volatility;
 mod chart_prices;
 mod chart_williams;
 mod convergence_statistics;
+mod cpi_cashflows;
 mod credit;
 mod creditdensity;
 mod creditengine;
@@ -373,6 +374,9 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     cashflows.add_class::<PyYoYInflationOptionletCouponPricer>()?;
     cashflows.add_class::<PyYoYInflationLeg>()?;
     cashflows.add_class::<PyIborLeg>()?;
+    cashflows.add_class::<cpi_cashflows::PyCpiCoupon>()?;
+    cashflows.add_class::<cpi_cashflows::PyCpiCouponPricer>()?;
+    cashflows.add_class::<cpi_cashflows::PyCpiLeg>()?;
     cashflows.add_class::<bma::PyAverageBMACoupon>()?;
     cashflows.add_class::<PyCashFlow>()?;
     cashflows.add_class::<PyLeg>()?;
