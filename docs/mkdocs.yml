@@ -79,6 +79,7 @@ nav:
   - European signed gap FD pricing: gap-option-bindings.md
   - European percentage-strike FD pricing: percentage-strike-bindings.md
   - Callable bond sensitivities: callable-bond-sensitivities.md
+  - Bond and leg payment inspection: payment-inspection-bindings.md
   - Callable OAS: callable-oas.md
   - Callable implied volatility: callable-implied-volatility.md
   - Black callable bonds: black-callable-bonds.md
