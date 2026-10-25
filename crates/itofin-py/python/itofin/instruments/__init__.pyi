@@ -1764,6 +1764,18 @@ class VanillaOption:
         FD cell averaging preserves its existing signed/cancelling-value fallback.
         """
     @classmethod
+    def percentage_strike(cls, option_type: OptionType, moneyness: builtins.float, expiry: time.Date, settings: itofin.Settings) -> VanillaOption:
+        r"""
+        Build a European percentage-strike option for the existing FD engine.
+
+        Moneyness is a finite dimensionless ratio, not a percent scaled by 100
+        or an absolute strike. Signed ratios are accepted. A call pays
+        S*max(1-m,0), a put S*max(m-1,0). Use set_fd_engine or price_fd;
+        analytic Black rejects this payoff. The FD volatility lookup receives m
+        unchanged, so strike-smile surfaces can reject it. Constant-vol use is
+        the validated path; existing grid and market-domain limits apply.
+        """
+    @classmethod
     def american(cls, option_type: OptionType, strike: builtins.float, earliest: time.Date, latest: time.Date, settings: itofin.Settings) -> VanillaOption:
         r"""
         Build the option exercisable at any time over [earliest, latest].

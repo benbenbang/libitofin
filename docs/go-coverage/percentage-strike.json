@@ -1,0 +1,18 @@
+{
+  "domain": "european-percentage-strike-option-factory",
+  "entries": [
+    {
+      "c": "itofin_option_percentage_strike_new",
+      "go": "Session.NewPercentageStrikeOption",
+      "python": "itofin.instruments.VanillaOption.percentage_strike",
+      "status": "implemented",
+      "tests": [
+        "TestPercentageStrikeFactoryPricingAndUnsupportedAnalytic",
+        "TestPercentageStrikeRatioAndRetainedGraph",
+        "TestPercentageStrikeFactoryDomainsAndSessions",
+        "TestPercentageStrikeLiveCurvesAndMixedEngineSessions",
+        "TestPercentageStrikeNativeGridLadder"
+      ]
+    }
+  ]
+}
