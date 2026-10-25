@@ -7322,6 +7322,23 @@ int32_t itofin_option_gap_new(struct ItofinContext *ctx,
                               struct ItofinError *error);
 
 /**
+ * Build a European percentage-strike option for the existing FD engine.
+ * Moneyness is a finite dimensionless ratio, not an absolute strike or percent
+ * scaled by 100. Signed ratios are accepted. Call pays S*max(1-m,0), put pays
+ * S*max(m-1,0). FD volatility lookup uses m unchanged; certify constant-vol use.
+ * The analytic Black engine rejects this payoff.
+ * # Safety
+ * Follow the crate-level C caller contract. Output is written only on success.
+ */
+int32_t itofin_option_percentage_strike_new(struct ItofinContext *ctx,
+                                            int32_t kind,
+                                            double moneyness,
+                                            int32_t expiry,
+                                            uint64_t settings,
+                                            uint64_t *out,
+                                            struct ItofinError *error);
+
+/**
  * Build an American option whose exercise window starts at Date::min_date().
  * # Safety
  * Outputs must be aligned, live and non-overlapping. Context and handles must
