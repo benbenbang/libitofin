@@ -10,3 +10,6 @@ mod zerocouponbond;
 pub use zerocouponbond::ZeroCouponBond;
 mod floatingratebond;
 pub use floatingratebond::FloatingRateBond;
+
+mod cpibond;
+pub use cpibond::CpiBond;

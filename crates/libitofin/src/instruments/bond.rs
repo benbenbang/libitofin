@@ -359,6 +359,29 @@ impl Bond {
         Ok(())
     }
 
+    pub(crate) fn set_indexed_redemption(
+        &mut self,
+        notional: Real,
+        payment: Shared<dyn CashFlow>,
+    ) -> QlResult<()> {
+        require!(
+            notional.is_finite() && notional > 0.0,
+            "positive finite notional required"
+        );
+        require!(
+            payment.date() != Date::null(),
+            "non-null redemption date required"
+        );
+        self.notionals = vec![notional, 0.0];
+        self.notional_schedule = vec![Date::null(), payment.date()];
+        self.redemptions.clear();
+        self.base.register_with(payment.observable());
+        self.cashflows.push(Shared::clone(&payment));
+        self.redemptions.push(payment);
+        self.cashflows.sort_by_key(|flow| flow.date());
+        Ok(())
+    }
+
     /// Sets the issue date after constructing a derived bond's coupon leg.
     pub(crate) fn set_issue_date(&mut self, date: Option<Date>) {
         self.issue_date = date;

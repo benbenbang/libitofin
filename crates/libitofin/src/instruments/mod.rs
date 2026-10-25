@@ -94,3 +94,5 @@ mod xccybasisswap;
 pub use xccybasisswap::XccyBasisSwap;
 
 pub use floatfloatswap::FloatFloatSwap;
+
+pub use bonds::CpiBond;
