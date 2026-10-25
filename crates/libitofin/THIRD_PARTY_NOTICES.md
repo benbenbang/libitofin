@@ -142,3 +142,16 @@ adapted from `ql/instruments/cpiswap.{hpp,cpp}` at QuantLib revision
 Copyright (C) 2007, 2009, 2011 Chris Kenyon;
 Copyright (C) 2009 StatPro Italia srl.
 The complete QuantLib license is included in `QUANTLIB_LICENSE.txt`.
+
+## QuantLib cumulative CPI quoted-price options
+
+The cumulative CPI cap/floor instrument, quoted-price parity surface and
+interpolating engine are adapted from QuantLib revision
+`9863b578af0caa4cecabf697196533e84a8308b6`:
+`ql/instruments/cpicapfloor.{hpp,cpp}` and
+`ql/experimental/inflation/{cpicapfloortermpricesurface,cpicapfloorengines}.{hpp,cpp}`.
+Copyright (C) 2010, 2011 Chris Kenyon; Copyright (C) 2021 Ralf Konrad Eckel.
+The complete license is included in `QUANTLIB_LICENSE.txt` above. The bounded
+immutable reference-date and whole-year-tenor contracts, plus mixed native-oracle
+provenance, are documented in `docs/docs/cpi-capfloor-bindings.md` at repository
+level and `sdk/go/testdata/cpi-capfloor-native.provenance.json`.

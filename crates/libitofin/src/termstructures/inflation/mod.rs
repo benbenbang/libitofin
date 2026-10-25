@@ -19,3 +19,5 @@ pub mod seasonality;
 pub mod yoycapfloortermpricesurface;
 
 pub use seasonality::{KerkhofSeasonality, MultiplicativePriceSeasonality, Seasonality};
+
+pub mod cpicapfloortermpricesurface;
