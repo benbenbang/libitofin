@@ -333,6 +333,30 @@ class Bond:
     def issue_date(self) -> typing.Optional[time.Date]: ...
     def cashflows(self) -> cashflows.Leg: ...
     def redemptions(self) -> cashflows.Leg: ...
+    def start_date(self) -> time.Date:
+        r"""
+        Earliest coupon accrual start or non-coupon payment date; needs no engine.
+        """
+    def is_tradable(self, settlement: typing.Optional[time.Date] = None) -> builtins.bool:
+        r"""
+        Whether outstanding notional is nonzero at settlement; omitted date uses bond settlement.
+        """
+    def previous_cash_flow_date(self, settlement: typing.Optional[time.Date] = None) -> typing.Optional[time.Date]:
+        r"""
+        Previous payment date, or None; excludes settlement flows unless today Settings override.
+        """
+    def next_cash_flow_date(self, settlement: typing.Optional[time.Date] = None) -> typing.Optional[time.Date]:
+        r"""
+        Next payment date, or None; today Settings can override settlement exclusion.
+        """
+    def previous_cash_flow_amount(self, settlement: typing.Optional[time.Date] = None) -> typing.Optional[builtins.float]:
+        r"""
+        Aggregate previous actual payment, including principal, or None; not a per-100 quote.
+        """
+    def next_cash_flow_amount(self, settlement: typing.Optional[time.Date] = None) -> typing.Optional[builtins.float]:
+        r"""
+        Aggregate next actual payment, including principal, or None; not a per-100 quote.
+        """
     def is_expired(self) -> builtins.bool: ...
     def is_calculated(self) -> builtins.bool: ...
     def freeze(self) -> None:

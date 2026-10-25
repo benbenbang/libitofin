@@ -309,6 +309,30 @@ class Leg:
     Indexable and sized, which with CashFlow's two accessors is enough to
     hand-check what npv() sums.
     """
+    def start_date(self) -> time.Date:
+        r"""
+        Earliest coupon accrual start or non-coupon payment date; empty legs fail.
+        """
+    def maturity_date(self) -> time.Date:
+        r"""
+        Latest coupon accrual end or non-coupon payment date; empty legs fail.
+        """
+    def previous_cash_flow_date(self, settings: itofin.Settings, *, include_settlement_date_flows: typing.Optional[builtins.bool] = None, settlement_date: typing.Optional[time.Date] = None) -> typing.Optional[time.Date]:
+        r"""
+        Previous payment date, or None; date-only inspection needs no fixings.
+        """
+    def next_cash_flow_date(self, settings: itofin.Settings, *, include_settlement_date_flows: typing.Optional[builtins.bool] = None, settlement_date: typing.Optional[time.Date] = None) -> typing.Optional[time.Date]:
+        r"""
+        Next payment date, or None; settlement-date policy follows Settings when omitted.
+        """
+    def previous_cash_flow_amount(self, settings: itofin.Settings, *, include_settlement_date_flows: typing.Optional[builtins.bool] = None, settlement_date: typing.Optional[time.Date] = None) -> typing.Optional[builtins.float]:
+        r"""
+        Aggregate actual amount on the previous payment date, or None; includes principal.
+        """
+    def next_cash_flow_amount(self, settings: itofin.Settings, *, include_settlement_date_flows: typing.Optional[builtins.bool] = None, settlement_date: typing.Optional[time.Date] = None) -> typing.Optional[builtins.float]:
+        r"""
+        Aggregate actual amount on the next payment date, or None; includes principal.
+        """
     def __len__(self) -> builtins.int:
         r"""
         Return the number of flows on the leg.
