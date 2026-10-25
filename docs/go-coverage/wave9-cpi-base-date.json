@@ -1,0 +1,34 @@
+{
+  "domain": "live-base-date-cpi-coupon-leg",
+  "entries": [
+    {
+      "c": "itofin_cpi_coupon_from_base_date",
+      "go": "Session.NewCPICouponFromBaseDate",
+      "python": "itofin.cashflows.CPICoupon.from_base_date",
+      "status": "implemented",
+      "tests": [
+        "TestCPICouponBaseDateNative",
+        "TestCPICouponBaseDateRebindingAndErrors"
+      ]
+    },
+    {
+      "c": "itofin_cpi_coupon_value",
+      "go": "CPICoupon.BaseFixing",
+      "python": "itofin.cashflows.CPICoupon.base_fixing",
+      "status": "implemented",
+      "tests": [
+        "TestCPICouponBaseDateNative"
+      ]
+    },
+    {
+      "c": "itofin_cpi_leg_from_base_date",
+      "go": "Session.NewCPILegFromBaseDate",
+      "python": "itofin.cashflows.CPILeg.from_base_date",
+      "status": "implemented",
+      "tests": [
+        "TestCPILegBaseDateDefaultNPVAndRetention",
+        "TestCPILegBaseDateNativeMatrix"
+      ]
+    }
+  ]
+}
