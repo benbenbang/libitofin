@@ -134,3 +134,11 @@ The explicit-base CPI bond constructor is adapted from
 `9863b578af0caa4cecabf697196533e84a8308b6`.
 Copyright (C) 2010, 2011 Chris Kenyon.
 The complete QuantLib license is included in `QUANTLIB_LICENSE.txt`.
+
+## QuantLib CPI swap
+The CPI-versus-Ibor swap construction and terminal exchange conventions are
+adapted from `ql/instruments/cpiswap.{hpp,cpp}` at QuantLib revision
+`9863b578af0caa4cecabf697196533e84a8308b6`.
+Copyright (C) 2007, 2009, 2011 Chris Kenyon;
+Copyright (C) 2009 StatPro Italia srl.
+The complete QuantLib license is included in `QUANTLIB_LICENSE.txt`.
