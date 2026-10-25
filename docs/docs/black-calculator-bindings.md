@@ -2,8 +2,10 @@
 
 `BlackCalculator` is an immutable standalone Black 1976 calculator for a call or
 put. It copies `option_type`, `strike`, `forward`, `std_dev` and `discount`. It is
-not an instrument, pricing engine or volatility/curve observer. No payoff-object
-visitor or digital payoff is exposed by this interface.
+not an instrument, pricing engine or volatility/curve observer. This page covers
+the original vanilla constructor. A separate additive
+[cash-digital factory](cash-digital-black-calculator.md) returns the same calculator
+type; no generic payoff-object visitor is exposed.
 
 ## Construction and queries
 

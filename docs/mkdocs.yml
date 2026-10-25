@@ -74,6 +74,7 @@ nav:
   - Constant-parameter GSR process: gsr-process-bindings.md
   - Black FX delta conventions: black-delta-bindings.md
   - Plain-vanilla BlackCalculator: black-calculator-bindings.md
+  - Cash-digital BlackCalculator: cash-digital-black-calculator.md
   - European analytic cash digitals: cash-digital-bindings.md
   - European asset-or-nothing FD pricing: asset-digital-bindings.md
   - European signed gap FD pricing: gap-option-bindings.md
