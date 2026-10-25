@@ -1,0 +1,123 @@
+{
+  "modifications": {
+    "face_amount": 1000,
+    "interpolation": "Linear",
+    "maturity": "2025-07-19",
+    "payment_calendar": "WeekendsOnly",
+    "payment_convention": "Preceding",
+    "settlement_days": 0
+  },
+  "rows": [
+    {
+      "initial": {
+        "accrued_per100": 0.8387068493150684,
+        "cashflows": [
+          {
+            "amount": 10.229854175872736,
+            "date": "2025-07-18"
+          },
+          {
+            "amount": 1009.1612903225806,
+            "date": "2025-07-18"
+          }
+        ],
+        "clean_price": 100.74354857797327,
+        "dirty_price": 101.58225542728835,
+        "maturity": "2025-07-19",
+        "notional": 1000.0,
+        "npv": 1015.7112373529058,
+        "settlement": "2025-06-16"
+      },
+      "rates": [
+        0.02
+      ],
+      "schedule": [
+        "2025-01-15",
+        "2025-07-19"
+      ],
+      "tenor_months": 12,
+      "terminal": [
+        {
+          "cashflow_npv_exclude_settlement": 0.0,
+          "cashflow_npv_include_settlement": 1019.3911444984534,
+          "expired": true,
+          "include_reference_date_events": false,
+          "maturity": "2025-07-19",
+          "notional_jul17": 1000.0,
+          "notional_jul18": 0.0,
+          "notional_jul19": 0.0
+        },
+        {
+          "cashflow_npv_exclude_settlement": 0.0,
+          "cashflow_npv_include_settlement": 1019.3911444984534,
+          "expired": false,
+          "include_reference_date_events": true,
+          "maturity": "2025-07-19",
+          "notional_jul17": 1000.0,
+          "notional_jul18": 0.0,
+          "notional_jul19": 0.0
+        }
+      ]
+    },
+    {
+      "initial": {
+        "accrued_per100": 0.8387068493150684,
+        "cashflows": [
+          {
+            "amount": 10.006108705258507,
+            "date": "2025-07-15"
+          },
+          {
+            "amount": 0.3317790543526292,
+            "date": "2025-07-18"
+          },
+          {
+            "amount": 1009.1612903225806,
+            "date": "2025-07-18"
+          }
+        ],
+        "clean_price": 100.75464198717978,
+        "dirty_price": 101.59334883649485,
+        "maturity": "2025-07-19",
+        "notional": 1000.0,
+        "npv": 1015.8221592884762,
+        "settlement": "2025-06-16"
+      },
+      "rates": [
+        0.02,
+        0.03
+      ],
+      "schedule": [
+        "2025-01-15",
+        "2025-07-15",
+        "2025-07-19"
+      ],
+      "tenor_months": 6,
+      "terminal": [
+        {
+          "cashflow_npv_exclude_settlement": 0.0,
+          "cashflow_npv_include_settlement": 1009.4930693769332,
+          "expired": true,
+          "include_reference_date_events": false,
+          "maturity": "2025-07-19",
+          "notional_jul17": 1000.0,
+          "notional_jul18": 0.0,
+          "notional_jul19": 0.0
+        },
+        {
+          "cashflow_npv_exclude_settlement": 0.0,
+          "cashflow_npv_include_settlement": 1009.4930693769332,
+          "expired": false,
+          "include_reference_date_events": true,
+          "maturity": "2025-07-19",
+          "notional_jul17": 1000.0,
+          "notional_jul18": 0.0,
+          "notional_jul19": 0.0
+        }
+      ]
+    }
+  ],
+  "schema": 1,
+  "shared_inputs": "cpi-oracle-inputs.json",
+  "source_generator": "scripts/generate_cpi_bond_preceding_oracle.py"
+}

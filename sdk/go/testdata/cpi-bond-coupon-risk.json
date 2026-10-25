@@ -1,0 +1,55 @@
+{
+  "conclusion": "generic coupon BPS omits CPI index ratios and generic ATM returns nominal/accrual-weighted effective coupon rate, not raw CPI fixed rate; these are not raw CPI fixed-rate sensitivity/par-rate analytics",
+  "inputs": "cpi-oracle-inputs.json",
+  "method": "native QuantLib BondFunctions and CashFlows results compared with rebuilding CPIBond at raw fixed rate plus 1bp; no Rust implementation involved",
+  "provenance": {
+    "native_sha256": "04a53b6f425e728083149241f77e9b9711db845614ce65d2544a09a0970597d8",
+    "source_is_wheel_build_provenance": false,
+    "source_reference_revision": "9863b578af0caa4cecabf697196533e84a8308b6",
+    "wheel_version": "1.43"
+  },
+  "rows": [
+    {
+      "actual_currency_raw_coupon_1bp_bump": 29.572075615040376,
+      "actual_dirty_per100_raw_coupon_1bp_bump": 0.029578557876220657,
+      "actual_yield_dirty_per100_raw_coupon_1bp_bump": 0.0295785578762152,
+      "bumped_npv": 102639.7980302537,
+      "bumped_raw_fixed_rate": 0.0201,
+      "effective_coupon_bps_scaling": 1.039252585819066,
+      "generic_currency_coupon_bps": 28.455137873661137,
+      "generic_own_npv_atm_rate": 0.020785051716381835,
+      "generic_per100_coupon_bps": 0.02846137529973736,
+      "generic_target_clean_price_atm_rate": 0.0296959444973094,
+      "generic_target_dirty_price_atm_rate": 0.0311775775745727,
+      "generic_yield_coupon_bps": 0.02846137529973736,
+      "interpolation": "flat",
+      "original_npv": 102610.22595463866,
+      "original_raw_fixed_rate": 0.02,
+      "own_atm_to_raw_rate_ratio": 1.0392525858190917,
+      "settlement": "2025-06-17",
+      "target_raw_fixed_rate": 0.03
+    },
+    {
+      "actual_currency_raw_coupon_1bp_bump": 29.59955562572577,
+      "actual_dirty_per100_raw_coupon_1bp_bump": 0.029606043910590074,
+      "actual_yield_dirty_per100_raw_coupon_1bp_bump": 0.02960604391056404,
+      "bumped_npv": 102736.99955876112,
+      "bumped_raw_fixed_rate": 0.0201,
+      "effective_coupon_bps_scaling": 1.0402183168869457,
+      "generic_currency_coupon_bps": 28.455137873661137,
+      "generic_own_npv_atm_rate": 0.02080436633773549,
+      "generic_per100_coupon_bps": 0.02846137529973736,
+      "generic_target_clean_price_atm_rate": 0.029723345446620596,
+      "generic_target_dirty_price_atm_rate": 0.03120654950660326,
+      "generic_yield_coupon_bps": 0.02846137529973736,
+      "interpolation": "linear",
+      "original_npv": 102707.4000031354,
+      "original_raw_fixed_rate": 0.02,
+      "own_atm_to_raw_rate_ratio": 1.0402183168867745,
+      "settlement": "2025-06-17",
+      "target_raw_fixed_rate": 0.03
+    }
+  ],
+  "schema": 1,
+  "source_generator": "scripts/generate_cpi_bond_coupon_risk_oracle.py"
+}
