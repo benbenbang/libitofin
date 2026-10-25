@@ -374,3 +374,7 @@ pub unsafe extern "C" fn itofin_cpi_pricer_value(
         })
     }
 }
+
+#[cfg(test)]
+#[path = "cpi_cashflows_tests.rs"]
+mod tests;
