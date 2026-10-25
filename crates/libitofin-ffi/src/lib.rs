@@ -50,6 +50,7 @@ pub mod cashflows_api;
 pub mod constraint_api;
 pub mod convergence_statistics_api;
 pub mod cpi_cashflows_api;
+pub mod cpi_swap_api;
 pub mod credit_api;
 pub mod credit_helpers_api;
 pub mod credit_instruments_api;
