@@ -269,3 +269,221 @@ fn cpi_leg_retains_principal_and_rejects_wrong_npv_settings() {
         assert!((flows[1].amount().unwrap() - 100800.0).abs() < 1e-9);
     }
 }
+
+#[test]
+fn base_date_coupon_is_lazy_and_ignores_explicit_config_base() {
+    let (mut c, mut a) = fixture();
+    a.base_cpi = f64::NAN;
+    let index = zero_index(&c, a.index).unwrap();
+    let base = Date::new(15, December, 2024).serial_number();
+    let mut coupon = 0;
+    let mut value = -71.0;
+    unsafe {
+        assert_eq!(
+            itofin_cpi_coupon_from_base_date(&mut c, a, base, &mut coupon, null_mut()),
+            0
+        );
+        assert_eq!(
+            itofin_cpi_coupon_value(&mut c, coupon, 6, 0, &mut value, null_mut()),
+            CORE_ERROR
+        );
+        assert_eq!(value, -71.0);
+        index
+            .add_fixing(Date::new(1, December, 2024), 100.0)
+            .unwrap();
+        assert_eq!(
+            itofin_cpi_coupon_value(&mut c, coupon, 6, 0, &mut value, null_mut()),
+            0
+        );
+        assert_eq!(value, 100.0);
+        let retained = c.get::<Shared<CpiCoupon>>(coupon).unwrap();
+        assert_eq!(retained.base_cpi(), f64::MAX);
+        assert_eq!(retained.base_date(), Some(Date::new(15, December, 2024)));
+        let mut pricer = 0;
+        assert_eq!(
+            itofin_cpi_coupon_pricer_new(&mut c, 0, &mut pricer, null_mut()),
+            0
+        );
+        assert_eq!(
+            itofin_cpi_coupon_set_pricer(&mut c, coupon, pricer, null_mut()),
+            0
+        );
+        assert_eq!(
+            itofin_cpi_coupon_value(&mut c, coupon, 1, 0, &mut value, null_mut()),
+            0
+        );
+        assert!((value - 999.7150684931507).abs() < 1e-10);
+    }
+}
+#[test]
+fn base_date_coupon_rejects_null_dates_and_pointers_before_output_write() {
+    let (mut c, a) = fixture();
+    let mut out = 191;
+    unsafe {
+        assert_eq!(
+            itofin_cpi_coupon_from_base_date(&mut c, a, 0, &mut out, null_mut()),
+            INVALID_ARGUMENT
+        );
+        assert_eq!(out, 191);
+        let (_, a) = fixture();
+        assert_eq!(
+            itofin_cpi_coupon_from_base_date(
+                &mut c,
+                a,
+                Date::new(1, January, 2024).serial_number(),
+                null_mut(),
+                null_mut()
+            ),
+            INVALID_ARGUMENT
+        );
+        assert_eq!(out, 191);
+        let (_, a) = fixture();
+        assert_eq!(
+            itofin_cpi_coupon_from_base_date(
+                &mut c,
+                a,
+                Date::new(1, January, 2024).serial_number(),
+                &mut out,
+                without_provenance_mut::<ItofinError>(1)
+            ),
+            INVALID_ARGUMENT
+        );
+        assert_eq!(out, 191);
+    }
+}
+
+fn base_date_leg_config(c: &mut Context, coupon: &ItofinCpiCouponConfig) -> ItofinCpiLegConfig {
+    static NOTIONALS: [f64; 1] = [10000.0];
+    static RATES: [f64; 1] = [0.02];
+    let calendar = NativeCalendar {
+        inner: NullCalendar::new(),
+        horizon: None,
+        first_year: 1901,
+    };
+    let calendar_id = c.insert(calendar.clone()).unwrap();
+    let schedule = c
+        .insert_with_metadata(
+            Schedule::from_dates(vec![
+                Date::new(15, January, 2025),
+                Date::new(15, July, 2025),
+            ]),
+            calendar,
+        )
+        .unwrap();
+    ItofinCpiLegConfig {
+        schedule,
+        index: coupon.index,
+        base_cpi: f64::NAN,
+        lag_length: 3,
+        lag_unit: 2,
+        interpolation: 0,
+        day_counter: coupon.day_counter,
+        payment_calendar: calendar_id,
+        payment_convention: 2,
+        notionals: NOTIONALS.as_ptr(),
+        notionals_len: 1,
+        fixed_rates: RATES.as_ptr(),
+        fixed_rates_len: 1,
+        growth_only: 0,
+        ex_coupon_length: 0,
+        ex_coupon_unit: 0,
+        ex_coupon_calendar: 0,
+        ex_coupon_convention: 2,
+        ex_coupon_end_of_month: 0,
+    }
+}
+#[test]
+fn both_base_date_factories_reject_null_and_misaligned_outputs_or_errors() {
+    for mode in 0..3 {
+        let (mut c, coupon) = fixture();
+        let leg = base_date_leg_config(&mut c, &coupon);
+        let mut sentinel = 719;
+        let out = match mode {
+            0 => null_mut(),
+            1 => without_provenance_mut::<u64>(1),
+            _ => &mut sentinel,
+        };
+        let error = if mode == 2 {
+            without_provenance_mut::<ItofinError>(1)
+        } else {
+            null_mut()
+        };
+        unsafe {
+            assert_eq!(
+                itofin_cpi_coupon_from_base_date(
+                    &mut c,
+                    coupon,
+                    Date::new(15, December, 2024).serial_number(),
+                    out,
+                    error
+                ),
+                INVALID_ARGUMENT
+            );
+            assert_eq!(sentinel, 719);
+            assert_eq!(
+                itofin_cpi_leg_from_base_date(&mut c, leg, 0, out, error),
+                INVALID_ARGUMENT
+            );
+            assert_eq!(sentinel, 719);
+            let mut pricer = 0;
+            assert_eq!(
+                itofin_cpi_coupon_pricer_new(&mut c, 0, &mut pricer, null_mut()),
+                0
+            );
+        }
+    }
+}
+#[test]
+fn effective_base_query_rejects_wrong_foreign_and_released_handles_without_writes() {
+    let (mut c, a) = fixture();
+    let wrong = a.day_counter;
+    let mut other = Context::new();
+    let mut coupon = 0;
+    let mut value = -719.0;
+    unsafe {
+        assert_eq!(
+            itofin_cpi_coupon_from_base_date(
+                &mut c,
+                a,
+                Date::new(1, April, 2025).serial_number(),
+                &mut coupon,
+                null_mut()
+            ),
+            0
+        );
+        assert_eq!(
+            itofin_cpi_coupon_value(&mut c, coupon, 6, 0, &mut value, null_mut()),
+            0
+        );
+        assert_eq!(value, 100.8);
+        value = -719.0;
+        assert_eq!(
+            itofin_cpi_coupon_value(&mut c, wrong, 6, 0, &mut value, null_mut()),
+            INVALID_HANDLE
+        );
+        assert_eq!(value, -719.0);
+        assert_eq!(
+            itofin_cpi_coupon_value(&mut other, coupon, 6, 0, &mut value, null_mut()),
+            INVALID_HANDLE
+        );
+        assert_eq!(value, -719.0);
+        assert_eq!(
+            itofin_cpi_coupon_value(
+                &mut c,
+                coupon,
+                6,
+                0,
+                &mut value,
+                without_provenance_mut::<ItofinError>(1)
+            ),
+            INVALID_ARGUMENT
+        );
+        assert_eq!(value, -719.0);
+        assert_eq!(itofin_handle_release(&mut c, coupon, null_mut()), 0);
+        assert_eq!(
+            itofin_cpi_coupon_value(&mut c, coupon, 6, 0, &mut value, null_mut()),
+            INVALID_HANDLE
+        );
+        assert_eq!(value, -719.0);
+    }
+}
