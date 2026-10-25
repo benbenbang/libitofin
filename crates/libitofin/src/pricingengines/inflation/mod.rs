@@ -6,3 +6,6 @@
 pub mod inflationcapfloorengines;
 
 pub use inflationcapfloorengines::{YoYInflationCapFloorEngine, yoy_optionlet_price};
+
+pub mod cpicapfloorengine;
+pub use cpicapfloorengine::InterpolatingCpiCapFloorEngine;
