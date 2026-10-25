@@ -85,6 +85,7 @@ nav:
   - Black callable bonds: black-callable-bonds.md
   - Callable zero-coupon bonds: callable-zero-coupon-bonds.md
   - Floating-type payoff: floating-type-payoff.md
+  - Standalone scalar payoffs: scalar-payoff-bindings.md
   - Percentage-strike payoff: percentage-strike-payoff.md
   - Bachelier asset ITM: normal-itm.md
   - OIS payer and receiver: ois-side.md
