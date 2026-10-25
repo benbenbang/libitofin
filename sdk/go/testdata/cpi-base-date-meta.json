@@ -1,0 +1,31 @@
+{
+  "case_count": 36,
+  "full_native_matrix_sha256": "4fcdf6a157eea29f04676ad54a57c14ee29e0789b52bef1555d7f4b08061255b",
+  "inputs": {
+    "day_counter": "Actual365Fixed",
+    "evaluation_date": "2025-08-18",
+    "inflation_curve_dates": [
+      "2025-01-01",
+      "2035-01-01"
+    ],
+    "inflation_rate": -0.0075,
+    "relinked_inflation_rate": 0.065
+  },
+  "provenance": {
+    "generator_sha256": "78c6cccb28deddd16f5965b60f7a9aa85e86963c166157904ca082a3116a83c5",
+    "native_binary": "/private/tmp/itofin-bindings4-20261022/model-qa/venv/lib/python3.13/site-packages/QuantLib/_QuantLib.abi3.so",
+    "native_sha256": "04a53b6f425e728083149241f77e9b9711db845614ce65d2544a09a0970597d8",
+    "native_version": "1.43",
+    "source_is_wheel_build_provenance": false,
+    "source_reference_revision": "9863b578af0caa4cecabf697196533e84a8308b6"
+  },
+  "qualifications": [
+    "Native coupon base CPI observed via laggedFixing(baseDate+lag,lag,interpolation), not simply laggedFixing(baseDate,0,interpolation).",
+    "Month-end date arithmetic is not invertible; 31January plus1month minus1month may be29January."
+  ],
+  "stages": [
+    "original",
+    "overwritten",
+    "relinked"
+  ]
+}
