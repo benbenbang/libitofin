@@ -1,0 +1,25 @@
+{
+  "cases": 32,
+  "fixture_sha256": {
+    "cpi-base-date-leg-flows.tsv": "8442843d9cc402dbba2f712b602db0f3b9d168eac87cb014be35b68af7702039",
+    "cpi-base-date-leg-npv.tsv": "4da15954f0e741a4d690613d1cb94e4315ef2393284c6da2a82cd7c33f3304ca"
+  },
+  "flow_rows": 480,
+  "header_source_revision": "9863b578af0caa4cecabf697196533e84a8308b6",
+  "npv_rows": 384,
+  "oracle_kind": "mixed_pinned_headers_and_native_wheel",
+  "qualification": "Three numerical sanity values and shared Settings agree with SWIG. Full independent SWIG reconstruction is separately recorded. Not a universal ABI proof or full-source build.",
+  "sanity": {
+    "coupon_amount": -51.41023477226254,
+    "npv": 6896.228058286242,
+    "terminal_amount": 6714.046015132657
+  },
+  "source_cpp_sha256": "147404c08282e981b353c60116cfa758e080ecd3fe420b867d7367a0094ae0fa",
+  "source_is_wheel_build_provenance": false,
+  "swig_crosscheck": {
+    "checks": 1728,
+    "qualification": "Independent SWIG reconstruction of all native amounts, dates, denominator levels and NPV values; not a full-source build."
+  },
+  "wheel_native_sha256": "04a53b6f425e728083149241f77e9b9711db845614ce65d2544a09a0970597d8",
+  "wheel_version": "1.43"
+}
