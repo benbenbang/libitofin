@@ -29,6 +29,7 @@ __all__ = [
     "CallableZeroCouponBond",
     "CapFloor",
     "CapFloorType",
+    "CpiCapFloor",
     "CreditDefaultSwap",
     "Duration",
     "EuropeanExercise",
@@ -708,6 +709,35 @@ class CapFloor:
         Raises:
             ItofinError: If no engine is attached, which the core reports as
                 "null pricing engine".
+        """
+
+@typing.final
+class CpiCapFloor:
+    r"""
+    A single cumulative CPI cap/floor, not an option on each coupon.
+
+    NPV is the surface quote, independent of nominal, base_cpi and start_date.
+    Expiry is after raw maturity, not the adjusted payment date.
+    """
+    def __init__(self, option_type: OptionType, nominal: builtins.float, start_date: time.Date, base_cpi: builtins.float, maturity: time.Date, fixing_calendar: time.Calendar, fixing_convention: time.BusinessDayConvention, payment_calendar: time.Calendar, payment_convention: time.BusinessDayConvention, strike: builtins.float, index: indexes.ZeroInflationIndex, observation_lag: time.Period, interpolation: indexes.CpiInterpolationType, settings: itofin.Settings, engine: pricingengines.InterpolatingCpiCapFloorEngine) -> None:
+        r"""
+        Build a cumulative CPI option with explicit calendars and settings.
+        """
+    def npv(self) -> builtins.float:
+        r"""
+        Surface-quoted NPV, zero after raw maturity.
+        """
+    def fixing_date(self) -> time.Date:
+        r"""
+        Observation-lagged, adjusted fixing date.
+        """
+    def pay_date(self) -> time.Date:
+        r"""
+        Adjusted payment date, distinct from the expiry date.
+        """
+    def is_expired(self) -> builtins.bool:
+        r"""
+        Whether the live evaluation date is after raw maturity.
         """
 
 @typing.final

@@ -31,6 +31,7 @@ __all__ = [
     "FdBlackScholesVanillaEngine",
     "FdScheme",
     "ForwardsInCouponPeriod",
+    "InterpolatingCpiCapFloorEngine",
     "IsdaCdsEngine",
     "JumpDiffusionEngine",
     "MCAmericanEngine",
@@ -457,6 +458,16 @@ class FdBlackScholesVanillaEngine:
         Raises:
             ValueError: If the grid dimensions are invalid.
             OverflowError: If a grid integer is outside the accepted range.
+        """
+
+@typing.final
+class InterpolatingCpiCapFloorEngine:
+    r"""
+    Price-surface interpolation engine, without instrument notional scaling.
+    """
+    def __init__(self, surface: termstructures.CpiCapFloorTermPriceSurface) -> None:
+        r"""
+        Retain an immutable CPI price surface.
         """
 
 @typing.final
