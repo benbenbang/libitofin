@@ -30,6 +30,7 @@ mod chart_ohlc_volatility;
 mod chart_prices;
 mod chart_williams;
 mod convergence_statistics;
+mod cpi_bond;
 mod cpi_cashflows;
 mod credit;
 mod creditdensity;
@@ -399,6 +400,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     instruments.add_class::<floating_bonds::PyAmortizingFloatingRateBond>()?;
     instruments.add_class::<bonds::PyFixedRateBond>()?;
     instruments.add_class::<amortizing_fixed_bond::PyAmortizingFixedRateBond>()?;
+    instruments.add_class::<cpi_bond::PyCpiBond>()?;
     instruments.add_class::<bonds::PyZeroCouponBond>()?;
     instruments.add_class::<variance_swap::PyVarianceSwap>()?;
     instruments.add_class::<PyOptionType>()?;

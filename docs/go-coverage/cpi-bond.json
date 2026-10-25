@@ -1,0 +1,19 @@
+{
+  "domain": "cpi-bond",
+  "entries": [
+    {
+      "c": "itofin_cpi_bond_new",
+      "go": "Session.NewCPIBond",
+      "python": "itofin.instruments.CPIBond.__new__",
+      "status": "implemented",
+      "tests": [
+        "TestCPIBondNativeAndLive",
+        "TestCPIBondWeekendExCouponAndRetainedFixings",
+        "TestCPIBondErrorsAndSessions",
+        "TestCPIBondExtractedLegSettingsAndFiniteSums",
+        "TestCPIBondNativePrecedingPayment",
+        "TestCPIBondRawCouponBPSAndATMAreUnsupported"
+      ]
+    }
+  ]
+}
