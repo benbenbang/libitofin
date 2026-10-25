@@ -27,7 +27,20 @@ type CPILegConfig struct {
 	ExCouponEndOfMonth    bool
 }
 
+// NewCPILegFromBaseDate creates a lazy live-base leg. BaseCPI in config is ignored.
+// A nil base date uses schedule start minus lag. Index inputs remain live.
+func (s *Session) NewCPILegFromBaseDate(a CPILegConfig, baseDate *Date) (*CPILeg, error) {
+	if baseDate != nil && baseDate.Serial() == 0 {
+		return nil, fmt.Errorf("invalid explicit CPI base date")
+	}
+	return s.newCPILeg(a, baseDate, true)
+}
+
 func (s *Session) NewCPILeg(a CPILegConfig) (*CPILeg, error) {
+	return s.newCPILeg(a, nil, false)
+}
+
+func (s *Session) newCPILeg(a CPILegConfig, baseDate *Date, liveBase bool) (*CPILeg, error) {
 	if a.Schedule == nil || a.Index == nil || a.DayCounter == nil || a.PaymentCalendar == nil {
 		return nil, fmt.Errorf("schedule, index, day counter and calendar required")
 	}
@@ -48,6 +61,13 @@ func (s *Session) NewCPILeg(a CPILegConfig) (*CPILeg, error) {
 		}
 		cfg := C.ItofinCpiLegConfig{schedule: C.uint64_t(a.Schedule.id), index: C.uint64_t(a.Index.id), base_cpi: C.double(a.BaseCPI), lag_length: C.int32_t(a.ObservationLag.Length), lag_unit: C.int32_t(a.ObservationLag.Unit), interpolation: C.int32_t(a.Interpolation), day_counter: C.uint64_t(a.DayCounter.id), payment_calendar: C.uint64_t(a.PaymentCalendar.id), payment_convention: C.int32_t(a.PaymentAdjustment), notionals: inflationDoubles(a.Notionals), notionals_len: C.size_t(len(a.Notionals)), fixed_rates: inflationDoubles(a.FixedRates), fixed_rates_len: C.size_t(len(a.FixedRates)), growth_only: creditBool(a.GrowthOnly), ex_coupon_length: C.int32_t(a.ExCouponPeriod.Length), ex_coupon_unit: C.int32_t(a.ExCouponPeriod.Unit), ex_coupon_calendar: C.uint64_t(ex), ex_coupon_convention: C.int32_t(a.ExCouponAdjustment), ex_coupon_end_of_month: creditBool(a.ExCouponEndOfMonth)}
 		var e C.ItofinError
+		if liveBase {
+			var base C.int32_t
+			if baseDate != nil {
+				base = C.int32_t(baseDate.Serial())
+			}
+			return ffiError(C.itofin_cpi_leg_from_base_date(s.ctx, cfg, base, &id, &e), &e)
+		}
 		return ffiError(C.itofin_cpi_leg_new(s.ctx, cfg, &id, &e), &e)
 	})
 	if err != nil {
@@ -83,7 +103,21 @@ type CPICouponConfig struct {
 	DayCounter                                 *DayCounter
 }
 
+// NewCPICouponFromBaseDate creates a coupon with a lazy live denominator.
+// Config BaseCPI is ignored. BaseFixing reports the effective denominator;
+// the native stored-base MAX sentinel is not an observed CPI value.
+func (s *Session) NewCPICouponFromBaseDate(a CPICouponConfig, baseDate Date) (*CPICoupon, error) {
+	if baseDate.Serial() == 0 {
+		return nil, fmt.Errorf("invalid CPI base date")
+	}
+	return s.newCPICoupon(a, &baseDate)
+}
+
 func (s *Session) NewCPICoupon(a CPICouponConfig) (*CPICoupon, error) {
+	return s.newCPICoupon(a, nil)
+}
+
+func (s *Session) newCPICoupon(a CPICouponConfig, baseDate *Date) (*CPICoupon, error) {
 	for _, date := range []*Date{a.ReferenceStart, a.ReferenceEnd, a.ExCouponDate} {
 		if date != nil && date.Serial() == 0 {
 			return nil, fmt.Errorf("invalid explicit CPI coupon date")
@@ -105,6 +139,9 @@ func (s *Session) NewCPICoupon(a CPICouponConfig) (*CPICoupon, error) {
 		}
 		cfg := C.ItofinCpiCouponConfig{index: C.uint64_t(a.Index.id), base_cpi: C.double(a.BaseCPI), nominal: C.double(a.Nominal), fixed_rate: C.double(a.FixedRate), payment: C.int32_t(a.PaymentDate.Serial()), start: C.int32_t(a.StartDate.Serial()), end: C.int32_t(a.EndDate.Serial()), reference_start: optional(a.ReferenceStart), reference_end: optional(a.ReferenceEnd), ex_coupon: optional(a.ExCouponDate), lag_length: C.int32_t(a.ObservationLag.Length), lag_unit: C.int32_t(a.ObservationLag.Unit), interpolation: C.int32_t(a.Interpolation), day_counter: C.uint64_t(a.DayCounter.id)}
 		var e C.ItofinError
+		if baseDate != nil {
+			return ffiError(C.itofin_cpi_coupon_from_base_date(s.ctx, cfg, C.int32_t(baseDate.Serial()), &id, &e), &e)
+		}
 		return ffiError(C.itofin_cpi_coupon_new(s.ctx, cfg, &id, &e), &e)
 	})
 	if err != nil {
@@ -165,6 +202,10 @@ func (c *CPICoupon) IndexFixing() (float64, error)            { return c.value(2
 func (c *CPICoupon) IndexRatio(date Date) (float64, error)    { return c.value(3, date) }
 func (c *CPICoupon) AccruedAmount(date Date) (float64, error) { return c.value(4, date) }
 func (c *CPICoupon) AccrualPeriod() (float64, error)          { return c.value(5, Date{}) }
+
+// BaseFixing returns the effective denominator, read live for base-date coupons.
+func (c *CPICoupon) BaseFixing() (float64, error) { return c.value(6, Date{}) }
+
 func (p *CPICouponPricer) value(c *CPICoupon, field int32, date Date) (float64, error) {
 	if p == nil {
 		return 0, errNilArgument("CPI pricer")
