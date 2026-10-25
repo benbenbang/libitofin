@@ -93,6 +93,7 @@ pub mod models_api;
 pub mod optimize_api;
 pub mod options_api;
 pub mod overnight_futures_api;
+pub mod payment_inspection_api;
 pub mod performance_ratios_api;
 pub mod poisson_rng_api;
 pub mod prices_api;
