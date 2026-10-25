@@ -95,11 +95,10 @@ pub(crate) fn observed_cpi(
         checked_cpi_shift(today, index.availability_lag())?;
     }
     let period = inflation_period(fixing, index.frequency())?;
-    if interpolation == CpiInterpolationType::Linear
-        && date != inflation_period(date, index.frequency())?.0
-    {
+    let observation_period = inflation_period(date, index.frequency())?;
+    if interpolation == CpiInterpolationType::Linear && date != observation_period.0 {
         require!(
-            period.1.serial_number() < 109574,
+            period.1.serial_number() < 109574 && observation_period.1.serial_number() < 109574,
             "CPI interpolation outside date range"
         );
     }
@@ -156,6 +155,7 @@ pub struct CpiCoupon {
     base: CouponBase,
     index: Shared<ZeroInflationIndex>,
     base_cpi: Real,
+    base_date: Option<Date>,
     lag: Period,
     interpolation: CpiInterpolationType,
     day_counter: DayCounter,
@@ -225,6 +225,7 @@ impl CpiCoupon {
             ),
             index,
             base_cpi,
+            base_date: None,
             lag,
             interpolation,
             day_counter,
@@ -234,7 +235,72 @@ impl CpiCoupon {
             forwarder,
         })
     }
+    /// Construct a coupon whose base CPI is read lazily from `base_date`.
+    ///
+    /// Native coupon observation uses `base_date + lag` followed by the lagged
+    /// fixing, including month-end and Linear interpolation conventions.
+    /// # Errors
+    /// Rejects invalid terms and checked date arithmetic, without reading fixings.
+    #[allow(clippy::too_many_arguments)]
+    pub fn from_base_date(
+        base_date: Date,
+        payment: Date,
+        nominal: Real,
+        start: Date,
+        end: Date,
+        index: Shared<ZeroInflationIndex>,
+        lag: Period,
+        interpolation: CpiInterpolationType,
+        day_counter: DayCounter,
+        fixed_rate: Real,
+        reference_start: Option<Date>,
+        reference_end: Option<Date>,
+        ex_coupon: Option<Date>,
+    ) -> QlResult<Self> {
+        checked_cpi_offset(base_date, lag, true)?;
+        let mut coupon = Self::new(
+            f64::MAX,
+            payment,
+            nominal,
+            start,
+            end,
+            index,
+            lag,
+            interpolation,
+            day_counter,
+            fixed_rate,
+            reference_start,
+            reference_end,
+            ex_coupon,
+        )?;
+        coupon.base_date = Some(base_date);
+        Ok(coupon)
+    }
+    /// Return the optional live base observation date.
+    pub fn base_date(&self) -> Option<Date> {
+        self.base_date
+    }
+    /// Return the effective CPI denominator, reading a date-based value live.
+    ///
+    /// # Errors
+    /// Propagates missing fixings, curve errors and invalid observed CPI values.
+    pub fn base_fixing(&self) -> QlResult<Real> {
+        let value = match self.base_date {
+            Some(date) => observed_cpi(
+                &self.index,
+                checked_cpi_offset(date, self.lag, true)?,
+                self.lag,
+                self.interpolation,
+            )?,
+            None => self.base_cpi,
+        };
+        check_base_cpi(value)?;
+        Ok(value)
+    }
     /// Return the explicitly supplied CPI denominator.
+    ///
+    /// Date-based objects return the native `f64::MAX` null sentinel, not an
+    /// observed CPI level. Use `base_fixing` for their fallible live denominator.
     pub fn base_cpi(&self) -> Real {
         self.base_cpi
     }
@@ -275,13 +341,14 @@ impl CpiCoupon {
             self.interpolation,
         )
     }
-    /// Return the lagged CPI level at `date` divided by explicit base CPI.
+    /// Return the lagged CPI level at `date` divided by its effective base CPI.
     ///
     /// # Errors
     /// Returns an error for invalid inputs, unsupported dates, unavailable fixings
     /// or curves, and non-finite calculated values.
     pub fn index_ratio(&self, date: Date) -> QlResult<Real> {
-        finite_cpi(observed_cpi(&self.index, date, self.lag, self.interpolation)? / self.base_cpi)
+        let base = self.base_fixing()?;
+        finite_cpi(observed_cpi(&self.index, date, self.lag, self.interpolation)? / base)
     }
     /// Attach and retain the plain swaplet pricer, notifying observers.
     pub fn set_pricer(&self, pricer: Shared<CpiCouponPricer>) {
