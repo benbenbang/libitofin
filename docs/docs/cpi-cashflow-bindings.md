@@ -49,8 +49,10 @@ The Rust builder materializes dates on each `build()` call.
 
 ## Boundaries
 
-Base-date-derived constructors, capped/floored individual CPI coupons, CPI
-optionlet volatility models and convexity adjustments are not included here.
+For additive live base-date constructors, see the
+[live base-date CPI guide](cpi-base-date-bindings.md). Capped/floored individual
+CPI coupons, optionlet volatility models and convexity adjustments remain outside
+this plain cash-flow path.
 The cumulative single-payoff CPICapFloor instrument is a separate pricing path,
 not a clamp on these coupons. Vectors carry their last value forward; leg
 notionals have at most one entry per coupon plus terminal payment, and rates
