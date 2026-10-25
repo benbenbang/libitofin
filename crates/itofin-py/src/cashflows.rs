@@ -626,6 +626,7 @@ impl PyYoYInflationLeg {
         Ok(PyLeg {
             inner: self.leg().build().map_err(PyQlError::from)?,
             guard: None,
+            cpi_settings: None,
         })
     }
 }
@@ -899,6 +900,7 @@ impl PyCashFlow {
 pub struct PyLeg {
     inner: Leg,
     guard: Option<CashFlowGuard>,
+    cpi_settings: Option<Shared<libitofin::settings::Settings<libitofin::time::date::Date>>>,
 }
 
 #[gen_stub_pymethods]
@@ -975,6 +977,13 @@ pub(crate) fn npv(
         .current_link()
         .map_err(PyQlError::from)?;
     let settings = settings.inner();
+    if let Some(cpi_settings) = &leg.cpi_settings
+        && !std::ptr::eq(&*settings, &**cpi_settings)
+    {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "CPI leg and NPV settings must match",
+        ));
+    }
     if let Some(guard) = &leg.guard {
         for (i, flow) in leg.inner.iter().enumerate() {
             if !flow
@@ -1001,7 +1010,7 @@ pub(crate) fn npv(
         npv_date.map(PyDate::inner),
     )
     .map_err(PyQlError::from)?;
-    if leg.guard.is_some() {
+    if leg.guard.is_some() || leg.cpi_settings.is_some() {
         crate::bonds::finite(value)
     } else {
         Ok(value)
@@ -1010,7 +1019,21 @@ pub(crate) fn npv(
 
 impl PyLeg {
     pub(crate) fn from_inner(inner: Leg) -> Self {
-        Self { inner, guard: None }
+        Self {
+            inner,
+            guard: None,
+            cpi_settings: None,
+        }
+    }
+    pub(crate) fn with_cpi_settings(
+        inner: Leg,
+        settings: Shared<libitofin::settings::Settings<libitofin::time::date::Date>>,
+    ) -> Self {
+        Self {
+            inner,
+            guard: None,
+            cpi_settings: Some(settings),
+        }
     }
     pub(crate) fn with_guard(inner: Leg, guard: Option<CashFlowGuard>) -> Self {
         let mut leg = Self::from_inner(inner);
@@ -1056,6 +1079,13 @@ impl PyLeg {
         include: Option<bool>,
         settlement: Option<libitofin::time::date::Date>,
     ) -> PyResult<()> {
+        if let Some(cpi_settings) = &self.cpi_settings
+            && !std::ptr::eq(settings, &**cpi_settings)
+        {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "CPI leg and NPV settings must match",
+            ));
+        }
         if let Some(guard) = &self.guard {
             for (i, flow) in self.inner.iter().enumerate() {
                 if !flow
