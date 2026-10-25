@@ -257,3 +257,7 @@ pub unsafe extern "C" fn itofin_bond_payment(
         })
     }
 }
+
+#[cfg(test)]
+#[path = "payment_inspection_tests.rs"]
+mod tests;
