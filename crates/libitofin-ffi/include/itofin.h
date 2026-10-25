@@ -1676,6 +1676,35 @@ typedef struct ItofinSofrFutureHelperConfig {
 } ItofinSofrFutureHelperConfig;
 
 /**
+ * Navigation policy for an erased leg. Date zero uses the evaluation date.
+ */
+typedef struct ItofinPaymentQuery {
+  uint64_t settings;
+  int32_t settlement;
+  /**
+   * -1 uses Settings, 0 excludes settlement-date flows, 1 includes them.
+   */
+  int32_t include_settlement;
+  /**
+   * 0 previous payment, 1 next payment.
+   */
+  int32_t direction;
+  /**
+   * 0 reads only the date, 1 also resolves and aggregates payment amounts.
+   */
+  uint8_t with_amount;
+} ItofinPaymentQuery;
+
+/**
+ * No payment has present=0, date=0 and amount=0; a date-only query has amount=0.
+ */
+typedef struct ItofinPaymentResult {
+  uint8_t present;
+  int32_t date;
+  double amount;
+} ItofinPaymentResult;
+
+/**
  * One dated OHLC observation. Dates are QuantLib-compatible serial numbers.
  */
 typedef struct ItofinDatedIntervalPrice {
@@ -7853,6 +7882,56 @@ int32_t itofin_overnight_add_fixing(struct ItofinContext *ctx,
                                     int32_t fixing_date,
                                     double value,
                                     struct ItofinError *error);
+
+/**
+ * Read the leg's accrual span: field 0 start, 1 maturity. Empty legs fail.
+ * # Safety
+ * Pointers, non-overlap and thread ownership must satisfy the C caller contract.
+ */
+int32_t itofin_leg_span_date(struct ItofinContext *ctx,
+                             uint64_t id,
+                             int32_t field,
+                             int32_t *out,
+                             struct ItofinError *error);
+
+/**
+ * Inspect a payment without valuing other dates or consulting a pricing engine.
+ * # Safety
+ * Pointers, non-overlap and thread ownership must satisfy the C caller contract.
+ */
+int32_t itofin_leg_payment(struct ItofinContext *ctx,
+                           uint64_t id,
+                           struct ItofinPaymentQuery query,
+                           struct ItofinPaymentResult *out,
+                           struct ItofinError *error);
+
+/**
+ * Read field 0 accrual start date, or field 1 tradability (0/1).
+ * Settlement zero uses the bond's calendar-aware settlement date for field 1.
+ * # Safety
+ * Pointers, non-overlap and thread ownership must satisfy the C caller contract.
+ */
+int32_t itofin_bond_inspection(struct ItofinContext *ctx,
+                               uint64_t id,
+                               int32_t field,
+                               int32_t settlement,
+                               int32_t *out,
+                               struct ItofinError *error);
+
+/**
+ * Read the previous (0) or next (1) payment with settlement-date exclusion.
+ * Settings includeTodaysCashFlows can override exclusion when settlement is today.
+ * with_amount is 0 for date-only or 1 for date and aggregated actual amount.
+ * # Safety
+ * Pointers, non-overlap and thread ownership must satisfy the C caller contract.
+ */
+int32_t itofin_bond_payment(struct ItofinContext *ctx,
+                            uint64_t id,
+                            int32_t direction_value,
+                            uint8_t with_amount,
+                            int32_t settlement,
+                            struct ItofinPaymentResult *out,
+                            struct ItofinError *error);
 
 /**
  * All-observation RMS shortfall below a per-period target, without annualization.
