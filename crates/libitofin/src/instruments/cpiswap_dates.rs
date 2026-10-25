@@ -190,3 +190,7 @@ impl crate::cashflows::Coupon for CheckedIborCoupon {
         self.0.accrued_amount(date)
     }
 }
+
+#[cfg(test)]
+#[path = "cpiswap_dates_tests.rs"]
+mod tests;
