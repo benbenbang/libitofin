@@ -78,7 +78,7 @@ pub unsafe extern "C" fn itofin_bond_forward_new(
         with_context(ctx, error, |c| {
             check_ptr(out)?;
             let bond = c.get::<NativeBond>(a.bond)?;
-            if bond.floating.is_some() {
+            if bond.floating.is_some() || bond.indexed {
                 return Err(BindingError::invalid("fixed or zero plain bond required"));
             }
             let plain = bond.bond.plain()?.clone();

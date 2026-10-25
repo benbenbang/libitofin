@@ -22,6 +22,7 @@ pub(crate) struct NativeBond {
     pub(crate) fixed: Option<(Frequency, DayCounter, Option<DayCounter>)>,
     pub(crate) flags: Shared<Cell<(bool, Option<bool>)>>,
     pub(crate) floating: Option<crate::floating_bond_api::NativeFloating>,
+    pub(crate) indexed: bool,
 }
 impl NativeBond {
     pub(crate) fn new(
@@ -49,6 +50,7 @@ impl NativeBond {
             fixed,
             flags: shared(Cell::new(flags)),
             floating: None,
+            indexed: false,
         }
     }
     pub(crate) fn settlement(&self, supplied: Option<Date>) -> BindingResult<Date> {
@@ -593,13 +595,30 @@ pub unsafe extern "C" fn itofin_bond_handle(
                 0 => c.insert(native.calendar)?,
                 1 => {
                     let leg = native.bond.borrow().cashflows().clone();
-                    if let Some(floating) = native.floating {
+                    if native.indexed {
+                        let settings = native.bond.borrow().settings_handle();
+                        c.insert_with_metadata(
+                            leg,
+                            crate::cpi_cashflows_api::CpiLegSettings(settings),
+                        )?
+                    } else if let Some(floating) = native.floating {
                         c.insert_with_metadata(leg, floating)?
                     } else {
                         c.insert(leg)?
                     }
                 }
-                2 => c.insert(native.bond.borrow().redemptions().clone())?,
+                2 => {
+                    let bond = native.bond.borrow();
+                    let leg = bond.redemptions().clone();
+                    if native.indexed {
+                        c.insert_with_metadata(
+                            leg,
+                            crate::cpi_cashflows_api::CpiLegSettings(bond.settings_handle()),
+                        )?
+                    } else {
+                        c.insert(leg)?
+                    }
+                }
                 3 | 4 => {
                     let fixed = native
                         .fixed

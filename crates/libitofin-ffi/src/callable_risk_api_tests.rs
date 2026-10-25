@@ -39,6 +39,7 @@ fn fixture(
             fixed: None,
             flags,
             floating: None,
+            indexed: false,
         })
         .unwrap();
     let tree_engine = c
