@@ -22,6 +22,7 @@ __all__ = [
     "Bond",
     "BondForward",
     "CPIBond",
+    "CPISwap",
     "Callability",
     "CallabilityType",
     "CallableFixedRateBond",
@@ -365,6 +366,66 @@ class CPIBond(Bond):
     Plain CPI-indexed coupon bond with explicit base CPI and indexed principal.
     """
     def __new__(cls, settlement_days: builtins.int, face_amount: builtins.float, base_cpi: builtins.float, observation_lag: time.Period, index: indexes.ZeroInflationIndex, observation_interpolation: indexes.CpiInterpolationType, schedule: time.Schedule, coupons: typing.Sequence[builtins.float], accrual_day_counter: time.DayCounter, settings: itofin.Settings, *, payment_convention: time.BusinessDayConvention = time.BusinessDayConvention.ModifiedFollowing, issue_date: typing.Optional[time.Date] = None, payment_calendar: typing.Optional[time.Calendar] = None, ex_coupon_period: typing.Optional[time.Period] = None, ex_coupon_calendar: typing.Optional[time.Calendar] = None, ex_coupon_convention: time.BusinessDayConvention = time.BusinessDayConvention.Unadjusted, ex_coupon_end_of_month: builtins.bool = False) -> CPIBond: ...
+
+@typing.final
+class CPISwap:
+    r"""
+    CPI-scaled fixed coupons against plain Ibor-plus-spread coupons.
+    Payer pays Ibor and receives CPI; Receiver reverses both signs.
+    """
+    def __init__(self, swap_type: SwapType, nominal: builtins.float, subtract_inflation_nominal: builtins.bool, spread: builtins.float, float_schedule: time.Schedule, float_index: indexes.IborIndex, float_day_count: time.DayCounter, float_convention: time.BusinessDayConvention, fixed_rate: builtins.float, base_cpi: builtins.float, fixed_schedule: time.Schedule, fixed_index: indexes.ZeroInflationIndex, fixed_day_count: time.DayCounter, fixed_convention: time.BusinessDayConvention, observation_lag: time.Period, settings: itofin.Settings, *, interpolation: typing.Optional[indexes.CpiInterpolationType] = None, inflation_nominal: typing.Optional[builtins.float] = None) -> None:
+        r"""
+        Construct plain coupon schedules and terminal exchanges, retaining live indexes.
+        Ibor fixing days use the index default. Payer pays the floating leg.
+        """
+    def set_engine(self, curve: termstructures.YieldTermStructure, settings: itofin.Settings) -> None:
+        r"""
+        Attach a retained live curve with native defaults; Settings must be the same object.
+        """
+    def npv(self) -> builtins.float:
+        r"""
+        Signed present value under the retained engine.
+        """
+    def fixed_leg_npv(self) -> builtins.float:
+        r"""
+        Signed CPI-leg present value including indexed principal.
+        """
+    def float_leg_npv(self) -> builtins.float:
+        r"""
+        Signed Ibor-leg present value including any nominal exchange.
+        """
+    def float_leg_bps(self) -> builtins.float:
+        r"""
+        Signed sensitivity to a one-basis-point Ibor spread increase.
+        """
+    def fair_spread(self) -> builtins.float:
+        r"""
+        Absolute Ibor spread that zeroes NPV with the CPI leg unchanged.
+        """
+    def calculate(self) -> None:
+        r"""
+        Populate native cached results if needed.
+        """
+    def recalculate(self) -> None:
+        r"""
+        Force native repricing, including while frozen.
+        """
+    def freeze(self) -> None:
+        r"""
+        Pin native cached results until unfreeze or explicit recalculate.
+        """
+    def unfreeze(self) -> None:
+        r"""
+        Resume native observer-driven repricing.
+        """
+    def is_calculated(self) -> builtins.bool:
+        r"""
+        Read the native cache flag without calculating.
+        """
+    def is_expired(self) -> builtins.bool:
+        r"""
+        Test native expiry without calculating.
+        """
 
 @typing.final
 class Callability:

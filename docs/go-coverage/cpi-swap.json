@@ -1,0 +1,148 @@
+{
+  "domain": "cpi-swap",
+  "entries": [
+    {
+      "c": "itofin_cpi_swap_new",
+      "go": "Session.NewCPISwap",
+      "python": "itofin.instruments.CPISwap.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestCPISwapIndependentNativeProfiles",
+        "TestCPISwapLifecycleRetainsInputsAndSession",
+        "TestCPISwapNilNumericAndEnumGuards"
+      ]
+    },
+    {
+      "c": "itofin_cpi_swap_set_engine",
+      "go": "CPISwap.SetEngine",
+      "python": "itofin.instruments.CPISwap.set_engine",
+      "status": "implemented",
+      "tests": [
+        "TestCPISwapIndependentNativeProfiles",
+        "TestCPISwapLifecycleRetainsInputsAndSession",
+        "TestCPISwapNilNumericAndEnumGuards"
+      ]
+    },
+    {
+      "c": "itofin_cpi_swap_value",
+      "go": "CPISwap.NPV",
+      "python": "itofin.instruments.CPISwap.npv",
+      "status": "implemented",
+      "tests": [
+        "TestCPISwapIndependentNativeProfiles",
+        "TestCPISwapLifecycleRetainsInputsAndSession",
+        "TestCPISwapNilNumericAndEnumGuards"
+      ]
+    },
+    {
+      "c": "itofin_cpi_swap_value",
+      "go": "CPISwap.FixedLegNPV",
+      "python": "itofin.instruments.CPISwap.fixed_leg_npv",
+      "status": "implemented",
+      "tests": [
+        "TestCPISwapIndependentNativeProfiles",
+        "TestCPISwapLifecycleRetainsInputsAndSession",
+        "TestCPISwapNilNumericAndEnumGuards"
+      ]
+    },
+    {
+      "c": "itofin_cpi_swap_value",
+      "go": "CPISwap.FloatLegNPV",
+      "python": "itofin.instruments.CPISwap.float_leg_npv",
+      "status": "implemented",
+      "tests": [
+        "TestCPISwapIndependentNativeProfiles",
+        "TestCPISwapLifecycleRetainsInputsAndSession",
+        "TestCPISwapNilNumericAndEnumGuards"
+      ]
+    },
+    {
+      "c": "itofin_cpi_swap_value",
+      "go": "CPISwap.FloatLegBPS",
+      "python": "itofin.instruments.CPISwap.float_leg_bps",
+      "status": "implemented",
+      "tests": [
+        "TestCPISwapIndependentNativeProfiles",
+        "TestCPISwapLifecycleRetainsInputsAndSession",
+        "TestCPISwapNilNumericAndEnumGuards"
+      ]
+    },
+    {
+      "c": "itofin_cpi_swap_value",
+      "go": "CPISwap.FairSpread",
+      "python": "itofin.instruments.CPISwap.fair_spread",
+      "status": "implemented",
+      "tests": [
+        "TestCPISwapIndependentNativeProfiles",
+        "TestCPISwapLifecycleRetainsInputsAndSession",
+        "TestCPISwapNilNumericAndEnumGuards"
+      ]
+    },
+    {
+      "c": "itofin_cpi_swap_action",
+      "go": "CPISwap.Calculate",
+      "python": "itofin.instruments.CPISwap.calculate",
+      "status": "implemented",
+      "tests": [
+        "TestCPISwapIndependentNativeProfiles",
+        "TestCPISwapLifecycleRetainsInputsAndSession",
+        "TestCPISwapNilNumericAndEnumGuards"
+      ]
+    },
+    {
+      "c": "itofin_cpi_swap_action",
+      "go": "CPISwap.Recalculate",
+      "python": "itofin.instruments.CPISwap.recalculate",
+      "status": "implemented",
+      "tests": [
+        "TestCPISwapIndependentNativeProfiles",
+        "TestCPISwapLifecycleRetainsInputsAndSession",
+        "TestCPISwapNilNumericAndEnumGuards"
+      ]
+    },
+    {
+      "c": "itofin_cpi_swap_action",
+      "go": "CPISwap.Freeze",
+      "python": "itofin.instruments.CPISwap.freeze",
+      "status": "implemented",
+      "tests": [
+        "TestCPISwapIndependentNativeProfiles",
+        "TestCPISwapLifecycleRetainsInputsAndSession",
+        "TestCPISwapNilNumericAndEnumGuards"
+      ]
+    },
+    {
+      "c": "itofin_cpi_swap_action",
+      "go": "CPISwap.Unfreeze",
+      "python": "itofin.instruments.CPISwap.unfreeze",
+      "status": "implemented",
+      "tests": [
+        "TestCPISwapIndependentNativeProfiles",
+        "TestCPISwapLifecycleRetainsInputsAndSession",
+        "TestCPISwapNilNumericAndEnumGuards"
+      ]
+    },
+    {
+      "c": "itofin_cpi_swap_value",
+      "go": "CPISwap.IsCalculated",
+      "python": "itofin.instruments.CPISwap.is_calculated",
+      "status": "implemented",
+      "tests": [
+        "TestCPISwapIndependentNativeProfiles",
+        "TestCPISwapLifecycleRetainsInputsAndSession",
+        "TestCPISwapNilNumericAndEnumGuards"
+      ]
+    },
+    {
+      "c": "itofin_cpi_swap_value",
+      "go": "CPISwap.IsExpired",
+      "python": "itofin.instruments.CPISwap.is_expired",
+      "status": "implemented",
+      "tests": [
+        "TestCPISwapIndependentNativeProfiles",
+        "TestCPISwapLifecycleRetainsInputsAndSession",
+        "TestCPISwapNilNumericAndEnumGuards"
+      ]
+    }
+  ]
+}
