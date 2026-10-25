@@ -8,7 +8,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github/workflows/semantic-release.yml"
-GATE = "${{ !cancelled() && needs.resolve-release.result == 'success' && needs.publish-optimizer.result == 'success' && needs.resolve-release.outputs.publish == 'true' && (inputs.publish_targets == 'all' || inputs.publish_targets == 'rust') }}"
+GATE = "${{ !cancelled() && needs.resolve-release.result == 'success' && needs.publish-optimizer.result == 'success' && needs.resolve-release.outputs.publish == 'true' && (github.event_name == 'schedule' || inputs.publish_targets == 'all' || inputs.publish_targets == 'rust') }}"
 TAG = "${{ needs.resolve-release.outputs.tag }}"
 REVISION = "${{ needs.resolve-release.outputs.revision }}"
 
@@ -44,12 +44,28 @@ class OptimizerReleaseTests(unittest.TestCase):
             block = self.jobs[name]
             self.assertIn("needs.resolve-release.outputs.publish == 'true'", field(block, "if"))
         self.assertEqual(field(self.jobs["semantic-release"], "if"),
-                         "${{ inputs.prompt == 'true' && inputs.release_tag == '' }}")
+                         "${{ (inputs.prompt == 'true' || (github.event_name == 'schedule' && vars.ENABLE_SCHEDULED_RELEASES == 'true')) && inputs.release_tag == '' }}")
         self.assertIn("DRY_RUN: ${{ inputs.dry_run }}", self.jobs["resolve-release"])
         self.assertIn("REQUESTED_TAG: ${{ inputs.release_tag }}", self.jobs["resolve-release"])
         self.assertIn("needs.semantic-release.result == 'success'", self.jobs["resolve-release"])
         self.assertIn("needs.semantic-release.result == 'skipped'", self.jobs["resolve-release"])
         self.assertIn("cancel-in-progress: false", self.source)
+
+    def test_scheduled_releases_are_opt_in_and_publish_all_channels(self):
+        self.assertIn("\n  schedule:\n    - cron: '0 0 * * 2,6'", self.source)
+        enabled = "(inputs.prompt == 'true' || (github.event_name == 'schedule' && vars.ENABLE_SCHEDULED_RELEASES == 'true'))"
+        for name in ("semantic-release", "resolve-release"):
+            with self.subTest(job=name):
+                self.assertIn(enabled, field(self.jobs[name], "if"))
+        self.assertIn("dry_run: ${{ inputs.dry_run || false }}", self.jobs["semantic-release"])
+        for name, target in (("publish-optimizer", "rust"), ("publish-crate", "rust"),
+                             ("build-python-wheels", "python"), ("publish-pypi", "python"),
+                             ("publish-go", "go")):
+            with self.subTest(job=name):
+                self.assertIn(
+                    f"(github.event_name == 'schedule' || inputs.publish_targets == 'all' || inputs.publish_targets == '{target}')",
+                    field(self.jobs[name], "if"),
+                )
 
     def test_both_crates_use_new_tooling_but_immutable_released_source(self):
         for name in ("publish-optimizer", "publish-crate"):
