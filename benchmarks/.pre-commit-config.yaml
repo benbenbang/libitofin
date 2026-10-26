@@ -1,0 +1,46 @@
+repos:
+    - repo: https://github.com/timothycrosley/isort
+      rev: 10.0.0b1
+      hooks:
+        - id: isort
+          name: isort
+          args:
+            - --settings-path=.isort.cfg
+    - repo: https://github.com/astral-sh/ruff-pre-commit
+      rev: v0.17.1
+      hooks:
+        - id: ruff
+          args:
+            - --fix
+        - id: ruff-format
+    - repo: https://github.com/pre-commit/pre-commit-hooks
+      rev: v6.0.0
+      hooks:
+        - id: check-yaml
+          args:
+            - --allow-multiple-documents
+            - --unsafe
+        - id: end-of-file-fixer
+        - id: trailing-whitespace
+        - id: check-added-large-files
+          args:
+            - --maxkb=1024
+          stages:
+            - pre-commit
+        - id: requirements-txt-fixer
+        - id: check-merge-conflict
+        - id: debug-statements
+        - id: pretty-format-json
+          args:
+            - --autofix
+            - --indent=2
+    - repo: local
+      hooks:
+        - id: validate-commit-msg
+          name: commit message is valid
+          args:
+            - --negate
+          entry: ^(build|ci|docs|feat|fix|perf|refactor|style|test|revert|hotfix|ops|chore|incompat)\([\w,\.,\-,\(,\),\/]+\)(!?)(:)\s{1}([\w,\W,:]+)$
+          language: pygrep
+          stages:
+            - commit-msg
