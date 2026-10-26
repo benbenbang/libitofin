@@ -64,7 +64,7 @@ exclude = [
 [tool.ruff.lint]
 fixable = ["ALL"]
 unfixable = []
-ignore = ["E731"]
+ignore = ["E731", "I"]
 # exclude = ["ALL"]
 # select = ["PL"]
 
