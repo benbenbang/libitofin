@@ -25,6 +25,9 @@ from importlib.metadata import version
 # pypi/conda library
 from rich import print
 
+# qt bench library
+from qt_bench_async.extra import BOOTSTRAP, CURVE_BUMP, CURVE_DFS, EURO_REUSE, RESPOT, SWPN, TIMES, make_swpn_strikes
+
 # itofin library
 from itofin import Settings
 from itofin.instruments import OptionType, VanillaOption
@@ -234,13 +237,15 @@ def timed(fn, *args, repeat):
     return med, cv
 
 
-def process_bench(lib, workers, n):
+def process_bench(lib, workers, n, chunks=1):
+    """Same total work; chunks > 1 splits it into smaller tasks so fast cores take more."""
+    tasks, per = workers * chunks, max(1, n // chunks)
     with ProcessPoolExecutor(max_workers=workers, mp_context=CTX) as ex:
         list(ex.map(euro_task, [lib] * workers * 2, [10] * workers * 2))  # spin up
         t0 = time.perf_counter()
-        list(ex.map(euro_task, [lib] * workers, [n] * workers))
+        list(ex.map(euro_task, [lib] * tasks, [per] * tasks))
         wall = time.perf_counter() - t0
-    return workers * n / wall
+    return tasks * per / wall
 
 
 def ratio(a, b):
@@ -257,6 +262,7 @@ def main():
     ap.add_argument("--scale", type=float, default=1.0)
     ap.add_argument("--workers", type=int, default=os.cpu_count() or 4)
     ap.add_argument("--repeat", type=int, default=5)
+    ap.add_argument("--chunks", type=int, default=1, help="tasks per worker in test 4")
     a = ap.parse_args()
 
     n_single = int(20_000 * a.scale)
@@ -310,7 +316,7 @@ def main():
     # --- 4. Multi-process ----------------------------------------------
     print(f"\n== 4. {a.workers} processes x {n_worker:,} options ==")
     for lib in LIBS:
-        thr = process_bench(lib, a.workers, n_worker)
+        thr = process_bench(lib, a.workers, n_worker, a.chunks)
         results[("procs", lib)] = thr
         print(f"{lib:<9} {thr:>10,.0f} options/s | speed-up vs 1 process {ratio(thr, results[('single', lib)])}")
 
@@ -324,18 +330,74 @@ def main():
         start, end = res
         print(f"{lib:<9} peak RSS {start:7.1f} MB -> {end:7.1f} MB (growth {end - start:+.1f} MB)")
 
+    n_bump = int(20_000 * a.scale)
+    n_curve_bump = int(500 * a.scale)
+    boot_reps = max(1, int(20 * a.scale))
+    n_swpn = int(2_000 * a.scale)
+
+    # --- 6. Market reuse and spot repricing -----------------------------
+    print(f"\n== 6a. European, market built once ({n_single:,} options) ==")
+    for lib in LIBS:
+        med, cv = timed(EURO_REUSE[lib], strikes, repeat=a.repeat)
+        results[("reuse", lib)] = n_single / med
+        print(f"{lib:<9} {med / n_single * 1e6:8.2f} us/option | CV {cv:4.1f}%")
+
+    print(f"\n== 6b. Reprice one option at {n_bump:,} new spots ==")
+    d = abs(RESPOT["itofin"](1_000) - RESPOT["QuantLib"](1_000))
+    print(f"Checksum |diff| over 1,000 spots: {d:.2e}")
+    for lib, how in (("itofin", "new process"), ("QuantLib", "bump SimpleQuote")):
+        med, cv = timed(RESPOT[lib], n_bump, repeat=a.repeat)
+        results[("respot", lib)] = n_bump / med
+        print(f"{lib:<9} {med / n_bump * 1e6:8.2f} us/reprice ({how}) | CV {cv:4.1f}%")
+
+    # --- 7. Curve bootstrap ----------------------------------------------
+    print("\n== 7. Curve bootstrap (3 deposits + 9 swaps, log-linear discount) ==")
+    d = max(abs(x - y) for x, y in zip(CURVE_DFS["itofin"](), CURVE_DFS["QuantLib"]()))
+    print(f"Max |diff| in discount factors over {len(TIMES)} times: {d:.2e}")
+    for lib in LIBS:
+        med, cv = timed(BOOTSTRAP[lib], boot_reps, repeat=a.repeat)
+        results[("boot", lib)] = med / boot_reps
+        print(f"{lib:<9} {med / boot_reps * 1e6:9.1f} us/build+bootstrap | CV {cv:4.1f}%")
+    for lib in LIBS:
+        med, cv = timed(CURVE_BUMP[lib], n_curve_bump, repeat=a.repeat)
+        results[("cbump", lib)] = med / n_curve_bump
+        print(f"{lib:<9} {med / n_curve_bump * 1e6:9.1f} us/bump+re-bootstrap | CV {cv:4.1f}%")
+
+    # --- 8. Swaptions ------------------------------------------------------
+    print(f"\n== 8. Swaption sweep, Jamshidian ({n_swpn:,} strikes) ==")
+    probe_k = make_swpn_strikes(200)
+    it_s, ql_s = SWPN["itofin"](probe_k, True), SWPN["QuantLib"](probe_k, True)
+    print(f"K=3% NPV: itofin {it_s[100]:.10f} | QuantLib {ql_s[100]:.10f}")
+    print(f"Max |diff| over {len(probe_k)} strikes: {max(abs(x - y) for x, y in zip(it_s, ql_s)):.2e}")
+    swpn_strikes = make_swpn_strikes(n_swpn)
+    for lib in LIBS:
+        med, cv = timed(SWPN[lib], swpn_strikes, repeat=a.repeat)
+        results[("swpn", lib)] = n_swpn / med
+        print(f"{lib:<9} {med / n_swpn * 1e6:8.2f} us/swaption | CV {cv:4.1f}%")
+
     # --- Summary -------------------------------------------------------
     print("\n== Summary (itofin advantage; > 1.00x means itofin is faster) ==")
-    for key, label in (
-        ("single", "Single-thread European"),
+    throughput = (  # higher is better
+        ("single", "European, rebuild all"),
+        ("reuse", "European, market reused"),
+        ("respot", "Reprice at new spot"),
         ("threads", "Multi-thread European"),
         ("procs", "Multi-process European"),
-    ):
+        ("swpn", "Swaption sweep"),
+    )
+    durations = (  # lower is better
+        ("heston", "Heston calibration"),
+        ("boot", "Curve bootstrap"),
+        ("cbump", "Curve bump + re-bootstrap"),
+    )
+    for key, label in throughput:
         i, q = results.get((key, "itofin")), results.get((key, "QuantLib"))
         if i and q:
-            print(f"{label:<24} {ratio(i, q)}")
-    i, q = results[("heston", "itofin")], results[("heston", "QuantLib")]
-    print(f"{'Heston calibration':<24} {ratio(q, i)}")
+            print(f"{label:<27} {ratio(i, q)}")
+    for key, label in durations:
+        i, q = results.get((key, "itofin")), results.get((key, "QuantLib"))
+        if i and q:
+            print(f"{label:<27} {ratio(q, i)}")
 
 
 if __name__ == "__main__":
