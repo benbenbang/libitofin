@@ -3,8 +3,8 @@
 //! Explicit transforms replace QuantLib's global inverse-cumulative override.
 //! Errors consume the attempted draw and preserve the last successful sequence.
 
-use super::UniformRng;
 use super::rngtraits::SequenceGenerator;
+use super::{Seeded, UniformRng};
 use crate::errors::QlResult;
 use crate::math::distributions::normal::InverseCumulativeNormal;
 use crate::math::distributions::poisson::InverseCumulativePoisson;
@@ -64,6 +64,14 @@ impl<R: UniformRng, IC: FallibleInverseCumulative> InverseCumulativeRng<R, IC> {
     }
 }
 
+impl<R: Seeded, IC> Seeded for InverseCumulativeRng<R, IC> {
+    type Seed = R::Seed;
+
+    fn seed(&self) -> R::Seed {
+        self.uniform.seed()
+    }
+}
+
 /// Fallible counterpart of `InverseCumulativeRsg`, preserving source weights.
 #[derive(Clone)]
 pub struct FallibleInverseCumulativeRsg<USG, IC> {
@@ -106,5 +114,13 @@ impl<USG: SequenceGenerator, IC: FallibleInverseCumulative> FallibleInverseCumul
     /// Number of components in each sequence.
     pub fn dimension(&self) -> usize {
         self.uniform.dimension()
+    }
+}
+
+impl<USG: Seeded, IC> Seeded for FallibleInverseCumulativeRsg<USG, IC> {
+    type Seed = USG::Seed;
+
+    fn seed(&self) -> USG::Seed {
+        self.uniform.seed()
     }
 }

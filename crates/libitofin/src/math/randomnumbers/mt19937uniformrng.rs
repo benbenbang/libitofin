@@ -5,7 +5,7 @@
 //! initialization). The state words are `u32` with wrapping arithmetic where
 //! the C code relies on `& 0xffffffff` masking; the sequences are identical.
 
-use super::{UniformRng, seedgenerator};
+use super::{Seeded, UniformRng, seedgenerator};
 use crate::types::Real;
 
 const N: usize = 624;
@@ -19,16 +19,18 @@ const LOWER_MASK: u32 = 0x7fff_ffff;
 pub struct MersenneTwisterUniformRng {
     mt: [u32; N],
     mti: usize,
+    seed: Option<u32>,
 }
 
 impl MersenneTwisterUniformRng {
     /// A generator initialized from the given seed; a seed of `0` draws a
-    /// random seed from the [`seedgenerator`] singleton.
+    /// random non-zero seed from the [`seedgenerator`] singleton, reported by
+    /// [`Seeded::seed`].
     pub fn new(seed: u32) -> Self {
         let s = if seed != 0 {
             seed
         } else {
-            seedgenerator::get()
+            seedgenerator::get_nonzero()
         };
         let mut mt = [0u32; N];
         mt[0] = s;
@@ -37,7 +39,11 @@ impl MersenneTwisterUniformRng {
                 .wrapping_mul(mt[i - 1] ^ (mt[i - 1] >> 30))
                 .wrapping_add(i as u32);
         }
-        MersenneTwisterUniformRng { mt, mti: N }
+        MersenneTwisterUniformRng {
+            mt,
+            mti: N,
+            seed: Some(s),
+        }
     }
 
     /// A generator initialized from an array of seeds, QuantLib's
@@ -77,6 +83,7 @@ impl MersenneTwisterUniformRng {
         }
         mt[0] = UPPER_MASK;
         rng.mti = N;
+        rng.seed = None;
         rng
     }
 
@@ -107,6 +114,15 @@ impl MersenneTwisterUniformRng {
         let y = (self.mt[N - 1] & UPPER_MASK) | (self.mt[0] & LOWER_MASK);
         self.mt[N - 1] = self.mt[M - 1] ^ (y >> 1) ^ mag01[(y & 0x1) as usize];
         self.mti = 0;
+    }
+}
+
+impl Seeded for MersenneTwisterUniformRng {
+    type Seed = Option<u32>;
+
+    /// The resolved scalar seed, or `None` for [`from_seeds`](Self::from_seeds).
+    fn seed(&self) -> Option<u32> {
+        self.seed
     }
 }
 

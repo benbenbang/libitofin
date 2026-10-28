@@ -8,7 +8,7 @@
 
 #![allow(clippy::excessive_precision)]
 
-use super::{UniformRng, seedgenerator};
+use super::{Seeded, UniformRng, seedgenerator};
 use crate::types::Real;
 
 const KK: usize = 100;
@@ -23,6 +23,7 @@ pub struct KnuthUniformRng {
     ranf_arr_ptr: usize,
     ranf_arr_sentinel: usize,
     ran_u: Vec<Real>,
+    seed: i64,
 }
 
 fn mod_sum(x: Real, y: Real) -> Real {
@@ -35,18 +36,20 @@ fn is_odd(s: i32) -> bool {
 
 impl KnuthUniformRng {
     /// A generator initialized from the given seed; a seed of `0` draws a
-    /// random seed from the [`seedgenerator`] singleton.
+    /// random non-zero seed from the [`seedgenerator`] singleton, reported by
+    /// [`Seeded::seed`].
     pub fn new(seed: i64) -> Self {
+        let seed = if seed != 0 {
+            seed
+        } else {
+            i64::from(seedgenerator::get_nonzero())
+        };
         let mut rng = KnuthUniformRng {
             ranf_arr_buf: vec![0.0; QUALITY],
             ranf_arr_ptr: QUALITY,
             ranf_arr_sentinel: QUALITY,
             ran_u: vec![0.0; QUALITY],
-        };
-        let seed = if seed != 0 {
-            seed
-        } else {
-            i64::from(seedgenerator::get())
+            seed,
         };
         rng.ranf_start(seed);
         rng
@@ -138,6 +141,14 @@ impl KnuthUniformRng {
         self.ranf_arr_ptr = 1;
         self.ranf_arr_sentinel = 100;
         self.ranf_arr_buf[0]
+    }
+}
+
+impl Seeded for KnuthUniformRng {
+    type Seed = i64;
+
+    fn seed(&self) -> i64 {
+        self.seed
     }
 }
 

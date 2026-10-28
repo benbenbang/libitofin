@@ -46,6 +46,18 @@ pub fn get() -> u32 {
         .next_u32()
 }
 
+/// The next non-zero seed from the process-wide seed generator, redrawing past
+/// a `0` draw: a generator reports the seed it resolved, and a reported `0`
+/// could not be replayed because `0` itself means "draw a random seed".
+pub fn get_nonzero() -> u32 {
+    loop {
+        let seed = get();
+        if seed != 0 {
+            return seed;
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -54,5 +66,10 @@ mod tests {
     fn successive_seeds_differ() {
         let seeds: Vec<u32> = (0..5).map(|_| get()).collect();
         assert!(seeds.windows(2).any(|w| w[0] != w[1]));
+    }
+
+    #[test]
+    fn nonzero_seeds_are_never_zero() {
+        assert!((0..1000).all(|_| get_nonzero() != 0));
     }
 }
