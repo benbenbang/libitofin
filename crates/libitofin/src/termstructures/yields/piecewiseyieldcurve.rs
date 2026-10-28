@@ -31,6 +31,10 @@
 //!   are deferred (they need the global convergence loop, unported).
 //! - `MultiCurveBootstrapProvider` (`ql/termstructures/multicurve.hpp:36`), a
 //!   marker base used only for a `dynamic_pointer_cast`, is dropped.
+//! - [`moving`](PiecewiseYieldCurve::moving) builds the settlement-days
+//!   variant whose reference date follows the evaluation date of an explicit
+//!   [`Settings`] (D5). A date change invalidates the bootstrap; the next read
+//!   re-solves warm from the previous nodes when their count is unchanged.
 //! - Jump quotes (`jumps`/`jumpDates`) are not ported, following the
 //!   [`YieldTermStructure`] precedent.
 
@@ -43,15 +47,17 @@ use crate::math::interpolations::Interpolator;
 use crate::patterns::lazyobject::LazyObject;
 use crate::patterns::observable::{AsObservable, Observable, Observer};
 use crate::require;
+use crate::settings::Settings;
 use crate::shared::{Shared, SharedMut, shared_mut};
 use crate::termstructures::bootstraphelper::RateHelper;
 use crate::termstructures::bootstraptraits::{CurveData, YieldBootstrapTraits};
 use crate::termstructures::iterativebootstrap::{Bootstrap, IterativeBootstrap, PiecewiseCurve};
 use crate::termstructures::yieldtermstructure::YieldTermStructure;
 use crate::termstructures::{TermStructure, TermStructureBase};
+use crate::time::calendar::Calendar;
 use crate::time::date::Date;
 use crate::time::daycounter::DayCounter;
-use crate::types::{DiscountFactor, Real, Time};
+use crate::types::{DiscountFactor, Natural, Real, Time};
 
 /// Feeds a helper-quote or evaluation-date notification into the curve's lazy
 /// core: it invalidates the bootstrap cache and re-broadcasts to the curve's
@@ -128,6 +134,84 @@ where
         interpolator: I,
         bootstrap: B,
     ) -> QlResult<Shared<PiecewiseYieldCurve<T, I, B>>> {
+        Self::build(
+            TermStructureBase::with_reference_date(reference_date, None, Some(day_counter)),
+            instruments,
+            interpolator,
+            bootstrap,
+        )
+    }
+
+    /// Builds a curve whose reference date moves with the evaluation date,
+    /// advanced by `settlement_days` business days on `calendar` (the C++
+    /// settlement-days constructor, `piecewiseyieldcurve.hpp:102-131`), with a
+    /// default-configured bootstrap. An unset evaluation date surfaces as an
+    /// `Err` on the first read, never a system-clock fallback.
+    pub fn moving(
+        settlement_days: Natural,
+        calendar: Calendar,
+        instruments: Vec<Shared<dyn RateHelper>>,
+        day_counter: DayCounter,
+        interpolator: I,
+        settings: Shared<Settings<Date>>,
+    ) -> QlResult<Shared<PiecewiseYieldCurve<T, I, B>>>
+    where
+        B: Default,
+    {
+        Self::moving_with_bootstrap(
+            settlement_days,
+            calendar,
+            instruments,
+            day_counter,
+            interpolator,
+            settings,
+            B::default(),
+        )
+    }
+
+    /// The moving constructor with an explicitly configured bootstrap.
+    ///
+    /// The curve's own [`CurveUpdater`] is registered on the evaluation-date
+    /// observable after the base's reference-date half, so a date change
+    /// invalidates the bootstrap even when every helper has fixed dates (such
+    /// helpers do not observe the evaluation date). Relative helpers also
+    /// forward the change, so an always-forwarding curve notifies its
+    /// observers once more per date change than the fixed-date constructor
+    /// does; the extra notification is harmless, and a curve set to forward
+    /// only the first notification swallows it.
+    #[allow(clippy::too_many_arguments)]
+    pub fn moving_with_bootstrap(
+        settlement_days: Natural,
+        calendar: Calendar,
+        instruments: Vec<Shared<dyn RateHelper>>,
+        day_counter: DayCounter,
+        interpolator: I,
+        settings: Shared<Settings<Date>>,
+        bootstrap: B,
+    ) -> QlResult<Shared<PiecewiseYieldCurve<T, I, B>>> {
+        let curve = Self::build(
+            TermStructureBase::moving(
+                settlement_days,
+                calendar,
+                Some(day_counter),
+                Shared::clone(&settings),
+            ),
+            instruments,
+            interpolator,
+            bootstrap,
+        )?;
+        settings.register_eval_date_observer(
+            &(SharedMut::clone(&curve.updater) as SharedMut<dyn Observer>),
+        );
+        Ok(curve)
+    }
+
+    fn build(
+        base: TermStructureBase,
+        instruments: Vec<Shared<dyn RateHelper>>,
+        interpolator: I,
+        bootstrap: B,
+    ) -> QlResult<Shared<PiecewiseYieldCurve<T, I, B>>> {
         require!(!instruments.is_empty(), "no bootstrap helpers given");
 
         let curve = Shared::new_cyclic(|weak: &Weak<PiecewiseYieldCurve<T, I, B>>| {
@@ -138,11 +222,7 @@ where
                 lazy: SharedMut::clone(&lazy),
             });
             PiecewiseYieldCurve {
-                base: TermStructureBase::with_reference_date(
-                    reference_date,
-                    None,
-                    Some(day_counter),
-                ),
+                base,
                 instruments,
                 interpolator,
                 data: RefCell::new(CurveData::new()),
@@ -478,15 +558,36 @@ mod tests {
             false,
         );
 
+        let (_, instruments) = instruments_on(&settings);
+
+        CommonVars {
+            settings,
+            today,
+            settlement,
+            instruments,
+        }
+    }
+
+    /// The deposit + swap helpers on `settings`, with their quotes, so a
+    /// second curve can be built over its own helpers on the same settings.
+    fn instruments_on(
+        settings: &Shared<Settings<Date>>,
+    ) -> (Vec<Shared<SimpleQuote>>, Vec<Shared<dyn RateHelper>>) {
+        let calendar = Target::new();
+        let mut rates = Vec::new();
         let mut instruments: Vec<Shared<dyn RateHelper>> = Vec::new();
         for (n, units, rate) in DEPOSIT_DATA {
-            let quote = Handle::new(shared(SimpleQuote::new(rate / 100.0)) as Shared<dyn Quote>);
+            let rate = shared(SimpleQuote::new(rate / 100.0));
+            let quote = Handle::new(Shared::clone(&rate) as Shared<dyn Quote>);
+            rates.push(rate);
             let index = Euribor::new(Period::new(n, units), Handle::empty(), settings.clone())
                 .expect("deposit tenor is valid");
             instruments.push(DepositRateHelper::new(quote, &index) as Shared<dyn RateHelper>);
         }
         for (n, units, rate) in SWAP_DATA {
-            let quote = Handle::new(shared(SimpleQuote::new(rate / 100.0)) as Shared<dyn Quote>);
+            let rate = shared(SimpleQuote::new(rate / 100.0));
+            let quote = Handle::new(Shared::clone(&rate) as Shared<dyn Quote>);
+            rates.push(rate);
             let euribor6m = Euribor::six_months(Handle::empty(), settings.clone());
             instruments.push(SwapRateHelper::new(
                 quote,
@@ -498,13 +599,7 @@ mod tests {
                 &euribor6m,
             ) as Shared<dyn RateHelper>);
         }
-
-        CommonVars {
-            settings,
-            today,
-            settlement,
-            instruments,
-        }
+        (rates, instruments)
     }
 
     fn euribor6m_on(
@@ -1699,5 +1794,197 @@ mod tests {
             );
         }
         assert!(worst < 1.0e-9, "worst relative discount gap is {worst}");
+    }
+
+    fn rolled(today: Date) -> Date {
+        Target::new().advance(
+            today,
+            15,
+            TimeUnit::Days,
+            BusinessDayConvention::Following,
+            false,
+        )
+    }
+
+    fn moving_curve(
+        instruments: Vec<Shared<dyn RateHelper>>,
+        settings: &Shared<Settings<Date>>,
+    ) -> Shared<PiecewiseYieldCurve<Discount, LogLinear>> {
+        PiecewiseYieldCurve::moving(
+            2,
+            Target::new(),
+            instruments,
+            Actual360::new(),
+            LogLinear,
+            settings.clone(),
+        )
+        .unwrap()
+    }
+
+    /// `testObservability` (`piecewiseyieldcurve.cpp:832-875`) on the moving
+    /// constructor: a quote change notifies and recalculates, a date change
+    /// notifies, and a second date change without an intervening
+    /// recalculation does not.
+    #[test]
+    fn moving_curve_observability() {
+        let vars = common_vars();
+        let (rates, instruments) = instruments_on(&vars.settings);
+        let curve = moving_curve(instruments.clone(), &vars.settings);
+        curve.lazy.borrow_mut().forward_first_notification_only();
+        let flag = crate::test_support::Flag::new();
+        curve.register_observer(&crate::test_support::as_observer(&flag));
+
+        for (rate, helper) in rates.iter().zip(&instruments) {
+            let t = Actual360::new().year_fraction(vars.settlement, helper.pillar_date());
+            let discount = curve.discount(t, false).unwrap();
+            crate::test_support::Flag::lower(&flag);
+            rate.set_value(rate.value().unwrap() * 1.01);
+            assert!(
+                crate::test_support::Flag::is_up(&flag),
+                "not notified of rate change"
+            );
+            assert_ne!(
+                curve.discount(t, true).unwrap(),
+                discount,
+                "no recalculation"
+            );
+            rate.set_value(rate.value().unwrap() / 1.01);
+        }
+
+        curve.max_date();
+        crate::test_support::Flag::lower(&flag);
+        vars.settings.set_evaluation_date(rolled(vars.today));
+        assert!(
+            crate::test_support::Flag::is_up(&flag),
+            "not notified of date change"
+        );
+
+        crate::test_support::Flag::lower(&flag);
+        vars.settings.set_evaluation_date(vars.today);
+        assert!(
+            !crate::test_support::Flag::is_up(&flag),
+            "notified of date change without an intervening recalculation"
+        );
+    }
+
+    /// Fixed-date helpers do not observe the evaluation date, so only the
+    /// curve's own eval-date registration invalidates it: after a roll the
+    /// pillars stay put while the reference date, and so the node times, move.
+    #[test]
+    fn moving_curve_with_fixed_date_helpers_rebootstraps_on_roll() {
+        let vars = common_vars();
+        let index = Euribor::new(
+            Period::new(3, TimeUnit::Months),
+            Handle::empty(),
+            vars.settings.clone(),
+        )
+        .unwrap();
+        let windows = [
+            (
+                Date::new(15, Month::September, 2026),
+                Date::new(15, Month::December, 2026),
+            ),
+            (
+                Date::new(15, Month::December, 2026),
+                Date::new(15, Month::March, 2027),
+            ),
+        ];
+        let instruments = windows
+            .into_iter()
+            .map(|(start, end)| {
+                let quote = Handle::new(shared(SimpleQuote::new(0.03)) as Shared<dyn Quote>);
+                FraRateHelper::from_dates(quote, start, end, &index, false, Pillar::MaturityDate)
+                    as Shared<dyn RateHelper>
+            })
+            .collect();
+        let curve = moving_curve(instruments, &vars.settings);
+        let dates = curve.dates().unwrap();
+        let times = curve.times().unwrap();
+        assert_eq!(dates[0], vars.settlement);
+
+        let new_today = rolled(vars.today);
+        vars.settings.set_evaluation_date(new_today);
+        assert!(!curve.lazy.borrow().is_calculated());
+
+        let new_dates = curve.dates().unwrap();
+        let new_reference = Target::new().advance(
+            new_today,
+            2,
+            TimeUnit::Days,
+            BusinessDayConvention::Following,
+            false,
+        );
+        assert_eq!(new_dates[0], new_reference);
+        assert_eq!(new_dates[1..], dates[1..]);
+        assert!(curve.times().unwrap()[1] < times[1]);
+    }
+
+    /// After a 15-business-day roll the moving curve matches a curve built
+    /// fresh with the fixed constructor at the new reference date, over its
+    /// own helpers on the same settings.
+    #[test]
+    fn rolled_moving_curve_matches_a_fresh_fixed_curve() {
+        let vars = common_vars();
+        let curve = moving_curve(vars.instruments.clone(), &vars.settings);
+        curve.calculate().unwrap();
+
+        let new_today = rolled(vars.today);
+        vars.settings.set_evaluation_date(new_today);
+        let reference = Target::new().advance(
+            new_today,
+            2,
+            TimeUnit::Days,
+            BusinessDayConvention::Following,
+            false,
+        );
+        assert_eq!(TermStructure::reference_date(&*curve).unwrap(), reference);
+        let rolled_nodes = curve.nodes().unwrap();
+
+        let (_, instruments) = instruments_on(&vars.settings);
+        let fresh = PiecewiseYieldCurve::<Discount, LogLinear>::new(
+            reference,
+            instruments,
+            Actual360::new(),
+            LogLinear,
+        )
+        .unwrap();
+        let fresh_nodes = fresh.nodes().unwrap();
+        assert_eq!(rolled_nodes.len(), fresh_nodes.len());
+        for ((date, df), (fresh_date, fresh_df)) in rolled_nodes.iter().zip(&fresh_nodes) {
+            assert_eq!(date, fresh_date);
+            assert!(
+                (df - fresh_df).abs() <= 1.0e-10,
+                "{date}: {df} vs {fresh_df}"
+            );
+        }
+    }
+
+    /// With the node count unchanged across a roll, the stored solution is
+    /// still valid when the re-bootstrap starts, which is the reuse predicate
+    /// of the warm path (`iterativebootstrap.rs`: `cd.is_valid() && len == nodes`).
+    #[test]
+    fn a_roll_keeps_the_previous_solution_for_a_warm_restart() {
+        let vars = common_vars();
+        let curve = moving_curve(vars.instruments.clone(), &vars.settings);
+        let nodes = curve.data().unwrap().len();
+
+        vars.settings.set_evaluation_date(rolled(vars.today));
+        assert!(!curve.lazy.borrow().is_calculated());
+        assert!(curve.data.borrow().is_valid());
+        assert_eq!(curve.data.borrow().data().len(), nodes);
+
+        assert_eq!(curve.data().unwrap().len(), nodes);
+        assert!(curve.data.borrow().is_valid());
+    }
+
+    /// D10: a moving curve on settings with no evaluation date errs rather
+    /// than falling back to the system clock.
+    #[test]
+    fn moving_curve_without_an_evaluation_date_errs() {
+        let vars = common_vars();
+        let unset = shared(Settings::<Date>::new());
+        let curve = moving_curve(vars.instruments.clone(), &unset);
+        assert!(TermStructure::reference_date(&*curve).is_err());
+        assert!(curve.discount(1.0, true).is_err());
     }
 }
