@@ -5,6 +5,7 @@ use std::cell::RefCell;
 use crate::errors::QlResult;
 use crate::instruments::{VarianceSwapArguments, VarianceSwapEngine, VarianceSwapResults};
 use crate::math::randomnumbers::rngtraits::{McRngTraits, PseudoRandom};
+use crate::math::randomnumbers::seedgenerator;
 use crate::math::statistics::{MeanStdDev, Statistics};
 use crate::math::timegrid::TimeGrid;
 use crate::methods::montecarlo::{McSimulation, PathGenerator};
@@ -23,7 +24,9 @@ use pricer::VariancePathPricer;
 
 /// Spot-start variance pricing using native integrated-diffusion path statistics.
 /// Sampling error excludes discretization bias. Seed zero is randomized; other
-/// seeds restart reproducibly on each calculation. No bridge or variance reduction.
+/// seeds restart reproducibly on each calculation. Every calculation reports the
+/// seed it used as the additional result `seed` (a `Real`), so a randomized run
+/// replays by passing it back. No bridge or variance reduction.
 pub struct MCVarianceSwapEngine {
     base: VarianceSwapEngine,
     process: Shared<GeneralizedBlackScholesProcess>,
@@ -162,7 +165,11 @@ impl PricingEngine for MCVarianceSwapEngine {
                 && grid.back().is_some_and(|v| v.is_finite() && v > 0.0),
             "invalid variance MC grid"
         );
-        let generator = PseudoRandom::make_sequence_generator(steps, self.config.seed)?;
+        let seed = match self.config.seed {
+            0 => seedgenerator::get_nonzero(),
+            seed => seed,
+        };
+        let generator = PseudoRandom::make_sequence_generator(steps, seed)?;
         let path_generator =
             PathGenerator::from_time_grid(self.process.clone(), grid, generator, false)?;
         let pricer = shared(VariancePathPricer {
@@ -220,6 +227,10 @@ impl PricingEngine for MCVarianceSwapEngine {
         results.samples = Some(samples);
         results.instrument.value = Some(value);
         results.instrument.error_estimate = Some(error);
+        results.instrument.additional_results.insert(
+            "seed".to_string(),
+            shared(f64::from(seed)) as Shared<dyn std::any::Any>,
+        );
         Ok(())
     }
 }

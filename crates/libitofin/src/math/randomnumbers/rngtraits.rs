@@ -93,6 +93,11 @@ pub trait McRngTraits {
     /// Maximum number of sequence draws, when the underlying generator is finite.
     const MAX_SAMPLES: Option<usize> = None;
 
+    /// Whether a seed of `0` asks for a random seed. Only the pseudo-random
+    /// policy resolves it; a low-discrepancy sequence keeps `0` as a fixed seed
+    /// (Sobol uses it for the dimensions above its tabulated count).
+    const RANDOMIZES_ZERO_SEED: bool = false;
+
     /// Builds a `dimension`-wide sequence generator seeded with `seed`.
     ///
     /// # Errors
@@ -124,6 +129,8 @@ impl McRngTraits for PseudoRandom {
     >;
 
     const ALLOWS_ERROR_ESTIMATE: bool = true;
+
+    const RANDOMIZES_ZERO_SEED: bool = true;
 
     fn make_sequence_generator(dimension: usize, seed: u32) -> QlResult<Self::RsgType> {
         let ursg = RandomSequenceGenerator::with_seed(dimension, seed)?;

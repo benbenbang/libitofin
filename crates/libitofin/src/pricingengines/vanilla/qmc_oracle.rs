@@ -82,3 +82,37 @@ fn qmc_rejects_missing_samples_tolerances_and_zero_steps() {
             .is_err()
     );
 }
+
+/// Sobol draws its direction integers above the 31 tabulated Jaeckel dimensions
+/// from the seed (`sobol/mod.rs:194`), so seed 0 must stay a fixed seed for QMC:
+/// the NPV is pinned to its value before seed reporting, and the reported seed
+/// is the given one.
+#[test]
+fn qmc_seed_zero_above_the_tabulated_sobol_dimension_is_unchanged_and_reported() {
+    let market = market();
+    market.set(100.0, 0.02, 0.05, 0.20);
+    let price = |seed: u32| {
+        let engine = MakeMcEuropeanEngine::<LowDiscrepancy>::new(Shared::clone(&market.process))
+            .with_steps(40)
+            .with_samples(255)
+            .with_seed(seed)
+            .build()
+            .unwrap();
+        let mut option = EuropeanOption::new(
+            shared(PlainVanillaPayoff::new(OptionType::Call, 100.0)),
+            shared(EuropeanExercise::new(today() + 360)),
+            Shared::clone(&market.settings),
+        );
+        option
+            .base_mut()
+            .set_pricing_engine(shared_mut(engine) as SharedMut<dyn PricingEngine>);
+        (option.npv().unwrap(), option.result::<f64>("seed").unwrap())
+    };
+    let (npv, seed) = price(0);
+    assert_eq!(npv.to_bits(), 4_620_890_469_078_457_386, "{npv}");
+    assert_eq!(seed, 0.0);
+    assert_eq!(price(0).0.to_bits(), npv.to_bits());
+    let (other, seed) = price(7);
+    assert_ne!(other.to_bits(), npv.to_bits());
+    assert_eq!(seed, 7.0);
+}

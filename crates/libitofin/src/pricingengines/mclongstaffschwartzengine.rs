@@ -23,9 +23,16 @@
 //! - **the calibration seed offset is added in `u32`**: C++ computes `seed +
 //!   1768237423L` in `BigNatural` (`:149`); this stack's RNG surface is seeded
 //!   by `u32`, so the addition wraps. Only seeds above 2526729872 differ, and
-//!   they select a stream just as arbitrary as the C++ one. The zero seed
-//!   (`:148`) is kept as zero, which draws a fresh stream per pass rather than a
-//!   fixed one (`mt19937uniformrng.rs:25-31`), exactly as C++ relies on.
+//!   they select a stream just as arbitrary as the C++ one. The one wrap value,
+//!   pricing seed 2526729873, would offset to `0` (a random seed here), so its
+//!   calibration seed is `1` instead.
+//! - **the calibration seed derives from the resolved pricing seed**: both
+//!   seeds resolve at calculation time. A pseudo-random pricing seed of `0`
+//!   (`:148`) first resolves to a random non-zero seed, and an unset
+//!   calibration seed is then offset from it, where C++ keeps `0` and draws two
+//!   independent random streams. Both seeds used are reported as the additional
+//!   results `seed` and `seed_calibration`, so the run replays from `seed`
+//!   alone (or from both when the calibration seed was set explicitly).
 //!
 //! Deferred, omitted visibly rather than accepted and ignored:
 //! - **`brownianBridgeCalibration`** (`:145`): deferred with the Brownian bridge
@@ -39,6 +46,7 @@ use std::any::Any;
 use crate::errors::QlResult;
 use crate::instruments::OptionArguments;
 use crate::math::randomnumbers::rngtraits::McRngTraits;
+use crate::math::randomnumbers::seedgenerator;
 use crate::math::statistics::GeneralStatistics;
 use crate::math::timegrid::TimeGrid;
 use crate::methods::montecarlo::{LongstaffSchwartzPathPricer, MonteCarloModel};
@@ -60,7 +68,7 @@ pub struct McLongstaffSchwartzEngineBase<RNG> {
     base: McVanillaEngineBase<RNG>,
     n_calibration_samples: Size,
     antithetic_variate_calibration: bool,
-    seed_calibration: u32,
+    seed_calibration: Option<u32>,
 }
 
 impl<RNG: McRngTraits> McLongstaffSchwartzEngineBase<RNG> {
@@ -105,7 +113,7 @@ impl<RNG: McRngTraits> McLongstaffSchwartzEngineBase<RNG> {
             n_calibration_samples: n_calibration_samples.unwrap_or(DEFAULT_CALIBRATION_SAMPLES),
             antithetic_variate_calibration: antithetic_variate_calibration
                 .unwrap_or(antithetic_variate),
-            seed_calibration: seed_calibration.unwrap_or_else(|| calibration_seed(seed)),
+            seed_calibration,
         })
     }
 
@@ -144,9 +152,11 @@ impl<RNG: McRngTraits> McLongstaffSchwartzEngineBase<RNG> {
         self.antithetic_variate_calibration
     }
 
-    /// The seed of the calibration stream (`:148-149`).
+    /// The configured seed of the calibration stream (`:148-149`), before a
+    /// zero seed is resolved at calculation time.
     pub fn seed_calibration(&self) -> u32 {
         self.seed_calibration
+            .unwrap_or_else(|| calibration_seed(self.base.seed()))
     }
 
     /// The simulation grid, including positive Bermudan exercise dates (`:218-231`).
@@ -172,9 +182,15 @@ impl<RNG: McRngTraits> McLongstaffSchwartzEngineBase<RNG> {
     /// failure.
     pub fn calculate_with(&mut self, pricer: Shared<LongstaffSchwartzPathPricer>) -> QlResult<()> {
         let grid = self.time_grid()?;
+        let seed = self.base.resolve_seed();
+        let seed_calibration = match self.seed_calibration {
+            Some(0) if RNG::RANDOMIZES_ZERO_SEED => seedgenerator::get_nonzero(),
+            Some(explicit) => explicit,
+            None => calibration_seed(seed),
+        };
         let generator = self
             .base
-            .path_generator_on_grid(grid.clone(), Some(self.seed_calibration))?;
+            .path_generator_on_grid(grid.clone(), Some(seed_calibration))?;
         let mut calibration_model = MonteCarloModel::new(
             generator,
             Shared::clone(&pricer),
@@ -184,8 +200,10 @@ impl<RNG: McRngTraits> McLongstaffSchwartzEngineBase<RNG> {
         calibration_model.add_samples(self.n_calibration_samples)?;
         pricer.calibrate()?;
 
-        let generator = self.base.path_generator_on_grid(grid, None)?;
+        let generator = self.base.path_generator_on_grid(grid, Some(seed))?;
         self.base.run_with(generator, Shared::clone(&pricer))?;
+        self.base.record_seed("seed", seed);
+        self.base.record_seed("seed_calibration", seed_calibration);
 
         let probability = pricer.exercise_probability()?;
         self.base
@@ -201,13 +219,13 @@ impl<RNG: McRngTraits> McLongstaffSchwartzEngineBase<RNG> {
 }
 
 /// The calibration seed of a pricing `seed` (`mclongstaffschwartzengine.hpp:149`):
-/// zero stays zero so both passes draw fresh streams, anything else is offset so
-/// the two streams differ.
+/// zero stays zero, anything else is offset so the two streams differ, and the
+/// one wrap to zero lands on `1` so a non-zero seed never turns random.
 fn calibration_seed(seed: u32) -> u32 {
     if seed == 0 {
         0
     } else {
-        seed.wrapping_add(CALIBRATION_SEED_OFFSET)
+        seed.wrapping_add(CALIBRATION_SEED_OFFSET).max(1)
     }
 }
 
@@ -262,6 +280,24 @@ mod tests {
         n_calibration_samples: Option<Size>,
         seed_calibration: Option<u32>,
     ) -> McLongstaffSchwartzEngineBase<PseudoRandom> {
+        seeded_driver(
+            market,
+            antithetic_variate,
+            antithetic_variate_calibration,
+            n_calibration_samples,
+            42,
+            seed_calibration,
+        )
+    }
+
+    fn seeded_driver(
+        market: &Market,
+        antithetic_variate: bool,
+        antithetic_variate_calibration: Option<bool>,
+        n_calibration_samples: Option<Size>,
+        seed: u32,
+        seed_calibration: Option<u32>,
+    ) -> McLongstaffSchwartzEngineBase<PseudoRandom> {
         let mut engine = McLongstaffSchwartzEngineBase::new(
             Shared::clone(&market.process) as Shared<dyn StochasticProcess1D>,
             Some(4),
@@ -272,7 +308,7 @@ mod tests {
             Some(512),
             None,
             None,
-            42,
+            seed,
             n_calibration_samples,
             antithetic_variate_calibration,
             seed_calibration,
@@ -380,5 +416,67 @@ mod tests {
         let results = instrument_results(&engine);
         assert!(results.value.unwrap() > 0.0);
         assert!((0.0..=1.0).contains(&pricer.exercise_probability().unwrap()));
+    }
+
+    fn run(market: &Market, seed: u32, seed_calibration: Option<u32>) -> (u64, u64, Real, Real) {
+        let mut engine = seeded_driver(market, false, None, Some(64), seed, seed_calibration);
+        let pricer = lsm(market, &engine);
+        engine.calculate_with(pricer).unwrap();
+        let results = instrument_results(&engine);
+        let seed = |key: &str| {
+            *results.additional_results[key]
+                .downcast_ref::<Real>()
+                .unwrap()
+        };
+        (
+            results.value.unwrap().to_bits(),
+            results.error_estimate.unwrap().to_bits(),
+            seed("seed"),
+            seed("seed_calibration"),
+        )
+    }
+
+    /// The one pricing seed whose wrapped offset is zero gets calibration seed
+    /// `1`, never the random `0`.
+    #[test]
+    fn the_wrapped_calibration_seed_is_never_zero() {
+        assert_eq!(calibration_seed(u32::MAX - CALIBRATION_SEED_OFFSET + 1), 1);
+        assert_eq!(calibration_seed(2_526_729_873), 1);
+        let market = flat_market();
+        let (_, _, seed, calibration) = run(&market, 2_526_729_873, None);
+        assert_eq!((seed, calibration), (2_526_729_873.0, 1.0));
+    }
+
+    /// A random pricing seed resolves once; the calibration seed is offset from
+    /// it, both are reported, and the reported pricing seed replays the run.
+    #[test]
+    fn a_random_lsm_run_reports_both_seeds_and_replays_bit_for_bit() {
+        let market = flat_market();
+        let (npv, error, seed, calibration) = run(&market, 0, None);
+        assert_ne!(seed, 0.0);
+        assert_eq!(calibration, Real::from(calibration_seed(seed as u32)));
+        assert_eq!(
+            run(&market, seed as u32, None),
+            (npv, error, seed, calibration)
+        );
+    }
+
+    /// An explicit calibration seed of `0` is kept until calculation time and
+    /// then resolved to its own random seed, which is reported.
+    #[test]
+    fn an_explicit_zero_calibration_seed_resolves_at_calculation() {
+        let market = flat_market();
+        assert_eq!(
+            driver(&market, false, None, None, Some(0)).seed_calibration(),
+            0
+        );
+        let (npv, error, seed, calibration) = run(&market, 42, Some(0));
+        assert_eq!(seed, 42.0);
+        assert_ne!(calibration, 0.0);
+        assert_ne!(calibration, Real::from(calibration_seed(42)));
+        assert_eq!(
+            run(&market, 42, Some(calibration as u32)),
+            (npv, error, seed, calibration)
+        );
     }
 }
