@@ -44,6 +44,7 @@ use pyo3_stub_gen::derive::{
 )]
 pub struct PyYieldTermStructure {
     inner: Handle<dyn YieldTermStructure>,
+    fresh_links: bool,
 }
 
 #[gen_stub_pymethods]
@@ -211,13 +212,34 @@ impl PyYieldTermStructure {
 
 impl PyYieldTermStructure {
     pub(crate) fn from_inner(inner: Handle<dyn YieldTermStructure>) -> Self {
-        Self { inner }
+        Self {
+            inner,
+            fresh_links: false,
+        }
     }
 
-    /// A clone of the inner curve handle for the process/model ctors (H1/W1).
+    /// Wrap a curve built here, so each consumer may get its own link to it.
+    pub(crate) fn from_local(curve: Shared<dyn YieldTermStructure>) -> Self {
+        Self {
+            inner: Handle::new(curve),
+            fresh_links: true,
+        }
+    }
+
+    /// A handle for the process/model ctors (H1/W1).
+    ///
+    /// Ownership contract: a curve built by this crate (`from_local`) hands
+    /// each consumer its own link to the same curve, so the curve's strong
+    /// count records every native owner. A handle wrapped by `from_inner` may
+    /// carry an owner (a joint-curve member retains its whole assembly) that
+    /// `Handle::new` would drop and `current_link` does not carry, so every
+    /// consumer shares a clone of that handle instead.
     #[allow(dead_code)]
     pub(crate) fn handle(&self) -> Handle<dyn YieldTermStructure> {
-        self.inner.clone()
+        match self.inner.current_link() {
+            Ok(curve) if self.fresh_links => Handle::new(curve),
+            _ => self.inner.clone(),
+        }
     }
 }
 
@@ -254,10 +276,8 @@ impl PyFlatForward {
             Compounding::Continuous,
             Frequency::Annual,
         )) as Shared<dyn YieldTermStructure>;
-        PyClassInitializer::from(PyYieldTermStructure {
-            inner: Handle::new(curve),
-        })
-        .add_subclass(PyFlatForward)
+        PyClassInitializer::from(PyYieldTermStructure::from_local(curve))
+            .add_subclass(PyFlatForward)
     }
 
     /// Build a flat curve backed by a retained, observable quote.
@@ -277,8 +297,7 @@ impl PyFlatForward {
         )) as Shared<dyn YieldTermStructure>;
         Py::new(
             py,
-            PyClassInitializer::from(PyYieldTermStructure::from_inner(Handle::new(curve)))
-                .add_subclass(Self),
+            PyClassInitializer::from(PyYieldTermStructure::from_local(curve)).add_subclass(Self),
         )
     }
 }
@@ -333,10 +352,10 @@ impl PyZeroCurve {
                 )));
             }
         };
-        Ok(PyClassInitializer::from(PyYieldTermStructure {
-            inner: Handle::new(curve),
-        })
-        .add_subclass(PyZeroCurve))
+        Ok(
+            PyClassInitializer::from(PyYieldTermStructure::from_local(curve))
+                .add_subclass(PyZeroCurve),
+        )
     }
 }
 
@@ -400,10 +419,10 @@ impl PyDiscountCurve {
                 )));
             }
         };
-        Ok(PyClassInitializer::from(PyYieldTermStructure {
-            inner: Handle::new(curve),
-        })
-        .add_subclass(PyDiscountCurve))
+        Ok(
+            PyClassInitializer::from(PyYieldTermStructure::from_local(curve))
+                .add_subclass(PyDiscountCurve),
+        )
     }
 }
 
@@ -444,10 +463,10 @@ impl PyForwardCurve {
             ForwardCurve::new(dates, forwards, day_counter.inner(), BackwardFlat)
                 .map_err(PyQlError::from)?,
         ) as Shared<dyn YieldTermStructure>;
-        Ok(PyClassInitializer::from(PyYieldTermStructure {
-            inner: Handle::new(curve),
-        })
-        .add_subclass(PyForwardCurve))
+        Ok(
+            PyClassInitializer::from(PyYieldTermStructure::from_local(curve))
+                .add_subclass(PyForwardCurve),
+        )
     }
 }
 
@@ -651,10 +670,10 @@ impl PyPiecewiseYieldCurve {
                 )));
             }
         };
-        Ok(PyClassInitializer::from(PyYieldTermStructure {
-            inner: Handle::new(curve),
-        })
-        .add_subclass(PyPiecewiseYieldCurve))
+        Ok(
+            PyClassInitializer::from(PyYieldTermStructure::from_local(curve))
+                .add_subclass(PyPiecewiseYieldCurve),
+        )
     }
 }
 
@@ -704,10 +723,10 @@ impl PyPiecewiseLogLinearDiscount {
         )
         .map_err(PyQlError::from)?;
         let erased = Shared::clone(&concrete) as Shared<dyn YieldTermStructure>;
-        Ok(PyClassInitializer::from(PyYieldTermStructure {
-            inner: Handle::new(erased),
-        })
-        .add_subclass(PyPiecewiseLogLinearDiscount { concrete }))
+        Ok(
+            PyClassInitializer::from(PyYieldTermStructure::from_local(erased))
+                .add_subclass(PyPiecewiseLogLinearDiscount { concrete }),
+        )
     }
 
     /// Return the bootstrapped node dates, triggering the lazy bootstrap.
@@ -782,10 +801,10 @@ impl PyPiecewiseLinearZero {
         )
         .map_err(PyQlError::from)?;
         let erased = Shared::clone(&concrete) as Shared<dyn YieldTermStructure>;
-        Ok(PyClassInitializer::from(PyYieldTermStructure {
-            inner: Handle::new(erased),
-        })
-        .add_subclass(PyPiecewiseLinearZero { concrete }))
+        Ok(
+            PyClassInitializer::from(PyYieldTermStructure::from_local(erased))
+                .add_subclass(PyPiecewiseLinearZero { concrete }),
+        )
     }
 
     /// Return the bootstrapped node dates, triggering the lazy bootstrap.
@@ -861,10 +880,10 @@ impl PyPiecewiseCubicZero {
         )
         .map_err(PyQlError::from)?;
         let erased = Shared::clone(&concrete) as Shared<dyn YieldTermStructure>;
-        Ok(PyClassInitializer::from(PyYieldTermStructure {
-            inner: Handle::new(erased),
-        })
-        .add_subclass(PyPiecewiseCubicZero { concrete }))
+        Ok(
+            PyClassInitializer::from(PyYieldTermStructure::from_local(erased))
+                .add_subclass(PyPiecewiseCubicZero { concrete }),
+        )
     }
 
     /// Return the bootstrapped node dates, triggering the lazy bootstrap.
@@ -938,10 +957,10 @@ impl PyPiecewiseLinearForward {
         )
         .map_err(PyQlError::from)?;
         let erased = Shared::clone(&concrete) as Shared<dyn YieldTermStructure>;
-        Ok(PyClassInitializer::from(PyYieldTermStructure {
-            inner: Handle::new(erased),
-        })
-        .add_subclass(PyPiecewiseLinearForward { concrete }))
+        Ok(
+            PyClassInitializer::from(PyYieldTermStructure::from_local(erased))
+                .add_subclass(PyPiecewiseLinearForward { concrete }),
+        )
     }
 
     /// Return the bootstrapped node dates, triggering the lazy bootstrap.
@@ -1062,10 +1081,10 @@ impl PyPiecewiseConvexMonotoneForward {
                 Shared::clone(curve) as Shared<dyn YieldTermStructure>
             }
         };
-        Ok(PyClassInitializer::from(PyYieldTermStructure {
-            inner: Handle::new(erased),
-        })
-        .add_subclass(PyPiecewiseConvexMonotoneForward { concrete }))
+        Ok(
+            PyClassInitializer::from(PyYieldTermStructure::from_local(erased))
+                .add_subclass(PyPiecewiseConvexMonotoneForward { concrete }),
+        )
     }
 
     /// Return the bootstrapped node dates, triggering the lazy bootstrap.
@@ -1147,10 +1166,10 @@ impl PyPiecewiseFlatForward {
         )
         .map_err(PyQlError::from)?;
         let erased = Shared::clone(&concrete) as Shared<dyn YieldTermStructure>;
-        Ok(PyClassInitializer::from(PyYieldTermStructure {
-            inner: Handle::new(erased),
-        })
-        .add_subclass(PyPiecewiseFlatForward { concrete }))
+        Ok(
+            PyClassInitializer::from(PyYieldTermStructure::from_local(erased))
+                .add_subclass(PyPiecewiseFlatForward { concrete }),
+        )
     }
 
     /// Return the bootstrapped node dates, triggering the lazy bootstrap.
@@ -1179,5 +1198,39 @@ impl PyPiecewiseFlatForward {
     ///     ItofinError: On a bootstrap failure.
     fn data(&self) -> PyResult<Vec<f64>> {
         Ok(self.concrete.data().map_err(PyQlError::from)?)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use libitofin::time::date::{Date, Month};
+    use libitofin::time::daycounters::actual360::Actual360;
+
+    fn flat() -> Shared<dyn YieldTermStructure> {
+        shared(FlatForward::with_rate(
+            Date::new(1, Month::January, 2026),
+            0.025,
+            Actual360::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        ))
+    }
+
+    #[test]
+    fn local_curve_gives_each_consumer_its_own_link() {
+        let curve = flat();
+        let wrapper = PyYieldTermStructure::from_local(Shared::clone(&curve));
+        let (first, second) = (wrapper.handle(), wrapper.handle());
+        assert!(!first.points_to_same_link(&second));
+        assert!(!first.points_to_same_link(&wrapper.inner));
+        assert_eq!(Shared::strong_count(&curve), 4);
+    }
+
+    #[test]
+    fn wrapped_handle_is_shared_by_every_consumer() {
+        let wrapper = PyYieldTermStructure::from_inner(Handle::new(flat()));
+        assert!(wrapper.handle().points_to_same_link(&wrapper.inner));
+        assert!(wrapper.handle().points_to_same_link(&wrapper.handle()));
     }
 }
