@@ -30,21 +30,31 @@
 //!   defaulting to `Statistics` (`mcvanillaengine.hpp:36`); both concrete engines
 //!   use that default, so `S` is fixed rather than a third generic.
 //!
+//! - **the seed actually used is reported**: a pseudo-random seed of `0`
+//!   draws a random non-zero seed once per calculation (QuantLib's
+//!   `SeedGenerator` behaviour), and every calculation records the seed it
+//!   priced with as the additional result `seed` (a `Real`, exact for every
+//!   `u32`), so a random run can be replayed by passing that seed back. A
+//!   low-discrepancy seed is reported as given.
+//!
 //! Deferred, rejected visibly rather than silently ignored:
 //! - **control variate**: the flag threads to [`McSimulation`], which rejects
 //!   it as deferred; `controlVariateValue` and the control
 //!   pricing engine (`mcvanillaengine.hpp:82,126`) are not ported.
 
+use std::any::Any;
 use std::marker::PhantomData;
 
 use crate::errors::QlResult;
 use crate::instruments::{OneAssetOptionEngine, OneAssetOptionResults, OptionArguments};
 use crate::math::randomnumbers::rngtraits::McRngTraits;
+use crate::math::randomnumbers::seedgenerator;
 use crate::math::statistics::MeanStdDev;
 use crate::math::timegrid::TimeGrid;
 use crate::methods::montecarlo::{McSimulation, McTraits, PathGen, PathPricer, SingleVariate};
 use crate::patterns::observable::{AsObservable, Observable};
 use crate::pricingengine::{Arguments, Results};
+use crate::shared::{Shared, shared};
 use crate::types::{Real, Size};
 use crate::{fail, require};
 
@@ -162,6 +172,30 @@ impl<RNG: McRngTraits, MC: McTraits> McVanillaEngineBase<RNG, MC> {
         self.base.observable()
     }
 
+    /// The configured seed, `0` meaning a random seed for a pseudo-random policy.
+    pub fn seed(&self) -> u32 {
+        self.seed
+    }
+
+    /// The seed a calculation runs with: the configured seed, or a fresh
+    /// non-zero draw from the [`seedgenerator`] when it is `0` and the policy
+    /// randomizes a zero seed ([`McRngTraits::RANDOMIZES_ZERO_SEED`]).
+    pub fn resolve_seed(&self) -> u32 {
+        if self.seed == 0 && RNG::RANDOMIZES_ZERO_SEED {
+            seedgenerator::get_nonzero()
+        } else {
+            self.seed
+        }
+    }
+
+    pub(crate) fn record_seed(&mut self, key: &str, seed: u32) {
+        self.base
+            .results_mut()
+            .instrument
+            .additional_results
+            .insert(key.to_string(), shared(Real::from(seed)) as Shared<dyn Any>);
+    }
+
     /// The simulation time grid, from the option's last exercise date
     /// (`mcvanillaengine.hpp:153`).
     ///
@@ -244,15 +278,19 @@ impl<RNG: McRngTraits, MC: McTraits> McVanillaEngineBase<RNG, MC> {
     }
 
     /// Runs the simulation: builds the policy's path generator from the RNG
-    /// policy and prices each path with `path_pricer`
-    /// (`mcvanillaengine.hpp:40,72`).
+    /// policy on the [`resolve_seed`](Self::resolve_seed) seed, prices each
+    /// path with `path_pricer` (`mcvanillaengine.hpp:40,72`), and records that
+    /// seed as the additional result `seed`.
     ///
     /// # Errors
     ///
     /// Propagates a generator, simulation, or accumulation failure.
     pub fn run<P: PathPricer<MC::PathType>>(&mut self, path_pricer: P) -> QlResult<()> {
-        let generator = self.path_generator()?;
-        self.run_with(generator, path_pricer)
+        let seed = self.resolve_seed();
+        let generator = self.path_generator_on_grid(self.time_grid()?, Some(seed))?;
+        self.run_with(generator, path_pricer)?;
+        self.record_seed("seed", seed);
+        Ok(())
     }
 
     /// Runs the simulation with a caller-supplied generator and pricer, then

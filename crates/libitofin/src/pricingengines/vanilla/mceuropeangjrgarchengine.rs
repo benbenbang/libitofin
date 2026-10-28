@@ -225,7 +225,8 @@ impl<RNG: McRngTraits> PricingEngine for MCEuropeanGjrGarchEngine<RNG> {
             .current_link()?
             .discount(time, false)?;
         let pricer = EuropeanGjrGarchPathPricer::new(option_type, strike, discount)?;
-        let generator = self.base.path_generator_on_grid(grid, None)?;
+        let seed = self.base.resolve_seed();
+        let generator = self.base.path_generator_on_grid(grid, Some(seed))?;
         if let Err(error) = self.base.run_with(generator, pricer) {
             self.base.reset();
             return Err(error);
@@ -239,6 +240,7 @@ impl<RNG: McRngTraits> PricingEngine for MCEuropeanGjrGarchEngine<RNG> {
             self.base.reset();
             fail!("GJR-GARCH MC result is not finite");
         }
+        self.base.record_seed("seed", seed);
         Ok(())
     }
 }
