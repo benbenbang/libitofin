@@ -10,7 +10,7 @@
 
 #![allow(clippy::excessive_precision)]
 
-use super::{GaussianRng, Uint64Rng};
+use super::{GaussianRng, Seeded, Uint64Rng};
 use crate::types::Real;
 
 const NORM_R: Real = 3.654152885361008796;
@@ -46,6 +46,14 @@ impl<R: Uint64Rng> ZigguratGaussianRng<R> {
 
 fn pdf(x: Real) -> Real {
     (-x * x / 2.0).exp()
+}
+
+impl<R: Uint64Rng + Seeded> Seeded for ZigguratGaussianRng<R> {
+    type Seed = R::Seed;
+
+    fn seed(&self) -> R::Seed {
+        self.uint64_generator.seed()
+    }
 }
 
 impl<R: Uint64Rng> GaussianRng for ZigguratGaussianRng<R> {

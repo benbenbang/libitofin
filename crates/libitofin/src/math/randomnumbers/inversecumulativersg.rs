@@ -10,6 +10,7 @@
 //! inverse cumulative (`inversecumulativersg.hpp:60`); here [`new`] always takes
 //! it explicitly, since the transform types on main carry no `Default`.
 
+use super::Seeded;
 use super::rngtraits::{InverseCumulative, SequenceGenerator};
 use crate::methods::montecarlo::Sample;
 use crate::types::Real;
@@ -38,6 +39,14 @@ impl<USG: SequenceGenerator, IC: InverseCumulative> InverseCumulativeRsg<USG, IC
             x: Sample::new(vec![0.0; dimension], 1.0),
             inverse_cumulative,
         }
+    }
+}
+
+impl<USG: Seeded, IC> Seeded for InverseCumulativeRsg<USG, IC> {
+    type Seed = USG::Seed;
+
+    fn seed(&self) -> USG::Seed {
+        self.uniform_generator.seed()
     }
 }
 

@@ -64,6 +64,19 @@ pub trait Uint64Rng: UniformRng {
     fn next_u64(&mut self) -> u64;
 }
 
+/// A generator that reports the seed it was initialized from, so a run seeded
+/// with `0` (a random seed) can be replayed bit-for-bit.
+///
+/// Wrappers forward the seed of the generator they draw from.
+pub trait Seeded {
+    /// The seed type of the underlying generator's constructor.
+    type Seed: Copy;
+
+    /// The seed actually used: never `0` for a generator seeded through its
+    /// seed constructor, `None` where it was initialized another way.
+    fn seed(&self) -> Self::Seed;
+}
+
 /// A generator of standard normal (mean `0`, standard deviation `1`)
 /// pseudo-random deviates.
 pub trait GaussianRng {

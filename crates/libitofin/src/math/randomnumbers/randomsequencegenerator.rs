@@ -20,9 +20,9 @@
 //!   which [`UniformRng`] does not model.
 //! - `nextInt32Sequence` (:77) is deferred: the Monte Carlo path never calls it.
 
-use super::UniformRng;
 use super::mt19937uniformrng::MersenneTwisterUniformRng;
 use super::rngtraits::SequenceGenerator;
+use super::{Seeded, UniformRng};
 use crate::errors::QlResult;
 use crate::methods::montecarlo::Sample;
 use crate::require;
@@ -61,13 +61,22 @@ impl RandomSequenceGenerator<MersenneTwisterUniformRng> {
     ///
     /// Mirrors QuantLib's `(dimensionality, seed)` constructor
     /// (`randomsequencegenerator.hpp:62`). A seed of `0` draws a random seed
-    /// from the seed generator, per [`MersenneTwisterUniformRng::new`].
+    /// from the seed generator, per [`MersenneTwisterUniformRng::new`], and
+    /// [`Seeded::seed`] reports it.
     ///
     /// # Errors
     ///
     /// Returns an error if `dimension` is zero.
     pub fn with_seed(dimension: usize, seed: u32) -> QlResult<Self> {
         Self::new(dimension, MersenneTwisterUniformRng::new(seed))
+    }
+}
+
+impl<R: Seeded> Seeded for RandomSequenceGenerator<R> {
+    type Seed = R::Seed;
+
+    fn seed(&self) -> R::Seed {
+        self.rng.seed()
     }
 }
 

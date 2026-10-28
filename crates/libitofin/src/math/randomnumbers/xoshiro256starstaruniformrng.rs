@@ -4,7 +4,7 @@
 //! Blackman and Vigna's xoshiro256** 1.0 (https://prng.di.unimi.it/), with
 //! the same SplitMix64 seed expansion.
 
-use super::{Uint64Rng, UniformRng, seedgenerator};
+use super::{Seeded, Uint64Rng, UniformRng, seedgenerator};
 use crate::types::Real;
 
 struct SplitMix64 {
@@ -29,17 +29,18 @@ pub struct Xoshiro256StarStarUniformRng {
     s1: u64,
     s2: u64,
     s3: u64,
+    seed: Option<u64>,
 }
 
 impl Xoshiro256StarStarUniformRng {
     /// A generator whose state is expanded from the given seed with
-    /// SplitMix64; a seed of `0` draws a random seed from the
-    /// [`seedgenerator`] singleton.
+    /// SplitMix64; a seed of `0` draws a random non-zero seed from the
+    /// [`seedgenerator`] singleton, reported by [`Seeded::seed`].
     pub fn new(seed: u64) -> Self {
         let seed = if seed != 0 {
             seed
         } else {
-            u64::from(seedgenerator::get())
+            u64::from(seedgenerator::get_nonzero())
         };
         let mut split_mix = SplitMix64 { x: seed };
         Xoshiro256StarStarUniformRng {
@@ -47,6 +48,7 @@ impl Xoshiro256StarStarUniformRng {
             s1: split_mix.next(),
             s2: split_mix.next(),
             s3: split_mix.next(),
+            seed: Some(seed),
         }
     }
 
@@ -54,7 +56,22 @@ impl Xoshiro256StarStarUniformRng {
     /// not everywhere zero; otherwise the first outputs are poorly
     /// distributed (all-zero state always returns `0`).
     pub fn from_state(s0: u64, s1: u64, s2: u64, s3: u64) -> Self {
-        Xoshiro256StarStarUniformRng { s0, s1, s2, s3 }
+        Xoshiro256StarStarUniformRng {
+            s0,
+            s1,
+            s2,
+            s3,
+            seed: None,
+        }
+    }
+}
+
+impl Seeded for Xoshiro256StarStarUniformRng {
+    type Seed = Option<u64>;
+
+    /// The resolved seed, or `None` for [`from_state`](Self::from_state).
+    fn seed(&self) -> Option<u64> {
+        self.seed
     }
 }
 

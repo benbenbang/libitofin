@@ -120,3 +120,88 @@ fn fallible_sequence_preserves_weights_and_last_success_on_error() {
     assert_eq!(generator.last_sequence().weight, first.weight);
     assert_eq!(generator.next_sequence().unwrap().value, first.value);
 }
+
+fn replays<S: Seeded, T: PartialEq + std::fmt::Debug>(
+    seeded_with: impl Fn(u32) -> S,
+    resolved: impl Fn(&S) -> u32,
+    mut draw: impl FnMut(&mut S) -> T,
+) {
+    let mut random = seeded_with(0);
+    let seed = resolved(&random);
+    assert_ne!(seed, 0, "seed 0 resolves to a reported non-zero seed");
+    let mut replay = seeded_with(seed);
+    assert_eq!(resolved(&replay), seed);
+    for _ in 0..1000 {
+        assert_eq!(draw(&mut random), draw(&mut replay));
+    }
+}
+
+#[test]
+fn a_random_seed_is_reported_and_replays_every_generator_bit_for_bit() {
+    let mt = |s: &MersenneTwisterUniformRng| s.seed().unwrap();
+    replays(MersenneTwisterUniformRng::new, mt, |g| g.next_u32());
+    replays(
+        |s| KnuthUniformRng::new(i64::from(s)),
+        |g| u32::try_from(g.seed()).unwrap(),
+        |g| g.next_real().to_bits(),
+    );
+    replays(
+        |s| Xoshiro256StarStarUniformRng::new(u64::from(s)),
+        |g| u32::try_from(g.seed().unwrap()).unwrap(),
+        |g| g.next_u64(),
+    );
+    replays(
+        |s| BoxMullerGaussianRng::new(MersenneTwisterUniformRng::new(s)),
+        |g| g.seed().unwrap(),
+        |g| g.next_gaussian().to_bits(),
+    );
+    replays(
+        |s| ZigguratGaussianRng::new(Xoshiro256StarStarUniformRng::new(u64::from(s))),
+        |g| u32::try_from(g.seed().unwrap()).unwrap(),
+        |g| g.next_gaussian().to_bits(),
+    );
+    replays(
+        PseudoRandom::make_scalar_generator,
+        |g| g.seed().unwrap(),
+        |g| g.next_sample().unwrap().value.to_bits(),
+    );
+    replays(
+        |s| PseudoRandom::make_sequence_generator(4, s).unwrap(),
+        |g| g.seed().unwrap(),
+        |g| g.next_sequence().value.clone(),
+    );
+    replays(
+        |s| PoissonPseudoRandom::make_scalar_generator(s, 4.0).unwrap(),
+        |g| g.seed().unwrap(),
+        |g| g.next_sample().unwrap().value.to_bits(),
+    );
+    replays(
+        |s| PoissonPseudoRandom::make_sequence_generator(4, s).unwrap(),
+        |g| g.seed().unwrap(),
+        |g| g.next_sequence().unwrap().value.clone(),
+    );
+}
+
+#[test]
+fn an_explicit_seed_is_reported_and_non_scalar_seeding_reports_none() {
+    assert_eq!(MersenneTwisterUniformRng::new(42).seed(), Some(42));
+    assert_eq!(KnuthUniformRng::new(-7).seed(), -7);
+    assert_eq!(Xoshiro256StarStarUniformRng::new(42).seed(), Some(42));
+    assert_eq!(
+        RandomSequenceGenerator::with_seed(2, 42).unwrap().seed(),
+        Some(42)
+    );
+    assert_eq!(MersenneTwisterUniformRng::from_seeds(&[1, 2]).seed(), None);
+    assert_eq!(
+        Xoshiro256StarStarUniformRng::from_state(1, 2, 3, 4).seed(),
+        None
+    );
+}
+
+#[test]
+fn successive_random_seeds_differ() {
+    assert_ne!(
+        MersenneTwisterUniformRng::new(0).seed(),
+        MersenneTwisterUniformRng::new(0).seed()
+    );
+}

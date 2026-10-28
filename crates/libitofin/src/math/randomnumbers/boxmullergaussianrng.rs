@@ -8,7 +8,7 @@
 
 #![allow(clippy::excessive_precision)]
 
-use super::{GaussianRng, UniformRng};
+use super::{GaussianRng, Seeded, UniformRng};
 use crate::types::Real;
 
 /// Gaussian random number generator drawing its uniform deviates from `U`.
@@ -25,6 +25,14 @@ impl<U: UniformRng> BoxMullerGaussianRng<U> {
             uniform_generator,
             second_value: None,
         }
+    }
+}
+
+impl<U: UniformRng + Seeded> Seeded for BoxMullerGaussianRng<U> {
+    type Seed = U::Seed;
+
+    fn seed(&self) -> U::Seed {
+        self.uniform_generator.seed()
     }
 }
 
