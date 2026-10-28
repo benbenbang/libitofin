@@ -1,0 +1,219 @@
+//! Bump-and-reprice sensitivities: parallel and bucket PV01 over SimpleQuotes.
+//!
+//! Port of QuantLib code removed in 1.36 (`6f379f4e9`); not part of current
+//! QuantLib. The source is `ql/experimental/risk/sensitivityanalysis.{hpp,cpp}`
+//! as of `6f379f4e9^`, deprecated upstream as "out of scope" (`9f0c9b90c`).
+//!
+//! Each function shifts one or more [`SimpleQuote`]s, reprices the instruments
+//! through their (lazy, observer-driven) [`Instrument::npv`], and returns the
+//! finite-difference first and second derivatives. The quotes are always
+//! restored to their original values before returning, on `Ok` and on `Err`
+//! alike (`.cpp:110-114`). There is no drop guard: restoring calls
+//! [`SimpleQuote::set_value`], which notifies observers, and that must not run
+//! during a panic unwind. A panic (a bug, not a QuantLib exception) therefore
+//! leaves the quotes bumped.
+//!
+//! The C++ `Handle<SimpleQuote>` arguments become [`Shared<SimpleQuote>`]: a
+//! `Handle<dyn Quote>` cannot be set, and every caller already holds the shared
+//! quote it wrapped into its curve handles. The C++ `Null<Real>` reference NPV
+//! and second order become `None`.
+//!
+//! Divergences from QuantLib (D10: silent zeros become explicit errors):
+//! - empty `instruments` returns `Err`; QuantLib returns `(0, 0)` (`.cpp:74,129`)
+//!   or zero vectors (`.cpp:265`).
+//! - an invalid quote returns `Err` in every form; QuantLib returns `(0, 0)` from
+//!   the single-quote bucket form (`.cpp:134`) and silently skips it in the
+//!   parallel form (`.cpp:81-86`).
+//!
+//! Deferred and not ported: the matrix overload of `parallelAnalysis`, the two
+//! matrix `bucketAnalysis` overloads and the `bucketAnalysis` overloads returning
+//! parameter sensitivities (#1307); the C, Go and Python bindings (#1306).
+
+use std::fmt;
+
+use crate::errors::QlResult;
+use crate::instrument::Instrument;
+use crate::quotes::{Quote, SimpleQuote};
+use crate::shared::{Shared, SharedMut};
+use crate::types::Real;
+use crate::{fail, require};
+
+/// The QuantLib default shift, one basis point (`.hpp:85`).
+pub const DEFAULT_SHIFT: Real = 1.0e-4;
+
+/// Finite-differences scheme (`SensitivityAnalysis`, `.hpp:41`).
+///
+/// The `Default` is [`Centered`](SensitivityAnalysis::Centered), the C++
+/// default argument (`.hpp:86`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum SensitivityAnalysis {
+    /// Forward difference: first order only.
+    OneSide,
+    /// Central difference: first and second order.
+    #[default]
+    Centered,
+}
+
+impl fmt::Display for SensitivityAnalysis {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SensitivityAnalysis::OneSide => f.write_str("OneSide"),
+            SensitivityAnalysis::Centered => f.write_str("Centered"),
+        }
+    }
+}
+
+/// Weighted sum of the instruments' NPVs (`aggregateNPV`, `.cpp:44-57`).
+///
+/// Empty `quantities`, or the single quantity `[1.0]`, mean unit weights;
+/// otherwise there must be one quantity per instrument.
+pub fn aggregate_npv(
+    instruments: &[SharedMut<dyn Instrument>],
+    quantities: &[Real],
+) -> QlResult<Real> {
+    if quantities.is_empty() || quantities == [1.0] {
+        let mut npv = 0.0;
+        for instrument in instruments {
+            npv += instrument.borrow_mut().npv()?;
+        }
+        return Ok(npv);
+    }
+    require!(
+        quantities.len() == instruments.len(),
+        "dimension mismatch between instruments ({}) and quantities ({})",
+        instruments.len(),
+        quantities.len()
+    );
+    let mut npv = 0.0;
+    for (instrument, quantity) in instruments.iter().zip(quantities) {
+        npv += quantity * instrument.borrow_mut().npv()?;
+    }
+    Ok(npv)
+}
+
+/// Parallel-shift PV01 over a quote vector (`parallelAnalysis`, `.cpp:60-118`).
+///
+/// All quotes are bumped together by `shift`. Returns the first derivative and,
+/// for [`Centered`](SensitivityAnalysis::Centered), the second derivative
+/// (`None` for [`OneSide`](SensitivityAnalysis::OneSide)). A `None`
+/// `reference_npv` is computed with [`aggregate_npv`].
+pub fn parallel_analysis(
+    quotes: &[Shared<SimpleQuote>],
+    instruments: &[SharedMut<dyn Instrument>],
+    quantities: &[Real],
+    shift: Real,
+    kind: SensitivityAnalysis,
+    reference_npv: Option<Real>,
+) -> QlResult<(Real, Option<Real>)> {
+    require!(!quotes.is_empty(), "empty SimpleQuote vector");
+    let (originals, reference_npv) =
+        prepare(quotes, instruments, quantities, shift, reference_npv)?;
+    let result = finite_differences(shift, kind, reference_npv, |bump| {
+        for (quote, original) in quotes.iter().zip(&originals) {
+            quote.set_value(original + bump);
+        }
+        aggregate_npv(instruments, quantities)
+    });
+    restore(quotes, &originals);
+    result
+}
+
+/// Bucket PV01 for a single quote (`bucketAnalysis`, `.cpp:120-160`).
+///
+/// Same conventions as [`parallel_analysis`], bumping `quote` alone.
+pub fn bucket_analysis(
+    quote: &Shared<SimpleQuote>,
+    instruments: &[SharedMut<dyn Instrument>],
+    quantities: &[Real],
+    shift: Real,
+    kind: SensitivityAnalysis,
+    reference_npv: Option<Real>,
+) -> QlResult<(Real, Option<Real>)> {
+    parallel_analysis(
+        std::slice::from_ref(quote),
+        instruments,
+        quantities,
+        shift,
+        kind,
+        reference_npv,
+    )
+}
+
+/// Bucket PV01 for each quote of a vector, bumped one at a time
+/// (`bucketAnalysis`, `.cpp:255-279`).
+///
+/// The reference NPV is computed once and shared by every bucket. Returns the
+/// first derivatives and the second derivatives, index-aligned with `quotes`.
+pub fn bucket_analysis_vector(
+    quotes: &[Shared<SimpleQuote>],
+    instruments: &[SharedMut<dyn Instrument>],
+    quantities: &[Real],
+    shift: Real,
+    kind: SensitivityAnalysis,
+) -> QlResult<(Vec<Real>, Vec<Option<Real>>)> {
+    require!(!quotes.is_empty(), "empty SimpleQuote vector");
+    let (_, reference_npv) = prepare(quotes, instruments, quantities, shift, None)?;
+    let mut first = Vec::with_capacity(quotes.len());
+    let mut second = Vec::with_capacity(quotes.len());
+    for quote in quotes {
+        let (d1, d2) = bucket_analysis(
+            quote,
+            instruments,
+            quantities,
+            shift,
+            kind,
+            Some(reference_npv),
+        )?;
+        first.push(d1);
+        second.push(d2);
+    }
+    Ok((first, second))
+}
+
+fn prepare(
+    quotes: &[Shared<SimpleQuote>],
+    instruments: &[SharedMut<dyn Instrument>],
+    quantities: &[Real],
+    shift: Real,
+    reference_npv: Option<Real>,
+) -> QlResult<(Vec<Real>, Real)> {
+    require!(shift != 0.0, "zero shift not allowed");
+    require!(!instruments.is_empty(), "empty instrument vector");
+    let mut originals = Vec::with_capacity(quotes.len());
+    for (i, quote) in quotes.iter().enumerate() {
+        let Ok(value) = quote.value() else {
+            fail!("invalid SimpleQuote at position {i}");
+        };
+        originals.push(value);
+    }
+    let reference_npv = match reference_npv {
+        Some(npv) => npv,
+        None => aggregate_npv(instruments, quantities)?,
+    };
+    Ok((originals, reference_npv))
+}
+
+fn finite_differences(
+    shift: Real,
+    kind: SensitivityAnalysis,
+    reference_npv: Real,
+    mut npv_at: impl FnMut(Real) -> QlResult<Real>,
+) -> QlResult<(Real, Option<Real>)> {
+    let up = npv_at(shift)?;
+    match kind {
+        SensitivityAnalysis::OneSide => Ok(((up - reference_npv) / shift, None)),
+        SensitivityAnalysis::Centered => {
+            let down = npv_at(-shift)?;
+            Ok((
+                (up - down) / (2.0 * shift),
+                Some((up - 2.0 * reference_npv + down) / (shift * shift)),
+            ))
+        }
+    }
+}
+
+fn restore(quotes: &[Shared<SimpleQuote>], originals: &[Real]) {
+    for (quote, original) in quotes.iter().zip(originals) {
+        quote.set_value(*original);
+    }
+}

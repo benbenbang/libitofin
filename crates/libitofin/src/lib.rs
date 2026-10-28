@@ -31,6 +31,7 @@ pub mod pricingengine;
 pub mod pricingengines;
 pub mod processes;
 pub mod quotes;
+pub mod risk;
 pub mod settings;
 pub mod shared;
 pub mod stochasticprocess;
