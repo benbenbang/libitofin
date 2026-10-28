@@ -217,6 +217,12 @@ impl TermStructureBase {
         }
     }
 
+    /// The settings whose evaluation date a moving structure follows; `None`
+    /// for a fixed or self-managed reference date.
+    pub(crate) fn moving_settings(&self) -> Option<&Shared<Settings<Date>>> {
+        self.settings.as_ref().filter(|_| self.reference.moving)
+    }
+
     /// The day counter used for date/time conversion, when provided.
     pub fn day_counter(&self) -> Option<DayCounter> {
         self.day_counter.clone()

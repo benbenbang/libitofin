@@ -392,6 +392,63 @@ mod tests {
         drop(external_a);
     }
 
+    /// A moving member's evaluation date is an upstream input: over fixed-date
+    /// helpers only, a date roll still reaches the wrapper (through
+    /// `register_upstream`) and fans out to the other member.
+    #[test]
+    fn a_date_roll_on_a_moving_member_fans_out() {
+        let (settings, today, index) = env();
+        let fra = |start: Date, end: Date| {
+            let quote = Handle::new(shared(SimpleQuote::new(0.02)) as Shared<dyn Quote>);
+            FraRateHelper::from_dates(quote, start, end, &index, false, Pillar::MaturityDate)
+                as Shared<dyn RateHelper>
+        };
+        let multicurve = MultiCurve::new(1.0e-10);
+
+        let a = BootCurve::moving_with_bootstrap(
+            2,
+            Target::new(),
+            vec![fra(
+                Date::new(15, Month::June, 2020),
+                Date::new(15, Month::September, 2020),
+            )],
+            Actual365Fixed::new(),
+            LogLinear,
+            Shared::clone(&settings),
+            GlobalBootstrap::default(),
+        )
+        .expect("moving curve A builds");
+        let internal_a = RelinkableHandle::<dyn YieldTermStructure>::empty();
+        multicurve
+            .add_bootstrapped_curve(&internal_a, a)
+            .expect("curve A is added");
+
+        let b = BootCurve::with_bootstrap(
+            today,
+            vec![fra(
+                Date::new(15, Month::June, 2020),
+                Date::new(15, Month::December, 2020),
+            )],
+            Actual365Fixed::new(),
+            LogLinear,
+            GlobalBootstrap::default(),
+        )
+        .expect("fixed curve B builds");
+        let internal_b = RelinkableHandle::<dyn YieldTermStructure>::empty();
+        multicurve
+            .add_bootstrapped_curve(&internal_b, Shared::clone(&b))
+            .expect("curve B is added");
+
+        let flag = shared_mut(Flag::default());
+        b.observable().register_observer(&flag_observer(&flag));
+
+        settings.set_evaluation_date(today + 21);
+        assert!(
+            flag.borrow().fired,
+            "a date roll on moving member A did not reach member B"
+        );
+    }
+
     #[test]
     fn update_fans_out_to_member_curves() {
         // MultiCurve registers with each member's UPSTREAM observables (its

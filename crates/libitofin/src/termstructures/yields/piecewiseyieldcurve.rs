@@ -353,13 +353,17 @@ where
 
     /// The curve's inputs are its rate helpers plus any helpers the bootstrap
     /// owns rather than fits: the same set its own [`CurveUpdater`] observes
-    /// (`:163-170`).
+    /// (`:163-170`), plus the evaluation date for a moving curve, as C++
+    /// `registerWithObservables` includes `Settings::evaluationDate()`.
     fn register_upstream(&self, observer: &SharedMut<dyn Observer>) {
         for helper in &self.instruments {
             helper.observable().register_observer(observer);
         }
         for observable in self.bootstrap.additional_observables() {
             observable.register_observer(observer);
+        }
+        if let Some(settings) = self.base.moving_settings() {
+            settings.register_eval_date_observer(observer);
         }
     }
 
@@ -1867,19 +1871,16 @@ mod tests {
         );
     }
 
-    /// Fixed-date helpers do not observe the evaluation date, so only the
-    /// curve's own eval-date registration invalidates it: after a roll the
-    /// pillars stay put while the reference date, and so the node times, move.
-    #[test]
-    fn moving_curve_with_fixed_date_helpers_rebootstraps_on_roll() {
-        let vars = common_vars();
+    /// Two FRA helpers over explicit windows, which do not observe the
+    /// evaluation date.
+    fn fixed_date_fras(settings: &Shared<Settings<Date>>) -> Vec<Shared<dyn RateHelper>> {
         let index = Euribor::new(
             Period::new(3, TimeUnit::Months),
             Handle::empty(),
-            vars.settings.clone(),
+            settings.clone(),
         )
         .unwrap();
-        let windows = [
+        [
             (
                 Date::new(15, Month::September, 2026),
                 Date::new(15, Month::December, 2026),
@@ -1888,16 +1889,54 @@ mod tests {
                 Date::new(15, Month::December, 2026),
                 Date::new(15, Month::March, 2027),
             ),
-        ];
-        let instruments = windows
-            .into_iter()
-            .map(|(start, end)| {
-                let quote = Handle::new(shared(SimpleQuote::new(0.03)) as Shared<dyn Quote>);
-                FraRateHelper::from_dates(quote, start, end, &index, false, Pillar::MaturityDate)
-                    as Shared<dyn RateHelper>
-            })
-            .collect();
-        let curve = moving_curve(instruments, &vars.settings);
+        ]
+        .into_iter()
+        .map(|(start, end)| {
+            let quote = Handle::new(shared(SimpleQuote::new(0.03)) as Shared<dyn Quote>);
+            FraRateHelper::from_dates(quote, start, end, &index, false, Pillar::MaturityDate)
+                as Shared<dyn RateHelper>
+        })
+        .collect()
+    }
+
+    /// The evaluation date is an upstream input of a moving curve only: over
+    /// fixed-date helpers, an observer wired through `register_upstream` hears
+    /// a date roll from the moving curve and not from the fixed one.
+    #[test]
+    fn register_upstream_includes_the_evaluation_date_only_when_moving() {
+        use crate::test_support::{Flag, as_observer};
+        let vars = common_vars();
+        let moving = moving_curve(fixed_date_fras(&vars.settings), &vars.settings);
+        let fixed = PiecewiseYieldCurve::<Discount, LogLinear>::new(
+            vars.settlement,
+            fixed_date_fras(&vars.settings),
+            Actual360::new(),
+            LogLinear,
+        )
+        .unwrap();
+        let moving_flag = Flag::new();
+        let fixed_flag = Flag::new();
+        moving.register_upstream(&as_observer(&moving_flag));
+        fixed.register_upstream(&as_observer(&fixed_flag));
+
+        vars.settings.set_evaluation_date(rolled(vars.today));
+        assert!(
+            Flag::is_up(&moving_flag),
+            "moving curve upstream missed the roll"
+        );
+        assert!(
+            !Flag::is_up(&fixed_flag),
+            "fixed curve upstream heard the roll"
+        );
+    }
+
+    /// Fixed-date helpers do not observe the evaluation date, so only the
+    /// curve's own eval-date registration invalidates it: after a roll the
+    /// pillars stay put while the reference date, and so the node times, move.
+    #[test]
+    fn moving_curve_with_fixed_date_helpers_rebootstraps_on_roll() {
+        let vars = common_vars();
+        let curve = moving_curve(fixed_date_fras(&vars.settings), &vars.settings);
         let dates = curve.dates().unwrap();
         let times = curve.times().unwrap();
         assert_eq!(dates[0], vars.settlement);
