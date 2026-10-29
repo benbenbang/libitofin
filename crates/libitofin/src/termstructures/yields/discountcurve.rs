@@ -9,8 +9,11 @@
 //!
 //! ## Divergences from QuantLib
 //!
-//! - Jump quotes (`jumps`/`jumpDates`) are not ported, per the
-//!   [`YieldTermStructure`] precedent.
+//! - Jump quotes (`jumps`/`jumpDates`) are taken by
+//!   [`with_jumps`](InterpolatedDiscountCurve::with_jumps), which builds with
+//!   a default-constructed interpolator factory; there is no constructor
+//!   taking both an explicit interpolator and jumps. Jumps on the zero and
+//!   forward curves are deferred (#1319), bindings (#1320).
 //! - The protected detached/moving constructors exist only for bootstrapped
 //!   curves and follow with the bootstrap; the public data constructors are
 //!   ported, with the empty calendar an `Option` per the base convention.
@@ -20,11 +23,13 @@
 //!   takes one explicitly.
 
 use crate::errors::QlResult;
+use crate::handle::Handle;
 use crate::math::interpolations::loglinear::LogLinear;
 use crate::math::interpolations::{Interpolation, Interpolator};
 use crate::patterns::observable::{AsObservable, Observable};
+use crate::quotes::Quote;
 use crate::termstructures::interpolatedcurve::InterpolatedCurve;
-use crate::termstructures::yieldtermstructure::YieldTermStructure;
+use crate::termstructures::yieldtermstructure::{YieldJumps, YieldTermStructure};
 use crate::termstructures::{TermStructure, TermStructureBase};
 use crate::time::calendar::Calendar;
 use crate::time::date::Date;
@@ -40,6 +45,7 @@ pub struct InterpolatedDiscountCurve<I: Interpolator> {
     base: TermStructureBase,
     dates: Vec<Date>,
     curve: InterpolatedCurve<I>,
+    jumps: Option<YieldJumps>,
 }
 
 /// Term structure based on log-linear interpolation of discount factors
@@ -57,6 +63,29 @@ impl<I: Interpolator + Default> InterpolatedDiscountCurve<I> {
         calendar: Option<Calendar>,
     ) -> QlResult<InterpolatedDiscountCurve<I>> {
         Self::with_interpolator(dates, discounts, day_counter, calendar, I::default())
+    }
+
+    /// Builds the curve as [`new`](Self::new) with multiplicative discount
+    /// jumps (C++'s `jumps`/`jumpDates` constructor arguments).
+    ///
+    /// Empty `jump_dates` generates consecutive year-end dates from the
+    /// reference year. Jump values are read and validated only after their
+    /// dates have been crossed.
+    ///
+    /// # Errors
+    /// Returns the [`new`](Self::new) errors, or a [`YieldJumps`]
+    /// construction error.
+    pub fn with_jumps(
+        dates: Vec<Date>,
+        discounts: Vec<DiscountFactor>,
+        day_counter: DayCounter,
+        calendar: Option<Calendar>,
+        jumps: Vec<Handle<dyn Quote>>,
+        jump_dates: Vec<Date>,
+    ) -> QlResult<InterpolatedDiscountCurve<I>> {
+        let mut curve = Self::new(dates, discounts, day_counter, calendar)?;
+        curve.jumps = Some(YieldJumps::new(&curve.base, jumps, jump_dates)?);
+        Ok(curve)
     }
 }
 
@@ -93,6 +122,7 @@ impl<I: Interpolator> InterpolatedDiscountCurve<I> {
             base: TermStructureBase::with_reference_date(dates[0], calendar, Some(day_counter)),
             dates,
             curve,
+            jumps: None,
         })
     }
 
@@ -153,6 +183,10 @@ where
         Some(self)
     }
 
+    fn jumps(&self) -> Option<&YieldJumps> {
+        self.jumps.as_ref()
+    }
+
     fn discount_impl(&self, t: Time) -> QlResult<DiscountFactor> {
         let interpolation = self.curve.interpolation()?;
         let t_max = *self
@@ -178,6 +212,9 @@ mod tests {
     use super::*;
     use crate::interestrate::Compounding;
     use crate::math::interpolations::linear::Linear;
+    use crate::quotes::SimpleQuote;
+    use crate::shared::{Shared, shared};
+    use crate::test_support::{Flag, as_observer};
     use crate::time::date::Month;
     use crate::time::daycounters::actual360::Actual360;
     use crate::time::frequency::Frequency;
@@ -337,5 +374,109 @@ mod tests {
             None,
         ));
         assert!(err.message().contains("dates not sorted"));
+    }
+
+    fn quote(value: Real) -> Handle<dyn Quote> {
+        Handle::new(shared(SimpleQuote::new(value)) as Shared<dyn Quote>)
+    }
+
+    fn jumped_curve(
+        jumps: Vec<Handle<dyn Quote>>,
+        jump_dates: Vec<Date>,
+    ) -> QlResult<DiscountCurve> {
+        DiscountCurve::with_jumps(
+            sample_dates(),
+            sample_discounts(),
+            Actual360::new(),
+            None,
+            jumps,
+            jump_dates,
+        )
+    }
+
+    #[test]
+    fn discount_is_the_base_discount_times_every_jump_before_t() {
+        let base = sample_curve();
+        let first = reference() + 90;
+        let second = reference() + 450;
+        let curve = jumped_curve(vec![quote(0.99), quote(0.98)], vec![first, second]).unwrap();
+        assert!(base.jumps().is_none());
+        assert_eq!(curve.jump_dates(), [first, second]);
+        assert_eq!(curve.jump_times().unwrap(), vec![0.25, 1.25]);
+        for (t, factor) in [
+            (0.1, 1.0),
+            (0.25, 1.0),
+            (0.75, 0.99),
+            (1.25, 0.99),
+            (1.5, 0.99 * 0.98),
+            (2.0, 0.99 * 0.98),
+        ] {
+            let expected = factor * base.discount(t, false).unwrap();
+            assert!((curve.discount(t, false).unwrap() - expected).abs() < 1.0e-15);
+        }
+        for (date, before, jump) in [(first, 1.0, 0.99), (second, 0.99, 0.98)] {
+            let at = curve.discount_date(date, false).unwrap();
+            let expected = before * base.discount_date(date, false).unwrap();
+            assert!((at - expected).abs() < 1.0e-15);
+            let after = curve.discount_date(date + 1, false).unwrap();
+            let expected = before * jump * base.discount_date(date + 1, false).unwrap();
+            assert!((after - expected).abs() < 1.0e-15);
+        }
+        let expected = 0.99 * 0.98 * base.discount(3.0, true).unwrap();
+        assert!((curve.discount(3.0, true).unwrap() - expected).abs() < 1.0e-15);
+    }
+
+    #[test]
+    fn out_of_order_jump_dates_are_all_applied() {
+        let base = sample_curve();
+        let curve = jumped_curve(
+            vec![quote(0.97), quote(0.99)],
+            vec![reference() + 450, reference() + 90],
+        )
+        .unwrap();
+        let expected = 0.99 * base.discount(1.0, false).unwrap();
+        assert!((curve.discount(1.0, false).unwrap() - expected).abs() < 1.0e-15);
+        let expected = 0.99 * 0.97 * base.discount(1.5, false).unwrap();
+        assert!((curve.discount(1.5, false).unwrap() - expected).abs() < 1.0e-15);
+    }
+
+    #[test]
+    fn empty_jump_dates_generate_year_ends() {
+        let curve = jumped_curve(vec![quote(0.99), quote(1.01)], vec![]).unwrap();
+        let year_end = Date::new(31, Month::December, 2026);
+        assert_eq!(
+            curve.jump_dates(),
+            [year_end, Date::new(31, Month::December, 2027)]
+        );
+        let after = curve.discount_date(year_end + 1, false).unwrap();
+        let expected = 0.99 * sample_curve().discount_date(year_end + 1, false).unwrap();
+        assert!((after - expected).abs() < 1.0e-15);
+    }
+
+    #[test]
+    fn invalid_jumps_are_rejected() {
+        let date = reference() + 90;
+        assert!(jumped_curve(vec![quote(0.99)], vec![date, date + 1]).is_err());
+        let curve = jumped_curve(vec![quote(0.0)], vec![date]).unwrap();
+        assert!(curve.discount(0.2, false).is_ok());
+        assert!(curve.discount(0.3, false).is_err());
+        let curve = jumped_curve(vec![Handle::empty()], vec![date]).unwrap();
+        assert!(curve.discount(0.3, false).is_err());
+    }
+
+    #[test]
+    fn jump_quote_change_notifies_and_reprices() {
+        let jump = shared(SimpleQuote::new(0.99));
+        let curve = jumped_curve(
+            vec![Handle::new(jump.clone() as Shared<dyn Quote>)],
+            vec![reference() + 90],
+        )
+        .unwrap();
+        let flag = Flag::new();
+        curve.observable().register_observer(&as_observer(&flag));
+        jump.set_value(0.95);
+        assert!(Flag::is_up(&flag));
+        let expected = 0.95 * sample_curve().discount(1.0, false).unwrap();
+        assert!((curve.discount(1.0, false).unwrap() - expected).abs() < 1.0e-15);
     }
 }
