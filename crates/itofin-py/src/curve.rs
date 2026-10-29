@@ -1,7 +1,7 @@
 //! Facades for the yield term-structure hierarchy: the YieldTermStructure base
 //! and the concrete FlatForward curve.
 
-use crate::bootstrap::{PySimpleQuoteVariables, global_bootstrap};
+use crate::bootstrap::{BootstrapCallbacks, PySimpleQuoteVariables, global_bootstrap};
 use crate::helpers::PyRateHelper;
 use crate::iterativebootstrap::{PyIterativeBootstrapOptions, strategy};
 use crate::market::PySimpleQuote;
@@ -25,6 +25,8 @@ use libitofin::termstructures::yields::{
 };
 use libitofin::termstructures::yieldtermstructure::YieldTermStructure;
 use libitofin::time::frequency::Frequency;
+use pyo3::PyTraverseError;
+use pyo3::gc::PyVisit;
 use pyo3::prelude::*;
 #[allow(unused_imports)]
 use pyo3_stub_gen::derive::{
@@ -491,9 +493,10 @@ impl PyForwardCurve {
 /// Fallible pricing queries report callback exceptions as ItofinError with their
 /// original type and message.
 ///
-/// Avoid strong callback captures of this curve or consumers that retain it:
-/// those cycles cross the native ownership graph and cannot be garbage-collected.
-/// Capture a weakref.ref(curve) instead. Capturing additional helpers is supported.
+/// A callback that strongly captures this curve is collected once the cycle is
+/// unreachable and no native consumer retains the curve. A strong capture of a
+/// consumer that retains the curve still cannot be garbage-collected: capture a
+/// weakref.ref instead. Capturing additional helpers is supported.
 /// Keep the residual count constant during each calculation; values must be finite.
 /// Quote mutation from a callback is rejected; read helpers and trial nodes instead.
 /// The supplied time and data lists include the reference node and are copies.
@@ -507,7 +510,30 @@ impl PyForwardCurve {
 /// current grid bound, or the reference date before a grid has been installed.
 #[gen_stub_pyclass]
 #[pyclass(name = "PiecewiseYieldCurve", extends = PyYieldTermStructure, unsendable, weakref, module = "itofin.termstructures")]
-pub struct PyPiecewiseYieldCurve;
+pub struct PyPiecewiseYieldCurve {
+    callbacks: Option<(Shared<dyn YieldTermStructure>, Shared<BootstrapCallbacks>)>,
+}
+
+impl PyPiecewiseYieldCurve {
+    /// The callbacks, exposed to the cycle GC only while this wrapper is the
+    /// sole native owner of the curve.
+    ///
+    /// Exactly two strong holders are expected then: the wrapper's own link
+    /// (built by `from_local`) and the `(curve, cell)` pair kept here. Helpers
+    /// link to the curve weakly and observers are weak, so neither counts.
+    /// Every consumer gets its own link from `handle()`, so any consumer, any
+    /// other clone, and any transient `current_link()` clone (a running query)
+    /// raises the count and hides the edge. Hiding is fail-safe: the cycle
+    /// leaks, but a live consumer's callbacks are never cleared. A foreign-thread
+    /// GC pass skips this unsendable traversal for the same reason. Joint curves
+    /// build `GlobalBootstrap::new` internally and never carry Python callbacks.
+    fn sole_owner_callbacks(&self) -> Option<&BootstrapCallbacks> {
+        self.callbacks
+            .as_ref()
+            .filter(|(curve, _)| Shared::strong_count(curve) == 2)
+            .map(|(_, callbacks)| &**callbacks)
+    }
+}
 
 #[gen_stub_pymethods]
 #[pymethods]
@@ -580,6 +606,7 @@ impl PyPiecewiseYieldCurve {
         let additional: Vec<Shared<dyn RateHelper>> = additional_helpers
             .map(|extra| extra.iter().map(|helper| helper.inner()).collect())
             .unwrap_or_default();
+        let mut callbacks = None;
         let curve: Shared<dyn YieldTermStructure> = match bootstrap {
             "iterative" => {
                 if !additional.is_empty()
@@ -624,13 +651,14 @@ impl PyPiecewiseYieldCurve {
                 }
             }
             "global" => {
-                let strategy = global_bootstrap(
+                let (strategy, cell) = global_bootstrap(
                     py,
                     additional,
                     additional_penalties,
                     additional_dates,
                     additional_variables.as_deref(),
                 )?;
+                callbacks = Some(cell);
                 match interpolation {
                     "LogLinear" => {
                         PiecewiseYieldCurve::<Discount, LogLinear, GlobalBootstrap>::with_bootstrap(
@@ -670,10 +698,26 @@ impl PyPiecewiseYieldCurve {
                 )));
             }
         };
+        let callbacks = callbacks.map(|cell| (Shared::clone(&curve), cell));
         Ok(
             PyClassInitializer::from(PyYieldTermStructure::from_local(curve))
-                .add_subclass(PyPiecewiseYieldCurve),
+                .add_subclass(PyPiecewiseYieldCurve { callbacks }),
         )
+    }
+
+    #[gen_stub(skip)]
+    fn __traverse__(&self, visit: PyVisit<'_>) -> Result<(), PyTraverseError> {
+        match self.sole_owner_callbacks() {
+            Some(callbacks) => callbacks.visit(&visit),
+            None => Ok(()),
+        }
+    }
+
+    #[gen_stub(skip)]
+    fn __clear__(&self) {
+        if let Some(callbacks) = self.sole_owner_callbacks() {
+            callbacks.clear();
+        }
     }
 }
 

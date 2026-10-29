@@ -2716,9 +2716,10 @@ class PiecewiseYieldCurve(YieldTermStructure):
     Fallible pricing queries report callback exceptions as ItofinError with their
     original type and message.
 
-    Avoid strong callback captures of this curve or consumers that retain it:
-    those cycles cross the native ownership graph and cannot be garbage-collected.
-    Capture a weakref.ref(curve) instead. Capturing additional helpers is supported.
+    A callback that strongly captures this curve is collected once the cycle is
+    unreachable and no native consumer retains the curve. A strong capture of a
+    consumer that retains the curve still cannot be garbage-collected: capture a
+    weakref.ref instead. Capturing additional helpers is supported.
     Keep the residual count constant during each calculation; values must be finite.
     Quote mutation from a callback is rejected; read helpers and trial nodes instead.
     The supplied time and data lists include the reference node and are copies.
