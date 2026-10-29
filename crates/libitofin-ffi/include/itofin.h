@@ -8146,6 +8146,17 @@ int32_t itofin_poisson_rng_copy(struct ItofinContext *ctx,
                                 struct ItofinError *error);
 
 /**
+ * Write the seed the generator was initialized from, the resolved random seed
+ * when it was built with seed zero (never zero itself).
+ * # Safety
+ * Follow the crate-level C caller contract.
+ */
+int32_t itofin_poisson_rng_seed(struct ItofinContext *ctx,
+                                uint64_t id,
+                                uint32_t *out,
+                                struct ItofinError *error);
+
+/**
  * Draw one sequence when last=0, or copy the last success when last=1.
  * Errors preserve output and the last successful sequence; attempted draws advance state.
  * # Safety
@@ -8643,6 +8654,19 @@ int32_t itofin_gaussian_rng_new(struct ItofinContext *ctx,
                                 struct ItofinError *error);
 
 /**
+ * Writes the seed a scalar generator was initialized from: the resolved random
+ * seed when it was built with seed zero (never zero itself), or zero when it was
+ * built from a seed array. Replaying that seed reproduces the stream.
+ * # Safety
+ * Follow the crate-level C caller contract.
+ */
+int32_t itofin_rng_seed(struct ItofinContext *ctx,
+                        uint64_t id,
+                        bool gaussian,
+                        uint32_t *out,
+                        struct ItofinError *error);
+
+/**
  * Draws count scalar values, preserving generator state between calls.
  * # Safety
  * Follow the crate-level C caller contract; out contains capacity doubles.
@@ -8723,6 +8747,18 @@ int32_t itofin_rng_sequence_dimension(struct ItofinContext *ctx,
                                       uint64_t id,
                                       size_t *out,
                                       struct ItofinError *error);
+
+/**
+ * Writes the seed of a pseudo-random sequence, as `itofin_rng_seed`: zero when
+ * its scalar source was built from a seed array. Low-discrepancy sequences are
+ * rejected.
+ * # Safety
+ * Follow the crate-level C caller contract.
+ */
+int32_t itofin_random_sequence_seed(struct ItofinContext *ctx,
+                                    uint64_t id,
+                                    uint32_t *out,
+                                    struct ItofinError *error);
 
 /**
  * Draws count rows; last=true copies the last row without drawing and requires count=1.

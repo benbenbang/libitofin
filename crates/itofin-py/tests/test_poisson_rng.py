@@ -42,3 +42,16 @@ def test_poisson_defaults_and_invalid_input_recovery():
     with pytest.raises(ItofinError):
         PoissonRandomSequenceGenerator(16777217)
     assert math.isfinite(PoissonRandomGenerator(42).next_real())
+
+
+def test_a_random_poisson_seed_is_reported_and_replays() -> None:
+    scalar = PoissonRandomGenerator(0, 3.0)
+    seed = scalar.seed()
+    assert seed is not None and seed != 0
+    replay = PoissonRandomGenerator(seed, 3.0)
+    assert [scalar.next_real() for _ in range(100)] == [replay.next_real() for _ in range(100)]
+    sequence = PoissonRandomSequenceGenerator(4, 0)
+    sequence_seed = sequence.seed()
+    assert sequence_seed is not None and sequence_seed != 0
+    assert sequence.copy().seed() == sequence_seed
+    assert PoissonRandomSequenceGenerator(4, 9).seed() == 9

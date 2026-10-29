@@ -1,7 +1,7 @@
 //! Concrete fallible Poisson generators with independent copied state.
 
 use crate::PyQlError;
-use libitofin::math::randomnumbers::{PoissonPseudoRandom, PoissonRng, PoissonRsg};
+use libitofin::math::randomnumbers::{PoissonPseudoRandom, PoissonRng, PoissonRsg, Seeded};
 use pyo3::prelude::*;
 use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 
@@ -27,6 +27,11 @@ impl PyPoissonRandomGenerator {
             inner: PoissonPseudoRandom::make_scalar_generator(seed, lambda_)
                 .map_err(PyQlError::from)?,
         })
+    }
+
+    /// The seed actually used: for seed 0, the random seed drawn (never 0).
+    fn seed(&self) -> Option<u32> {
+        self.inner.seed()
     }
 
     /// Draw the next count. Unresolvable quantiles raise ItofinError.
@@ -69,6 +74,11 @@ impl PyPoissonRandomSequenceGenerator {
             inner: PoissonPseudoRandom::with_lambda(dimension, seed, lambda_)
                 .map_err(PyQlError::from)?,
         })
+    }
+
+    /// The seed actually used: for seed 0, the random seed drawn (never 0).
+    fn seed(&self) -> Option<u32> {
+        self.inner.seed()
     }
 
     /// Number of components per draw.

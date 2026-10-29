@@ -101,6 +101,21 @@ func (r UniformRandomGenerator) NextU32() (uint32, error) {
 	})
 	return uint32(out), err
 }
+func scalarSeed(o object, gaussian bool) (uint32, error) {
+	var out C.uint32_t
+	err := o.session.invoke(func() error {
+		var e C.ItofinError
+		return ffiError(C.itofin_rng_seed(o.session.ctx, C.uint64_t(o.id), C.bool(gaussian), &out, &e), &e)
+	})
+	return uint32(out), err
+}
+
+// Seed returns the seed actually used: the resolved random seed for seed zero
+// (never zero), or zero for a generator built from a seed array.
+func (r UniformRandomGenerator) Seed() (uint32, error) { return scalarSeed(r.object, false) }
+
+// Seed returns the seed of the Box-Muller generator's uniform source, as UniformRandomGenerator.Seed.
+func (r GaussianRandomGenerator) Seed() (uint32, error) { return scalarSeed(r.object, true) }
 func (r GaussianRandomGenerator) NextGaussians(count int) ([]float64, error) {
 	return scalarDraw(r.object, true, count)
 }

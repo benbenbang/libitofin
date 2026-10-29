@@ -63,6 +63,20 @@
       "python": "itofin.randomnumbers.GaussianRandomGenerator.next_gaussians",
       "status": "implemented",
       "tests": "TestScalarRNGOracles"
+    },
+    {
+      "c": "itofin_rng_seed",
+      "go": "UniformRandomGenerator.Seed",
+      "python": "itofin.randomnumbers.UniformRandomGenerator.seed",
+      "status": "implemented",
+      "tests": "TestRandomSeedIsReportedAndReplays"
+    },
+    {
+      "c": "itofin_rng_seed",
+      "go": "GaussianRandomGenerator.Seed",
+      "python": "itofin.randomnumbers.GaussianRandomGenerator.seed",
+      "status": "implemented",
+      "tests": "TestRandomSeedIsReportedAndReplays"
     }
   ]
 }

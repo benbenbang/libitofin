@@ -3,7 +3,7 @@
 use crate::boundary::*;
 use crate::rng_api::check_buffer;
 use crate::rng_sequence_api::check_dimension;
-use libitofin::math::randomnumbers::{PoissonPseudoRandom, PoissonRsg};
+use libitofin::math::randomnumbers::{PoissonPseudoRandom, PoissonRsg, Seeded};
 use libitofin::shared::{SharedMut, shared_mut};
 
 /// Construct a Poisson sequence. Dimension one also supplies scalar draws.
@@ -47,6 +47,26 @@ pub unsafe extern "C" fn itofin_poisson_rng_copy(
             check_ptr(out)?;
             let copy = c.get::<SharedMut<PoissonRsg>>(source)?.borrow().clone();
             output(out, c.insert(shared_mut(copy))?)
+        })
+    }
+}
+
+/// Write the seed the generator was initialized from, the resolved random seed
+/// when it was built with seed zero (never zero itself).
+/// # Safety
+/// Follow the crate-level C caller contract.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn itofin_poisson_rng_seed(
+    ctx: *mut Context,
+    id: u64,
+    out: *mut u32,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(out)?;
+            let seed = c.get::<SharedMut<PoissonRsg>>(id)?.borrow().seed();
+            output(out, seed.unwrap_or(0))
         })
     }
 }

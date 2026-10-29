@@ -100,6 +100,20 @@
         "TestPoissonQuantLibSeedOraclesAndCopies",
         "TestPoissonInvalidInputsAndClosedState"
       ]
+    },
+    {
+      "c": "itofin_poisson_rng_seed",
+      "go": "PoissonRandomGenerator.Seed",
+      "python": "itofin.randomnumbers.PoissonRandomGenerator.seed",
+      "status": "implemented",
+      "tests": "TestRandomSeedIsReportedAndReplays"
+    },
+    {
+      "c": "itofin_poisson_rng_seed",
+      "go": "PoissonRandomSequenceGenerator.Seed",
+      "python": "itofin.randomnumbers.PoissonRandomSequenceGenerator.seed",
+      "status": "implemented",
+      "tests": "TestRandomSeedIsReportedAndReplays"
     }
   ]
 }

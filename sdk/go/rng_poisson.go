@@ -70,6 +70,20 @@ func poissonCopy(o object) (object, error) {
 	return object{o.session, uint64(id)}, err
 }
 
+func poissonSeed(o object) (uint32, error) {
+	var out C.uint32_t
+	err := o.session.invoke(func() error {
+		var e C.ItofinError
+		return ffiError(C.itofin_poisson_rng_seed(o.session.ctx, C.uint64_t(o.id), &out, &e), &e)
+	})
+	return uint32(out), err
+}
+
+// Seed returns the seed actually used: the resolved random seed for seed zero, never zero.
+func (r *PoissonRandomGenerator) Seed() (uint32, error) { return poissonSeed(r.object) }
+
+// Seed returns the seed actually used: the resolved random seed for seed zero, never zero.
+func (r *PoissonRandomSequenceGenerator) Seed() (uint32, error) { return poissonSeed(r.object) }
 func (r *PoissonRandomGenerator) NextReal() (float64, error) {
 	out, err := poissonDraw(r.object, 1, false)
 	if err != nil {
