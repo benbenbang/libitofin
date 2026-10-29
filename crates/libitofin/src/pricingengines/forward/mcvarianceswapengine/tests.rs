@@ -285,3 +285,31 @@ fn per_year_grid_truncates_with_minimum_one_and_checks_actual_work() {
     ));
     assert!(longer.variance().is_err());
 }
+
+#[test]
+fn a_random_variance_swap_run_reports_its_seed_and_replays_bit_for_bit() {
+    let market = Market::new();
+    let run = |seed: u64| {
+        let mut swap = swap(
+            &market,
+            market.process.clone(),
+            Position::Long,
+            Some(10),
+            None,
+            Some(1023),
+            None,
+            None,
+            seed,
+        );
+        (
+            swap.npv().unwrap().to_bits(),
+            swap.error_estimate().unwrap().to_bits(),
+            swap.result::<f64>("seed").unwrap(),
+        )
+    };
+    let (npv, error, seed) = run(0);
+    assert!(seed > 0.0 && seed.fract() == 0.0);
+    assert_eq!(run(seed as u64), (npv, error, seed));
+    assert_ne!(run(0).2, seed);
+    assert_eq!(run(42).2, 42.0);
+}

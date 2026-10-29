@@ -153,3 +153,15 @@ def test_mc_retains_parameter_snapshot_when_source_model_rebuilds():
     assert option.npv() == before
     option.set_mc_gjr_engine(MCEuropeanGJRGARCHEngine(model.process(), steps=24, samples=2048, seed=1234))
     assert option.npv() != before
+
+
+def test_a_random_seed_is_reported_and_replays_bitwise():
+    """Seed zero reports the drawn seed, and rebuilding with it replays the run."""
+
+    def run(seed):
+        option = priced(seed=seed, samples=512)[0][-1]
+        return option.npv(), option.error_estimate(), option.results().additional_results["seed"]
+
+    npv, error, seed = run(0)
+    assert seed > 0 and seed.is_integer()
+    assert run(int(seed)) == (npv, error, seed)

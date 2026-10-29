@@ -217,3 +217,33 @@ func TestMCAmericanCachedOracle(t *testing.T) {
 		t.Fatal("American engine accepted European exercise")
 	}
 }
+
+func TestMCEuropeanRandomSeedIsReportedAndReplays(t *testing.T) {
+	s := pricingMust(NewSession())
+	defer s.Close()
+	today := pricingMust(NewDate(15, 6, 2026))
+	expiry := pricingMust(today.AddDays(360))
+	settings := pricingMust(s.NewSettings())
+	pricingOK(t, settings.SetEvaluationDate(today))
+	p := pricingMust(s.NewBlackScholesProcess(BlackScholesConfig{Spot: 100, RiskFreeRate: .05, DividendYield: .02, Volatility: .2, ReferenceDate: today, DayCounter: pricingMust(s.Actual360())}))
+	run := func(seed uint32) (float64, float64, float64) {
+		opt := pricingMust(s.NewVanillaOption(Call, 100, expiry, settings))
+		cfg := MCConfig{Steps: pricingPtr(uint(4)), Samples: pricingPtr(uint(512)), Seed: pricingPtr(seed)}
+		pricingMust(opt.PriceMC(pricingMust(s.NewMCEuropeanEngine(p, cfg))))
+		r := pricingMust(opt.Results())
+		return *r.NPV, *r.ErrorEstimate, r.AdditionalResults["seed"]
+	}
+	npv, se, seed := run(0)
+	if seed <= 0 || seed != math.Trunc(seed) {
+		t.Fatal("seed zero must report a nonzero integer seed", seed)
+	}
+	if n, e, sd := run(uint32(seed)); n != npv || e != se || sd != seed {
+		t.Fatal("replay differs", n, npv, e, se, sd, seed)
+	}
+	if _, _, other := run(0); other == seed {
+		t.Fatal("successive random seeds must differ")
+	}
+	if _, _, fixed := run(42); fixed != 42 {
+		t.Fatal(fixed)
+	}
+}

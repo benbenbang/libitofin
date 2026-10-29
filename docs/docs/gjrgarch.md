@@ -98,7 +98,8 @@ At zero elapsed time a negative Reflection state becomes its absolute value.
 
 The normal stream is MT19937 plus inverse-normal transformation, consumed in
 path, step, spot-factor, variance-factor order. Each step consumes two draws,
-including zero-horizon runs. Seed zero is rejected. Identical inputs use the
+including zero-horizon runs. Seed zero is rejected (see
+[what seed 0 means](random-policies.md#what-seed-0-means)). Identical inputs use the
 same Rust kernel in all bindings; terminal values exactly match full-path tails.
 Increasing path count preserves the existing path prefix.
 

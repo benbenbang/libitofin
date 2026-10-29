@@ -47,7 +47,8 @@ By default, output is limited to
 `itofin.DEFAULT_MAX_OUTPUT_VALUES == 16_777_216` values (128 MiB). Set
 `max_output_values` to a positive number to override it; zero selects the
 default. `gaussian_draws(count, seed)` always uses the default limit. Both
-calls reject seed zero because the core interprets it as nondeterministic.
+calls reject seed zero because the core interprets it as nondeterministic
+(see [what seed 0 means](random-policies.md#what-seed-0-means)).
 Use `terminal_only=True` or smaller batches to reduce memory use.
 
 The kernel moved from `libitofin-ffi` to `libitofin` so the Python facade and
