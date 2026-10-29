@@ -9,8 +9,8 @@ use libitofin::pricingengine::PricingEngine;
 use libitofin::pricingengines::bond::DiscountingBondEngine;
 use libitofin::quotes::{Quote, SimpleQuote};
 use libitofin::risk::{
-    DEFAULT_SHIFT, SensitivityAnalysis, aggregate_npv, bucket_analysis, bucket_analysis_vector,
-    parallel_analysis,
+    DEFAULT_SHIFT, Rows, SensitivityAnalysis, aggregate_npv, bucket_analysis,
+    bucket_analysis_matrix, bucket_analysis_vector, parallel_analysis,
 };
 use libitofin::settings::Settings;
 use libitofin::shared::{Shared, SharedMut, shared, shared_mut};
@@ -361,6 +361,133 @@ fn a_failing_reprice_is_an_error_and_restores_every_quote() {
         10.0,
         SensitivityAnalysis::Centered,
         None,
+    );
+
+    let message = result.unwrap_err().message().to_owned();
+    assert!(message.contains("bootstrap failed"), "{message}");
+    assert_eq!(setup.values(), originals);
+    let npv = aggregate_npv(&instruments, &[]).unwrap();
+    assert!((npv - reference).abs() <= 1e-12, "{npv} vs {reference}");
+}
+
+impl CurveSetup {
+    fn ragged(&self) -> Vec<Vec<Shared<SimpleQuote>>> {
+        let q = |i: usize| Shared::clone(&self.quotes[i]);
+        vec![vec![q(0), q(1)], vec![], vec![q(2), q(3)]]
+    }
+}
+
+#[test]
+fn the_matrix_bucket_equals_the_flattened_vector_bucket_reshaped() {
+    for kind in [SensitivityAnalysis::OneSide, SensitivityAnalysis::Centered] {
+        let flat = CurveSetup::new();
+        let (first, second) = bucket_analysis_vector(
+            &flat.quotes,
+            &[SharedMut::clone(&flat.swap)],
+            &[],
+            DEFAULT_SHIFT,
+            kind,
+        )
+        .unwrap();
+        let ragged = CurveSetup::new();
+        let (matrix_first, matrix_second) = bucket_analysis_matrix(
+            &ragged.ragged(),
+            &[SharedMut::clone(&ragged.swap)],
+            &[],
+            DEFAULT_SHIFT,
+            kind,
+        )
+        .unwrap();
+        assert_eq!(
+            matrix_first,
+            vec![first[..2].to_vec(), vec![], first[2..].to_vec()]
+        );
+        assert_eq!(
+            matrix_second,
+            vec![second[..2].to_vec(), vec![], second[2..].to_vec()]
+        );
+    }
+    let setup = CurveSetup::new();
+    let instruments = [SharedMut::clone(&setup.swap)];
+    let (first, second) = bucket_analysis_matrix(
+        &[vec![], vec![]],
+        &instruments,
+        &[],
+        DEFAULT_SHIFT,
+        SensitivityAnalysis::Centered,
+    )
+    .unwrap();
+    assert_eq!((first.len(), second.len()), (2, 2));
+    assert!(first.iter().all(Vec::is_empty) && second.iter().all(Vec::is_empty));
+}
+
+#[test]
+fn matrix_edge_cases_are_errors() {
+    let setup = CurveSetup::new();
+    let instruments = [SharedMut::clone(&setup.swap)];
+    let kind = SensitivityAnalysis::Centered;
+    let message = |result: libitofin::errors::QlResult<(Rows<f64>, Rows<Option<f64>>)>| {
+        result.unwrap_err().message().to_owned()
+    };
+    assert_eq!(
+        message(bucket_analysis_matrix(
+            &[],
+            &instruments,
+            &[],
+            DEFAULT_SHIFT,
+            kind
+        )),
+        "empty SimpleQuote range"
+    );
+    assert_eq!(
+        message(bucket_analysis_matrix(
+            &setup.ragged(),
+            &[],
+            &[],
+            DEFAULT_SHIFT,
+            kind
+        )),
+        "empty instrument vector"
+    );
+    assert_eq!(
+        message(bucket_analysis_matrix(
+            &setup.ragged(),
+            &instruments,
+            &[],
+            0.0,
+            kind
+        )),
+        "zero shift not allowed"
+    );
+    let invalid = vec![
+        vec![Shared::clone(&setup.quotes[0])],
+        vec![shared(SimpleQuote::new(None))],
+    ];
+    assert_eq!(
+        message(bucket_analysis_matrix(
+            &invalid,
+            &instruments,
+            &[],
+            DEFAULT_SHIFT,
+            kind
+        )),
+        "invalid SimpleQuote at position 1"
+    );
+}
+
+#[test]
+fn a_failing_matrix_reprice_is_an_error_and_restores_every_quote() {
+    let setup = CurveSetup::new();
+    let instruments = [SharedMut::clone(&setup.swap)];
+    let originals = setup.values();
+    let reference = aggregate_npv(&instruments, &[]).unwrap();
+
+    let result = bucket_analysis_matrix(
+        &setup.ragged(),
+        &instruments,
+        &[],
+        10.0,
+        SensitivityAnalysis::Centered,
     );
 
     let message = result.unwrap_err().message().to_owned();
