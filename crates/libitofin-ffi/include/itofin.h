@@ -4794,6 +4794,32 @@ int32_t itofin_piecewise_curve_new(struct ItofinContext *ctx,
                                    struct ItofinError *error);
 
 /**
+ * The itofin_piecewise_curve_new twin whose reference date moves with the
+ * evaluation date of settings, settlement_days business days on calendar.
+ * settings must be the SAME instance the helpers' index carries: a different
+ * instance moves the curve's reference date while the helpers stay put.
+ * An unset evaluation date succeeds here and errs on the first read.
+ * # Safety
+ * Pointers must be aligned, live and valid for their stated lengths. Outputs
+ * must not overlap inputs or other outputs. Any context and its handles must
+ * belong to the calling thread; serialize calls including destruction.
+ * See the crate-level C caller contract for lifetime requirements.
+ */
+int32_t itofin_piecewise_curve_new_moving(struct ItofinContext *ctx,
+                                          uint32_t settlement_days,
+                                          uint64_t calendar,
+                                          uint64_t settings,
+                                          const uint64_t *helpers,
+                                          size_t len,
+                                          uint64_t dc,
+                                          int32_t kind,
+                                          int32_t algorithm,
+                                          const uint64_t *additional,
+                                          size_t additional_len,
+                                          uint64_t *out,
+                                          struct ItofinError *error);
+
+/**
  * Caller first queries length with capacity=0; then supplies both arrays with that capacity.
  * # Safety
  * Pointers must be aligned, live and valid for their stated lengths. Outputs

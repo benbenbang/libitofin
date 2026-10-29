@@ -1,6 +1,6 @@
 //! Yield curve construction and queries. All curves retain the same erased handle type.
 use crate::boundary::*;
-use crate::iterative_bootstrap_api::iterative_curve;
+use crate::iterative_bootstrap_api::{CurveAnchor, anchored, iterative_curve};
 use crate::time_api::{calendar, date, day_counter};
 use libitofin::handle::Handle;
 use libitofin::interestrate::Compounding;
@@ -8,6 +8,7 @@ use libitofin::math::interpolations::{
     convexmonotone::ConvexMonotone, cubic::Cubic, flat::BackwardFlat, linear::Linear,
     loglinear::LogLinear,
 };
+use libitofin::settings::Settings;
 use libitofin::shared::{Shared, shared};
 use libitofin::termstructures::yields::{
     DiscountCurve, FlatForward, ForwardCurve, InterpolatedDiscountCurve, InterpolatedZeroCurve,
@@ -19,6 +20,7 @@ use libitofin::termstructures::{
     globalbootstrap::GlobalBootstrap,
     localbootstrap::LocalBootstrap,
 };
+use libitofin::time::date::Date;
 use libitofin::time::frequency::Frequency;
 
 pub(crate) fn curve(c: &Context, id: u64) -> BindingResult<Handle<dyn YieldTermStructure>> {
@@ -230,67 +232,107 @@ pub unsafe extern "C" fn itofin_piecewise_curve_new(
     unsafe {
         with_context(ctx, error, |c| {
             check_ptr(out)?;
-            let reference = date(reference)?;
-            let dc = day_counter(c, dc)?;
-            let helpers = input_slice(helpers, len)?
-                .iter()
-                .map(|id| crate::helpers_api::helper(c, *id))
-                .collect::<BindingResult<Vec<_>>>()?;
-            let additional = input_slice(additional, additional_len)?
-                .iter()
-                .map(|id| crate::helpers_api::helper(c, *id))
-                .collect::<BindingResult<Vec<_>>>()?;
-            if algorithm != 1 && !additional.is_empty() {
+            let anchor = CurveAnchor::Fixed(date(reference)?);
+            let (h, x) = (
+                input_slice(helpers, len)?,
+                input_slice(additional, additional_len)?,
+            );
+            piecewise_curve(c, anchor, h, dc, kind, algorithm, x, out)
+        })
+    }
+}
+/// The itofin_piecewise_curve_new twin whose reference date moves with the
+/// evaluation date of settings, settlement_days business days on calendar.
+/// settings must be the SAME instance the helpers' index carries: a different
+/// instance moves the curve's reference date while the helpers stay put.
+/// An unset evaluation date succeeds here and errs on the first read.
+#[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
+pub unsafe extern "C" fn itofin_piecewise_curve_new_moving(
+    ctx: *mut Context,
+    settlement_days: u32,
+    calendar: u64,
+    settings: u64,
+    helpers: *const u64,
+    len: usize,
+    dc: u64,
+    kind: i32,
+    algorithm: i32,
+    additional: *const u64,
+    additional_len: usize,
+    out: *mut u64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(out)?;
+            let anchor = CurveAnchor::Moving(
+                settlement_days,
+                crate::time_api::calendar(c, calendar)?,
+                c.get::<Shared<Settings<Date>>>(settings)?,
+            );
+            let (h, x) = (
+                input_slice(helpers, len)?,
+                input_slice(additional, additional_len)?,
+            );
+            piecewise_curve(c, anchor, h, dc, kind, algorithm, x, out)
+        })
+    }
+}
+#[allow(clippy::too_many_arguments)]
+unsafe fn piecewise_curve(
+    c: &mut Context,
+    anchor: CurveAnchor,
+    helpers: &[u64],
+    dc: u64,
+    kind: i32,
+    algorithm: i32,
+    additional: &[u64],
+    out: *mut u64,
+) -> BindingResult<()> {
+    unsafe {
+        let dc = day_counter(c, dc)?;
+        let helpers = helpers
+            .iter()
+            .map(|id| crate::helpers_api::helper(c, *id))
+            .collect::<BindingResult<Vec<_>>>()?;
+        let additional = additional
+            .iter()
+            .map(|id| crate::helpers_api::helper(c, *id))
+            .collect::<BindingResult<Vec<_>>>()?;
+        if algorithm != 1 && !additional.is_empty() {
+            return Err(BindingError::invalid(
+                "additional helpers require global bootstrap",
+            ));
+        }
+        let global = || {
+            GlobalBootstrap::with_penalties(additional, None, None, None, Vec::new(), |_, _| {
+                Vec::new()
+            })
+        };
+        let (a, h) = (anchor, helpers);
+        let v = match (kind, algorithm) {
+            (0..=7, 0) => iterative_curve(a, h, dc, kind, Default::default())?,
+            (6, 2) => anchored::<ForwardRate, _, _>(
+                a,
+                h,
+                dc,
+                ConvexMonotone::default(),
+                LocalBootstrap::default(),
+            )?,
+            (0, 1) => anchored::<Discount, _, _>(a, h, dc, LogLinear, global())?,
+            (1, 1) => anchored::<Discount, _, _>(a, h, dc, Linear, global())?,
+            _ => {
                 return Err(BindingError::invalid(
-                    "additional helpers require global bootstrap",
+                    "unsupported curve/bootstrap combination",
                 ));
             }
-            let v: Shared<dyn YieldTermStructure> = match (kind, algorithm) {
-                (0..=7, 0) => iterative_curve(reference, helpers, dc, kind, Default::default())?,
-                (6, 2) => PiecewiseYieldCurve::<ForwardRate, ConvexMonotone, LocalBootstrap>::new(
-                    reference,
-                    helpers,
-                    dc,
-                    ConvexMonotone::default(),
-                )?,
-                (0, 1) => {
-                    PiecewiseYieldCurve::<Discount, LogLinear, GlobalBootstrap>::with_bootstrap(
-                        reference,
-                        helpers,
-                        dc,
-                        LogLinear,
-                        GlobalBootstrap::with_penalties(
-                            additional,
-                            None,
-                            None,
-                            None,
-                            Vec::new(),
-                            |_, _| Vec::new(),
-                        ),
-                    )?
-                }
-                (1, 1) => PiecewiseYieldCurve::<Discount, Linear, GlobalBootstrap>::with_bootstrap(
-                    reference,
-                    helpers,
-                    dc,
-                    Linear,
-                    GlobalBootstrap::with_penalties(
-                        additional,
-                        None,
-                        None,
-                        None,
-                        Vec::new(),
-                        |_, _| Vec::new(),
-                    ),
-                )?,
-                _ => {
-                    return Err(BindingError::invalid(
-                        "unsupported curve/bootstrap combination",
-                    ));
-                }
-            };
-            output(out, c.insert(Handle::new(v))?)
-        })
+        };
+        output(out, c.insert(Handle::new(v))?)
     }
 }
 /// Caller first queries length with capacity=0; then supplies both arrays with that capacity.
@@ -343,7 +385,17 @@ pub unsafe extern "C" fn itofin_curve_nodes(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::calendar_api::NativeCalendar;
+    use libitofin::indexes::Euribor;
+    use libitofin::termstructures::RateHelper;
+    use libitofin::termstructures::yields::DepositRateHelper;
+    use libitofin::time::businessdayconvention::BusinessDayConvention::Following;
+    use libitofin::time::calendars::target::Target;
+    use libitofin::time::date::Month;
+    use libitofin::time::daycounters::actual360::Actual360;
     use libitofin::time::{date::Date, daycounters::actual365fixed::Actual365Fixed};
+    use libitofin::time::{period::Period, timeunit::TimeUnit::*};
+    use std::ptr::null_mut;
     #[test]
     fn flat_curve_native_boundary_and_lifetimes() {
         let mut c = Context::new();
@@ -522,6 +574,111 @@ mod tests {
                 ),
                 INVALID_ARGUMENT
             );
+        }
+    }
+
+    fn deposits(c: &mut Context, settings: &Shared<Settings<Date>>) -> Vec<u64> {
+        let mut ids = Vec::new();
+        for (unit, rate) in [(Weeks, 0.04559), (Months, 0.04581), (Years, 0.04496)] {
+            let period = Period::new(1, unit);
+            let index = Euribor::new(period, Handle::empty(), Shared::clone(settings));
+            let helper = DepositRateHelper::from_rate(rate, &index.unwrap());
+            ids.push(c.insert(helper as Shared<dyn RateHelper>).unwrap());
+        }
+        ids
+    }
+
+    unsafe fn moving(c: &mut Context, ids: [u64; 3], helpers: &[u64], kind: [i32; 2]) -> u64 {
+        let [cal, settings, dc] = ids;
+        let (h, mut id) = (helpers, 0);
+        let (k, a, null) = (kind[0], kind[1], std::ptr::null());
+        let rc = unsafe {
+            itofin_piecewise_curve_new_moving(
+                c,
+                2,
+                cal,
+                settings,
+                h.as_ptr(),
+                h.len(),
+                dc,
+                k,
+                a,
+                null,
+                0,
+                &mut id,
+                null_mut(),
+            )
+        };
+        assert_eq!(rc, 0);
+        id
+    }
+
+    fn nodes(c: &mut Context, id: u64) -> (Vec<i32>, Vec<f64>) {
+        let (mut dates, mut values, mut n) = (vec![0; 8], vec![0.0; 8], 0);
+        let (d, v) = (dates.as_mut_ptr(), values.as_mut_ptr());
+        let rc = unsafe { itofin_curve_nodes(c, id, d, v, 8, &mut n, null_mut()) };
+        assert_eq!(rc, 0);
+        (dates[..n].to_vec(), values[..n].to_vec())
+    }
+
+    /// The moving curve and its helpers share one Settings (D5): a
+    /// 15-business-day roll moves the reference date, re-bootstraps, and
+    /// matches a fixed curve built at the new reference date within 1e-10.
+    /// An unset evaluation date builds and errs on the first read (D10).
+    #[test]
+    fn moving_piecewise_curve_follows_a_shared_settings_roll() {
+        let advance = |d, n| Target::new().advance(d, n, Days, Following, false);
+        for kind in [[0, 0], [6, 2], [0, 1]] {
+            let mut c = Context::new();
+            let today = Date::new(15, Month::June, 2026);
+            let settings = shared(Settings::<Date>::new());
+            settings.set_evaluation_date(today);
+            let s = c.insert(Shared::clone(&settings)).unwrap();
+            let unset = c.insert(shared(Settings::<Date>::new())).unwrap();
+            let dc = c.insert(Actual360::new()).unwrap();
+            let calendar = NativeCalendar {
+                inner: Target::new(),
+                horizon: None,
+                first_year: 1901,
+            };
+            let cal = c.insert(calendar).unwrap();
+            let helpers = deposits(&mut c, &settings);
+            let (mut fixed, mut serial) = (0, 0);
+            unsafe {
+                let id = moving(&mut c, [cal, s, dc], &helpers, kind);
+                let orphan = moving(&mut c, [cal, unset, dc], &helpers, kind);
+                let info = itofin_curve_info(&mut c, orphan, 0, &mut serial, null_mut());
+                assert_eq!(info, CORE_ERROR);
+                let (before, _) = nodes(&mut c, id);
+                let new_today = advance(today, 15);
+                settings.set_evaluation_date(new_today);
+                let info = itofin_curve_info(&mut c, id, 0, &mut serial, null_mut());
+                assert_eq!(info, 0);
+                assert_eq!(serial, advance(new_today, 2).serial_number());
+                let (rolled, values) = nodes(&mut c, id);
+                assert_ne!(rolled, before);
+                let h = deposits(&mut c, &settings);
+                let (k, a, null) = (kind[0], kind[1], std::ptr::null());
+                let rc = itofin_piecewise_curve_new(
+                    &mut c,
+                    serial,
+                    h.as_ptr(),
+                    3,
+                    dc,
+                    k,
+                    a,
+                    null,
+                    0,
+                    &mut fixed,
+                    null_mut(),
+                );
+                assert_eq!(rc, 0);
+                let (dates, expected) = nodes(&mut c, fixed);
+                assert_eq!(rolled, dates);
+                for (v, e) in values.iter().zip(&expected) {
+                    assert!((v - e).abs() <= 1e-10, "{v} vs {e}");
+                }
+            }
         }
     }
 }
