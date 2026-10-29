@@ -632,6 +632,18 @@ typedef struct ItofinOuInput {
 } ItofinOuInput;
 
 /**
+ * First and, for a centered scheme, second derivative of the aggregate NPV.
+ */
+typedef struct ItofinSensitivity {
+  double first;
+  double second;
+  /**
+   * Zero for a one-sided scheme, whose `second` is zero.
+   */
+  uint8_t has_second;
+} ItofinSensitivity;
+
+/**
  * GBM inputs; arrays each contain `assets` doubles, correlation `assets*assets`.
  */
 typedef struct ItofinGbmInput {
@@ -3732,6 +3744,26 @@ int32_t itofin_ou_paths(const struct ItofinOuInput *input,
                         ItofinReal *out,
                         size_t capacity,
                         struct ItofinError *error);
+
+/**
+ * Parallel PV01: every quote bumped together. `kind`: 0 one-sided, 1 centered.
+ * A null `reference_npv` computes the reference from the instruments; empty
+ * `quantities` mean unit weights. Quotes are restored on success and error.
+ * # Safety
+ * Pointers and thread ownership must satisfy the crate-level C caller contract.
+ */
+int32_t itofin_sensitivity_parallel(struct ItofinContext *ctx,
+                                    const uint64_t *quotes,
+                                    size_t quote_count,
+                                    const uint64_t *instruments,
+                                    size_t instrument_count,
+                                    const double *quantities,
+                                    size_t quantity_count,
+                                    double shift,
+                                    int32_t kind,
+                                    const double *reference_npv,
+                                    struct ItofinSensitivity *out,
+                                    struct ItofinError *error);
 
 /**
  * Generate `count` standard normal values with a deterministic nonzero seed.

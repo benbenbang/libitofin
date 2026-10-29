@@ -42,6 +42,7 @@ pub mod float_float_swap_api;
 pub mod floating_bond_api;
 pub mod merton_paths_api;
 pub mod ou_paths_api;
+pub mod sensitivity_api;
 pub mod simulation_api;
 pub use boundary::{Context, ItofinError};
 pub mod benchmark_beta_api;
