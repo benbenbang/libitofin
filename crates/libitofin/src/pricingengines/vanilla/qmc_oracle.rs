@@ -86,7 +86,8 @@ fn qmc_rejects_missing_samples_tolerances_and_zero_steps() {
 /// Sobol draws its direction integers above the 31 tabulated Jaeckel dimensions
 /// from the seed (`sobol/mod.rs:194`), so seed 0 must stay a fixed seed for QMC:
 /// the NPV is pinned to its value before seed reporting, and the reported seed
-/// is the given one.
+/// is the given one. The pin is a tolerance, not bits, because libm differs
+/// across platforms; a wrongly randomised QMC seed moves the NPV far beyond it.
 #[test]
 fn qmc_seed_zero_above_the_tabulated_sobol_dimension_is_unchanged_and_reported() {
     let market = market();
@@ -109,7 +110,8 @@ fn qmc_seed_zero_above_the_tabulated_sobol_dimension_is_unchanged_and_reported()
         (option.npv().unwrap(), option.result::<f64>("seed").unwrap())
     };
     let (npv, seed) = price(0);
-    assert_eq!(npv.to_bits(), 4_620_890_469_078_457_386, "{npv}");
+    let golden = 8.350388866949363;
+    assert!((npv - golden).abs() <= 1e-12 * golden, "{npv}");
     assert_eq!(seed, 0.0);
     assert_eq!(price(0).0.to_bits(), npv.to_bits());
     let (other, seed) = price(7);
