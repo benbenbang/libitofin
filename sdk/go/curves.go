@@ -162,6 +162,12 @@ type PiecewiseCurveConfig struct {
 	Interpolation       string        // PiecewiseYieldCurve: LogLinear (default), Linear, Cubic.
 	Bootstrap           string        // iterative (default), global; convex-monotone also supports local.
 	AdditionalHelpers   []*RateHelper // global bootstrap only; extends maximum date.
+	SettlementDays      uint32
+	Calendar            *Calendar
+	// Settings selects a moving reference date, SettlementDays on Calendar past its evaluation date.
+	// It must be the Settings the helpers' index carries, or the curve moves while the helpers stay put.
+	// Moving curves reject IterativeOptions and the global callbacks for now (#1317).
+	Settings *Settings
 }
 
 func (s *Session) piecewise(cfg PiecewiseCurveConfig, kind int) (*YieldTermStructure, error) {
@@ -205,8 +211,23 @@ func (s *Session) piecewise(cfg PiecewiseCurveConfig, kind int) (*YieldTermStruc
 	if globalOptions && algo != 1 {
 		return nil, fmt.Errorf("additional variables, dates and penalties require global bootstrap")
 	}
+	if cfg.Settings != nil {
+		if cfg.Calendar == nil {
+			return nil, errNilArgument("calendar")
+		}
+		if err := sameSession(s, cfg.Settings.object, cfg.Calendar.object); err != nil {
+			return nil, err
+		}
+		if cfg.IterativeOptions != nil || globalOptions {
+			return nil, fmt.Errorf("iterative options and additional variables, dates and penalties are not supported for moving curves")
+		}
+	}
 	var id C.uint64_t
 	err := s.invoke(func() error {
+		if cfg.Settings != nil {
+			var e C.ItofinError
+			return ffiError(C.itofin_piecewise_curve_new_moving(s.ctx, C.uint32_t(cfg.SettlementDays), C.uint64_t(cfg.Calendar.id), C.uint64_t(cfg.Settings.id), unsafe.SliceData(ids), C.size_t(len(ids)), C.uint64_t(cfg.DayCounter.id), C.int32_t(kind), C.int32_t(algo), unsafe.SliceData(extra), C.size_t(len(extra)), &id, &e), &e)
+		}
 		if globalOptions {
 			return s.globalCurve(cfg, kind, ids, extra, &id)
 		}

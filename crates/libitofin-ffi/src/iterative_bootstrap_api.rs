@@ -1,19 +1,24 @@
 use crate::boundary::*;
 use crate::time_api::{date, day_counter};
 use libitofin::handle::Handle;
+use libitofin::math::interpolations::Interpolator;
 use libitofin::math::interpolations::{
     convexmonotone::ConvexMonotone, cubic::Cubic, flat::BackwardFlat, linear::Linear,
     loglinear::LogLinear,
 };
+use libitofin::settings::Settings;
 use libitofin::shared::Shared;
 use libitofin::termstructures::RateHelper;
-use libitofin::termstructures::bootstraptraits::{Discount, ForwardRate, ZeroYield};
+use libitofin::termstructures::bootstraptraits::{
+    Discount, ForwardRate, YieldBootstrapTraits, ZeroYield,
+};
 use libitofin::termstructures::iterativebootstrap::{
-    IterativeBootstrap, IterativeBootstrapOptions,
+    Bootstrap, IterativeBootstrap, IterativeBootstrapOptions,
 };
 use libitofin::termstructures::yields::PiecewiseYieldCurve;
 use libitofin::termstructures::yieldtermstructure::YieldTermStructure;
-use libitofin::time::{date::Date, daycounter::DayCounter};
+use libitofin::time::{calendar::Calendar, date::Date, daycounter::DayCounter};
+use libitofin::types::Natural;
 
 /// Initialize with itofin_iterative_bootstrap_options_default before overriding.
 /// Presence and dont_throw flags accept only 0/1. Absent scalar values are ignored.
@@ -88,50 +93,67 @@ pub unsafe extern "C" fn itofin_iterative_bootstrap_options_default(
     }
 }
 
+/// The reference date of a piecewise curve: fixed, or moving with the
+/// evaluation date of `settings`, `settlement_days` business days on `calendar`.
+pub(crate) enum CurveAnchor {
+    Fixed(Date),
+    Moving(Natural, Calendar, Shared<Settings<Date>>),
+}
+
+pub(crate) fn anchored<T, I, B>(
+    anchor: CurveAnchor,
+    helpers: Vec<Shared<dyn RateHelper>>,
+    dc: DayCounter,
+    interpolator: I,
+    bootstrap: B,
+) -> BindingResult<Shared<dyn YieldTermStructure>>
+where
+    T: YieldBootstrapTraits + 'static,
+    I: Interpolator + 'static,
+    B: Bootstrap<PiecewiseYieldCurve<T, I, B>> + 'static,
+{
+    Ok(match anchor {
+        CurveAnchor::Fixed(reference) => PiecewiseYieldCurve::<T, I, B>::with_bootstrap(
+            reference,
+            helpers,
+            dc,
+            interpolator,
+            bootstrap,
+        )?,
+        CurveAnchor::Moving(days, calendar, settings) => {
+            PiecewiseYieldCurve::<T, I, B>::moving_with_bootstrap(
+                days,
+                calendar,
+                helpers,
+                dc,
+                interpolator,
+                settings,
+                bootstrap,
+            )?
+        }
+    })
+}
+
 pub(crate) fn iterative_curve(
-    reference: Date,
+    anchor: CurveAnchor,
     helpers: Vec<Shared<dyn RateHelper>>,
     dc: DayCounter,
     kind: i32,
     options: IterativeBootstrapOptions,
 ) -> BindingResult<Shared<dyn YieldTermStructure>> {
     let strategy = IterativeBootstrap::with_options(options)?;
-    let curve: Shared<dyn YieldTermStructure> = match kind {
-        0 => PiecewiseYieldCurve::<Discount, LogLinear>::with_bootstrap(
-            reference, helpers, dc, LogLinear, strategy,
-        )?,
-        1 => PiecewiseYieldCurve::<Discount, Linear>::with_bootstrap(
-            reference, helpers, dc, Linear, strategy,
-        )?,
-        2 => PiecewiseYieldCurve::<Discount, Cubic>::with_bootstrap(
-            reference, helpers, dc, Cubic, strategy,
-        )?,
-        3 => PiecewiseYieldCurve::<ZeroYield, Linear>::with_bootstrap(
-            reference, helpers, dc, Linear, strategy,
-        )?,
-        4 => PiecewiseYieldCurve::<ZeroYield, Cubic>::with_bootstrap(
-            reference, helpers, dc, Cubic, strategy,
-        )?,
-        5 => PiecewiseYieldCurve::<ForwardRate, Linear>::with_bootstrap(
-            reference, helpers, dc, Linear, strategy,
-        )?,
-        6 => PiecewiseYieldCurve::<ForwardRate, ConvexMonotone>::with_bootstrap(
-            reference,
-            helpers,
-            dc,
-            ConvexMonotone::default(),
-            strategy,
-        )?,
-        7 => PiecewiseYieldCurve::<ForwardRate, BackwardFlat>::with_bootstrap(
-            reference,
-            helpers,
-            dc,
-            BackwardFlat,
-            strategy,
-        )?,
-        _ => return Err(BindingError::invalid("unsupported iterative curve kind")),
-    };
-    Ok(curve)
+    let (h, a) = (helpers, anchor);
+    match kind {
+        0 => anchored::<Discount, _, _>(a, h, dc, LogLinear, strategy),
+        1 => anchored::<Discount, _, _>(a, h, dc, Linear, strategy),
+        2 => anchored::<Discount, _, _>(a, h, dc, Cubic, strategy),
+        3 => anchored::<ZeroYield, _, _>(a, h, dc, Linear, strategy),
+        4 => anchored::<ZeroYield, _, _>(a, h, dc, Cubic, strategy),
+        5 => anchored::<ForwardRate, _, _>(a, h, dc, Linear, strategy),
+        6 => anchored::<ForwardRate, _, _>(a, h, dc, ConvexMonotone::default(), strategy),
+        7 => anchored::<ForwardRate, _, _>(a, h, dc, BackwardFlat, strategy),
+        _ => Err(BindingError::invalid("unsupported iterative curve kind")),
+    }
 }
 
 /// Construct an iterative yield curve; kind uses itofin_piecewise_curve_new values.
@@ -161,7 +183,7 @@ pub unsafe extern "C" fn itofin_piecewise_curve_new_with_options(
                 .iter()
                 .map(|id| crate::helpers_api::helper(c, *id))
                 .collect::<BindingResult<Vec<_>>>()?;
-            let curve = iterative_curve(reference, helpers, dc, kind, options)?;
+            let curve = iterative_curve(CurveAnchor::Fixed(reference), helpers, dc, kind, options)?;
             output(out, c.insert(Handle::new(curve))?)
         })
     }

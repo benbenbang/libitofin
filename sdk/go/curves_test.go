@@ -2,6 +2,7 @@ package itofin
 
 import (
 	"math"
+	"strings"
 	"sync"
 	"testing"
 )
@@ -314,4 +315,71 @@ func TestProcessFromCurvesPreservesOrderAndDependencies(t *testing.T) {
 	curveNear(t, curveMust(t, r, e), 0.08, 1e-10)
 	d, e := p.DividendYield()
 	curveNear(t, curveMust(t, d, e), 0.02, 1e-10)
+}
+
+// D5: the moving curve and its helpers share one Settings, so a roll moves
+// both; the rolled curve matches a fixed curve at the new reference date.
+func TestMovingPiecewiseCurveFollowsSharedSettingsRoll(t *testing.T) {
+	s, e := NewSession()
+	s = curveMust(t, s, e)
+	defer s.Close()
+	settings, e := s.NewSettings()
+	settings = curveMust(t, settings, e)
+	dc, e := s.Actual360()
+	dc = curveMust(t, dc, e)
+	cal, e := s.Target()
+	cal = curveMust(t, cal, e)
+	deposits := func() []*RateHelper {
+		var hs []*RateHelper
+		for k, tenor := range []Period{{1, Weeks}, {1, Months}, {1, Years}} {
+			idx, e := s.NewEuribor(tenor, nil, settings)
+			h, e := s.NewDepositRateHelperFromRate([]float64{0.04559, 0.04581, 0.04496}[k], curveMust(t, idx, e))
+			hs = append(hs, curveMust(t, h, e))
+		}
+		return hs
+	}
+	today := curveDate(t, 15, 6, 2026)
+	curveMust(t, 0, settings.SetEvaluationDate(today))
+	unset, e := s.NewSettings()
+	cfg := PiecewiseCurveConfig{Helpers: deposits(), DayCounter: dc, SettlementDays: 2, Calendar: cal, Settings: curveMust(t, unset, e)}
+	c, e := s.NewPiecewiseYieldCurve(cfg)
+	if _, e = curveMust(t, c, e).ReferenceDate(); e == nil {
+		t.Fatal("unset evaluation date must fail on the first read")
+	}
+	cfg.Settings = settings
+	c, e = s.NewPiecewiseYieldCurve(cfg)
+	before, e := curveMust(t, c, e).Dates()
+	before = curveMust(t, before, e)
+	newToday, e := cal.Advance(today, 15, Days, Following, false)
+	curveMust(t, 0, settings.SetEvaluationDate(curveMust(t, newToday, e)))
+	reference, e := cal.Advance(newToday, 2, Days, Following, false)
+	reference = curveMust(t, reference, e)
+	dates, values, e := c.Nodes()
+	curveMust(t, 0, e)
+	if dates[0] != reference || dates[0] == before[0] {
+		t.Fatalf("rolled reference %v, want %v (was %v)", dates[0], reference, before[0])
+	}
+	fixed, e := s.NewPiecewiseYieldCurve(PiecewiseCurveConfig{ReferenceDate: reference, Helpers: deposits(), DayCounter: dc})
+	want, wantValues, e := curveMust(t, fixed, e).Nodes()
+	curveMust(t, 0, e)
+	for i := range want {
+		if dates[i] != want[i] {
+			t.Fatalf("node %d: %v vs %v", i, dates[i], want[i])
+		}
+		curveNear(t, values[i], wantValues[i], 1e-10)
+	}
+	moving := "not supported for moving curves"
+	for want, bad := range map[string]func(*PiecewiseCurveConfig){
+		"calendar must not be nil": func(c *PiecewiseCurveConfig) { c.Calendar = nil },
+		moving:                     func(c *PiecewiseCurveConfig) { c.IterativeOptions = &IterativeBootstrapOptions{} },
+		moving + " ": func(c *PiecewiseCurveConfig) {
+			c.Bootstrap, c.AdditionalDates = "global", func() ([]Date, error) { return nil, nil }
+		},
+	} {
+		next := cfg
+		bad(&next)
+		if _, e = s.NewPiecewiseYieldCurve(next); e == nil || !strings.Contains(e.Error()+" ", want) {
+			t.Fatalf("want %q, got %v", want, e)
+		}
+	}
 }
