@@ -30,7 +30,7 @@ use libitofin::math::randomnumbers::rngtraits::SequenceGenerator;
 use libitofin::math::randomnumbers::sobol::{DirectionIntegers, PPMT_MAX_DIM, SobolRsg};
 use libitofin::math::randomnumbers::{
     BoxMullerGaussianRng, GaussianRng, HaltonRsg, InverseCumulativeRsg, MersenneTwisterUniformRng,
-    RandomSequenceGenerator, SobolSequence, UniformRng,
+    RandomSequenceGenerator, Seeded, SobolSequence, UniformRng,
 };
 use numpy::{PyArray1, PyArray2, PyArrayMethods};
 use pyo3::prelude::*;
@@ -152,6 +152,16 @@ impl PyUniformRandomGenerator {
         })
     }
 
+    /// The seed the generator was initialized from.
+    ///
+    /// Returns:
+    ///     int | None: The resolved seed, never 0: a generator built with seed
+    ///     0 reports the random seed it drew, so passing it back replays the
+    ///     stream bitwise. None for a generator built from_seeds.
+    fn seed(&self) -> Option<u32> {
+        self.inner.seed()
+    }
+
     /// Draw the next uniform deviate.
     ///
     /// Returns:
@@ -244,6 +254,16 @@ impl PyGaussianRandomGenerator {
         }
     }
 
+    /// The seed the generator was initialized from.
+    ///
+    /// Returns:
+    ///     int | None: The resolved seed, never 0: a generator built with seed
+    ///     0 reports the random seed it drew, so passing it back replays the
+    ///     stream bitwise. None for a generator copied from a from_seeds source.
+    fn seed(&self) -> Option<u32> {
+        self.inner.seed()
+    }
+
     /// Draw the next standard normal deviate.
     ///
     /// Returns:
@@ -322,6 +342,16 @@ impl PyUniformRandomSequenceGenerator {
     fn with_seed(dimension: usize, seed: u32) -> PyResult<Self> {
         let inner = RandomSequenceGenerator::with_seed(dimension, seed).map_err(PyQlError::from)?;
         Ok(PyUniformRandomSequenceGenerator { inner })
+    }
+
+    /// The seed the sequence generator was initialized from.
+    ///
+    /// Returns:
+    ///     int | None: The resolved seed, never 0: a generator built with seed
+    ///     0 reports the random seed it drew, so passing it back replays the
+    ///     stream bitwise. None for a generator copied from a from_seeds source.
+    fn seed(&self) -> Option<u32> {
+        self.inner.seed()
     }
 
     /// The number of draws per sequence.
@@ -436,6 +466,16 @@ impl PyGaussianRandomSequenceGenerator {
         Ok(PyGaussianRandomSequenceGenerator {
             inner: InverseCumulativeRsg::new(usg, InverseCumulativeNormal::standard()),
         })
+    }
+
+    /// The seed the sequence generator was initialized from.
+    ///
+    /// Returns:
+    ///     int | None: The resolved seed, never 0: a generator built with seed
+    ///     0 reports the random seed it drew, so passing it back replays the
+    ///     stream bitwise. None for a generator copied from a from_seeds source.
+    fn seed(&self) -> Option<u32> {
+        self.inner.seed()
     }
 
     /// The number of draws per sequence.

@@ -1,6 +1,6 @@
 use crate::boundary::*;
 use libitofin::math::randomnumbers::{
-    BoxMullerGaussianRng, GaussianRng, MersenneTwisterUniformRng, UniformRng,
+    BoxMullerGaussianRng, GaussianRng, MersenneTwisterUniformRng, Seeded, UniformRng,
 };
 use libitofin::shared::{SharedMut, shared_mut};
 
@@ -74,6 +74,34 @@ pub unsafe extern "C" fn itofin_gaussian_rng_new(
                 uniform(c, source)?
             };
             output(out, c.insert(shared_mut(Gaussian::new(rng)))?)
+        })
+    }
+}
+
+/// Writes the seed a scalar generator was initialized from: the resolved random
+/// seed when it was built with seed zero (never zero itself), or zero when it was
+/// built from a seed array. Replaying that seed reproduces the stream.
+/// # Safety
+/// Follow the crate-level C caller contract.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn itofin_rng_seed(
+    ctx: *mut Context,
+    id: u64,
+    gaussian: bool,
+    out: *mut u32,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(out)?;
+            let seed = if gaussian {
+                c.get::<SharedMut<Gaussian>>(id)?.borrow().seed()
+            } else {
+                c.get::<SharedMut<MersenneTwisterUniformRng>>(id)?
+                    .borrow()
+                    .seed()
+            };
+            output(out, seed.unwrap_or(0))
         })
     }
 }

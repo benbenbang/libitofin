@@ -104,6 +104,15 @@ class GaussianRandomGenerator:
         Returns:
             GaussianRandomGenerator: The seeded generator.
         """
+    def seed(self) -> typing.Optional[builtins.int]:
+        r"""
+        The seed the generator was initialized from.
+
+        Returns:
+            int | None: The resolved seed, never 0: a generator built with seed
+            0 reports the random seed it drew, so passing it back replays the
+            stream bitwise. None for a generator copied from a from_seeds source.
+        """
     def next_gaussian(self) -> builtins.float:
         r"""
         Draw the next standard normal deviate.
@@ -161,6 +170,15 @@ class GaussianRandomSequenceGenerator:
 
         Raises:
             ItofinError: If dimension is 0.
+        """
+    def seed(self) -> typing.Optional[builtins.int]:
+        r"""
+        The seed the sequence generator was initialized from.
+
+        Returns:
+            int | None: The resolved seed, never 0: a generator built with seed
+            0 reports the random seed it drew, so passing it back replays the
+            stream bitwise. None for a generator copied from a from_seeds source.
         """
     def dimension(self) -> builtins.int:
         r"""
@@ -269,6 +287,10 @@ class PoissonRandomGenerator:
         r"""
         Construct with a finite positive rate; the default rate is one.
         """
+    def seed(self) -> typing.Optional[builtins.int]:
+        r"""
+        The seed actually used: for seed 0, the random seed drawn (never 0).
+        """
     def next_real(self) -> builtins.float:
         r"""
         Draw the next count. Unresolvable quantiles raise ItofinError.
@@ -286,6 +308,10 @@ class PoissonRandomSequenceGenerator:
     def __init__(self, dimension: builtins.int, seed: builtins.int = 0, lambda_: builtins.float = 1.0) -> None:
         r"""
         Construct a positive-dimensional sequence; the default rate is one.
+        """
+    def seed(self) -> typing.Optional[builtins.int]:
+        r"""
+        The seed actually used: for seed 0, the random seed drawn (never 0).
         """
     def dimension(self) -> builtins.int:
         r"""
@@ -431,6 +457,15 @@ class UniformRandomGenerator:
         Raises:
             ItofinError: If seeds is empty.
         """
+    def seed(self) -> typing.Optional[builtins.int]:
+        r"""
+        The seed the generator was initialized from.
+
+        Returns:
+            int | None: The resolved seed, never 0: a generator built with seed
+            0 reports the random seed it drew, so passing it back replays the
+            stream bitwise. None for a generator built from_seeds.
+        """
     def next_real(self) -> builtins.float:
         r"""
         Draw the next uniform deviate.
@@ -497,6 +532,15 @@ class UniformRandomSequenceGenerator:
 
         Raises:
             ItofinError: If dimension is 0.
+        """
+    def seed(self) -> typing.Optional[builtins.int]:
+        r"""
+        The seed the sequence generator was initialized from.
+
+        Returns:
+            int | None: The resolved seed, never 0: a generator built with seed
+            0 reports the random seed it drew, so passing it back replays the
+            stream bitwise. None for a generator copied from a from_seeds source.
         """
     def dimension(self) -> builtins.int:
         r"""

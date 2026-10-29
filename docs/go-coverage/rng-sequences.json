@@ -84,6 +84,20 @@
       "python": "itofin.randomnumbers.GaussianRandomSequenceGenerator.last_sequence",
       "status": "implemented",
       "tests": "TestPseudoRandomSequences"
+    },
+    {
+      "c": "itofin_random_sequence_seed",
+      "go": "UniformRandomSequenceGenerator.Seed",
+      "python": "itofin.randomnumbers.UniformRandomSequenceGenerator.seed",
+      "status": "implemented",
+      "tests": "TestRandomSeedIsReportedAndReplays"
+    },
+    {
+      "c": "itofin_random_sequence_seed",
+      "go": "GaussianRandomSequenceGenerator.Seed",
+      "python": "itofin.randomnumbers.GaussianRandomSequenceGenerator.seed",
+      "status": "implemented",
+      "tests": "TestRandomSeedIsReportedAndReplays"
     }
   ]
 }

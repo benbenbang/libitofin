@@ -14,7 +14,12 @@ import pytest
 
 # itofin library
 from itofin import ItofinError
-from itofin.randomnumbers import UniformRandomGenerator, UniformRandomSequenceGenerator
+from itofin.randomnumbers import (
+    GaussianRandomGenerator,
+    GaussianRandomSequenceGenerator,
+    UniformRandomGenerator,
+    UniformRandomSequenceGenerator,
+)
 
 INIT_BY_ARRAY_REFERENCE = [
     1067595299,
@@ -129,3 +134,33 @@ def test_batch_counts_past_the_address_space_are_rejected():
         UniformRandomGenerator(42).next_reals(2**62)
     with pytest.raises(ItofinError):
         UniformRandomSequenceGenerator.with_seed(3, 42).next_sequences(2**63)
+
+
+def test_a_random_seed_is_reported_and_replays_bitwise() -> None:
+    rng = UniformRandomGenerator(0)
+    seed = rng.seed()
+    assert seed is not None and seed != 0
+    replay = UniformRandomGenerator(seed)
+    assert replay.seed() == seed
+    assert np.array_equal(rng.next_reals(1000), replay.next_reals(1000))
+    assert UniformRandomGenerator(0).seed() != seed
+    assert UniformRandomGenerator(42).seed() == 42
+    assert UniformRandomGenerator.from_seeds([1, 2]).seed() is None
+
+    gaussian = GaussianRandomGenerator.with_seed(0)
+    gaussian_seed = gaussian.seed()
+    assert gaussian_seed is not None and gaussian_seed != 0
+    assert np.array_equal(
+        gaussian.next_gaussians(64),
+        GaussianRandomGenerator.with_seed(gaussian_seed).next_gaussians(64),
+    )
+
+    sequence = GaussianRandomSequenceGenerator.with_seed(3, 0)
+    sequence_seed = sequence.seed()
+    assert sequence_seed is not None and sequence_seed != 0
+    assert np.array_equal(
+        sequence.next_sequences(8),
+        GaussianRandomSequenceGenerator.with_seed(3, sequence_seed).next_sequences(8),
+    )
+    uniform_sequence = UniformRandomSequenceGenerator(2, UniformRandomGenerator(7))
+    assert uniform_sequence.seed() == 7

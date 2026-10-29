@@ -6,7 +6,7 @@ use libitofin::math::distributions::normal::InverseCumulativeNormal;
 use libitofin::math::randomnumbers::HaltonRsg;
 use libitofin::math::randomnumbers::rngtraits::SequenceGenerator;
 use libitofin::math::randomnumbers::{
-    InverseCumulativeRsg, MersenneTwisterUniformRng, RandomSequenceGenerator,
+    InverseCumulativeRsg, MersenneTwisterUniformRng, RandomSequenceGenerator, Seeded,
 };
 use libitofin::shared::{SharedMut, shared_mut};
 
@@ -120,6 +120,31 @@ pub unsafe extern "C" fn itofin_rng_sequence_dimension(
     unsafe {
         with_context(ctx, error, |c| {
             output(out, c.get::<SharedMut<Sequence>>(id)?.borrow().dimension())
+        })
+    }
+}
+
+/// Writes the seed of a pseudo-random sequence, as `itofin_rng_seed`: zero when
+/// its scalar source was built from a seed array. Low-discrepancy sequences are
+/// rejected.
+/// # Safety
+/// Follow the crate-level C caller contract.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn itofin_random_sequence_seed(
+    ctx: *mut Context,
+    id: u64,
+    out: *mut u32,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(out)?;
+            let seed = match &*c.get::<SharedMut<Sequence>>(id)?.borrow() {
+                Sequence::Uniform(r) => r.seed(),
+                Sequence::Gaussian(r) => r.seed(),
+                _ => return Err(BindingError::invalid("not a pseudo-random sequence")),
+            };
+            output(out, seed.unwrap_or(0))
         })
     }
 }

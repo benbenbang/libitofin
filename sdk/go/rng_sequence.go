@@ -69,6 +69,21 @@ func (r randomSequence) Dimension() (int, error) {
 	})
 	return int(out), err
 }
+func (r randomSequence) seed() (uint32, error) {
+	var out C.uint32_t
+	err := r.session.invoke(func() error {
+		var e C.ItofinError
+		return ffiError(C.itofin_random_sequence_seed(r.session.ctx, C.uint64_t(r.id), &out, &e), &e)
+	})
+	return uint32(out), err
+}
+
+// Seed returns the seed actually used, as UniformRandomGenerator.Seed.
+func (r UniformRandomSequenceGenerator) Seed() (uint32, error) { return r.seed() }
+
+// Seed returns the seed actually used, as UniformRandomGenerator.Seed.
+func (r GaussianRandomSequenceGenerator) Seed() (uint32, error) { return r.seed() }
+
 func (r randomSequence) NextSequence() ([]float64, error) { return r.draw(1, false) }
 func (r randomSequence) LastSequence() ([]float64, error) { return r.draw(1, true) }
 
