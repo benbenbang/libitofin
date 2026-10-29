@@ -24,10 +24,15 @@
 //! - an invalid quote returns `Err` in every form; QuantLib returns `(0, 0)` from
 //!   the single-quote bucket form (`.cpp:134`) and silently skips it in the
 //!   parallel form (`.cpp:81-86`).
+//! - the matrix form with empty `instruments` returns `Err`; QuantLib returns
+//!   zero matrices (`.cpp:333`).
 //!
-//! Deferred and not ported: the matrix overload of `parallelAnalysis`, the two
-//! matrix `bucketAnalysis` overloads and the `bucketAnalysis` overloads returning
-//! parameter sensitivities (#1307); the C, Go and Python bindings (#1306).
+//! Not ported: the matrix overload of `parallelAnalysis`, declared
+//! (`.hpp:104-110`) but never defined upstream. A caller can flatten the quotes
+//! into [`parallel_analysis`].
+//!
+//! Deferred and not ported: the `bucketAnalysis` overloads returning parameter
+//! sensitivities (#1307); the C, Go and Python bindings (#1324).
 
 use std::fmt;
 
@@ -40,6 +45,9 @@ use crate::{fail, require};
 
 /// The QuantLib default shift, one basis point (`.hpp:85`).
 pub const DEFAULT_SHIFT: Real = 1.0e-4;
+
+/// Ragged row-major results, one row per row of input quotes.
+pub type Rows<T> = Vec<Vec<T>>;
 
 /// Finite-differences scheme (`SensitivityAnalysis`, `.hpp:41`).
 ///
@@ -166,6 +174,44 @@ pub fn bucket_analysis_vector(
         )?;
         first.push(d1);
         second.push(d2);
+    }
+    Ok((first, second))
+}
+
+/// Bucket PV01 for each quote of a ragged matrix, bumped one at a time
+/// (`bucketAnalysis`, `.cpp:313-347`).
+///
+/// Same conventions as [`bucket_analysis_vector`]: one reference NPV shared by
+/// every bucket, results shaped like `quotes`. Empty rows are allowed; an
+/// empty outer slice is an error.
+pub fn bucket_analysis_matrix(
+    quotes: &[Vec<Shared<SimpleQuote>>],
+    instruments: &[SharedMut<dyn Instrument>],
+    quantities: &[Real],
+    shift: Real,
+    kind: SensitivityAnalysis,
+) -> QlResult<(Rows<Real>, Rows<Option<Real>>)> {
+    require!(!quotes.is_empty(), "empty SimpleQuote range");
+    let (_, reference_npv) = prepare(&quotes.concat(), instruments, quantities, shift, None)?;
+    let mut first = Vec::with_capacity(quotes.len());
+    let mut second = Vec::with_capacity(quotes.len());
+    for row in quotes {
+        let mut first_row = Vec::with_capacity(row.len());
+        let mut second_row = Vec::with_capacity(row.len());
+        for quote in row {
+            let (d1, d2) = bucket_analysis(
+                quote,
+                instruments,
+                quantities,
+                shift,
+                kind,
+                Some(reference_npv),
+            )?;
+            first_row.push(d1);
+            second_row.push(d2);
+        }
+        first.push(first_row);
+        second.push(second_row);
     }
     Ok((first, second))
 }
