@@ -36,10 +36,19 @@
 //! [`HazardRate`], [`SurvivalProbability`] and [`DefaultDensity`] share the bootstrap driver; their
 //! [`CreditBootstrapTraits`] implementations interpret the solved nodes.
 //!
-//! Jump quotes are not ported, per the
-//! [`defaulttermstructure`](crate::termstructures::credit::defaulttermstructure)
-//! divergence (#676), so the four C++ constructors collapse to
-//! [`new`](PiecewiseDefaultCurve::new).
+//! ## Constructors and deferrals
+//!
+//! - [`new`](PiecewiseDefaultCurve::new) is the reference-date constructor and
+//!   [`moving`](PiecewiseDefaultCurve::moving) the settlement-days one
+//!   (`piecewisedefaultcurve.hpp:106,121,135`), whose reference date follows the
+//!   evaluation date of an explicit [`Settings`] (D5). A date change invalidates
+//!   the bootstrap, as C++'s moving-aware `update()` does (`:248-258`).
+//! - Jump quotes are not ported, per the
+//!   [`defaulttermstructure`](crate::termstructures::credit::defaulttermstructure)
+//!   divergence (#676), so neither constructor takes `jumps`/`jumpDates`
+//!   (tracked by #1316).
+//! - The moving constructor is core-only: it is not exposed through the C, Go or
+//!   Python bindings yet (tracked by #1318).
 
 use std::cell::RefCell;
 use std::marker::PhantomData;
@@ -50,6 +59,7 @@ use crate::math::interpolations::Interpolator;
 use crate::patterns::lazyobject::LazyObject;
 use crate::patterns::observable::{AsObservable, Observable, Observer};
 use crate::require;
+use crate::settings::Settings;
 use crate::shared::{Shared, SharedMut, shared_mut};
 use crate::termstructures::bootstraptraits::CurveData;
 use crate::termstructures::credit::defaultdensitystructure::DefaultDensityStructure;
@@ -63,9 +73,10 @@ use crate::termstructures::credit::probabilitytraits::{
 use crate::termstructures::credit::survivalprobabilitystructure::SurvivalProbabilityStructure;
 use crate::termstructures::iterativebootstrap::{IterativeBootstrap, PiecewiseCurve};
 use crate::termstructures::{TermStructure, TermStructureBase};
+use crate::time::calendar::Calendar;
 use crate::time::date::Date;
 use crate::time::daycounter::DayCounter;
-use crate::types::{Probability, Rate, Real, Time};
+use crate::types::{Natural, Probability, Rate, Real, Time};
 
 /// Feeds a helper-quote, discount-curve or evaluation-date notification into
 /// the curve's lazy core: it invalidates the bootstrap cache and re-broadcasts
@@ -116,6 +127,55 @@ impl<T: CreditBootstrapTraits + 'static, I: Interpolator + 'static> PiecewiseDef
         day_counter: DayCounter,
         interpolator: I,
     ) -> QlResult<Shared<PiecewiseDefaultCurve<T, I>>> {
+        Self::build(
+            TermStructureBase::with_reference_date(reference_date, None, Some(day_counter)),
+            instruments,
+            interpolator,
+        )
+    }
+
+    /// Builds a curve whose reference date moves with the evaluation date,
+    /// advanced by `settlement_days` business days on `calendar` (the C++
+    /// settlement-days constructors, `piecewisedefaultcurve.hpp:106-146`). An
+    /// unset evaluation date surfaces as an `Err` on the first read, never a
+    /// system-clock fallback.
+    ///
+    /// The curve's own [`CurveUpdater`] is registered on the evaluation-date
+    /// observable, so a date change invalidates the bootstrap even when no
+    /// helper observes the evaluation date.
+    ///
+    /// # Errors
+    ///
+    /// Rejects an empty helper set.
+    pub fn moving(
+        settlement_days: Natural,
+        calendar: Calendar,
+        instruments: Vec<Shared<dyn DefaultProbabilityHelper>>,
+        day_counter: DayCounter,
+        interpolator: I,
+        settings: Shared<Settings<Date>>,
+    ) -> QlResult<Shared<PiecewiseDefaultCurve<T, I>>> {
+        let curve = Self::build(
+            TermStructureBase::moving(
+                settlement_days,
+                calendar,
+                Some(day_counter),
+                Shared::clone(&settings),
+            ),
+            instruments,
+            interpolator,
+        )?;
+        settings.register_eval_date_observer(
+            &(SharedMut::clone(&curve.updater) as SharedMut<dyn Observer>),
+        );
+        Ok(curve)
+    }
+
+    fn build(
+        base: TermStructureBase,
+        instruments: Vec<Shared<dyn DefaultProbabilityHelper>>,
+        interpolator: I,
+    ) -> QlResult<Shared<PiecewiseDefaultCurve<T, I>>> {
         require!(!instruments.is_empty(), "no bootstrap helpers given");
 
         let curve = Shared::new_cyclic(|weak: &Weak<PiecewiseDefaultCurve<T, I>>| {
@@ -126,11 +186,7 @@ impl<T: CreditBootstrapTraits + 'static, I: Interpolator + 'static> PiecewiseDef
                 lazy: SharedMut::clone(&lazy),
             });
             PiecewiseDefaultCurve {
-                base: TermStructureBase::with_reference_date(
-                    reference_date,
-                    None,
-                    Some(day_counter),
-                ),
+                base,
                 instruments,
                 interpolator,
                 data: RefCell::new(CurveData::new()),
@@ -208,6 +264,18 @@ impl<T: CreditBootstrapTraits + 'static, I: Interpolator + 'static> TermStructur
 {
     fn base(&self) -> &TermStructureBase {
         &self.base
+    }
+
+    /// The curve's inputs are its helpers, the same set its own
+    /// [`CurveUpdater`] observes, plus the evaluation date for a moving curve,
+    /// as C++ `registerWithObservables` includes `Settings::evaluationDate()`.
+    fn register_upstream(&self, observer: &SharedMut<dyn Observer>) {
+        for helper in &self.instruments {
+            helper.observable().register_observer(observer);
+        }
+        if let Some(settings) = self.base.moving_settings() {
+            settings.register_eval_date_observer(observer);
+        }
     }
 
     fn max_date(&self) -> Date {
@@ -348,7 +416,7 @@ mod tests {
     use crate::termstructures::RateHelper;
     use crate::termstructures::bootstraptraits::Discount;
     use crate::termstructures::credit::defaultprobabilityhelpers::{
-        CdsHelperTerms, SpreadCdsHelper, UpfrontCdsHelper,
+        CdsHelperTerms, DefaultProbabilityHelperBase, SpreadCdsHelper, UpfrontCdsHelper,
     };
     use crate::termstructures::yields::{DepositRateHelper, FlatForward, PiecewiseYieldCurve};
     use crate::termstructures::yieldtermstructure::YieldTermStructure;
@@ -1064,6 +1132,259 @@ mod tests {
             isda_node_grid(&fixture.discount, &credit, today() + 10_000).unwrap(),
             fixture.curve.dates().unwrap()
         );
+    }
+
+    const MOVING_SETTLEMENT_DAYS: Natural = 1;
+
+    fn business_days_after(date: Date, days: Integer) -> Date {
+        Target::new().advance(
+            date,
+            days,
+            TimeUnit::Days,
+            BusinessDayConvention::Following,
+            false,
+        )
+    }
+
+    /// The `testBootstrapFromSpread` helpers (`:154-186`) on `settings`, with
+    /// their quotes, so a second curve can be built over its own helpers.
+    fn spread_helpers_on(
+        settings: &Shared<Settings<Date>>,
+        discount: &Handle<dyn YieldTermStructure>,
+    ) -> (
+        Vec<Shared<SimpleQuote>>,
+        Vec<Shared<dyn DefaultProbabilityHelper>>,
+    ) {
+        let quotes: Vec<_> = QUOTES
+            .iter()
+            .map(|q| shared(SimpleQuote::new(*q)))
+            .collect();
+        let helpers = quotes
+            .iter()
+            .zip(TENORS)
+            .map(|(quote, n)| {
+                SpreadCdsHelper::new(
+                    Handle::new(Shared::clone(quote) as Shared<dyn Quote>),
+                    Period::new(n, TimeUnit::Years),
+                    SETTLEMENT_DAYS,
+                    Target::new(),
+                    Frequency::Quarterly,
+                    BusinessDayConvention::Following,
+                    DateGeneration::TwentiethIMM,
+                    day_counter(),
+                    RECOVERY_RATE,
+                    discount.clone(),
+                    Shared::clone(settings),
+                )
+                .unwrap() as Shared<dyn DefaultProbabilityHelper>
+            })
+            .collect();
+        (quotes, helpers)
+    }
+
+    fn moving_settings() -> Shared<Settings<Date>> {
+        let settings = settings_at(today());
+        settings.set_include_todays_cash_flows(Some(true));
+        settings
+    }
+
+    fn moving_curve(
+        helpers: Vec<Shared<dyn DefaultProbabilityHelper>>,
+        settings: &Shared<Settings<Date>>,
+    ) -> Shared<PiecewiseDefaultCurve<HazardRate, BackwardFlat>> {
+        PiecewiseDefaultCurve::moving(
+            MOVING_SETTLEMENT_DAYS,
+            Target::new(),
+            helpers,
+            day_counter(),
+            BackwardFlat,
+            settings.clone(),
+        )
+        .unwrap()
+    }
+
+    /// A helper quoting the survival probability to a fixed date, which does
+    /// not observe the evaluation date.
+    struct FixedSurvivalHelper {
+        base: DefaultProbabilityHelperBase,
+        date: Date,
+    }
+
+    impl AsObservable for FixedSurvivalHelper {
+        fn observable(&self) -> &Observable {
+            self.base.observable()
+        }
+    }
+
+    impl DefaultProbabilityHelper for FixedSurvivalHelper {
+        fn base(&self) -> &DefaultProbabilityHelperBase {
+            &self.base
+        }
+
+        fn implied_quote(&self) -> QlResult<Real> {
+            self.base
+                .term_structure()?
+                .survival_probability_date(self.date, true)
+        }
+    }
+
+    fn fixed_survival_helpers() -> Vec<Shared<dyn DefaultProbabilityHelper>> {
+        [(1, 0.99), (2, 0.97)]
+            .into_iter()
+            .map(|(years, probability)| {
+                let base = DefaultProbabilityHelperBase::new(Handle::new(shared(SimpleQuote::new(
+                    probability,
+                ))
+                    as Shared<dyn Quote>));
+                let date = today() + Period::new(years, TimeUnit::Years);
+                base.set_latest_date(date);
+                base.set_pillar_date(date);
+                shared(FixedSurvivalHelper { base, date }) as Shared<dyn DefaultProbabilityHelper>
+            })
+            .collect()
+    }
+
+    /// After a 15-business-day roll the moving curve's reference date is the
+    /// rolled evaluation date advanced by its settlement days, and its nodes
+    /// match a curve built fresh with [`new`](PiecewiseDefaultCurve::new) at
+    /// that date over its own helpers on the same settings.
+    #[test]
+    fn rolled_moving_curve_matches_a_fresh_fixed_curve() {
+        let settings = moving_settings();
+        let discount = discount_curve(today());
+        let (_, helpers) = spread_helpers_on(&settings, &discount);
+        let curve = moving_curve(helpers, &settings);
+        curve.calculate().unwrap();
+
+        let new_today = business_days_after(today(), 15);
+        settings.set_evaluation_date(new_today);
+        let reference = business_days_after(new_today, MOVING_SETTLEMENT_DAYS as Integer);
+        assert_eq!(TermStructure::reference_date(&*curve).unwrap(), reference);
+
+        let (_, fresh_helpers) = spread_helpers_on(&settings, &discount);
+        let fresh = PiecewiseDefaultCurve::<HazardRate, BackwardFlat>::new(
+            reference,
+            fresh_helpers.clone(),
+            day_counter(),
+            BackwardFlat,
+        )
+        .unwrap();
+        let (rolled_nodes, fresh_nodes) = (curve.nodes().unwrap(), fresh.nodes().unwrap());
+        assert_eq!(rolled_nodes.len(), fresh_nodes.len());
+        for ((rolled_date, rolled), (fresh_date, value)) in rolled_nodes.iter().zip(&fresh_nodes) {
+            assert_eq!(rolled_date, fresh_date);
+            assert!((rolled - value).abs() <= 1.0e-10, "{rolled} vs {value}");
+        }
+        for helper in &fresh_helpers {
+            let date = helper.latest_date();
+            let rolled = curve.survival_probability_date(date, false).unwrap();
+            let value = fresh.survival_probability_date(date, false).unwrap();
+            assert!((rolled - value).abs() <= 1.0e-10, "{rolled} vs {value}");
+        }
+    }
+
+    /// Fixed-date helpers do not observe the evaluation date, so only the
+    /// curve's own eval-date registration invalidates it: after a roll the
+    /// pillars stay put while the reference date moves.
+    #[test]
+    fn moving_curve_with_fixed_date_helpers_rebootstraps_on_roll() {
+        let settings = moving_settings();
+        let curve = moving_curve(fixed_survival_helpers(), &settings);
+        let dates = curve.dates().unwrap();
+        let data = curve.data().unwrap();
+        assert_eq!(dates[0], business_days_after(today(), 1));
+
+        let new_today = business_days_after(today(), 15);
+        settings.set_evaluation_date(new_today);
+        assert!(!curve.lazy.borrow().is_calculated());
+
+        let new_dates = curve.dates().unwrap();
+        assert_eq!(new_dates[0], business_days_after(new_today, 1));
+        assert_eq!(new_dates[1..], dates[1..]);
+        assert!(curve.data().unwrap()[1] > data[1]);
+    }
+
+    /// The evaluation date is an upstream input of a moving curve only: over
+    /// fixed-date helpers, an observer wired through `register_upstream` hears
+    /// a date roll from the moving curve and not from the fixed one.
+    #[test]
+    fn register_upstream_includes_the_evaluation_date_only_when_moving() {
+        use crate::test_support::{Flag, as_observer};
+        let settings = moving_settings();
+        let moving = moving_curve(fixed_survival_helpers(), &settings);
+        let fixed = PiecewiseDefaultCurve::<HazardRate, BackwardFlat>::new(
+            today(),
+            fixed_survival_helpers(),
+            day_counter(),
+            BackwardFlat,
+        )
+        .unwrap();
+        let (moving_flag, fixed_flag) = (Flag::new(), Flag::new());
+        moving.register_upstream(&as_observer(&moving_flag));
+        fixed.register_upstream(&as_observer(&fixed_flag));
+
+        settings.set_evaluation_date(business_days_after(today(), 15));
+        assert!(
+            Flag::is_up(&moving_flag),
+            "moving curve upstream missed the roll"
+        );
+        assert!(
+            !Flag::is_up(&fixed_flag),
+            "fixed curve upstream heard the roll"
+        );
+    }
+
+    /// `testObservability` (`piecewiseyieldcurve.cpp:832-875`) on the moving
+    /// credit curve: a quote change notifies and recalculates, a date change
+    /// notifies, and a second date change without an intervening
+    /// recalculation does not.
+    #[test]
+    fn moving_curve_observability() {
+        use crate::test_support::{Flag, as_observer};
+        let settings = moving_settings();
+        let discount = discount_curve(today());
+        let (quotes, helpers) = spread_helpers_on(&settings, &discount);
+        let curve = moving_curve(helpers.clone(), &settings);
+        curve.lazy.borrow_mut().forward_first_notification_only();
+        let flag = Flag::new();
+        curve.register_observer(&as_observer(&flag));
+
+        for (quote, helper) in quotes.iter().zip(&helpers) {
+            let date = helper.latest_date();
+            let survival = curve.survival_probability_date(date, false).unwrap();
+            Flag::lower(&flag);
+            quote.set_value(quote.value().unwrap() * 1.01);
+            assert!(Flag::is_up(&flag), "not notified of quote change");
+            assert_ne!(
+                curve.survival_probability_date(date, false).unwrap(),
+                survival,
+                "no recalculation"
+            );
+            quote.set_value(quote.value().unwrap() / 1.01);
+        }
+
+        curve.max_date();
+        Flag::lower(&flag);
+        settings.set_evaluation_date(business_days_after(today(), 15));
+        assert!(Flag::is_up(&flag), "not notified of date change");
+
+        Flag::lower(&flag);
+        settings.set_evaluation_date(today());
+        assert!(
+            !Flag::is_up(&flag),
+            "notified of date change without an intervening recalculation"
+        );
+    }
+
+    /// An unset evaluation date is an `Err` on the first read, never a
+    /// system-clock fallback (D10).
+    #[test]
+    fn moving_curve_without_an_evaluation_date_errs() {
+        let settings = shared(Settings::<Date>::new());
+        let curve = moving_curve(fixed_survival_helpers(), &settings);
+        assert!(TermStructure::reference_date(&*curve).is_err());
+        assert!(curve.calculate().is_err());
+        assert!(curve.survival_probability(1.0, true).is_err());
     }
 }
 
