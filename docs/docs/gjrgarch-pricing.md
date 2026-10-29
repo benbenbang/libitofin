@@ -133,7 +133,7 @@ European calls/puts are supported, including zero strike. Greeks are unavailable
 | Grid | Exactly one of fixed `steps` or `steps_per_year` |
 | Sampling | Exactly one of fixed `samples` or positive finite absolute tolerance |
 | Fixed pseudo-random samples | At least two observations |
-| Pseudo-random seed | Nonzero uint32 seed is reproducible; zero means randomized seed |
+| Pseudo-random seed | Nonzero uint32 seed is reproducible; zero draws a random seed, reported as `"seed"` |
 | Antithetic | One observation averages a path and its negated-draw partner |
 | Standard error | Sampling error of observations/pair averages, not model or discretization error |
 | Tolerance cap | Defaults to 50,000 observations; exhaustion returns an error |
@@ -148,7 +148,9 @@ These errors do not return a successful partial price.
 Rust also supports the low-discrepancy RNG policy with fixed samples only,
 without a standard-error estimate. Python/Go expose pseudo-random MC.
 Brownian bridge and control variates are not exposed by these GJR engines.
-Pseudo-random MC seed zero follows the existing randomized-seed convention; the separate
+Pseudo-random MC seed zero follows the existing randomized-seed convention, and the
+seed drawn is reported as the additional result `"seed"` for replay (see
+[what seed 0 means](random-policies.md#what-seed-0-means)); the separate
 [stateless batch-path API](gjrgarch.md#seeded-paths) rejects seed zero instead.
 
 ### Keep approximation bias separate from sampling error

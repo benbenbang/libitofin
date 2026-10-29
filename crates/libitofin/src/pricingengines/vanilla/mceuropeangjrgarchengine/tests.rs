@@ -313,3 +313,30 @@ fn per_year_grid_work_limit_is_checked_before_allocation() {
             .contains("step limit")
     );
 }
+
+#[test]
+fn a_random_gjr_run_reports_its_seed_and_replays_bit_for_bit() {
+    let run = |seed: u32| {
+        let mut engine = maker()
+            .with_steps(4)
+            .with_samples(512)
+            .with_seed(seed)
+            .build()
+            .unwrap();
+        set_arguments(&mut engine);
+        engine.calculate().unwrap();
+        let results = &result(&engine).instrument;
+        (
+            results.value.unwrap().to_bits(),
+            results.error_estimate.unwrap().to_bits(),
+            *results.additional_results["seed"]
+                .downcast_ref::<Real>()
+                .unwrap(),
+        )
+    };
+    let (npv, error, seed) = run(0);
+    assert!(seed > 0.0 && seed.fract() == 0.0);
+    assert_eq!(run(seed as u32), (npv, error, seed));
+    assert_ne!(run(0).2, seed);
+    assert_eq!(run(42).2, 42.0);
+}

@@ -97,3 +97,20 @@ def test_analytic_engine_provides_no_error_estimate():
     option.npv()
     with pytest.raises(ItofinError, match="error estimate not provided"):
         option.error_estimate()
+
+
+def test_the_one_shot_reports_a_random_seed_that_replays_bitwise():
+    """price_mc returns only the NPV; the seed it used is in results()."""
+    settings, process = _market()
+
+    def run(seed):
+        option = VanillaOption(OptionType.Call, 100.0, EXPIRY, settings)
+        npv = option.price_mc(MCEuropeanEngine(process, steps=4, samples=512, seed=seed))
+        results = option.results()
+        return npv, results.error_estimate, results.additional_results["seed"]
+
+    npv, error, seed = run(0)
+    assert seed > 0 and seed.is_integer()
+    assert run(int(seed)) == (npv, error, seed)
+    assert run(0)[2] != seed
+    assert run(42)[2] == 42.0

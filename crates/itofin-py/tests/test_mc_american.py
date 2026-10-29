@@ -137,3 +137,18 @@ def test_regression_settings_reach_the_core():
 
     assert baseline != _fixed_sample_npv(polynomial_order=4)
     assert baseline != _fixed_sample_npv(calibration_samples=1024)
+
+
+def test_a_random_seed_and_its_calibration_seed_are_reported_and_replay():
+    """LSM reports both seeds it used; replaying the pricing seed replays the run."""
+    settings, process = _market()
+
+    def run(seed):
+        option = _american_option(settings)
+        option.set_mc_american_engine(_milestone_engine(process, seed=seed))
+        extra = option.results().additional_results
+        return option.npv(), option.error_estimate(), extra["seed"], extra["seed_calibration"]
+
+    npv, error, seed, calibration = run(0)
+    assert seed > 0 and seed.is_integer() and calibration > 0
+    assert run(int(seed)) == (npv, error, seed, calibration)
