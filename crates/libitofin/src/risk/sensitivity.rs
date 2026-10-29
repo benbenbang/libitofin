@@ -1,10 +1,11 @@
-//! Bump-and-reprice sensitivities: parallel and bucket PV01 over SimpleQuotes.
+//! Bump-and-reprice sensitivities: parallel and bucket PV01 over SimpleQuotes,
+//! and the sensitivities of dependent quotes to a SimpleQuote bump.
 //!
 //! Port of QuantLib code removed in 1.36 (`6f379f4e9`); not part of current
 //! QuantLib. The source is `ql/experimental/risk/sensitivityanalysis.{hpp,cpp}`
 //! as of `6f379f4e9^`, deprecated upstream as "out of scope" (`9f0c9b90c`).
 //!
-//! Each function shifts one or more [`SimpleQuote`]s, reprices the instruments
+//! Each PV01 function shifts one or more [`SimpleQuote`]s, reprices the instruments
 //! through their (lazy, observer-driven) [`Instrument::npv`], and returns the
 //! finite-difference first and second derivatives. The quotes are always
 //! restored to their original values before returning, on `Ok` and on `Err`
@@ -26,17 +27,24 @@
 //!   parallel form (`.cpp:81-86`).
 //! - the matrix form with empty `instruments` returns `Err`; QuantLib returns
 //!   zero matrices (`.cpp:333`).
+//! - an invalid bump quote in the parameter forms returns `Err`; QuantLib fills
+//!   the results with `Null` (`.cpp:181-187`).
+//!
+//! The parameter forms are fault tolerant as in QuantLib: an invalid parameter
+//! yields `None` in its slot (`.cpp:198`), not an error. Their reference values
+//! are input only, where QuantLib's single-quote form fills an in/out vector
+//! (`.cpp:196-200`).
 //!
 //! Not ported: the matrix overload of `parallelAnalysis`, declared
 //! (`.hpp:104-110`) but never defined upstream. A caller can flatten the quotes
 //! into [`parallel_analysis`].
 //!
-//! Deferred and not ported: the `bucketAnalysis` overloads returning parameter
-//! sensitivities (#1307); the C, Go and Python bindings (#1324).
+//! Deferred and not ported: the C, Go and Python bindings (#1324).
 
 use std::fmt;
 
 use crate::errors::QlResult;
+use crate::handle::Handle;
 use crate::instrument::Instrument;
 use crate::quotes::{Quote, SimpleQuote};
 use crate::shared::{Shared, SharedMut};
@@ -48,6 +56,9 @@ pub const DEFAULT_SHIFT: Real = 1.0e-4;
 
 /// Ragged row-major results, one row per row of input quotes.
 pub type Rows<T> = Vec<Vec<T>>;
+
+/// Parameter derivatives, `None` where a parameter has no reference value.
+pub type ParameterDerivatives = Vec<Option<Real>>;
 
 /// Finite-differences scheme (`SensitivityAnalysis`, `.hpp:41`).
 ///
@@ -214,6 +225,134 @@ pub fn bucket_analysis_matrix(
         second.push(second_row);
     }
     Ok((first, second))
+}
+
+/// Sensitivities of `parameters` to a bump of `quote` (`bucketAnalysis`,
+/// `.cpp:167-253`).
+///
+/// Returns, index-aligned with `parameters`, the first derivatives and the
+/// second derivatives (`None` throughout for
+/// [`OneSide`](SensitivityAnalysis::OneSide)). A slot is `None` when its
+/// reference value is `None`: an invalid parameter is skipped, not an error
+/// (QuantLib's "fault tolerant", `.cpp:198`). A `None` `reference_values` is
+/// read from the parameters before the bump; QuantLib's in/out vector is
+/// input-only here.
+pub fn parameter_sensitivity(
+    quote: &Shared<SimpleQuote>,
+    parameters: &[Handle<dyn Quote>],
+    reference_values: Option<&[Option<Real>]>,
+    shift: Real,
+    kind: SensitivityAnalysis,
+) -> QlResult<(ParameterDerivatives, ParameterDerivatives)> {
+    require!(shift != 0.0, "zero shift not allowed");
+    require!(!parameters.is_empty(), "empty parameters vector");
+    let Ok(original) = quote.value() else {
+        fail!("invalid SimpleQuote");
+    };
+    let reference_values = match reference_values {
+        Some(values) => {
+            require!(
+                values.len() == parameters.len(),
+                "referenceValues has size {}, instead of {}",
+                values.len(),
+                parameters.len()
+            );
+            values.to_vec()
+        }
+        None => parameter_values(parameters)?,
+    };
+    let result = parameter_differences(quote, original, parameters, &reference_values, shift, kind);
+    quote.set_value(original);
+    result
+}
+
+/// [`parameter_sensitivity`] for each quote of a vector, bumped one at a time
+/// (`bucketAnalysis`, `.cpp:285-311`).
+///
+/// The reference values are read once and shared by every quote. Returns one
+/// row of first and second derivatives per quote.
+pub fn parameter_sensitivity_vector(
+    quotes: &[Shared<SimpleQuote>],
+    parameters: &[Handle<dyn Quote>],
+    shift: Real,
+    kind: SensitivityAnalysis,
+) -> QlResult<(Vec<ParameterDerivatives>, Vec<ParameterDerivatives>)> {
+    require!(!quotes.is_empty(), "empty SimpleQuote vector");
+    require!(!parameters.is_empty(), "empty parameters vector");
+    let reference_values = parameter_values(parameters)?;
+    let mut first = Vec::with_capacity(quotes.len());
+    let mut second = Vec::with_capacity(quotes.len());
+    for quote in quotes {
+        let (d1, d2) =
+            parameter_sensitivity(quote, parameters, Some(&reference_values), shift, kind)?;
+        first.push(d1);
+        second.push(d2);
+    }
+    Ok((first, second))
+}
+
+fn parameter_values(parameters: &[Handle<dyn Quote>]) -> QlResult<Vec<Option<Real>>> {
+    parameters
+        .iter()
+        .map(|parameter| {
+            let parameter = parameter.current_link()?;
+            Ok(if parameter.is_valid() {
+                Some(parameter.value()?)
+            } else {
+                None
+            })
+        })
+        .collect()
+}
+
+fn parameter_differences(
+    quote: &SimpleQuote,
+    original: Real,
+    parameters: &[Handle<dyn Quote>],
+    reference_values: &[Option<Real>],
+    shift: Real,
+    kind: SensitivityAnalysis,
+) -> QlResult<(ParameterDerivatives, ParameterDerivatives)> {
+    let values_at = |bump: Real| -> QlResult<Vec<Option<Real>>> {
+        quote.set_value(original + bump);
+        parameters
+            .iter()
+            .zip(reference_values)
+            .map(|(parameter, reference)| {
+                reference
+                    .map(|_| parameter.current_link()?.value())
+                    .transpose()
+            })
+            .collect()
+    };
+    let up = values_at(shift)?;
+    match kind {
+        SensitivityAnalysis::OneSide => {
+            let first = up
+                .iter()
+                .zip(reference_values)
+                .map(|(up, reference)| up.zip(*reference).map(|(up, r)| (up - r) / shift))
+                .collect();
+            Ok((first, vec![None; parameters.len()]))
+        }
+        SensitivityAnalysis::Centered => {
+            let down = values_at(-shift)?;
+            let mut first = Vec::with_capacity(parameters.len());
+            let mut second = Vec::with_capacity(parameters.len());
+            for ((up, down), reference) in up.iter().zip(&down).zip(reference_values) {
+                let (d1, d2) = match (up, down, reference) {
+                    (Some(up), Some(down), Some(reference)) => (
+                        Some((up - down) / (2.0 * shift)),
+                        Some((up - 2.0 * reference + down) / (shift * shift)),
+                    ),
+                    _ => (None, None),
+                };
+                first.push(d1);
+                second.push(d2);
+            }
+            Ok((first, second))
+        }
+    }
 }
 
 fn prepare(
