@@ -10,8 +10,9 @@
 //!
 //! ## Divergences from QuantLib
 //!
-//! - Jump quotes (`jumps`/`jumpDates`) are not ported, per the
-//!   [`YieldTermStructure`] divergence (#203); the constructors collapse to
+//! - Jump quotes (`jumps`/`jumpDates`) are deferred (#1319): the
+//!   [`YieldTermStructure`] jump support is not wired into this curve yet, so
+//!   the constructors collapse to
 //!   [`new`](InterpolatedForwardCurve::new) and
 //!   [`with_calendar`](InterpolatedForwardCurve::with_calendar).
 //! - The protected detached/moving constructors used by bootstrapped curves

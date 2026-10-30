@@ -9,8 +9,9 @@
 //!
 //! ## Divergences from QuantLib
 //!
-//! - Jump quotes are not ported, per the established
-//!   [`yieldtermstructure`](super::super::yieldtermstructure) divergence.
+//! - Jump quotes are deferred (#1319): the
+//!   [`yieldtermstructure`](super::super::yieldtermstructure) jump support is
+//!   not wired into this curve yet.
 //! - The protected detached/moving constructors (used only by bootstrapped
 //!   subclasses) follow with the bootstrap work; the public date-vector
 //!   constructors are ported.

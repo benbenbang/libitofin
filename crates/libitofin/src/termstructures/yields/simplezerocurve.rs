@@ -17,8 +17,9 @@
 //!   [`InterpolatedZeroCurve`](super::InterpolatedZeroCurve) uses: that
 //!   adapter's base converts a zero rate continuously, which is exactly the
 //!   compounding this curve does not use.
-//! - Jump quotes (`jumps`/`jumpDates`) are not ported, per the
-//!   [`YieldTermStructure`] precedent.
+//! - Jump quotes (`jumps`/`jumpDates`) are not wired yet: the
+//!   [`YieldTermStructure`] jump support is taken by the discount and
+//!   piecewise curves only.
 //! - The protected detached / reference-date / settlement-days constructors
 //!   (`interpolatedsimplezerocurve.hpp:65-74`) exist only for bootstrapped
 //!   subclasses and are not ported, matching the sibling curves.

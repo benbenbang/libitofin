@@ -35,24 +35,36 @@
 //!   variant whose reference date follows the evaluation date of an explicit
 //!   [`Settings`] (D5). A date change invalidates the bootstrap; the next read
 //!   re-solves warm from the previous nodes when their count is unchanged.
-//! - Jump quotes (`jumps`/`jumpDates`) are not ported, following the
-//!   [`YieldTermStructure`] precedent.
+//! - Jump quotes (`jumps`/`jumpDates`) are taken by
+//!   [`with_jumps`](PiecewiseYieldCurve::with_jumps) and
+//!   [`moving_with_jumps`](PiecewiseYieldCurve::moving_with_jumps), which use a
+//!   default-configured bootstrap. The quotes register with the curve's own
+//!   updater, so a jump change re-bootstraps: helpers price off the
+//!   jump-adjusted discount, as in C++.
+//! - Jump times are calculated on demand against the current reference date.
+//!   C++ `update()` (`piecewiseyieldcurve.hpp:220-229`) skips
+//!   `YieldTermStructure::update`, the only re-caller of `setJumps`
+//!   (`yieldtermstructure.cpp:174-180`), so a rolled C++ moving curve keeps
+//!   its construction-time `jumpTimes_`; here they follow the new reference
+//!   date while the jump dates stay fixed.
 
 use std::cell::RefCell;
 use std::marker::PhantomData;
 use std::rc::Weak;
 
 use crate::errors::QlResult;
+use crate::handle::Handle;
 use crate::math::interpolations::Interpolator;
 use crate::patterns::lazyobject::LazyObject;
 use crate::patterns::observable::{AsObservable, Observable, Observer};
+use crate::quotes::Quote;
 use crate::require;
 use crate::settings::Settings;
 use crate::shared::{Shared, SharedMut, shared_mut};
 use crate::termstructures::bootstraphelper::RateHelper;
 use crate::termstructures::bootstraptraits::{CurveData, YieldBootstrapTraits};
 use crate::termstructures::iterativebootstrap::{Bootstrap, IterativeBootstrap, PiecewiseCurve};
-use crate::termstructures::yieldtermstructure::YieldTermStructure;
+use crate::termstructures::yieldtermstructure::{YieldJumps, YieldTermStructure};
 use crate::termstructures::{TermStructure, TermStructureBase};
 use crate::time::calendar::Calendar;
 use crate::time::date::Date;
@@ -93,6 +105,7 @@ pub struct PiecewiseYieldCurve<T: YieldBootstrapTraits, I: Interpolator, B = Ite
     lazy: SharedMut<LazyObject>,
     observable: Shared<Observable>,
     updater: SharedMut<CurveUpdater>,
+    jumps: Option<YieldJumps>,
     bootstrap: B,
     accuracy: Real,
     self_weak: Weak<dyn YieldTermStructure>,
@@ -139,6 +152,39 @@ where
             instruments,
             interpolator,
             bootstrap,
+            Vec::new(),
+            Vec::new(),
+        )
+    }
+
+    /// Builds the fixed-reference-date curve with multiplicative discount
+    /// jumps (the C++ `jumps`/`jumpDates` arguments,
+    /// `piecewiseyieldcurve.hpp:75-84`) and a default-configured bootstrap.
+    ///
+    /// Empty `jump_dates` generates consecutive year-end dates from the
+    /// reference year.
+    ///
+    /// # Errors
+    /// Rejects an empty helper set, or returns a [`YieldJumps`] construction
+    /// error.
+    pub fn with_jumps(
+        reference_date: Date,
+        instruments: Vec<Shared<dyn RateHelper>>,
+        day_counter: DayCounter,
+        interpolator: I,
+        jumps: Vec<Handle<dyn Quote>>,
+        jump_dates: Vec<Date>,
+    ) -> QlResult<Shared<PiecewiseYieldCurve<T, I, B>>>
+    where
+        B: Default,
+    {
+        Self::build(
+            TermStructureBase::with_reference_date(reference_date, None, Some(day_counter)),
+            instruments,
+            interpolator,
+            B::default(),
+            jumps,
+            jump_dates,
         )
     }
 
@@ -189,6 +235,67 @@ where
         settings: Shared<Settings<Date>>,
         bootstrap: B,
     ) -> QlResult<Shared<PiecewiseYieldCurve<T, I, B>>> {
+        Self::build_moving(
+            settlement_days,
+            calendar,
+            instruments,
+            day_counter,
+            interpolator,
+            settings,
+            bootstrap,
+            Vec::new(),
+            Vec::new(),
+        )
+    }
+
+    /// The moving constructor with multiplicative discount jumps
+    /// (`piecewiseyieldcurve.hpp:102-112`) and a default-configured bootstrap.
+    ///
+    /// Empty `jump_dates` generates year-end dates from the reference year at
+    /// construction, so the evaluation date must already be set.
+    ///
+    /// # Errors
+    /// Rejects an empty helper set, or returns a [`YieldJumps`] construction
+    /// error.
+    #[allow(clippy::too_many_arguments)]
+    pub fn moving_with_jumps(
+        settlement_days: Natural,
+        calendar: Calendar,
+        instruments: Vec<Shared<dyn RateHelper>>,
+        day_counter: DayCounter,
+        interpolator: I,
+        settings: Shared<Settings<Date>>,
+        jumps: Vec<Handle<dyn Quote>>,
+        jump_dates: Vec<Date>,
+    ) -> QlResult<Shared<PiecewiseYieldCurve<T, I, B>>>
+    where
+        B: Default,
+    {
+        Self::build_moving(
+            settlement_days,
+            calendar,
+            instruments,
+            day_counter,
+            interpolator,
+            settings,
+            B::default(),
+            jumps,
+            jump_dates,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn build_moving(
+        settlement_days: Natural,
+        calendar: Calendar,
+        instruments: Vec<Shared<dyn RateHelper>>,
+        day_counter: DayCounter,
+        interpolator: I,
+        settings: Shared<Settings<Date>>,
+        bootstrap: B,
+        jumps: Vec<Handle<dyn Quote>>,
+        jump_dates: Vec<Date>,
+    ) -> QlResult<Shared<PiecewiseYieldCurve<T, I, B>>> {
         let curve = Self::build(
             TermStructureBase::moving(
                 settlement_days,
@@ -199,6 +306,8 @@ where
             instruments,
             interpolator,
             bootstrap,
+            jumps,
+            jump_dates,
         )?;
         settings.register_eval_date_observer(
             &(SharedMut::clone(&curve.updater) as SharedMut<dyn Observer>),
@@ -211,16 +320,26 @@ where
         instruments: Vec<Shared<dyn RateHelper>>,
         interpolator: I,
         bootstrap: B,
+        jumps: Vec<Handle<dyn Quote>>,
+        jump_dates: Vec<Date>,
     ) -> QlResult<Shared<PiecewiseYieldCurve<T, I, B>>> {
         require!(!instruments.is_empty(), "no bootstrap helpers given");
 
+        let lazy = shared_mut(LazyObject::new(true));
+        let observable = lazy.borrow().observable_handle();
+        let updater = shared_mut(CurveUpdater {
+            lazy: SharedMut::clone(&lazy),
+        });
+        let jumps = if jumps.is_empty() && jump_dates.is_empty() {
+            None
+        } else {
+            let observer = SharedMut::clone(&updater) as SharedMut<dyn Observer>;
+            Some(YieldJumps::with_observer(
+                &base, &observer, jumps, jump_dates,
+            )?)
+        };
         let curve = Shared::new_cyclic(|weak: &Weak<PiecewiseYieldCurve<T, I, B>>| {
             let self_weak: Weak<dyn YieldTermStructure> = weak.clone();
-            let lazy = shared_mut(LazyObject::new(true));
-            let observable = lazy.borrow().observable_handle();
-            let updater = shared_mut(CurveUpdater {
-                lazy: SharedMut::clone(&lazy),
-            });
             PiecewiseYieldCurve {
                 base,
                 instruments,
@@ -229,6 +348,7 @@ where
                 lazy,
                 observable,
                 updater,
+                jumps,
                 bootstrap,
                 accuracy: 1.0e-12,
                 self_weak,
@@ -351,13 +471,16 @@ where
         SharedMut::clone(&self.updater) as SharedMut<dyn Observer>
     }
 
-    /// The curve's inputs are its rate helpers plus any helpers the bootstrap
-    /// owns rather than fits: the same set its own [`CurveUpdater`] observes
-    /// (`:163-170`), plus the evaluation date for a moving curve, as C++
-    /// `registerWithObservables` includes `Settings::evaluationDate()`.
+    /// The curve's inputs are its rate helpers, any helpers the bootstrap
+    /// owns rather than fits, and its jump quotes: the same set its own
+    /// [`CurveUpdater`] observes, plus the evaluation date for a moving curve,
+    /// as C++ `registerWithObservables` includes `Settings::evaluationDate()`.
     fn register_upstream(&self, observer: &SharedMut<dyn Observer>) {
         for helper in &self.instruments {
             helper.observable().register_observer(observer);
+        }
+        if let Some(jumps) = &self.jumps {
+            jumps.register_observer(observer);
         }
         for observable in self.bootstrap.additional_observables() {
             observable.register_observer(observer);
@@ -398,12 +521,17 @@ where
         Some(self)
     }
 
+    fn jumps(&self) -> Option<&YieldJumps> {
+        self.jumps.as_ref()
+    }
+
     /// Runs the bootstrap before the range check, so `max_date` reflects the
-    /// solved curve (the C++ `discountImpl`/`maxDate` both call `calculate`).
+    /// solved curve (the C++ `discountImpl`/`maxDate` both call `calculate`),
+    /// then applies the jumps as the trait default does.
     fn discount(&self, t: Time, extrapolate: bool) -> QlResult<DiscountFactor> {
         self.calculate()?;
         self.check_range_time(t, extrapolate)?;
-        self.discount_impl(t)
+        Ok(self.jump_factor(t)? * self.discount_impl(t)?)
     }
 
     fn discount_impl(&self, t: Time) -> QlResult<DiscountFactor> {
@@ -645,8 +773,18 @@ mod tests {
             I::default(),
         )
         .unwrap();
-        let handle: Handle<dyn YieldTermStructure> =
-            Handle::new(Shared::clone(&curve) as Shared<dyn YieldTermStructure>);
+        reprice_helpers(
+            &vars,
+            Shared::clone(&curve) as Shared<dyn YieldTermStructure>,
+            tolerance,
+        );
+        curve
+    }
+
+    /// The deposit + swap round trip of `testCurveConsistency`: each helper,
+    /// rebuilt on `curve`, must reproduce its input quote within `tolerance`.
+    fn reprice_helpers(vars: &CommonVars, curve: Shared<dyn YieldTermStructure>, tolerance: Real) {
+        let handle: Handle<dyn YieldTermStructure> = Handle::new(curve);
 
         // deposits: a fresh index on the curve handle reprices its own rate
         for (n, units, rate) in DEPOSIT_DATA {
@@ -686,8 +824,6 @@ mod tests {
                 "{n} {units:?} swap: estimated {estimated} vs expected {expected}"
             );
         }
-
-        curve
     }
 
     /// `testLogLinearDiscountConsistency` -> `<Discount, LogLinear>`
@@ -2025,5 +2161,132 @@ mod tests {
         let curve = moving_curve(vars.instruments.clone(), &unset);
         assert!(TermStructure::reference_date(&*curve).is_err());
         assert!(curve.discount(1.0, true).is_err());
+    }
+
+    const JUMPS: [Real; 2] = [0.995, 0.99];
+
+    fn jump_dates() -> Vec<Date> {
+        vec![
+            Date::new(31, Month::December, 2026),
+            Date::new(31, Month::December, 2027),
+        ]
+    }
+
+    fn jump_quotes(values: &[Real]) -> (Vec<Shared<SimpleQuote>>, Vec<Handle<dyn Quote>>) {
+        let quotes: Vec<_> = values
+            .iter()
+            .map(|v| shared(SimpleQuote::new(*v)))
+            .collect();
+        let handles = quotes
+            .iter()
+            .map(|q| Handle::new(Shared::clone(q) as Shared<dyn Quote>))
+            .collect();
+        (quotes, handles)
+    }
+
+    fn jumped_curve(
+        vars: &CommonVars,
+        instruments: Vec<Shared<dyn RateHelper>>,
+        values: &[Real],
+    ) -> (
+        Vec<Shared<SimpleQuote>>,
+        Shared<PiecewiseYieldCurve<Discount, LogLinear>>,
+    ) {
+        let (quotes, handles) = jump_quotes(values);
+        let curve = PiecewiseYieldCurve::with_jumps(
+            vars.settlement,
+            instruments,
+            Actual360::new(),
+            LogLinear,
+            handles,
+            jump_dates(),
+        )
+        .unwrap();
+        (quotes, curve)
+    }
+
+    /// The bootstrap prices every helper off the jump-adjusted discount, so a
+    /// curve with jumps still reprices its deposits and swaps.
+    #[test]
+    fn a_jumped_curve_reprices_its_helpers() {
+        let vars = common_vars();
+        let (_, curve) = jumped_curve(&vars, vars.instruments.clone(), &JUMPS);
+        reprice_helpers(&vars, curve, TOLERANCE);
+    }
+
+    /// Unit jumps leave the bootstrap untouched: the curve equals the
+    /// jump-free one built over its own helpers on the same settings.
+    #[test]
+    fn unit_jumps_reproduce_the_jump_free_curve() {
+        let vars = common_vars();
+        let (_, jumped) = jumped_curve(&vars, vars.instruments.clone(), &[1.0, 1.0]);
+        let (_, instruments) = instruments_on(&vars.settings);
+        let plain = PiecewiseYieldCurve::<Discount, LogLinear>::new(
+            vars.settlement,
+            instruments,
+            Actual360::new(),
+            LogLinear,
+        )
+        .unwrap();
+        for t in [0.1, 0.5, 1.0, 1.5, 2.0, 5.0, 10.0, 20.0] {
+            let (a, b) = (
+                jumped.discount(t, false).unwrap(),
+                plain.discount(t, false).unwrap(),
+            );
+            assert!((a - b).abs() <= 1.0e-14, "t = {t}: {a} vs {b}");
+        }
+    }
+
+    /// The `discount` override multiplies in every jump strictly between the
+    /// reference date and `t` on top of the bootstrapped nodes.
+    #[test]
+    fn discount_applies_the_jumps_over_the_bootstrapped_nodes() {
+        let vars = common_vars();
+        let (_, curve) = jumped_curve(&vars, vars.instruments.clone(), &JUMPS);
+        let jump_times: Vec<Time> = jump_dates()
+            .into_iter()
+            .map(|date| TermStructure::time_from_reference(&*curve, date).unwrap())
+            .collect();
+        for t in [0.1, 0.5, 1.0, 1.5, 2.0, 5.0, 10.0] {
+            let expected: Real = jump_times
+                .iter()
+                .zip(JUMPS)
+                .filter(|(time, _)| 0.0 < **time && **time < t)
+                .map(|(_, jump)| jump)
+                .product();
+            let ratio = curve.discount(t, false).unwrap() / curve.discount_impl(t).unwrap();
+            assert!(
+                (ratio - expected).abs() <= 1.0e-14 * expected,
+                "t = {t}: {ratio} vs {expected}"
+            );
+        }
+        assert!(jump_times[1] < 2.0);
+    }
+
+    /// A jump quote is a bootstrap input: changing it invalidates the curve
+    /// through its own updater, reaches `register_upstream` subscribers, and
+    /// re-solves to different nodes.
+    #[test]
+    fn a_jump_quote_change_rebootstraps() {
+        use crate::test_support::{Flag, as_observer};
+        let vars = common_vars();
+        let (quotes, curve) = jumped_curve(&vars, vars.instruments.clone(), &JUMPS);
+        let flag = Flag::new();
+        curve.register_upstream(&as_observer(&flag));
+        let nodes = curve.data().unwrap();
+
+        quotes[1].set_value(0.98);
+        assert!(!curve.lazy.borrow().is_calculated());
+        assert!(Flag::is_up(&flag), "upstream subscriber missed the jump");
+        let rebuilt = curve.data().unwrap();
+        assert_eq!(rebuilt.len(), nodes.len());
+        assert!(
+            nodes
+                .iter()
+                .zip(&rebuilt)
+                .any(|(a, b)| (a - b).abs() > 1.0e-6),
+            "nodes did not move"
+        );
+        reprice_helpers(&vars, curve, TOLERANCE);
     }
 }
