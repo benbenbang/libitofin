@@ -12,8 +12,11 @@ import pytest
 
 from itofin import Settings
 from itofin.indexes import Euribor
-from itofin.instruments import SwapType, VanillaSwap
-from itofin.termstructures import FlatForward
+from itofin.instruments import OptionType, SwapType, VanillaSwap, ZeroCouponBond
+from itofin.models import HullWhite
+from itofin.pricingengines import DiscountingBondEngine
+from itofin.quotes import SimpleQuote
+from itofin.termstructures import FlatForward, PiecewiseYieldCurve, SwapRateHelper
 from itofin.time import BusinessDayConvention, Calendar, Date, DayCounter, Frequency, Period, Schedule
 from test_global_bootstrap import build, strip
 
@@ -123,8 +126,48 @@ def test_last_consumer_releases_callback():
     assert callback_ref() is None
 
 
-def test_consumer_keeps_direct_cycle_callbacks_alive():
-    """A live consumer blocks clearing a direct cycle, and its callbacks still run."""
+def ibor_index(curve, settings):
+    """An IborIndex forwarding on curve."""
+    index = Euribor(Period(1, "Months"), curve, settings)
+    return lambda: index.fixing(Date(15, 6, 2026), True)
+
+
+def swap_engine(curve, settings):
+    """A swap forecasting on a flat curve and discounting on curve."""
+    flat = FlatForward(Date(15, 6, 2026), 0.03, DayCounter.actual365_fixed())
+    swap = swap_over(Euribor(Period(1, "Months"), flat, settings), settings)
+    swap.set_engine(curve, settings)
+    return swap.npv
+
+
+def rate_helper_discount(curve, settings):
+    """A swap helper discounting on curve, bootstrapped into another curve."""
+    helper = SwapRateHelper(
+        SimpleQuote(0.03), Period(1, "Years"), Calendar.target(), Frequency.Annual,
+        BusinessDayConvention.ModifiedFollowing, DayCounter.thirty360_bond_basis(),
+        Euribor(Period(6, "Months"), None, settings), discount=curve,
+    )
+    outer = PiecewiseYieldCurve(Date(17, 6, 2026), [helper], DayCounter.actual365_fixed())
+    outer.discount(0.5)
+    return lambda: (outer, helper.implied_quote())
+
+
+def process_model(curve, settings):
+    """A Hull-White model on curve."""
+    model = HullWhite(curve, 0.1, 0.01)
+    return lambda: model.discount_bond_option(OptionType.Call, 0.99, 0.05, 0.2)
+
+
+def bond_engine(curve, settings):
+    """A zero-coupon bond priced by a discounting engine on curve."""
+    bond = ZeroCouponBond(2, Calendar.target(), 100.0, Date(17, 8, 2026), settings)
+    bond.set_engine(DiscountingBondEngine(curve, settings))
+    return bond.clean_price
+
+
+@pytest.mark.parametrize("consumer", [ibor_index, swap_engine, rate_helper_discount, process_model, bond_engine])
+def test_consumer_keeps_direct_cycle_callbacks_alive(consumer):
+    """A live native consumer blocks clearing a direct cycle, and its callbacks still run."""
     calls = []
 
     def make():
@@ -137,19 +180,19 @@ def test_consumer_keeps_direct_cycle_callbacks_alive():
             return []
 
         curve = build(helpers, additional_penalties=penalties)
+        curve.enable_extrapolation()
         holder.append(curve)
-        consumer = Euribor(Period(1, "Months"), curve, settings)
-        return consumer, quotes, [weakref.ref(curve), weakref.ref(penalties)]
+        return consumer(curve, settings), quotes, [weakref.ref(curve), weakref.ref(penalties)]
 
-    consumer, quotes, refs = make()
-    first = consumer.fixing(Date(15, 6, 2026), True)
+    query, quotes, refs = make()
+    query()
     gc.collect()
     assert all(ref() is not None for ref in refs)
     count = len(calls)
     quotes[0].set_value(0.05)
-    assert abs(consumer.fixing(Date(15, 6, 2026), True) - first) > 1.0e-3
+    query()
     assert len(calls) > count
-    del consumer
+    del query
     gc.collect()
     assert [ref() for ref in refs] == [None, None]
 

@@ -243,6 +243,11 @@ impl PyYieldTermStructure {
     /// carry an owner (a joint-curve member retains its whole assembly) that
     /// `Handle::new` would drop and `current_link` does not carry, so every
     /// consumer shares a clone of that handle instead.
+    ///
+    /// `PyPiecewiseYieldCurve::__traverse__` relies on this: a new native
+    /// holder of a local curve must take its link from here so it raises the
+    /// strong count. A holder that does not would let the GC clear callbacks
+    /// it still calls.
     #[allow(dead_code)]
     pub(crate) fn handle(&self) -> Handle<dyn YieldTermStructure> {
         match self.inner.current_link() {
@@ -534,6 +539,10 @@ impl PyPiecewiseYieldCurve {
     /// leaks, but a live consumer's callbacks are never cleared. A foreign-thread
     /// GC pass skips this unsendable traversal for the same reason. Joint curves
     /// build `GlobalBootstrap::new` internally and never carry Python callbacks.
+    ///
+    /// Rule: a `__traverse__` on an object shared with native code must
+    /// under-report. A leak is safe; over-reporting lets the GC clear a
+    /// callback a native consumer still calls, a use-after-free.
     fn sole_owner_callbacks(&self) -> Option<&BootstrapCallbacks> {
         self.callbacks
             .as_ref()
@@ -1428,6 +1437,20 @@ mod tests {
         assert!(!first.points_to_same_link(&second));
         assert!(!first.points_to_same_link(&wrapper.inner));
         assert_eq!(Shared::strong_count(&curve), 4);
+    }
+
+    #[test]
+    fn callbacks_are_hidden_while_a_consumer_link_lives() {
+        let curve = flat();
+        let wrapper = PyYieldTermStructure::from_local(Shared::clone(&curve));
+        let piecewise = PyPiecewiseYieldCurve {
+            callbacks: Some((curve, shared(BootstrapCallbacks::empty()))),
+        };
+        assert!(piecewise.sole_owner_callbacks().is_some());
+        let consumer = wrapper.handle();
+        assert!(piecewise.sole_owner_callbacks().is_none());
+        drop(consumer);
+        assert!(piecewise.sole_owner_callbacks().is_some());
     }
 
     #[test]
