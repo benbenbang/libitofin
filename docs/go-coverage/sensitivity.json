@@ -1,0 +1,58 @@
+{
+  "domain": "sensitivity",
+  "entries": [
+    {
+      "c": "itofin_sensitivity_parallel",
+      "go": "Session.ParallelAnalysis",
+      "python": "itofin.risk.parallel_analysis",
+      "status": "implemented",
+      "tests": [
+        "TestSensitivityParallelMatchesManualBump",
+        "TestSensitivityParallelZeroBondAnalyticDuration",
+        "TestSensitivityFloatingBondRunsThePreflight"
+      ]
+    },
+    {
+      "c": "itofin_sensitivity_bucket",
+      "go": "Session.BucketAnalysis",
+      "python": "itofin.risk.bucket_analysis",
+      "status": "implemented",
+      "tests": [
+        "TestSensitivityParallelEqualsTheSumOfBuckets",
+        "TestSensitivityErrorsLeaveTheQuotes"
+      ]
+    },
+    {
+      "go": "SensitivityAnalysis",
+      "python": "itofin.risk.SensitivityAnalysis",
+      "status": "implemented",
+      "tests": "TestSensitivityParallelMatchesManualBump"
+    },
+    {
+      "go": "SensitivityAnalysis: explicit integer conversion",
+      "python": "itofin.risk.SensitivityAnalysis.__int__",
+      "status": "implemented",
+      "tests": "TestSensitivityParallelMatchesManualBump"
+    },
+    {
+      "go": "OneSide",
+      "python": "itofin.risk.SensitivityAnalysis.OneSide",
+      "status": "implemented",
+      "tests": "TestSensitivityParallelMatchesManualBump"
+    },
+    {
+      "go": "Centered",
+      "python": "itofin.risk.SensitivityAnalysis.Centered",
+      "status": "implemented",
+      "tests": "TestSensitivityParallelMatchesManualBump"
+    },
+    {
+      "classification": "nonconstructible-enum",
+      "go": "SensitivityAnalysis",
+      "python": "itofin.risk.SensitivityAnalysis.__new__",
+      "reason": "Python SensitivityAnalysis forbids construction; Go uses typed integer constants. The C ABI validates the selector (0 OneSide, 1 Centered).",
+      "status": "language-specific"
+    }
+  ],
+  "scope": "Parallel and bucket PV01 over SimpleQuotes for bonds, vanilla swaps and OIS. Python bucket_analysis also returns a labelled dict for a Mapping of quotes; the Go labelled report is deferred (#1323). Options, swaptions, cap/floors and CDS are deferred (#1322)."
+}

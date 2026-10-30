@@ -82,6 +82,7 @@ mod performance_ratios;
 mod poissonrng;
 mod randomnumbers;
 mod results;
+mod risk;
 mod scalar_payoff;
 mod sequence_statistics;
 mod settings;
@@ -676,6 +677,11 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     )?)?;
     chart.add_function(wrap_pyfunction!(chart_prices::interval_prices, &chart)?)?;
 
+    let risk = PyModule::new(py, "risk")?;
+    risk.add_class::<risk::PySensitivityAnalysis>()?;
+    risk.add_function(wrap_pyfunction!(risk::parallel_analysis, &risk)?)?;
+    risk.add_function(wrap_pyfunction!(risk::bucket_analysis, &risk)?)?;
+
     let submodules = [
         ("time", &time),
         ("quotes", &quotes),
@@ -692,6 +698,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
         ("results", &results),
         ("statistics", &statistics),
         ("chart", &chart),
+        ("risk", &risk),
     ];
 
     let sys_modules = PyModule::import(py, "sys")?.getattr("modules")?;
