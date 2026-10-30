@@ -999,6 +999,9 @@ impl SwapRateHelper {
                 true,
                 on_eval_change,
             );
+            if let Some(discount) = &discounting_curve {
+                discount.register_observer(&base.observer());
+            }
             let helper = SwapRateHelper {
                 base,
                 date_error: RefCell::new(None),
@@ -1279,6 +1282,9 @@ impl OISRateHelper {
                 true,
                 on_eval_change,
             );
+            if let Some(discount) = &discounting_curve {
+                discount.register_observer(&base.observer());
+            }
             overnight_spread.register_observer(&base.observer());
             let helper = OISRateHelper {
                 base,
@@ -1837,6 +1843,102 @@ mod tests {
 
         let implied = helper.implied_quote().unwrap();
         assert!((helper.quote_error().unwrap() - (0.05 - implied)).abs() < 1e-15);
+    }
+
+    /// Bootstraps a curve through the helper `build` makes on an exogenous
+    /// discounting curve backed by a [`SimpleQuote`], moves that quote, and
+    /// checks the existing curve re-bootstraps to the same discount factor as a
+    /// curve built fresh on the moved quote (`ratehelpers.cpp:544`,
+    /// `oisratehelper.cpp:119`). Without the helper observing its discounting
+    /// handle the existing curve stays stale.
+    fn assert_curve_tracks_exogenous_discount(
+        build: impl Fn(Handle<dyn YieldTermStructure>) -> Shared<dyn RateHelper>,
+    ) {
+        let discount_curve = |quote: &Shared<SimpleQuote>| {
+            Handle::new(shared(FlatForward::new(
+                today(),
+                Handle::new(Shared::clone(quote) as Shared<dyn Quote>),
+                Actual360::new(),
+                Compounding::Continuous,
+                Frequency::Annual,
+            )) as Shared<dyn YieldTermStructure>)
+        };
+        let bootstrap = |helper: Shared<dyn RateHelper>| {
+            let maturity = helper.maturity_date();
+            let curve = PiecewiseYieldCurve::<Discount, LogLinear>::new(
+                today(),
+                vec![helper],
+                Actual360::new(),
+                LogLinear,
+            )
+            .unwrap();
+            (curve, maturity)
+        };
+
+        let quote = shared(SimpleQuote::new(0.01));
+        let (curve, maturity) = bootstrap(build(discount_curve(&quote)));
+        let before = curve.discount_date(maturity, false).unwrap();
+
+        quote.set_value(0.05);
+        let moved = curve.discount_date(maturity, false).unwrap();
+
+        let fresh_quote = shared(SimpleQuote::new(0.05));
+        let (fresh_curve, _) = bootstrap(build(discount_curve(&fresh_quote)));
+        let fresh = fresh_curve.discount_date(maturity, false).unwrap();
+
+        assert!(
+            (fresh - before).abs() > 1e-8,
+            "degenerate fixture: the discounting curve does not move the bootstrap"
+        );
+        assert!(
+            (moved - fresh).abs() < 1e-12,
+            "stale curve after the discounting quote moved: {moved} vs fresh {fresh}"
+        );
+    }
+
+    #[test]
+    fn swap_helper_observes_its_exogenous_discounting_curve() {
+        let (_settings, source) = swap_setup();
+        assert_curve_tracks_exogenous_discount(|discount| {
+            SwapRateHelper::with_details(
+                Handle::new(shared(SimpleQuote::new(0.03)) as Shared<dyn Quote>),
+                Period::new(5, TimeUnit::Years),
+                Target::new(),
+                Frequency::Annual,
+                BusinessDayConvention::ModifiedFollowing,
+                Actual360::new(),
+                &source,
+                Handle::empty(),
+                Period::new(0, TimeUnit::Days),
+                Some(discount),
+                Pillar::LastRelevantDate,
+            ) as Shared<dyn RateHelper>
+        });
+    }
+
+    #[test]
+    fn ois_helper_observes_its_exogenous_discounting_curve() {
+        use crate::indexes::ibor::Estr;
+
+        let settings = settings_on(today());
+        let estr = Estr::new(Handle::empty(), settings.clone());
+        assert_curve_tracks_exogenous_discount(|discount| {
+            OISRateHelper::new(
+                2,
+                Period::new(5, TimeUnit::Years),
+                Handle::new(shared(SimpleQuote::new(0.03)) as Shared<dyn Quote>),
+                &estr,
+                Some(discount),
+                2,
+                BusinessDayConvention::Following,
+                Frequency::Annual,
+                Period::new(0, TimeUnit::Days),
+                Handle::empty(),
+                Pillar::LastRelevantDate,
+                RateAveraging::Compound,
+                settings.clone(),
+            ) as Shared<dyn RateHelper>
+        });
     }
 
     /// QuantLib 1.43 values from `tests/fixtures/overnight_averaging/bindings.json`.
