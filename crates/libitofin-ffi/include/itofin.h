@@ -3766,6 +3766,25 @@ int32_t itofin_sensitivity_parallel(struct ItofinContext *ctx,
                                     struct ItofinError *error);
 
 /**
+ * Bucket PV01: each quote bumped alone, with one shared reference NPV. Writes
+ * `quote_count` results to `out`, index-aligned with `quotes`. Same `kind`,
+ * `quantities` and restore conventions as `itofin_sensitivity_parallel`.
+ * # Safety
+ * Pointers and thread ownership must satisfy the crate-level C caller contract.
+ */
+int32_t itofin_sensitivity_bucket(struct ItofinContext *ctx,
+                                  const uint64_t *quotes,
+                                  size_t quote_count,
+                                  const uint64_t *instruments,
+                                  size_t instrument_count,
+                                  const double *quantities,
+                                  size_t quantity_count,
+                                  double shift,
+                                  int32_t kind,
+                                  struct ItofinSensitivity *out,
+                                  struct ItofinError *error);
+
+/**
  * Generate `count` standard normal values with a deterministic nonzero seed.
  * # Safety
  * Follow the crate-level pointer contract. Output contains `count` doubles.
