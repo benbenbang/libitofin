@@ -53,6 +53,10 @@ impl HongKong {
 struct HkexImpl;
 
 impl CalendarImpl for HkexImpl {
+    fn holiday_horizon(&self) -> Option<Year> {
+        Some(HOLIDAY_HORIZON)
+    }
+
     fn name(&self) -> String {
         "Hong Kong stock exchange".to_string()
     }

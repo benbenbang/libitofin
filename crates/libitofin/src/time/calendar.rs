@@ -65,6 +65,13 @@ pub trait CalendarImpl {
     fn is_weekend_on(&self, date: Date) -> bool {
         self.is_weekend(date.weekday())
     }
+    /// The last year whose moving holidays are tabulated, for markets that
+    /// rely on per-year tables. Past it the calendar still answers, falling
+    /// through to its weekend and recurring rules exactly like QuantLib; the
+    /// bindings use this to reject such dates on request. Defaults to `None`.
+    fn holiday_horizon(&self) -> Option<Year> {
+        None
+    }
 }
 
 /// Whether `w` is a Saturday or Sunday (the Western/Orthodox weekend).
@@ -128,6 +135,12 @@ impl Calendar {
     /// weekend this equals [`is_weekend`](Self::is_weekend) of `d.weekday()`.
     pub fn is_weekend_on(&self, d: Date) -> bool {
         self.imp.is_weekend_on(d)
+    }
+
+    /// The last year whose moving holidays are tabulated, if any (see
+    /// [`CalendarImpl::holiday_horizon`]).
+    pub fn holiday_horizon(&self) -> Option<Year> {
+        self.imp.holiday_horizon()
     }
 
     /// The set of holidays added on top of the natural schedule.

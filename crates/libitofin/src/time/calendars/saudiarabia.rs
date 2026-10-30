@@ -146,6 +146,10 @@ fn is_eid_al_fitr(d: Date) -> bool {
 struct TadawulImpl;
 
 impl CalendarImpl for TadawulImpl {
+    fn holiday_horizon(&self) -> Option<Year> {
+        Some(HOLIDAY_HORIZON)
+    }
+
     fn name(&self) -> String {
         "Tadawul".to_string()
     }

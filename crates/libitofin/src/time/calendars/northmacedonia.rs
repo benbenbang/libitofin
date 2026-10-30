@@ -44,6 +44,10 @@ impl NorthMacedonia {
 struct MseImpl;
 
 impl CalendarImpl for MseImpl {
+    fn holiday_horizon(&self) -> Option<Year> {
+        Some(HOLIDAY_HORIZON)
+    }
+
     fn name(&self) -> String {
         "Macedonian Stock Exchange".to_string()
     }

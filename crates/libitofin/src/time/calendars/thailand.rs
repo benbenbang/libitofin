@@ -37,6 +37,10 @@ impl Thailand {
 struct SetImpl;
 
 impl CalendarImpl for SetImpl {
+    fn holiday_horizon(&self) -> Option<Year> {
+        Some(HOLIDAY_HORIZON)
+    }
+
     fn name(&self) -> String {
         "Thailand stock exchange".to_string()
     }
