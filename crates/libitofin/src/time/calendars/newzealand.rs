@@ -23,8 +23,9 @@ pub enum Market {
 
 /// Last year for which New Zealand's Matariki holiday is tabulated (matching
 /// QuantLib's data). Matariki has no fixed formula - its dates are announced
-/// and tabulated per year - so queries beyond this year cannot be answered
-/// reliably and panic rather than silently omitting Matariki.
+/// and tabulated per year - so past this year Matariki is not observed and the
+/// calendar falls through to its weekend and recurring rules, exactly like
+/// QuantLib (which never checks the year).
 pub const HOLIDAY_HORIZON: Year = 2052;
 
 /// The New Zealand calendar.
@@ -32,8 +33,9 @@ pub const HOLIDAY_HORIZON: Year = 2052;
 /// # Accuracy
 ///
 /// New Zealand's Matariki holiday is tabulated (from QuantLib) only through
-/// 2052. Querying a date after 2052 panics rather than silently returning an
-/// unreliable business-day result.
+/// 2052. After 2052 the tabulated holidays are not observed and the calendar
+/// falls through to its weekend and recurring rules, exactly like QuantLib
+/// (which never checks the year).
 pub struct NewZealand;
 
 impl NewZealand {
@@ -54,11 +56,6 @@ fn common_is_business_day(date: Date) -> bool {
     let dd = date.day_of_year();
     let m = date.month();
     let y = date.year();
-    assert!(
-        y <= HOLIDAY_HORIZON,
-        "New Zealand's Matariki holiday is tabulated only through {HOLIDAY_HORIZON} \
-         (matching QuantLib); year {y} is beyond the supported horizon"
-    );
     let em = western_easter_monday(y);
     !(is_weekend_sat_sun(w)
         // New Year's Day (possibly moved to Monday or Tuesday)
@@ -201,9 +198,14 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "beyond the supported horizon")]
-    fn beyond_horizon_panics() {
+    fn beyond_horizon_falls_through() {
+        // QuantLib never checks the year: past the tables only weekends and
+        // recurring rules apply, and tabulated dates do not recur.
         let c = NewZealand::new(Market::Wellington);
-        let _ = c.is_business_day(Date::new(1, Month::January, HOLIDAY_HORIZON + 1));
+        assert!(c.is_holiday(Date::new(6, Month::February, 2053)));
+        assert!(c.is_holiday(Date::new(25, Month::April, 2053)));
+        assert!(c.is_holiday(Date::new(27, Month::April, 2054)));
+        assert!(c.is_business_day(Date::new(20, Month::June, 2053)));
+        assert!(c.is_business_day(Date::new(5, Month::February, 2053)));
     }
 }

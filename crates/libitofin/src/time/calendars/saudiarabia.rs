@@ -15,9 +15,10 @@ use crate::time::weekday::Weekday;
 /// Last year for which *all* of Saudi Arabia's Islamic holiday tables are
 /// complete (matching QuantLib's data). This is the MINIMUM across the required
 /// moving-holiday tables, not the maximum: QuantLib's Eid al-Fitr table runs to
-/// 2029 but its Eid al-Adha table stops at 2022, so from 2023 onward Eid al-Adha
-/// would be silently omitted. Queries beyond this year cannot be answered
-/// reliably and panic instead.
+/// 2029 but its Eid al-Adha table stops at 2022, so from 2023 onward Eid
+/// al-Adha is not observed while Eid al-Fitr still is. Past this year the
+/// calendar falls through to its weekend and recurring rules, exactly like
+/// QuantLib (which never checks the year).
 pub const HOLIDAY_HORIZON: Year = 2022;
 
 /// Market handled by the Saudi Arabian calendar.
@@ -33,8 +34,9 @@ pub enum Market {
 ///
 /// Saudi Arabia's Islamic (Eid) holidays are tabulated (from QuantLib) only
 /// through 2022 - the Eid al-Adha table ends there, even though Eid al-Fitr
-/// extends to 2029. Querying a date after 2022 panics rather than silently
-/// omitting Eid al-Adha and returning an unreliable business-day result.
+/// extends to 2029. After 2022 Eid al-Adha is not observed (Eid al-Fitr is,
+/// through 2029) and the calendar falls through to its weekend and recurring
+/// rules, exactly like QuantLib (which never checks the year).
 pub struct SaudiArabia;
 
 impl SaudiArabia {
@@ -163,12 +165,6 @@ impl CalendarImpl for TadawulImpl {
         let m = date.month();
         let y = date.year();
 
-        assert!(
-            y <= HOLIDAY_HORIZON,
-            "Saudi Arabia Islamic (Eid) holidays are tabulated only through {HOLIDAY_HORIZON} \
-             (matching QuantLib); year {y} is beyond the supported horizon"
-        );
-
         !(is_true_weekend(date)
             || is_eid_al_adha(date)
             || is_eid_al_fitr(date)
@@ -215,9 +211,14 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "beyond the supported horizon")]
-    fn beyond_horizon_panics() {
+    fn beyond_horizon_falls_through() {
+        // QuantLib never checks the year: past the tables only weekends and
+        // recurring rules apply, and tabulated dates do not recur.
         let c = SaudiArabia::new(Market::Tadawul);
-        let _ = c.is_business_day(Date::new(1, Month::January, HOLIDAY_HORIZON + 1));
+        assert!(c.is_holiday(Date::new(23, Month::September, 2026)));
+        assert!(c.is_holiday(Date::new(24, Month::April, 2023)));
+        assert!(c.is_holiday(Date::new(9, Month::March, 2027)));
+        assert!(c.is_business_day(Date::new(28, Month::June, 2023)));
+        assert!(c.is_business_day(Date::new(5, Month::February, 2030)));
     }
 }
