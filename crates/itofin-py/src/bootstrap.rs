@@ -116,6 +116,14 @@ pub(crate) struct BootstrapCallbacks {
 }
 
 impl BootstrapCallbacks {
+    #[cfg(test)]
+    pub(crate) fn empty() -> Self {
+        Self {
+            penalties: RefCell::new(None),
+            dates: RefCell::new(None),
+        }
+    }
+
     pub(crate) fn visit(&self, visit: &PyVisit<'_>) -> Result<(), PyTraverseError> {
         for slot in [&self.penalties, &self.dates] {
             if let Ok(callback) = slot.try_borrow() {
