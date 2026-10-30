@@ -8,8 +8,8 @@ use crate::time::date::{Date, Month, Year};
 use crate::time::weekday::Weekday;
 
 /// Last year for which Turkey's Islamic holidays are tabulated (matching
-/// QuantLib's data). Queries beyond this year cannot be answered reliably and
-/// panic rather than silently omitting holidays.
+/// QuantLib's data). Past this year the calendar falls through to its weekend
+/// and recurring rules, exactly like QuantLib (which never checks the year).
 pub const HOLIDAY_HORIZON: Year = 2034;
 
 /// The Turkish calendar (Istanbul Stock Exchange).
@@ -17,8 +17,9 @@ pub const HOLIDAY_HORIZON: Year = 2034;
 /// # Accuracy
 ///
 /// Turkey's Islamic holidays are tabulated (from QuantLib) only through 2034.
-/// Querying a date after 2034 panics rather than silently returning an
-/// unreliable business-day result.
+/// After 2034 the tabulated holidays are not observed and the calendar falls
+/// through to its weekend and recurring rules, exactly like QuantLib (which
+/// never checks the year).
 pub struct Turkey;
 
 impl Turkey {
@@ -45,12 +46,6 @@ impl CalendarImpl for Impl {
         let d = date.day_of_month();
         let m = date.month();
         let y = date.year();
-
-        assert!(
-            y <= HOLIDAY_HORIZON,
-            "Turkey Islamic holidays are tabulated only through {HOLIDAY_HORIZON} \
-             (matching QuantLib); year {y} is beyond the supported horizon"
-        );
 
         if is_weekend_sat_sun(w)
             // New Year's Day
@@ -380,9 +375,12 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "beyond the supported horizon")]
-    fn beyond_horizon_panics() {
+    fn beyond_horizon_falls_through() {
+        // QuantLib never checks the year: past the tables only weekends and
+        // recurring rules apply, and tabulated dates do not recur.
         let c = Turkey::new();
-        let _ = c.is_business_day(Date::new(1, Month::January, HOLIDAY_HORIZON + 1));
+        assert!(c.is_holiday(Date::new(23, Month::April, 2035)));
+        assert!(c.is_business_day(Date::new(24, Month::April, 2035)));
+        assert!(c.is_business_day(Date::new(12, Month::December, 2035)));
     }
 }

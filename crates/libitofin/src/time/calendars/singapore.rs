@@ -8,8 +8,9 @@ use crate::time::date::{Date, Month, Year};
 use crate::time::weekday::Weekday;
 
 /// Last year for which Singapore's public/lunar holidays are tabulated
-/// (matching QuantLib's data). Queries beyond this year cannot be answered
-/// reliably and panic rather than silently omitting holidays.
+/// (matching QuantLib's data). Past this year the calendar falls through to its
+/// weekend and recurring rules, exactly like QuantLib (which never checks the
+/// year).
 pub const HOLIDAY_HORIZON: Year = 2026;
 
 /// Singapore markets.
@@ -24,8 +25,9 @@ pub enum Market {
 /// # Accuracy
 ///
 /// Singapore's public/lunar holidays are tabulated (from QuantLib) only through
-/// 2026. Querying a date after 2026 panics rather than silently returning an
-/// unreliable business-day result.
+/// 2026. After 2026 the tabulated holidays are not observed and the calendar
+/// falls through to its weekend and recurring rules, exactly like QuantLib
+/// (which never checks the year).
 pub struct Singapore;
 
 impl Singapore {
@@ -57,12 +59,6 @@ impl CalendarImpl for SgxImpl {
         let dd = date.day_of_year();
         let m = date.month();
         let y = date.year();
-
-        assert!(
-            y <= HOLIDAY_HORIZON,
-            "Singapore public/lunar holidays are tabulated only through {HOLIDAY_HORIZON} \
-             (matching QuantLib); year {y} is beyond the supported horizon"
-        );
 
         let em = western_easter_monday(y);
 
@@ -331,9 +327,13 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "beyond the supported horizon")]
-    fn beyond_horizon_panics() {
+    fn beyond_horizon_falls_through() {
+        // QuantLib never checks the year: past the tables only weekends and
+        // recurring rules apply, and tabulated dates do not recur.
         let c = Singapore::new(Market::Sgx);
-        let _ = c.is_business_day(Date::new(1, Month::January, HOLIDAY_HORIZON + 1));
+        assert!(c.is_holiday(Date::new(9, Month::August, 2027)));
+        assert!(c.is_holiday(Date::new(26, Month::March, 2027)));
+        assert!(c.is_business_day(Date::new(8, Month::February, 2027)));
+        assert!(c.is_business_day(Date::new(10, Month::August, 2027)));
     }
 }

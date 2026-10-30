@@ -10,9 +10,9 @@
 /// much of the Middle East and North Africa.
 ///
 /// The tabulated Eid al-Fitr and Eid al-Adha dates run only through 2040
-/// (matching QuantLib). These helpers do not panic beyond that horizon; each
-/// calendar that consumes them (North Macedonia, Uzbekistan) owns the horizon
-/// panic at its own `is_business_day` level.
+/// (matching QuantLib). Beyond that horizon these helpers report no Eid, so the
+/// calendars that consume them (North Macedonia, Uzbekistan) fall through to
+/// their other rules, as in QuantLib.
 pub mod moon_sighting {
     use crate::time::date::{Date, Month};
 
