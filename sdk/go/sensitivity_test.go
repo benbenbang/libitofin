@@ -192,3 +192,53 @@ func TestSensitivityErrorsLeaveTheQuotes(t *testing.T) {
 		t.Fatal("cross-session analysis accepted")
 	}
 }
+
+func TestSensitivityRefreshesTheSettingsFlags(t *testing.T) {
+	s, e := NewSession()
+	bondCheck(t, e)
+	defer s.Close()
+	settings := sessionMust(s.NewSettings())
+	today := testDate(t, 15, 1, 2024)
+	bondCheck(t, settings.SetEvaluationDate(today))
+	quote := sessionMust(s.NewSimpleQuote(.04))
+	curve := sessionMust(s.NewFlatForwardFromQuote(today, quote, sessionMust(s.Actual365Fixed())))
+	b := sessionMust(s.NewZeroCouponBond(ZeroCouponBondConfig{BondConfig: BondConfig{Calendar: sessionMust(s.NullCalendar()), Settings: settings, FaceAmount: 100}, MaturityDate: today}))
+	bondCheck(t, b.SetEngine(sessionMust(s.NewDiscountingBondEngine(curve, settings, nil))))
+	if v := sessionMust(b.NPV()); v != 0 {
+		t.Fatalf("flow on the reference date counted: %g", v)
+	}
+	bondCheck(t, settings.SetIncludeReferenceDateEvents(true))
+	p := sensitivityPortfolio{[]*SimpleQuote{quote}, []Instrument{&b.Bond}, nil}
+	got, e := s.ParallelAnalysis(p.quotes, p.instruments, nil, DefaultShift, OneSide, nil)
+	bondCheck(t, e)
+	reference := sessionMust(b.NPV())
+	bondCheck(t, quote.SetValue(.04+DefaultShift))
+	up := sessionMust(b.NPV())
+	bondCheck(t, quote.SetValue(.04))
+	if reference != 100 || got.First != (up-reference)/DefaultShift {
+		t.Fatalf("stale reference: %v vs manual %g", got, (up-reference)/DefaultShift)
+	}
+}
+
+func TestSensitivityPreflightRejectsCalendarBounds(t *testing.T) {
+	s, e := NewSession()
+	bondCheck(t, e)
+	defer s.Close()
+	settings := sessionMust(s.NewSettings())
+	today := testDate(t, 15, 1, 2040)
+	bondCheck(t, settings.SetEvaluationDate(today))
+	cal, dc := sessionMust(s.NullCalendar()), sessionMust(s.Actual360())
+	quote := sessionMust(s.NewSimpleQuote(.03))
+	curve := sessionMust(s.NewFlatForwardFromQuote(today, quote, dc))
+	index := sessionMust(s.NewCustomIborIndex(IborIndexConfig{FamilyName: "SensitivityBound", Tenor: Period{6, Months}, SettlementDays: 2, Currency: sessionMust(s.USD()), FixingCalendar: cal, ValueCalendar: cal, MaturityCalendar: sessionMust(s.Uzbekistan()), Convention: Following, DayCounter: dc, Forwarding: curve, Settings: settings}))
+	schedule := sessionMust(s.NewSchedule(ScheduleConfig{Start: testDate(t, 15, 11, 2040), End: testDate(t, 15, 5, 2041), Frequency: Semiannual, Calendar: cal, Convention: Unadjusted}))
+	b := sessionMust(s.NewFloatingRateBond(FloatingRateBondConfig{FaceAmount: 1000, Schedule: schedule, Index: index, AccrualDayCounter: dc, Settings: settings}))
+	bondCheck(t, b.SetEngine(sessionMust(s.NewDiscountingBondEngine(curve, settings, nil))))
+	_, e = s.ParallelAnalysis([]*SimpleQuote{quote}, []Instrument{b}, nil, DefaultShift, Centered, nil)
+	if e == nil || !strings.Contains(e.Error(), "tabulated only through 2040") {
+		t.Fatalf("forecast beyond the calendar horizon passed the preflight: %v", e)
+	}
+	if v, e := quote.Value(); e != nil || v != .03 {
+		t.Fatalf("quote moved: %g", v)
+	}
+}
