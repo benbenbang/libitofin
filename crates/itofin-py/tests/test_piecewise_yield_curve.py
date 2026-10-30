@@ -752,3 +752,56 @@ def test_cubic_under_global_is_rejected():
         PiecewiseYieldCurve(
             settlement, deposits, DayCounter.actual360(), "Cubic", "global"
         )
+
+
+
+def _deposits_on(settings):
+    """Fresh deposit helpers whose indexes carry `settings`."""
+    return [
+        DepositRateHelper(SimpleQuote(rate / 100.0), Euribor(P(n, unit), None, settings))
+        for n, unit, rate in DEPOSIT_DATA
+    ]
+
+
+def test_moving_curve_follows_a_shared_settings_roll():
+    """D5 same-Settings contract (#1303): the moving curve and its helpers'
+    indexes share one Settings, so a 15-business-day roll moves the curve's
+    reference date, re-bootstraps, and matches a fixed curve built at the new
+    reference date over fresh helpers on the same Settings, within 1e-10."""
+    settings, calendar, today, settlement, deposits, _ = _fixture()
+    curve = PiecewiseYieldCurve.moving(
+        2, calendar, deposits, DayCounter.actual360(), settings
+    )
+    assert curve.reference_date() == settlement
+    probe = settlement + 120
+    before = curve.discount_date(probe)
+
+    new_today = calendar.advance(
+        today, 15, "Days", BusinessDayConvention.Following, False
+    )
+    settings.set_evaluation_date(new_today)
+    reference = calendar.advance(
+        new_today, 2, "Days", BusinessDayConvention.Following, False
+    )
+    assert curve.reference_date() == reference
+    assert curve.discount_date(probe) != before
+
+    fixed = PiecewiseYieldCurve(
+        reference, _deposits_on(settings), DayCounter.actual360()
+    )
+    assert curve.max_date() == fixed.max_date()
+    for days in range(0, 270, 9):
+        date = reference + days
+        assert abs(curve.discount_date(date) - fixed.discount_date(date)) <= 1.0e-10
+
+
+def test_moving_curve_errs_before_an_evaluation_date_is_set():
+    """D10: construction succeeds; the first read raises, never a clock fallback."""
+    settings, calendar, _, _, deposits, _ = _fixture()
+    curve = PiecewiseYieldCurve.moving(
+        2, calendar, deposits, DayCounter.actual360(), Settings()
+    )
+    with pytest.raises(ItofinError):
+        curve.reference_date()
+    with pytest.raises(ItofinError):
+        curve.discount(0.5)
