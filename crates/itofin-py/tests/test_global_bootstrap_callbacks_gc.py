@@ -149,7 +149,7 @@ def rate_helper_discount(curve, settings):
     )
     outer = PiecewiseYieldCurve(Date(17, 6, 2026), [helper], DayCounter.actual365_fixed())
     outer.discount(0.5)
-    return lambda: (outer, helper.implied_quote())
+    return lambda: (helper, outer.discount(0.5))
 
 
 def process_model(curve, settings):
