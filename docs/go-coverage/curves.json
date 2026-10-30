@@ -136,6 +136,16 @@
       ]
     },
     {
+      "c": "itofin_piecewise_curve_new_moving",
+      "go": "Session.NewPiecewiseYieldCurve",
+      "python": "itofin.termstructures.PiecewiseYieldCurve.moving",
+      "status": "implemented",
+      "tests": [
+        "moving_piecewise_curve_follows_a_shared_settings_roll",
+        "TestMovingPiecewiseCurveFollowsSharedSettingsRoll"
+      ]
+    },
+    {
       "c": "itofin_piecewise_curve_new",
       "go": "Session.NewPiecewiseLogLinearDiscount",
       "python": "itofin.termstructures.PiecewiseLogLinearDiscount.__init__",
