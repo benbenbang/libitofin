@@ -144,22 +144,23 @@ def test_native_consumer_retains_callback_after_wrapper_drops():
     assert callback_ref() is None
 
 
-def test_strong_capture_requires_user_to_break_ownership_cycle():
-    """Document the mixed native/Python GC boundary without unsafe __clear__."""
-    _, _, helpers = strip()
-    holder = []
+def test_unreachable_direct_cycle_is_collected():
+    """A callback strongly capturing its own curve wrapper is collected by gc."""
 
-    def penalties(*args):
-        assert holder[0] is not None
-        return []
+    def make():
+        _, _, helpers = strip()
+        holder = []
 
-    curve = build(helpers, additional_penalties=penalties)
-    holder.append(curve)
-    curve_ref, callback_ref = weakref.ref(curve), weakref.ref(penalties)
-    del curve, penalties
-    gc.collect()
-    assert curve_ref() is not None
-    holder.clear()
+        def penalties(*args):
+            assert holder[0] is not None
+            return []
+
+        curve = build(helpers, additional_penalties=penalties)
+        holder.append(curve)
+        curve.discount(0.1)
+        return weakref.ref(curve), weakref.ref(penalties)
+
+    curve_ref, callback_ref = make()
     gc.collect()
     assert curve_ref() is None
     assert callback_ref() is None

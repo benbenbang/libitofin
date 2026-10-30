@@ -9,9 +9,11 @@ use libitofin::shared::{Shared, shared};
 use libitofin::termstructures::RateHelper;
 use libitofin::termstructures::globalbootstrap::{FallibleAdditionalDates, GlobalBootstrap};
 use libitofin::termstructures::globalbootstrapvars::SimpleQuoteVariables;
+use pyo3::PyTraverseError;
+use pyo3::gc::PyVisit;
 use pyo3::prelude::*;
 use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 
 thread_local! {
     static CALLBACK_DEPTH: Cell<usize> = const { Cell::new(0) };
@@ -106,13 +108,53 @@ fn callback_error(name: &str, error: PyErr) -> QlError {
     QlError::new(format!("{name} callback failed: {error}"), file!(), line!())
 }
 
+/// The Python callables of one global bootstrap, shared by its native closures
+/// and the owning curve wrapper so the wrapper can expose them to the cycle GC.
+pub(crate) struct BootstrapCallbacks {
+    penalties: RefCell<Option<Py<PyAny>>>,
+    dates: RefCell<Option<Py<PyAny>>>,
+}
+
+impl BootstrapCallbacks {
+    pub(crate) fn visit(&self, visit: &PyVisit<'_>) -> Result<(), PyTraverseError> {
+        for slot in [&self.penalties, &self.dates] {
+            if let Ok(callback) = slot.try_borrow() {
+                visit.call(callback.as_ref())?;
+            }
+        }
+        Ok(())
+    }
+
+    pub(crate) fn clear(&self) {
+        self.penalties.take();
+        self.dates.take();
+    }
+
+    fn callback(
+        slot: &RefCell<Option<Py<PyAny>>>,
+        configured: bool,
+        name: &str,
+        py: Python<'_>,
+    ) -> QlResult<Option<Py<PyAny>>> {
+        match slot.borrow().as_ref() {
+            Some(callback) => Ok(Some(callback.clone_ref(py))),
+            None if configured => Err(QlError::new(
+                format!("{name} callback was released by garbage collection"),
+                file!(),
+                line!(),
+            )),
+            None => Ok(None),
+        }
+    }
+}
+
 pub(crate) fn global_bootstrap(
     py: Python<'_>,
     helpers: Vec<Shared<dyn RateHelper>>,
     penalties: Option<Py<PyAny>>,
     dates: Option<Py<PyAny>>,
     variables: Option<&PySimpleQuoteVariables>,
-) -> PyResult<GlobalBootstrap> {
+) -> PyResult<(GlobalBootstrap, Shared<BootstrapCallbacks>)> {
     for (name, callback) in [
         ("additional_penalties", &penalties),
         ("additional_dates", &dates),
@@ -124,13 +166,26 @@ pub(crate) fn global_bootstrap(
             return Err(ItofinError::new_err(format!("{name} must be callable")));
         }
     }
+    let (has_penalties, has_dates) = (penalties.is_some(), dates.is_some());
+    let callbacks = shared(BootstrapCallbacks {
+        penalties: RefCell::new(penalties),
+        dates: RefCell::new(dates),
+    });
+    let date_callbacks = Shared::clone(&callbacks);
+    let penalty_callbacks = Shared::clone(&callbacks);
     let residual_count = shared(Cell::new(None));
     let date_count = Shared::clone(&residual_count);
     let dates: Box<FallibleAdditionalDates> = Box::new(move || {
         date_count.set(None);
         Python::attach(|py| {
             let _guard = CallbackGuard::enter();
-            let Some(callback) = &dates else {
+            let Some(callback) = BootstrapCallbacks::callback(
+                &date_callbacks.dates,
+                has_dates,
+                "additional_dates",
+                py,
+            )?
+            else {
                 return Ok(Vec::new());
             };
             let result = callback
@@ -151,7 +206,13 @@ pub(crate) fn global_bootstrap(
         move |times, data| {
             let values = Python::attach(|py| {
                 let _guard = CallbackGuard::enter();
-                let Some(callback) = &penalties else {
+                let Some(callback) = BootstrapCallbacks::callback(
+                    &penalty_callbacks.penalties,
+                    has_penalties,
+                    "additional_penalties",
+                    py,
+                )?
+                else {
                     return Ok(Vec::new());
                 };
                 callback
@@ -178,5 +239,5 @@ pub(crate) fn global_bootstrap(
         bootstrap = bootstrap
             .with_additional_variables(Box::new(variables.build().map_err(PyQlError::from)?));
     }
-    Ok(bootstrap)
+    Ok((bootstrap, callbacks))
 }
