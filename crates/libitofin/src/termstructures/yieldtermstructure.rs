@@ -19,11 +19,10 @@
 //!   construction reference date. As in QuantLib, automatic year-end dates
 //!   are generated once; a moving reference date changes jump times, not the
 //!   generated dates.
-//! - Jumps on `InterpolatedZeroCurve` / `InterpolatedForwardCurve` are deferred (#1319), and curves that override
-//!   [`discount`](YieldTermStructure::discount) (`PiecewiseYieldCurve`) apply
-//!   them only once wired through
-//!   [`jump_factor`](YieldTermStructure::jump_factor) (#1316). Bindings are
-//!   deferred (#1320).
+//! - Jumps on `InterpolatedZeroCurve` / `InterpolatedForwardCurve` are deferred (#1319). Curves that override
+//!   [`discount`](YieldTermStructure::discount) (`PiecewiseYieldCurve`)
+//!   multiply in [`jump_factor`](YieldTermStructure::jump_factor) themselves.
+//!   Bindings are deferred (#1320).
 //! - A null jump date is an `Err` at construction; C++ accepts it unchecked.
 //! - C++ overloads on `Date`/`Time`/`Period` become distinct method names
 //!   (`discount_date`, `forward_rate_between`, ...), following the
@@ -32,8 +31,10 @@
 use crate::errors::QlResult;
 use crate::handle::Handle;
 use crate::interestrate::{Compounding, InterestRate};
+use crate::patterns::observable::Observer;
 use crate::quotes::Quote;
 use crate::require;
+use crate::shared::SharedMut;
 use crate::termstructures::{TermStructure, TermStructureBase};
 use crate::time::date::{Date, Month};
 use crate::time::daycounter::DayCounter;
@@ -68,6 +69,21 @@ impl YieldJumps {
     pub fn new(
         base: &TermStructureBase,
         quotes: Vec<Handle<dyn Quote>>,
+        dates: Vec<Date>,
+    ) -> QlResult<Self> {
+        Self::with_observer(base, &base.updater(), quotes, dates)
+    }
+
+    /// As [`new`](Self::new), registering the jump quotes with `observer`
+    /// instead of the base updater: a bootstrapped curve passes the private
+    /// updater that invalidates its cache.
+    ///
+    /// # Errors
+    /// Returns the [`new`](Self::new) errors.
+    pub fn with_observer(
+        base: &TermStructureBase,
+        observer: &SharedMut<dyn Observer>,
+        quotes: Vec<Handle<dyn Quote>>,
         mut dates: Vec<Date>,
     ) -> QlResult<Self> {
         if dates.is_empty() && !quotes.is_empty() {
@@ -90,15 +106,21 @@ impl YieldJumps {
             dates.iter().all(|date| *date != Date::null()),
             "null jump date"
         );
-        for quote in &quotes {
-            quote.register_observer(&base.updater());
-        }
-        Ok(Self { quotes, dates })
+        let jumps = Self { quotes, dates };
+        jumps.register_observer(observer);
+        Ok(jumps)
     }
 
     /// The immutable jump dates, including any generated year-end dates.
     pub fn dates(&self) -> &[Date] {
         &self.dates
+    }
+
+    /// Registers `observer` with every jump quote.
+    pub fn register_observer(&self, observer: &SharedMut<dyn Observer>) {
+        for quote in &self.quotes {
+            quote.register_observer(observer);
+        }
     }
 
     fn factor<T: TermStructure + ?Sized>(&self, curve: &T, t: Time) -> QlResult<DiscountFactor> {
