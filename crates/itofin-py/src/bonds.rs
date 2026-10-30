@@ -507,6 +507,14 @@ impl PyBond {
             self.flags = flags;
         }
     }
+    pub(crate) fn sensitivity_instrument(&mut self) -> PyResult<SharedMut<dyn Instrument>> {
+        self.prepare(false)?;
+        Ok(match &self.inner {
+            BondBacking::Plain(bond) => SharedMut::clone(bond) as SharedMut<dyn Instrument>,
+            BondBacking::CallableFixed(bond) => SharedMut::clone(bond) as SharedMut<dyn Instrument>,
+            BondBacking::CallableZero(bond) => SharedMut::clone(bond) as SharedMut<dyn Instrument>,
+        })
+    }
     fn prepare(&mut self, force: bool) -> PyResult<()> {
         let settlement = self.settlement_date(None)?.inner();
         self.refresh_forward();

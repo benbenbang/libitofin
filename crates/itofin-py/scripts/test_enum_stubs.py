@@ -109,7 +109,7 @@ class Choice(enum.Enum):
                     f"{cls.name}()", f"{cls.name}(0)", f"{instance}.{members[0]} = {instance}",
                     f"h_{cls.name}: Hashable = {instance}",
                 ])
-        self.assertEqual(len(imports), 34)
+        self.assertEqual(len(imports), 35)
         self.assertIn("from itofin.instruments import PayoffKind", imports)
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

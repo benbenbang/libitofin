@@ -17,6 +17,7 @@ from . import processes
 from . import quotes
 from . import randomnumbers
 from . import results
+from . import risk
 from . import statistics
 from . import termstructures
 from . import time
@@ -37,6 +38,7 @@ __all__ = [
     "quotes",
     "randomnumbers",
     "results",
+    "risk",
     "simulate_gbm",
     "simulate_gjr",
     "simulate_heston",
