@@ -57,6 +57,10 @@ impl Indonesia {
 struct BejImpl;
 
 impl CalendarImpl for BejImpl {
+    fn holiday_horizon(&self) -> Option<Year> {
+        Some(HOLIDAY_HORIZON)
+    }
+
     fn name(&self) -> String {
         "Jakarta stock exchange".to_string()
     }

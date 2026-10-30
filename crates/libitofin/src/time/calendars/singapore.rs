@@ -45,6 +45,10 @@ impl Singapore {
 struct SgxImpl;
 
 impl CalendarImpl for SgxImpl {
+    fn holiday_horizon(&self) -> Option<Year> {
+        Some(HOLIDAY_HORIZON)
+    }
+
     fn name(&self) -> String {
         "Singapore exchange".to_string()
     }

@@ -111,6 +111,10 @@ fn common_is_business_day(date: Date) -> bool {
 struct WellingtonImpl;
 
 impl CalendarImpl for WellingtonImpl {
+    fn holiday_horizon(&self) -> Option<Year> {
+        Some(HOLIDAY_HORIZON)
+    }
+
     fn name(&self) -> String {
         "New Zealand (Wellington)".to_string()
     }
@@ -134,6 +138,10 @@ impl CalendarImpl for WellingtonImpl {
 struct AucklandImpl;
 
 impl CalendarImpl for AucklandImpl {
+    fn holiday_horizon(&self) -> Option<Year> {
+        Some(HOLIDAY_HORIZON)
+    }
+
     fn name(&self) -> String {
         "New Zealand (Auckland)".to_string()
     }

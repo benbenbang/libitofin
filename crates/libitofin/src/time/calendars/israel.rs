@@ -437,6 +437,10 @@ fn tase_weekend(date: Date) -> bool {
 struct TelAvivImpl;
 
 impl CalendarImpl for TelAvivImpl {
+    fn holiday_horizon(&self) -> Option<Year> {
+        Some(HOLIDAY_HORIZON)
+    }
+
     fn name(&self) -> String {
         "Tel Aviv stock exchange".to_string()
     }
@@ -482,6 +486,10 @@ impl CalendarImpl for TelAvivImpl {
 struct TelborImpl;
 
 impl CalendarImpl for TelborImpl {
+    fn holiday_horizon(&self) -> Option<Year> {
+        Some(HOLIDAY_HORIZON)
+    }
+
     fn name(&self) -> String {
         "Telbor fixing calendar".to_string()
     }
@@ -541,6 +549,10 @@ impl CalendarImpl for TelborImpl {
 struct ShirImpl;
 
 impl CalendarImpl for ShirImpl {
+    fn holiday_horizon(&self) -> Option<Year> {
+        Some(HOLIDAY_HORIZON)
+    }
+
     fn name(&self) -> String {
         "SHIR fixing calendar".to_string()
     }

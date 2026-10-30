@@ -52,6 +52,10 @@ impl India {
 struct NseImpl;
 
 impl CalendarImpl for NseImpl {
+    fn holiday_horizon(&self) -> Option<Year> {
+        Some(HOLIDAY_HORIZON)
+    }
+
     fn name(&self) -> String {
         "National Stock Exchange of India".to_string()
     }

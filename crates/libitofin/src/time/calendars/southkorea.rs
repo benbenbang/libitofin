@@ -278,6 +278,10 @@ fn settlement_is_business_day(date: Date) -> bool {
 struct SettlementImpl;
 
 impl CalendarImpl for SettlementImpl {
+    fn holiday_horizon(&self) -> Option<Year> {
+        Some(HOLIDAY_HORIZON)
+    }
+
     fn name(&self) -> String {
         "South-Korean settlement".to_string()
     }
@@ -294,6 +298,10 @@ impl CalendarImpl for SettlementImpl {
 struct KrxImpl;
 
 impl CalendarImpl for KrxImpl {
+    fn holiday_horizon(&self) -> Option<Year> {
+        Some(HOLIDAY_HORIZON)
+    }
+
     fn name(&self) -> String {
         "South-Korea exchange".to_string()
     }

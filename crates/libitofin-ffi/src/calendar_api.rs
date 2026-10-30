@@ -86,23 +86,7 @@ fn country_calendar(country: i32, market: i32) -> BindingResult<NativeCalendar> 
         46 => market!(uzbekistan, Uzbekistan, Uzse),
         _ => return Err(BindingError::invalid("unknown calendar or market")),
     };
-    let horizon = match country {
-        46 => Some(uzbekistan::HOLIDAY_HORIZON),
-        42 => Some(taiwan::HOLIDAY_HORIZON),
-        41 => Some(southkorea::HOLIDAY_HORIZON),
-        38 => Some(singapore::HOLIDAY_HORIZON),
-        32 => Some(northmacedonia::HOLIDAY_HORIZON),
-        31 => Some(newzealand::HOLIDAY_HORIZON),
-        26 => Some(israel::HOLIDAY_HORIZON),
-        24 => Some(india::HOLIDAY_HORIZON),
-        22 => Some(hongkong::HOLIDAY_HORIZON),
-        17 => Some(china::HOLIDAY_HORIZON),
-        10 => Some(turkey::HOLIDAY_HORIZON),
-        9 => Some(thailand::HOLIDAY_HORIZON),
-        25 => Some(indonesia::HOLIDAY_HORIZON),
-        36 => Some(saudiarabia::HOLIDAY_HORIZON),
-        _ => None,
-    };
+    let horizon = inner.holiday_horizon();
     Ok(NativeCalendar {
         inner,
         horizon,
@@ -330,6 +314,13 @@ mod tests {
         ] {
             assert!(us.is_holiday(Date::new(day, month, 2004)).unwrap());
         }
+        let tabulated: Vec<i32> = (0..47)
+            .filter(|&country| country_calendar(country, 0).unwrap().horizon.is_some())
+            .collect();
+        assert_eq!(
+            tabulated,
+            [9, 10, 17, 22, 24, 25, 26, 31, 32, 36, 38, 41, 42, 46]
+        );
         for (country, year) in [(25, 2014), (36, 2022)] {
             let cal = country_calendar(country, 0).unwrap();
             assert!(cal.checked(Date::new(1, Month::June, year)).is_ok());

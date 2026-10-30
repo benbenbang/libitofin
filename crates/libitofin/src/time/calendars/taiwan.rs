@@ -53,6 +53,10 @@ impl Taiwan {
 struct TsecImpl;
 
 impl CalendarImpl for TsecImpl {
+    fn holiday_horizon(&self) -> Option<Year> {
+        Some(HOLIDAY_HORIZON)
+    }
+
     fn name(&self) -> String {
         "Taiwan stock exchange".to_string()
     }

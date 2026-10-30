@@ -218,6 +218,10 @@ fn sse_is_business_day(date: Date) -> bool {
 struct SseImpl;
 
 impl CalendarImpl for SseImpl {
+    fn holiday_horizon(&self) -> Option<Year> {
+        Some(HOLIDAY_HORIZON)
+    }
+
     fn name(&self) -> String {
         "Shanghai stock exchange".to_string()
     }
@@ -234,6 +238,10 @@ impl CalendarImpl for SseImpl {
 struct IbImpl;
 
 impl CalendarImpl for IbImpl {
+    fn holiday_horizon(&self) -> Option<Year> {
+        Some(HOLIDAY_HORIZON)
+    }
+
     fn name(&self) -> String {
         "China inter bank market".to_string()
     }
@@ -456,6 +464,18 @@ mod tests {
     fn in_horizon_query_works() {
         let c = China::new(Market::Sse);
         assert!(c.is_holiday(Date::new(1, Month::January, HOLIDAY_HORIZON)));
+    }
+
+    #[test]
+    fn holiday_horizon_is_reported() {
+        assert_eq!(
+            China::new(Market::Sse).holiday_horizon(),
+            Some(HOLIDAY_HORIZON)
+        );
+        assert_eq!(
+            China::new(Market::Ib).holiday_horizon(),
+            Some(HOLIDAY_HORIZON)
+        );
     }
 
     #[test]
