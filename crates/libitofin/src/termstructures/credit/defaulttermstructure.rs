@@ -32,7 +32,9 @@
 
 use crate::errors::QlResult;
 use crate::handle::Handle;
+use crate::patterns::observable::Observer;
 use crate::quotes::Quote;
+use crate::shared::SharedMut;
 use crate::termstructures::{TermStructure, TermStructureBase};
 use crate::time::date::{Date, Month};
 use crate::types::{Probability, Rate, Real, Time};
@@ -61,6 +63,21 @@ impl DefaultProbabilityJumps {
     pub fn new(
         base: &TermStructureBase,
         quotes: Vec<Handle<dyn Quote>>,
+        dates: Vec<Date>,
+    ) -> QlResult<Self> {
+        Self::with_observer(base, &base.updater(), quotes, dates)
+    }
+
+    /// As [`new`](Self::new), registering the jump quotes with `observer`
+    /// instead of the base updater: a bootstrapped curve passes the private
+    /// updater that invalidates its cache.
+    ///
+    /// # Errors
+    /// Returns the [`new`](Self::new) errors.
+    pub fn with_observer(
+        base: &TermStructureBase,
+        observer: &SharedMut<dyn Observer>,
+        quotes: Vec<Handle<dyn Quote>>,
         mut dates: Vec<Date>,
     ) -> QlResult<Self> {
         if dates.is_empty() && !quotes.is_empty() {
@@ -83,15 +100,21 @@ impl DefaultProbabilityJumps {
             dates.iter().all(|date| *date != Date::null()),
             "null jump date"
         );
-        for quote in &quotes {
-            quote.register_observer(&base.updater());
-        }
-        Ok(Self { quotes, dates })
+        let jumps = Self { quotes, dates };
+        jumps.register_observer(observer);
+        Ok(jumps)
     }
 
     /// The immutable jump dates, including any generated year-end dates.
     pub fn dates(&self) -> &[Date] {
         &self.dates
+    }
+
+    /// Registers `observer` with every jump quote.
+    pub fn register_observer(&self, observer: &SharedMut<dyn Observer>) {
+        for quote in &self.quotes {
+            quote.register_observer(observer);
+        }
     }
 
     fn factor<T: TermStructure + ?Sized>(&self, curve: &T, t: Time) -> QlResult<Probability> {

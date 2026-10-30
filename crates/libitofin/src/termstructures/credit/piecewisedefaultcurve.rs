@@ -43,10 +43,20 @@
 //!   (`piecewisedefaultcurve.hpp:106,121,135`), whose reference date follows the
 //!   evaluation date of an explicit [`Settings`] (D5). A date change invalidates
 //!   the bootstrap, as C++'s moving-aware `update()` does (`:248-258`).
-//! - Jump quotes are not ported, per the
-//!   [`defaulttermstructure`](crate::termstructures::credit::defaulttermstructure)
-//!   divergence (#676), so neither constructor takes `jumps`/`jumpDates`
-//!   (tracked by #1316).
+//! - Jump quotes (`jumps`/`jumpDates`) are taken by
+//!   [`with_jumps`](PiecewiseDefaultCurve::with_jumps) and
+//!   [`moving_with_jumps`](PiecewiseDefaultCurve::moving_with_jumps). The
+//!   quotes register with the curve's own updater, so a jump change
+//!   re-bootstraps: helpers price off the jump-adjusted survival probability,
+//!   as in C++. Bindings are deferred (#1321).
+//! - Jump times are calculated on demand against the current reference date
+//!   (the [`defaulttermstructure`](crate::termstructures::credit::defaulttermstructure)
+//!   divergence), so a rolled moving curve's jump times follow the new
+//!   reference date while the jump dates stay fixed. C++ `update()`
+//!   (`piecewisedefaultcurve.hpp:248-258`) skips
+//!   `DefaultProbabilityTermStructure::update`, the only re-caller of
+//!   `setJumps` (`defaulttermstructure.hpp:243-247`), so a rolled C++ moving
+//!   curve keeps its construction-time `jumpTimes_`.
 //! - The moving constructor is core-only: it is not exposed through the C, Go or
 //!   Python bindings yet (tracked by #1318).
 
@@ -55,16 +65,20 @@ use std::marker::PhantomData;
 use std::rc::Weak;
 
 use crate::errors::QlResult;
+use crate::handle::Handle;
 use crate::math::interpolations::Interpolator;
 use crate::patterns::lazyobject::LazyObject;
 use crate::patterns::observable::{AsObservable, Observable, Observer};
+use crate::quotes::Quote;
 use crate::require;
 use crate::settings::Settings;
 use crate::shared::{Shared, SharedMut, shared_mut};
 use crate::termstructures::bootstraptraits::CurveData;
 use crate::termstructures::credit::defaultdensitystructure::DefaultDensityStructure;
 use crate::termstructures::credit::defaultprobabilityhelpers::DefaultProbabilityHelper;
-use crate::termstructures::credit::defaulttermstructure::DefaultProbabilityTermStructure;
+use crate::termstructures::credit::defaulttermstructure::{
+    DefaultProbabilityJumps, DefaultProbabilityTermStructure,
+};
 use crate::termstructures::credit::hazardratestructure::HazardRateStructure;
 use crate::termstructures::credit::interpolatedhazardratecurve::hazard_rate_from_nodes;
 use crate::termstructures::credit::probabilitytraits::{
@@ -107,6 +121,7 @@ pub struct PiecewiseDefaultCurve<T: CreditBootstrapTraits, I: Interpolator> {
     lazy: SharedMut<LazyObject>,
     observable: Shared<Observable>,
     updater: SharedMut<CurveUpdater>,
+    jumps: Option<DefaultProbabilityJumps>,
     bootstrap: IterativeBootstrap,
     accuracy: Real,
     self_weak: Weak<dyn DefaultProbabilityTermStructure>,
@@ -127,10 +142,40 @@ impl<T: CreditBootstrapTraits + 'static, I: Interpolator + 'static> PiecewiseDef
         day_counter: DayCounter,
         interpolator: I,
     ) -> QlResult<Shared<PiecewiseDefaultCurve<T, I>>> {
+        Self::with_jumps(
+            reference_date,
+            instruments,
+            day_counter,
+            interpolator,
+            Vec::new(),
+            Vec::new(),
+        )
+    }
+
+    /// The reference-date constructor with multiplicative survival jumps (the
+    /// C++ `jumps`/`jumpDates` arguments, `piecewisedefaultcurve.hpp:68-79`).
+    ///
+    /// Empty `jump_dates` generates consecutive year-end dates from the
+    /// reference year.
+    ///
+    /// # Errors
+    ///
+    /// Rejects an empty helper set, or returns a [`DefaultProbabilityJumps`]
+    /// construction error.
+    pub fn with_jumps(
+        reference_date: Date,
+        instruments: Vec<Shared<dyn DefaultProbabilityHelper>>,
+        day_counter: DayCounter,
+        interpolator: I,
+        jumps: Vec<Handle<dyn Quote>>,
+        jump_dates: Vec<Date>,
+    ) -> QlResult<Shared<PiecewiseDefaultCurve<T, I>>> {
         Self::build(
             TermStructureBase::with_reference_date(reference_date, None, Some(day_counter)),
             instruments,
             interpolator,
+            jumps,
+            jump_dates,
         )
     }
 
@@ -155,6 +200,39 @@ impl<T: CreditBootstrapTraits + 'static, I: Interpolator + 'static> PiecewiseDef
         interpolator: I,
         settings: Shared<Settings<Date>>,
     ) -> QlResult<Shared<PiecewiseDefaultCurve<T, I>>> {
+        Self::moving_with_jumps(
+            settlement_days,
+            calendar,
+            instruments,
+            day_counter,
+            interpolator,
+            settings,
+            Vec::new(),
+            Vec::new(),
+        )
+    }
+
+    /// The settlement-days constructor with multiplicative survival jumps
+    /// (`piecewisedefaultcurve.hpp:106-118`).
+    ///
+    /// Empty `jump_dates` generates year-end dates from the reference year at
+    /// construction, so the evaluation date must already be set.
+    ///
+    /// # Errors
+    ///
+    /// Rejects an empty helper set, or returns a [`DefaultProbabilityJumps`]
+    /// construction error.
+    #[allow(clippy::too_many_arguments)]
+    pub fn moving_with_jumps(
+        settlement_days: Natural,
+        calendar: Calendar,
+        instruments: Vec<Shared<dyn DefaultProbabilityHelper>>,
+        day_counter: DayCounter,
+        interpolator: I,
+        settings: Shared<Settings<Date>>,
+        jumps: Vec<Handle<dyn Quote>>,
+        jump_dates: Vec<Date>,
+    ) -> QlResult<Shared<PiecewiseDefaultCurve<T, I>>> {
         let curve = Self::build(
             TermStructureBase::moving(
                 settlement_days,
@@ -164,6 +242,8 @@ impl<T: CreditBootstrapTraits + 'static, I: Interpolator + 'static> PiecewiseDef
             ),
             instruments,
             interpolator,
+            jumps,
+            jump_dates,
         )?;
         settings.register_eval_date_observer(
             &(SharedMut::clone(&curve.updater) as SharedMut<dyn Observer>),
@@ -175,16 +255,26 @@ impl<T: CreditBootstrapTraits + 'static, I: Interpolator + 'static> PiecewiseDef
         base: TermStructureBase,
         instruments: Vec<Shared<dyn DefaultProbabilityHelper>>,
         interpolator: I,
+        jumps: Vec<Handle<dyn Quote>>,
+        jump_dates: Vec<Date>,
     ) -> QlResult<Shared<PiecewiseDefaultCurve<T, I>>> {
         require!(!instruments.is_empty(), "no bootstrap helpers given");
 
+        let lazy = shared_mut(LazyObject::new(true));
+        let observable = lazy.borrow().observable_handle();
+        let updater = shared_mut(CurveUpdater {
+            lazy: SharedMut::clone(&lazy),
+        });
+        let jumps = if jumps.is_empty() && jump_dates.is_empty() {
+            None
+        } else {
+            let observer = SharedMut::clone(&updater) as SharedMut<dyn Observer>;
+            Some(DefaultProbabilityJumps::with_observer(
+                &base, &observer, jumps, jump_dates,
+            )?)
+        };
         let curve = Shared::new_cyclic(|weak: &Weak<PiecewiseDefaultCurve<T, I>>| {
             let self_weak: Weak<dyn DefaultProbabilityTermStructure> = weak.clone();
-            let lazy = shared_mut(LazyObject::new(true));
-            let observable = lazy.borrow().observable_handle();
-            let updater = shared_mut(CurveUpdater {
-                lazy: SharedMut::clone(&lazy),
-            });
             PiecewiseDefaultCurve {
                 base,
                 instruments,
@@ -193,6 +283,7 @@ impl<T: CreditBootstrapTraits + 'static, I: Interpolator + 'static> PiecewiseDef
                 lazy,
                 observable,
                 updater,
+                jumps,
                 bootstrap: IterativeBootstrap::new(),
                 accuracy: 1.0e-12,
                 self_weak,
@@ -266,12 +357,16 @@ impl<T: CreditBootstrapTraits + 'static, I: Interpolator + 'static> TermStructur
         &self.base
     }
 
-    /// The curve's inputs are its helpers, the same set its own
-    /// [`CurveUpdater`] observes, plus the evaluation date for a moving curve,
-    /// as C++ `registerWithObservables` includes `Settings::evaluationDate()`.
+    /// The curve's inputs are its helpers and jump quotes, the same set its
+    /// own [`CurveUpdater`] observes, plus the evaluation date for a moving
+    /// curve, as C++ `registerWithObservables` includes
+    /// `Settings::evaluationDate()`.
     fn register_upstream(&self, observer: &SharedMut<dyn Observer>) {
         for helper in &self.instruments {
             helper.observable().register_observer(observer);
+        }
+        if let Some(jumps) = &self.jumps {
+            jumps.register_observer(observer);
         }
         if let Some(settings) = self.base.moving_settings() {
             settings.register_eval_date_observer(observer);
@@ -314,6 +409,10 @@ impl<T: CreditBootstrapTraits + 'static, I: Interpolator + 'static> DefaultProba
     /// (`isdacdsengine.cpp:137-141`), which composition cannot reproduce.
     fn as_any(&self) -> Option<&dyn std::any::Any> {
         Some(self)
+    }
+
+    fn jumps(&self) -> Option<&DefaultProbabilityJumps> {
+        self.jumps.as_ref()
     }
 
     fn survival_probability_impl(&self, t: Time) -> QlResult<Probability> {
@@ -1385,6 +1484,128 @@ mod tests {
         assert!(TermStructure::reference_date(&*curve).is_err());
         assert!(curve.calculate().is_err());
         assert!(curve.survival_probability(1.0, true).is_err());
+    }
+
+    const JUMPS: [Real; 2] = [0.999, 0.998];
+
+    fn jump_dates() -> Vec<Date> {
+        vec![
+            Date::new(31, Month::December, 2006),
+            Date::new(31, Month::December, 2007),
+        ]
+    }
+
+    fn jump_quotes(values: &[Real]) -> (Vec<Shared<SimpleQuote>>, Vec<Handle<dyn Quote>>) {
+        let quotes: Vec<_> = values
+            .iter()
+            .map(|v| shared(SimpleQuote::new(*v)))
+            .collect();
+        let handles = quotes
+            .iter()
+            .map(|q| Handle::new(Shared::clone(q) as Shared<dyn Quote>))
+            .collect();
+        (quotes, handles)
+    }
+
+    /// The `testBootstrapFromSpread` fixture over a curve built with jumps.
+    fn jumped_fixture(values: &[Real]) -> (Vec<Shared<SimpleQuote>>, Fixture) {
+        let settings = moving_settings();
+        let discount = discount_curve(today());
+        let (_, helpers) = spread_helpers_on(&settings, &discount);
+        let (quotes, handles) = jump_quotes(values);
+        let curve = PiecewiseDefaultCurve::with_jumps(
+            today(),
+            helpers.clone(),
+            day_counter(),
+            BackwardFlat,
+            handles,
+            jump_dates(),
+        )
+        .unwrap();
+        let fixture = Fixture {
+            settings,
+            discount,
+            helpers,
+            curve,
+        };
+        (quotes, fixture)
+    }
+
+    /// The bootstrap prices every helper off the jump-adjusted survival
+    /// probability, so a curve with jumps still reproduces its spreads.
+    #[test]
+    fn a_jumped_curve_reproduces_the_input_cds_spreads() {
+        let (_, fixture) = jumped_fixture(&JUMPS);
+        assert_the_spreads_reproduce(&fixture);
+    }
+
+    /// Unit jumps leave the bootstrap untouched: the curve equals the
+    /// jump-free fixture curve.
+    #[test]
+    fn unit_jumps_reproduce_the_jump_free_curve() {
+        let (_, jumped) = jumped_fixture(&[1.0, 1.0]);
+        let plain = fixture();
+        for t in [0.1, 0.5, 1.0, 1.5, 2.0, 3.0, 4.5] {
+            let (a, b) = (
+                jumped.curve.survival_probability(t, false).unwrap(),
+                plain.curve.survival_probability(t, false).unwrap(),
+            );
+            assert!((a - b).abs() <= 1.0e-14, "t = {t}: {a} vs {b}");
+        }
+    }
+
+    /// Survival multiplies in every jump before `t` on top of the
+    /// bootstrapped nodes.
+    #[test]
+    fn survival_applies_the_jumps_over_the_bootstrapped_nodes() {
+        let (_, fixture) = jumped_fixture(&JUMPS);
+        let curve = &fixture.curve;
+        let jump_times: Vec<Time> = jump_dates()
+            .into_iter()
+            .map(|date| TermStructure::time_from_reference(&**curve, date).unwrap())
+            .collect();
+        assert!(jump_times[1] < 2.0);
+        for t in [0.1, 0.5, 1.0, 1.5, 2.0, 3.0, 4.5] {
+            let expected: Real = jump_times
+                .iter()
+                .zip(JUMPS)
+                .filter(|(time, _)| **time < t)
+                .map(|(_, jump)| jump)
+                .product();
+            let ratio = curve.survival_probability(t, false).unwrap()
+                / curve.survival_probability_impl(t).unwrap();
+            assert!(
+                (ratio - expected).abs() <= 1.0e-14 * expected,
+                "t = {t}: {ratio} vs {expected}"
+            );
+        }
+    }
+
+    /// A jump quote is a bootstrap input: changing it invalidates the curve
+    /// through its own updater, reaches `register_upstream` subscribers, and
+    /// re-solves to different nodes that still reproduce the spreads.
+    #[test]
+    fn a_jump_quote_change_rebootstraps() {
+        use crate::test_support::{Flag, as_observer};
+        let (quotes, fixture) = jumped_fixture(&JUMPS);
+        let curve = &fixture.curve;
+        let flag = Flag::new();
+        curve.register_upstream(&as_observer(&flag));
+        let nodes = curve.data().unwrap();
+
+        quotes[1].set_value(0.996);
+        assert!(!curve.lazy.borrow().is_calculated());
+        assert!(Flag::is_up(&flag), "upstream subscriber missed the jump");
+        let rebuilt = curve.data().unwrap();
+        assert_eq!(rebuilt.len(), nodes.len());
+        assert!(
+            nodes
+                .iter()
+                .zip(&rebuilt)
+                .any(|(a, b)| (a - b).abs() > 1.0e-6),
+            "nodes did not move"
+        );
+        assert_the_spreads_reproduce(&fixture);
     }
 }
 
