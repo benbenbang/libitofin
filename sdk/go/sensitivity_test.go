@@ -2,6 +2,7 @@ package itofin
 
 import (
 	"math"
+	"strings"
 	"testing"
 )
 
@@ -110,4 +111,84 @@ func TestSensitivityFloatingBondRunsThePreflight(t *testing.T) {
 	}
 	bondCheck(t, m.index.AddFixing(testDate(t, 13, 7, 2024), .0275))
 	p.checkManual(t, s, []float64{1})
+}
+
+func TestSensitivityParallelEqualsTheSumOfBuckets(t *testing.T) {
+	s, e := NewSession()
+	bondCheck(t, e)
+	defer s.Close()
+	settings, e := s.NewSettings()
+	bondCheck(t, e)
+	bondCheck(t, settings.SetEvaluationDate(testDate(t, 15, 6, 2026)))
+	var quotes []*SimpleQuote
+	cfg := PiecewiseCurveConfig{ReferenceDate: testDate(t, 17, 6, 2026), DayCounter: sessionMust(s.Actual365Fixed())}
+	for i, months := range []int32{3, 6, 12, 24} {
+		quotes = append(quotes, sessionMust(s.NewSimpleQuote(.03+.002*float64(i))))
+		index := sessionMust(s.NewEuribor(Period{months, Months}, nil, settings))
+		cfg.Helpers = append(cfg.Helpers, sessionMust(s.NewDepositRateHelper(quotes[i], index)))
+	}
+	curve := sessionMust(s.NewPiecewiseLinearZero(cfg))
+	ibor := sessionMust(s.NewEuriborSixMonths(curve, settings))
+	rate := .04
+	swap := sessionMust(s.MakeVanillaSwap(MakeVanillaSwapConfig{Tenor: Period{2, Years}, Index: ibor, Settings: settings, FixedRate: &rate}))
+	instruments := []Instrument{swap}
+	parallel, e := s.ParallelAnalysis(quotes, instruments, nil, DefaultShift, Centered, nil)
+	bondCheck(t, e)
+	buckets, e := s.BucketAnalysis(quotes, instruments, nil, DefaultShift, Centered)
+	bondCheck(t, e)
+	sum := 0.0
+	for _, b := range buckets {
+		if b.Second == nil {
+			t.Fatal("centered bucket without second order")
+		}
+		sum += b.First
+	}
+	if len(buckets) != len(quotes) || math.Abs(parallel.First) < 1e-3 || math.Abs(sum/parallel.First-1) > 1e-6 {
+		t.Fatalf("buckets %v sum %g vs parallel %g", buckets, sum, parallel.First)
+	}
+	single, e := s.BucketAnalysis(quotes[3:], instruments, nil, DefaultShift, OneSide)
+	bondCheck(t, e)
+	alone, e := s.ParallelAnalysis(quotes[3:], instruments, nil, DefaultShift, OneSide, nil)
+	bondCheck(t, e)
+	if math.Abs(single[0].First/alone.First-1) > 1e-9 || single[0].Second != nil {
+		t.Fatalf("single bucket %v vs parallel %v", single[0], alone)
+	}
+}
+
+func TestSensitivityErrorsLeaveTheQuotes(t *testing.T) {
+	s, e := NewSession()
+	bondCheck(t, e)
+	defer s.Close()
+	p := sensitivityFixture(t, s)
+	bond, _, settings, cal, _, _, _, _ := bondFixture(t, s, "zero", 100)
+	unpriced := sessionMust(s.NewZeroCouponBond(ZeroCouponBondConfig{BondConfig: BondConfig{FaceAmount: 100, Settings: settings, Calendar: cal}, MaturityDate: testDate(t, 15, 1, 2027)}))
+	cases := []struct {
+		instruments []Instrument
+		shift       float64
+		want        string
+	}{
+		{p.instruments, 0, "zero shift not allowed"},
+		{nil, DefaultShift, "empty instrument vector"},
+		{[]Instrument{(*Bond)(nil)}, DefaultShift, "uninitialized object"},
+		{[]Instrument{nil}, DefaultShift, "must not be nil"},
+		{[]Instrument{bond, unpriced}, DefaultShift, "pricing engine"},
+	}
+	reference := 100.0
+	for _, c := range cases {
+		_, e := s.ParallelAnalysis(p.quotes, c.instruments, nil, c.shift, Centered, &reference)
+		_, be := s.BucketAnalysis(p.quotes, c.instruments, nil, c.shift, Centered)
+		for _, err := range []error{e, be} {
+			if err == nil || !strings.Contains(err.Error(), c.want) {
+				t.Fatalf("%q: got %v", c.want, err)
+			}
+		}
+		if v, _ := p.quotes[0].Value(); v != .04 {
+			t.Fatalf("quote moved: %g", v)
+		}
+	}
+	other := sessionMust(NewSession())
+	defer other.Close()
+	if _, e := other.BucketAnalysis(p.quotes, p.instruments, nil, DefaultShift, Centered); e == nil {
+		t.Fatal("cross-session analysis accepted")
+	}
 }

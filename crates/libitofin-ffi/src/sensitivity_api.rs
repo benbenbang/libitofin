@@ -132,3 +132,44 @@ pub unsafe extern "C" fn itofin_sensitivity_parallel(
         })
     }
 }
+#[unsafe(no_mangle)]
+/// Bucket PV01: each quote bumped alone, with one shared reference NPV. Writes
+/// `quote_count` results to `out`, index-aligned with `quotes`. Same `kind`,
+/// `quantities` and restore conventions as `itofin_sensitivity_parallel`.
+/// # Safety
+/// Pointers and thread ownership must satisfy the crate-level C caller contract.
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn itofin_sensitivity_bucket(
+    ctx: *mut Context,
+    quotes: *const u64,
+    quote_count: usize,
+    instruments: *const u64,
+    instrument_count: usize,
+    quantities: *const f64,
+    quantity_count: usize,
+    shift: f64,
+    kind: i32,
+    out: *mut ItofinSensitivity,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(out)?;
+            let kind = self::kind(kind)?;
+            let (quotes, instruments) =
+                inputs(c, (quotes, quote_count), (instruments, instrument_count))?;
+            let (first, second) = risk::bucket_analysis_vector(
+                &quotes,
+                &instruments,
+                input_slice(quantities, quantity_count)?,
+                finite(shift)?,
+                kind,
+            )?;
+            let out = std::slice::from_raw_parts_mut(out, quote_count);
+            for (slot, value) in out.iter_mut().zip(first.into_iter().zip(second)) {
+                *slot = value.into();
+            }
+            Ok(())
+        })
+    }
+}

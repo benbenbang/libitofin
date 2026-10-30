@@ -43,6 +43,8 @@ pub mod floating_bond_api;
 pub mod merton_paths_api;
 pub mod ou_paths_api;
 pub mod sensitivity_api;
+#[cfg(test)]
+mod sensitivity_api_tests;
 pub mod simulation_api;
 pub use boundary::{Context, ItofinError};
 pub mod benchmark_beta_api;

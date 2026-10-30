@@ -113,3 +113,26 @@ func (s *Session) ParallelAnalysis(quotes []*SimpleQuote, instruments []Instrume
 	}
 	return sensitivity(out), nil
 }
+
+// BucketAnalysis bumps each quote alone by shift, against one shared reference
+// NPV, and returns one Sensitivity per quote in quote order. Same conventions
+// as ParallelAnalysis.
+func (s *Session) BucketAnalysis(quotes []*SimpleQuote, instruments []Instrument, quantities []float64, shift float64, kind SensitivityAnalysis) ([]Sensitivity, error) {
+	q, i, err := sensitivityIDs(s, quotes, instruments)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]C.ItofinSensitivity, max(len(q), 1))
+	err = s.invoke(func() error {
+		var e C.ItofinError
+		return ffiError(C.itofin_sensitivity_bucket(s.ctx, idPointer(q), C.size_t(len(q)), idPointer(i), C.size_t(len(i)), doubles(quantities), C.size_t(len(quantities)), C.double(shift), C.int32_t(kind), &out[0], &e), &e)
+	})
+	if err != nil {
+		return nil, err
+	}
+	results := make([]Sensitivity, len(q))
+	for k := range results {
+		results[k] = sensitivity(out[k])
+	}
+	return results, nil
+}
