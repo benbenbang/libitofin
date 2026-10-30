@@ -70,6 +70,7 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 /// (the `null_deleter`/`observer = false` of `ratehelpers.cpp:217`).
 pub struct DepositRateHelper {
     base: BootstrapHelperBase,
+    date_error: RefCell<Option<QlError>>,
     index: IborIndex,
     term_structure_handle: RelinkableHandle<dyn YieldTermStructure>,
     fixing_date: Cell<Date>,
@@ -104,6 +105,7 @@ impl DepositRateHelper {
             let base = BootstrapHelperBase::new_relative(quote, settings, true, on_eval_change);
             let helper = DepositRateHelper {
                 base,
+                date_error: RefCell::new(None),
                 index,
                 term_structure_handle,
                 fixing_date: Cell::new(Date::null()),
@@ -131,6 +133,9 @@ impl RateHelper for DepositRateHelper {
     /// `ratehelpers.cpp:213`): the helper prices off the curve, never off a
     /// stored fixing.
     fn implied_quote(&self) -> QlResult<Real> {
+        if let Some(error) = self.date_error.borrow().as_ref() {
+            return Err(error.clone());
+        }
         self.base.term_structure()?;
         self.index.fixing(self.fixing_date.get(), true)
     }
@@ -153,14 +158,21 @@ impl RelativeDateRateHelper for DepositRateHelper {
     /// maturity the value date advanced by the tenor. Pillar, latest and
     /// latest-relevant dates all equal the maturity.
     ///
-    /// The value- and maturity-date arithmetic is calendar rolling on an
-    /// already-adjusted business day and so cannot fail; the `expect` documents
-    /// that invariant.
+    /// An unset evaluation date is stored as the error and returned by the
+    /// next [`implied_quote`](RateHelper::implied_quote) (D10). The value- and
+    /// maturity-date arithmetic is calendar rolling on an already-adjusted
+    /// business day and so cannot fail; the `expect`s document that invariant.
     fn initialize_dates(&self) {
+        *self.date_error.borrow_mut() = self.try_initialize_dates().err();
+    }
+}
+
+impl DepositRateHelper {
+    fn try_initialize_dates(&self) -> QlResult<()> {
         let evaluation_date = self
             .base
             .evaluation_date()
-            .expect("a relative-date helper always tracks an evaluation date");
+            .ok_or_else(|| QlError::new("evaluation date is not set", file!(), line!()))?;
         let reference_date = self
             .index
             .fixing_calendar()
@@ -180,6 +192,7 @@ impl RelativeDateRateHelper for DepositRateHelper {
         self.base.set_pillar_date(maturity);
         self.base.set_latest_date(maturity);
         self.base.set_latest_relevant_date(maturity);
+        Ok(())
     }
 }
 
@@ -745,10 +758,9 @@ impl FraRateHelper {
         let (earliest, maturity, latest_relevant, pillar, fixing_date, spanning_time) =
             rebuild_dates(|| {
                 let (earliest, maturity) = if self.base.update_dates() {
-                    let evaluation_date = self
-                        .base
-                        .evaluation_date()
-                        .expect("a relative-date helper always tracks an evaluation date");
+                    let evaluation_date = self.base.evaluation_date().ok_or_else(|| {
+                        QlError::new("evaluation date is not set", file!(), line!())
+                    })?;
                     let calendar = self.index.fixing_calendar();
                     let reference =
                         calendar.adjust(evaluation_date, BusinessDayConvention::Following);
@@ -2577,5 +2589,68 @@ mod tests {
             (estimated - fra_rate).abs() <= 1.0e-9,
             "par reprice {estimated} vs input {fra_rate}"
         );
+    }
+
+    /// D10: a deposit helper built before the evaluation date is set does not
+    /// panic; its first read returns the unset-date error, and setting the
+    /// date rebuilds a usable schedule.
+    #[test]
+    fn deposit_unset_evaluation_date_is_an_error_on_first_read() {
+        let settings = shared(Settings::<Date>::new());
+        let source = euribor(
+            Period::new(6, TimeUnit::Months),
+            Handle::empty(),
+            settings.clone(),
+        );
+        let helper = DepositRateHelper::from_rate(0.02, &source);
+        let curve = flat_curve(today(), 0.03);
+        helper.set_term_structure(&curve);
+
+        let error = helper.quote_error().unwrap_err();
+        assert_eq!(error.message(), "evaluation date is not set");
+
+        settings.set_evaluation_date(today());
+        assert!(helper.earliest_date() > today());
+        helper.quote_error().unwrap();
+    }
+
+    /// D10: the FRA helper's unset evaluation date surfaces as that error, not
+    /// as the `rebuild_dates` panic fallback "helper dates exceed supported
+    /// range", and clears once the date is set.
+    #[test]
+    fn fra_unset_evaluation_date_is_an_error_on_first_read() {
+        let settings = shared(Settings::<Date>::new());
+        let source = euribor(
+            Period::new(3, TimeUnit::Months),
+            Handle::empty(),
+            settings.clone(),
+        );
+        let error = FraRateHelper::try_from_rate(
+            0.02,
+            Period::new(3, TimeUnit::Months),
+            &source,
+            true,
+            Pillar::LastRelevantDate,
+        )
+        .err()
+        .unwrap();
+        assert_eq!(error.message(), "evaluation date is not set");
+
+        let helper = FraRateHelper::from_rate(
+            0.02,
+            Period::new(3, TimeUnit::Months),
+            &source,
+            true,
+            Pillar::LastRelevantDate,
+        );
+        let curve = flat_curve(today(), 0.03);
+        helper.set_term_structure(&curve);
+        let error = helper.quote_error().unwrap_err();
+        assert_eq!(error.message(), "evaluation date is not set");
+
+        settings.set_evaluation_date(today());
+        assert!(helper.validate_dates().is_ok());
+        assert!(helper.earliest_date() > today());
+        helper.quote_error().unwrap();
     }
 }
