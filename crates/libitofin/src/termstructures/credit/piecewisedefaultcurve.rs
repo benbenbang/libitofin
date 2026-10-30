@@ -1607,6 +1607,63 @@ mod tests {
         );
         assert_the_spreads_reproduce(&fixture);
     }
+
+    /// After a roll, the moving curve's generated jump dates stay fixed while
+    /// its jump times follow the new reference date (a C++ moving curve keeps
+    /// its construction-time times, see the module divergence), and it matches
+    /// a curve built fresh with the same jumps at the new reference date. The
+    /// probe between the old and new first jump time tells the two apart.
+    #[test]
+    fn a_rolled_moving_jumped_curve_matches_a_fresh_fixed_one() {
+        let settings = moving_settings();
+        let discount = discount_curve(today());
+        let (_, helpers) = spread_helpers_on(&settings, &discount);
+        let curve = PiecewiseDefaultCurve::<HazardRate, BackwardFlat>::moving_with_jumps(
+            MOVING_SETTLEMENT_DAYS,
+            Target::new(),
+            helpers,
+            day_counter(),
+            BackwardFlat,
+            settings.clone(),
+            jump_quotes(&JUMPS).1,
+            Vec::new(),
+        )
+        .unwrap();
+        assert_eq!(curve.jump_dates(), jump_dates());
+        let old_reference = TermStructure::reference_date(&*curve).unwrap();
+        let times = curve.jump_times().unwrap();
+        curve.calculate().unwrap();
+
+        settings.set_evaluation_date(business_days_after(today(), 15));
+        assert!(!curve.lazy.borrow().is_calculated());
+        let reference = TermStructure::reference_date(&*curve).unwrap();
+        assert_eq!(curve.jump_dates(), jump_dates());
+        let new_times = curve.jump_times().unwrap();
+        for ((old, new), date) in times.iter().zip(&new_times).zip(jump_dates()) {
+            assert!((old - day_counter().year_fraction(old_reference, date)).abs() <= 1.0e-14);
+            assert!((new - day_counter().year_fraction(reference, date)).abs() <= 1.0e-14);
+        }
+        assert!(new_times[0] < times[0]);
+
+        let (_, fresh_helpers) = spread_helpers_on(&settings, &discount);
+        let fresh = PiecewiseDefaultCurve::<HazardRate, BackwardFlat>::with_jumps(
+            reference,
+            fresh_helpers,
+            day_counter(),
+            BackwardFlat,
+            jump_quotes(&JUMPS).1,
+            jump_dates(),
+        )
+        .unwrap();
+        let probe = 0.5 * (times[0] + new_times[0]);
+        for t in [probe, 0.1, 1.0, 1.5, 2.0, 3.0, 4.5] {
+            let (a, b) = (
+                curve.survival_probability(t, false).unwrap(),
+                fresh.survival_probability(t, false).unwrap(),
+            );
+            assert!((a - b).abs() <= 1.0e-10, "t = {t}: {a} vs {b}");
+        }
+    }
 }
 
 #[cfg(test)]

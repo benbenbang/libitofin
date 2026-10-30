@@ -2289,4 +2289,61 @@ mod tests {
         );
         reprice_helpers(&vars, curve, TOLERANCE);
     }
+
+    /// After a roll, the moving curve's generated jump dates stay fixed while
+    /// its jump times follow the new reference date (a C++ moving curve keeps
+    /// its construction-time times, see the module divergence), and it matches
+    /// a curve built fresh with the same jumps at the new reference date. The
+    /// probe between the old and new first jump time tells the two apart.
+    #[test]
+    fn a_rolled_moving_jumped_curve_matches_a_fresh_fixed_one() {
+        let vars = common_vars();
+        let (_, handles) = jump_quotes(&JUMPS);
+        let curve = PiecewiseYieldCurve::<Discount, LogLinear>::moving_with_jumps(
+            2,
+            Target::new(),
+            vars.instruments.clone(),
+            Actual360::new(),
+            LogLinear,
+            vars.settings.clone(),
+            handles,
+            Vec::new(),
+        )
+        .unwrap();
+        assert_eq!(curve.jump_dates(), jump_dates());
+        let times = curve.jump_times().unwrap();
+        curve.calculate().unwrap();
+
+        vars.settings.set_evaluation_date(rolled(vars.today));
+        assert!(!curve.lazy.borrow().is_calculated());
+        let reference = TermStructure::reference_date(&*curve).unwrap();
+        assert_eq!(curve.jump_dates(), jump_dates());
+        let shift = Actual360::new().year_fraction(vars.settlement, reference);
+        let new_times = curve.jump_times().unwrap();
+        for (old, new) in times.iter().zip(&new_times) {
+            assert!(
+                (old - shift - new).abs() <= 1.0e-14,
+                "{old} - {shift} vs {new}"
+            );
+        }
+
+        let (_, instruments) = instruments_on(&vars.settings);
+        let fresh = PiecewiseYieldCurve::<Discount, LogLinear>::with_jumps(
+            reference,
+            instruments,
+            Actual360::new(),
+            LogLinear,
+            jump_quotes(&JUMPS).1,
+            jump_dates(),
+        )
+        .unwrap();
+        let probe = 0.5 * (times[0] + new_times[0]);
+        for t in [probe, 0.1, 1.0, 1.5, 2.0, 5.0, 10.0] {
+            let (a, b) = (
+                curve.discount(t, false).unwrap(),
+                fresh.discount(t, false).unwrap(),
+            );
+            assert!((a - b).abs() <= 1.0e-10, "t = {t}: {a} vs {b}");
+        }
+    }
 }
