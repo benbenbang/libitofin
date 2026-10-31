@@ -1063,6 +1063,11 @@ impl RateHelper for SwapRateHelper {
     /// The par swap rate implied by the current curve
     /// (`ratehelpers.cpp:633-646`).
     ///
+    /// The curve is brought up to date before the swap is borrowed, so a stale
+    /// curve re-bootstraps without re-entering this helper's borrowed swap; the
+    /// rate is then priced on the converged curve, as C++ does through
+    /// `LazyObject::calculate` (`lazyobject.hpp:257-258`).
+    ///
     /// The swap is force-recalculated first (the C++ `swap_->deepUpdate()`,
     /// forced because the helper does not observe the curve); then the rate is
     /// reconstructed from the floating-leg NPV, the spread carried on the
@@ -1070,7 +1075,8 @@ impl RateHelper for SwapRateHelper {
     /// `fair_rate()`.
     fn implied_quote(&self) -> QlResult<Real> {
         self.validate_dates()?;
-        self.base.term_structure()?;
+        let curve = self.base.term_structure()?;
+        curve.discount(0.0, true)?;
         let mut guard = self.swap.borrow_mut();
         let swap = guard
             .as_mut()
@@ -1346,6 +1352,11 @@ impl RateHelper for OISRateHelper {
 
     /// The par OIS rate implied by the current curve (`oisratehelper.cpp:220-232`).
     ///
+    /// The curve is brought up to date before the swap is borrowed, so a stale
+    /// curve re-bootstraps without re-entering this helper's borrowed swap; the
+    /// rate is then priced on the converged curve, as C++ does through
+    /// `LazyObject::calculate` (`lazyobject.hpp:257-258`).
+    ///
     /// The swap is force-recalculated first (the C++ `swap_->deepUpdate()`,
     /// forced because the helper does not observe the curve); then the rate is
     /// reconstructed from the overnight-leg NPV, the spread carried on the
@@ -1353,7 +1364,8 @@ impl RateHelper for OISRateHelper {
     /// `fair_rate()`.
     fn implied_quote(&self) -> QlResult<Real> {
         self.validate_dates()?;
-        self.base.term_structure()?;
+        let curve = self.base.term_structure()?;
+        curve.discount(0.0, true)?;
         let mut guard = self.swap.borrow_mut();
         let swap = guard
             .as_mut()
@@ -1479,7 +1491,7 @@ mod tests {
     use crate::termstructures::bootstraptraits::Discount;
     use crate::termstructures::yields::FlatForward;
     use crate::termstructures::yields::PiecewiseYieldCurve;
-    use crate::test_support::{Flag, as_observer};
+    use crate::test_support::{Flag, as_observer, implied_quote_on_dirty_curve};
     use crate::time::calendars::target::Target;
     use crate::time::date::{Date, Month};
     use crate::time::daycounters::actual360::Actual360;
@@ -2093,6 +2105,58 @@ mod tests {
             },
             || estr.add_fixing(today(), 0.08).unwrap(),
         );
+    }
+
+    /// A direct `implied_quote()` on a dirty curve re-bootstraps first and
+    /// prices on the converged curve, as C++ does (`lazyobject.hpp:257-258`),
+    /// rather than re-borrowing the swap from inside the nested bootstrap.
+    #[test]
+    fn swap_implied_quote_on_a_dirty_curve_reprices_the_new_quote() {
+        let (_settings, source) = swap_setup();
+        let (dirty, fresh) = implied_quote_on_dirty_curve(today(), 0.03, 0.04, |quote| {
+            SwapRateHelper::with_details(
+                quote,
+                Period::new(1, TimeUnit::Years),
+                Target::new(),
+                Frequency::Annual,
+                BusinessDayConvention::ModifiedFollowing,
+                Actual360::new(),
+                &source,
+                Handle::empty(),
+                Period::new(0, TimeUnit::Days),
+                None,
+                Pillar::LastRelevantDate,
+            ) as Shared<dyn RateHelper>
+        });
+        assert!((dirty - fresh).abs() < 1e-10, "{dirty} vs {fresh}");
+        assert!((dirty - 0.04).abs() < 1e-9, "{dirty}");
+    }
+
+    #[test]
+    fn ois_implied_quote_on_a_dirty_curve_reprices_the_new_quote() {
+        use crate::indexes::ibor::Estr;
+
+        let settings = settings_on(today());
+        let estr = Estr::new(Handle::empty(), settings.clone());
+        let (dirty, fresh) = implied_quote_on_dirty_curve(today(), 0.03, 0.04, |quote| {
+            OISRateHelper::new(
+                2,
+                Period::new(1, TimeUnit::Years),
+                quote,
+                &estr,
+                None,
+                0,
+                BusinessDayConvention::Following,
+                Frequency::Annual,
+                Period::new(0, TimeUnit::Days),
+                Handle::empty(),
+                Pillar::LastRelevantDate,
+                RateAveraging::Compound,
+                settings.clone(),
+            ) as Shared<dyn RateHelper>
+        });
+        assert!((dirty - fresh).abs() < 1e-10, "{dirty} vs {fresh}");
+        assert!((dirty - 0.04).abs() < 1e-9, "{dirty}");
     }
 
     /// The FRA helper is notified of a fixing (`ratehelpers.cpp:318`), and so
