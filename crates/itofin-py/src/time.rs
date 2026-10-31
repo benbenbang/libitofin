@@ -547,11 +547,7 @@ impl PyCalendar {
     ///     Calendar: The TARGET business-day calendar.
     #[staticmethod]
     fn target() -> Self {
-        PyCalendar {
-            inner: Target::new(),
-            horizon: None,
-            first_year: Date::min_date().year(),
-        }
+        PyCalendar::with_core_horizon(Target::new())
     }
 
     /// The calendar holding no holidays at all.
@@ -560,11 +556,7 @@ impl PyCalendar {
     ///     Calendar: The null calendar, on which every day is a business day.
     #[staticmethod]
     fn null_calendar() -> Self {
-        PyCalendar {
-            inner: NullCalendar::new(),
-            horizon: None,
-            first_year: Date::min_date().year(),
-        }
+        PyCalendar::with_core_horizon(NullCalendar::new())
     }
 
     /// The weekends-only calendar: Saturdays and Sundays are holidays and no
@@ -577,11 +569,7 @@ impl PyCalendar {
     ///     Calendar: The weekends-only calendar.
     #[staticmethod]
     fn weekends_only() -> Self {
-        PyCalendar {
-            inner: WeekendsOnly::new(),
-            horizon: None,
-            first_year: Date::min_date().year(),
-        }
+        PyCalendar::with_core_horizon(WeekendsOnly::new())
     }
 
     /// The Botswanan calendar.
@@ -590,11 +578,7 @@ impl PyCalendar {
     ///     Calendar: The Botswanan calendar.
     #[staticmethod]
     fn botswana() -> Self {
-        PyCalendar {
-            inner: Botswana::new(),
-            horizon: None,
-            first_year: Date::min_date().year(),
-        }
+        PyCalendar::with_core_horizon(Botswana::new())
     }
 
     /// The Danish calendar.
@@ -603,11 +587,7 @@ impl PyCalendar {
     ///     Calendar: The Danish calendar.
     #[staticmethod]
     fn denmark() -> Self {
-        PyCalendar {
-            inner: Denmark::new(),
-            horizon: None,
-            first_year: Date::min_date().year(),
-        }
+        PyCalendar::with_core_horizon(Denmark::new())
     }
 
     /// The Finnish calendar.
@@ -616,11 +596,7 @@ impl PyCalendar {
     ///     Calendar: The Finnish calendar.
     #[staticmethod]
     fn finland() -> Self {
-        PyCalendar {
-            inner: Finland::new(),
-            horizon: None,
-            first_year: Date::min_date().year(),
-        }
+        PyCalendar::with_core_horizon(Finland::new())
     }
 
     /// The Hungarian calendar.
@@ -629,11 +605,7 @@ impl PyCalendar {
     ///     Calendar: The Hungarian calendar.
     #[staticmethod]
     fn hungary() -> Self {
-        PyCalendar {
-            inner: Hungary::new(),
-            horizon: None,
-            first_year: Date::min_date().year(),
-        }
+        PyCalendar::with_core_horizon(Hungary::new())
     }
 
     /// The Japanese calendar.
@@ -642,11 +614,7 @@ impl PyCalendar {
     ///     Calendar: The Japanese calendar.
     #[staticmethod]
     fn japan() -> Self {
-        PyCalendar {
-            inner: Japan::new(),
-            horizon: None,
-            first_year: Date::min_date().year(),
-        }
+        PyCalendar::with_core_horizon(Japan::new())
     }
 
     /// The Norwegian calendar.
@@ -655,11 +623,7 @@ impl PyCalendar {
     ///     Calendar: The Norwegian calendar.
     #[staticmethod]
     fn norway() -> Self {
-        PyCalendar {
-            inner: Norway::new(),
-            horizon: None,
-            first_year: Date::min_date().year(),
-        }
+        PyCalendar::with_core_horizon(Norway::new())
     }
 
     /// The South African calendar.
@@ -668,11 +632,7 @@ impl PyCalendar {
     ///     Calendar: The South African calendar.
     #[staticmethod]
     fn south_africa() -> Self {
-        PyCalendar {
-            inner: SouthAfrica::new(),
-            horizon: None,
-            first_year: Date::min_date().year(),
-        }
+        PyCalendar::with_core_horizon(SouthAfrica::new())
     }
 
     /// The Swedish calendar.
@@ -681,11 +641,7 @@ impl PyCalendar {
     ///     Calendar: The Swedish calendar.
     #[staticmethod]
     fn sweden() -> Self {
-        PyCalendar {
-            inner: Sweden::new(),
-            horizon: None,
-            first_year: Date::min_date().year(),
-        }
+        PyCalendar::with_core_horizon(Sweden::new())
     }
 
     /// The Swiss calendar.
@@ -694,11 +650,7 @@ impl PyCalendar {
     ///     Calendar: The Swiss calendar.
     #[staticmethod]
     fn switzerland() -> Self {
-        PyCalendar {
-            inner: Switzerland::new(),
-            horizon: None,
-            first_year: Date::min_date().year(),
-        }
+        PyCalendar::with_core_horizon(Switzerland::new())
     }
 
     /// The Thai calendar.
@@ -707,11 +659,7 @@ impl PyCalendar {
     ///     Calendar: The Thai calendar.
     #[staticmethod]
     fn thailand() -> Self {
-        PyCalendar {
-            inner: Thailand::new(),
-            horizon: Some(libitofin::time::calendars::thailand::HOLIDAY_HORIZON),
-            first_year: Date::min_date().year(),
-        }
+        PyCalendar::with_core_horizon(Thailand::new())
     }
 
     /// The Turkish calendar.
@@ -720,11 +668,7 @@ impl PyCalendar {
     ///     Calendar: The Turkish calendar.
     #[staticmethod]
     fn turkey() -> Self {
-        PyCalendar {
-            inner: Turkey::new(),
-            horizon: Some(libitofin::time::calendars::turkey::HOLIDAY_HORIZON),
-            first_year: Date::min_date().year(),
-        }
+        PyCalendar::with_core_horizon(Turkey::new())
     }
 
     /// The Argentine calendar.
@@ -742,11 +686,7 @@ impl PyCalendar {
     fn argentina(market: &str) -> PyResult<Self> {
         use libitofin::time::calendars::argentina::Market;
         let market = parse_name("Argentina market", market, &[("Merval", Market::Merval)])?;
-        Ok(PyCalendar {
-            inner: Argentina::new(market),
-            horizon: None,
-            first_year: Date::min_date().year(),
-        })
+        Ok(PyCalendar::with_core_horizon(Argentina::new(market)))
     }
 
     /// The Australian calendar.
@@ -768,11 +708,7 @@ impl PyCalendar {
             market,
             &[("Settlement", Market::Settlement), ("ASX", Market::Asx)],
         )?;
-        Ok(PyCalendar {
-            inner: Australia::new(market),
-            horizon: None,
-            first_year: Date::min_date().year(),
-        })
+        Ok(PyCalendar::with_core_horizon(Australia::new(market)))
     }
 
     /// The Austrian calendar.
@@ -797,11 +733,7 @@ impl PyCalendar {
                 ("Exchange", Market::Exchange),
             ],
         )?;
-        Ok(PyCalendar {
-            inner: Austria::new(market),
-            horizon: None,
-            first_year: Date::min_date().year(),
-        })
+        Ok(PyCalendar::with_core_horizon(Austria::new(market)))
     }
 
     /// The Brazilian calendar.
@@ -826,11 +758,7 @@ impl PyCalendar {
                 ("Exchange", Market::Exchange),
             ],
         )?;
-        Ok(PyCalendar {
-            inner: Brazil::new(market),
-            horizon: None,
-            first_year: Date::min_date().year(),
-        })
+        Ok(PyCalendar::with_core_horizon(Brazil::new(market)))
     }
 
     /// The Canadian calendar.
@@ -852,11 +780,7 @@ impl PyCalendar {
             market,
             &[("Settlement", Market::Settlement), ("TSX", Market::Tsx)],
         )?;
-        Ok(PyCalendar {
-            inner: Canada::new(market),
-            horizon: None,
-            first_year: Date::min_date().year(),
-        })
+        Ok(PyCalendar::with_core_horizon(Canada::new(market)))
     }
 
     /// The Chilean calendar.
@@ -874,11 +798,7 @@ impl PyCalendar {
     fn chile(market: &str) -> PyResult<Self> {
         use libitofin::time::calendars::chile::Market;
         let market = parse_name("Chile market", market, &[("SSE", Market::Sse)])?;
-        Ok(PyCalendar {
-            inner: Chile::new(market),
-            horizon: None,
-            first_year: Date::min_date().year(),
-        })
+        Ok(PyCalendar::with_core_horizon(Chile::new(market)))
     }
 
     /// The Chinese calendar.
@@ -900,11 +820,7 @@ impl PyCalendar {
             market,
             &[("SSE", Market::Sse), ("IB", Market::Ib)],
         )?;
-        Ok(PyCalendar {
-            inner: China::new(market),
-            horizon: Some(libitofin::time::calendars::china::HOLIDAY_HORIZON),
-            first_year: Date::min_date().year(),
-        })
+        Ok(PyCalendar::with_core_horizon(China::new(market)))
     }
 
     /// The Croatian calendar.
@@ -922,11 +838,7 @@ impl PyCalendar {
     fn croatia(market: &str) -> PyResult<Self> {
         use libitofin::time::calendars::croatia::Market;
         let market = parse_name("Croatia market", market, &[("ZSE", Market::Zse)])?;
-        Ok(PyCalendar {
-            inner: Croatia::new(market),
-            horizon: None,
-            first_year: Date::min_date().year(),
-        })
+        Ok(PyCalendar::with_core_horizon(Croatia::new(market)))
     }
 
     /// The Czech calendar.
@@ -944,11 +856,7 @@ impl PyCalendar {
     fn czech_republic(market: &str) -> PyResult<Self> {
         use libitofin::time::calendars::czechrepublic::Market;
         let market = parse_name("CzechRepublic market", market, &[("PSE", Market::Pse)])?;
-        Ok(PyCalendar {
-            inner: CzechRepublic::new(market),
-            horizon: None,
-            first_year: Date::min_date().year(),
-        })
+        Ok(PyCalendar::with_core_horizon(CzechRepublic::new(market)))
     }
 
     /// The French calendar.
@@ -973,11 +881,7 @@ impl PyCalendar {
                 ("Exchange", Market::Exchange),
             ],
         )?;
-        Ok(PyCalendar {
-            inner: France::new(market),
-            horizon: None,
-            first_year: Date::min_date().year(),
-        })
+        Ok(PyCalendar::with_core_horizon(France::new(market)))
     }
 
     /// The German calendar.
@@ -1005,11 +909,7 @@ impl PyCalendar {
                 ("Euwax", Market::Euwax),
             ],
         )?;
-        Ok(PyCalendar {
-            inner: Germany::new(market),
-            horizon: None,
-            first_year: Date::min_date().year(),
-        })
+        Ok(PyCalendar::with_core_horizon(Germany::new(market)))
     }
 
     /// The Hong Kong calendar.
@@ -1027,11 +927,7 @@ impl PyCalendar {
     fn hong_kong(market: &str) -> PyResult<Self> {
         use libitofin::time::calendars::hongkong::Market;
         let market = parse_name("HongKong market", market, &[("HKEx", Market::HKEx)])?;
-        Ok(PyCalendar {
-            inner: HongKong::new(market),
-            horizon: Some(libitofin::time::calendars::hongkong::HOLIDAY_HORIZON),
-            first_year: Date::min_date().year(),
-        })
+        Ok(PyCalendar::with_core_horizon(HongKong::new(market)))
     }
 
     /// The Icelandic calendar.
@@ -1049,11 +945,7 @@ impl PyCalendar {
     fn iceland(market: &str) -> PyResult<Self> {
         use libitofin::time::calendars::iceland::Market;
         let market = parse_name("Iceland market", market, &[("ICEX", Market::Icex)])?;
-        Ok(PyCalendar {
-            inner: Iceland::new(market),
-            horizon: None,
-            first_year: Date::min_date().year(),
-        })
+        Ok(PyCalendar::with_core_horizon(Iceland::new(market)))
     }
 
     /// The Indian calendar.
@@ -1071,11 +963,7 @@ impl PyCalendar {
     fn india(market: &str) -> PyResult<Self> {
         use libitofin::time::calendars::india::Market;
         let market = parse_name("India market", market, &[("NSE", Market::Nse)])?;
-        Ok(PyCalendar {
-            inner: India::new(market),
-            horizon: Some(libitofin::time::calendars::india::HOLIDAY_HORIZON),
-            first_year: Date::min_date().year(),
-        })
+        Ok(PyCalendar::with_core_horizon(India::new(market)))
     }
 
     /// The Indonesian calendar.
@@ -1105,11 +993,7 @@ impl PyCalendar {
                 ("IDX", Market::Idx),
             ],
         )?;
-        Ok(PyCalendar {
-            inner: Indonesia::new(market),
-            horizon: Some(libitofin::time::calendars::indonesia::HOLIDAY_HORIZON),
-            first_year: Date::min_date().year(),
-        })
+        Ok(PyCalendar::with_core_horizon(Indonesia::new(market)))
     }
 
     /// The Israeli calendar.
@@ -1136,11 +1020,7 @@ impl PyCalendar {
                 ("Telbor", Market::Telbor),
             ],
         )?;
-        Ok(PyCalendar {
-            inner: Israel::new(market),
-            horizon: Some(libitofin::time::calendars::israel::HOLIDAY_HORIZON),
-            first_year: Date::min_date().year(),
-        })
+        Ok(PyCalendar::with_core_horizon(Israel::new(market)))
     }
 
     /// The Italian calendar.
@@ -1165,11 +1045,7 @@ impl PyCalendar {
                 ("Exchange", Market::Exchange),
             ],
         )?;
-        Ok(PyCalendar {
-            inner: Italy::new(market),
-            horizon: None,
-            first_year: Date::min_date().year(),
-        })
+        Ok(PyCalendar::with_core_horizon(Italy::new(market)))
     }
 
     /// The Maltese calendar.
@@ -1187,11 +1063,7 @@ impl PyCalendar {
     fn malta(market: &str) -> PyResult<Self> {
         use libitofin::time::calendars::malta::Market;
         let market = parse_name("Malta market", market, &[("MSE", Market::Mse)])?;
-        Ok(PyCalendar {
-            inner: Malta::new(market),
-            horizon: None,
-            first_year: Date::min_date().year(),
-        })
+        Ok(PyCalendar::with_core_horizon(Malta::new(market)))
     }
 
     /// The Mexican calendar.
@@ -1209,11 +1081,7 @@ impl PyCalendar {
     fn mexico(market: &str) -> PyResult<Self> {
         use libitofin::time::calendars::mexico::Market;
         let market = parse_name("Mexico market", market, &[("BMV", Market::Bmv)])?;
-        Ok(PyCalendar {
-            inner: Mexico::new(market),
-            horizon: None,
-            first_year: Date::min_date().year(),
-        })
+        Ok(PyCalendar::with_core_horizon(Mexico::new(market)))
     }
 
     /// The Montenegrin calendar.
@@ -1231,11 +1099,7 @@ impl PyCalendar {
     fn montenegro(market: &str) -> PyResult<Self> {
         use libitofin::time::calendars::montenegro::Market;
         let market = parse_name("Montenegro market", market, &[("MNSE", Market::Mnse)])?;
-        Ok(PyCalendar {
-            inner: Montenegro::new(market),
-            horizon: None,
-            first_year: Date::min_date().year(),
-        })
+        Ok(PyCalendar::with_core_horizon(Montenegro::new(market)))
     }
 
     /// The New Zealand calendar.
@@ -1260,11 +1124,7 @@ impl PyCalendar {
                 ("Auckland", Market::Auckland),
             ],
         )?;
-        Ok(PyCalendar {
-            inner: NewZealand::new(market),
-            horizon: Some(libitofin::time::calendars::newzealand::HOLIDAY_HORIZON),
-            first_year: Date::min_date().year(),
-        })
+        Ok(PyCalendar::with_core_horizon(NewZealand::new(market)))
     }
 
     /// The North Macedonian calendar.
@@ -1282,11 +1142,7 @@ impl PyCalendar {
     fn north_macedonia(market: &str) -> PyResult<Self> {
         use libitofin::time::calendars::northmacedonia::Market;
         let market = parse_name("NorthMacedonia market", market, &[("MSE", Market::Mse)])?;
-        Ok(PyCalendar {
-            inner: NorthMacedonia::new(market),
-            horizon: Some(libitofin::time::calendars::northmacedonia::HOLIDAY_HORIZON),
-            first_year: Date::min_date().year(),
-        })
+        Ok(PyCalendar::with_core_horizon(NorthMacedonia::new(market)))
     }
 
     /// The Polish calendar.
@@ -1308,11 +1164,7 @@ impl PyCalendar {
             market,
             &[("Settlement", Market::Settlement), ("WSE", Market::Wse)],
         )?;
-        Ok(PyCalendar {
-            inner: Poland::new(market),
-            horizon: None,
-            first_year: Date::min_date().year(),
-        })
+        Ok(PyCalendar::with_core_horizon(Poland::new(market)))
     }
 
     /// The Romanian calendar.
@@ -1334,11 +1186,7 @@ impl PyCalendar {
             market,
             &[("Public", Market::Public), ("BVB", Market::Bvb)],
         )?;
-        Ok(PyCalendar {
-            inner: Romania::new(market),
-            horizon: None,
-            first_year: Date::min_date().year(),
-        })
+        Ok(PyCalendar::with_core_horizon(Romania::new(market)))
     }
 
     /// The Russian calendar.
@@ -1360,9 +1208,10 @@ impl PyCalendar {
             market,
             &[("Settlement", Market::Settlement), ("MOEX", Market::Moex)],
         )?;
+        let inner = Russia::new(market);
         Ok(PyCalendar {
-            inner: Russia::new(market),
-            horizon: None,
+            horizon: inner.holiday_horizon(),
+            inner,
             first_year: if market == Market::Moex {
                 libitofin::time::calendars::russia::MOEX_FIRST_YEAR
             } else {
@@ -1394,11 +1243,7 @@ impl PyCalendar {
             market,
             &[("Tadawul", Market::Tadawul)],
         )?;
-        Ok(PyCalendar {
-            inner: SaudiArabia::new(market),
-            horizon: Some(libitofin::time::calendars::saudiarabia::HOLIDAY_HORIZON),
-            first_year: Date::min_date().year(),
-        })
+        Ok(PyCalendar::with_core_horizon(SaudiArabia::new(market)))
     }
 
     /// The Serbian calendar.
@@ -1416,11 +1261,7 @@ impl PyCalendar {
     fn serbia(market: &str) -> PyResult<Self> {
         use libitofin::time::calendars::serbia::Market;
         let market = parse_name("Serbia market", market, &[("BSE", Market::Bse)])?;
-        Ok(PyCalendar {
-            inner: Serbia::new(market),
-            horizon: None,
-            first_year: Date::min_date().year(),
-        })
+        Ok(PyCalendar::with_core_horizon(Serbia::new(market)))
     }
 
     /// The Singapore calendar.
@@ -1438,11 +1279,7 @@ impl PyCalendar {
     fn singapore(market: &str) -> PyResult<Self> {
         use libitofin::time::calendars::singapore::Market;
         let market = parse_name("Singapore market", market, &[("SGX", Market::Sgx)])?;
-        Ok(PyCalendar {
-            inner: Singapore::new(market),
-            horizon: Some(libitofin::time::calendars::singapore::HOLIDAY_HORIZON),
-            first_year: Date::min_date().year(),
-        })
+        Ok(PyCalendar::with_core_horizon(Singapore::new(market)))
     }
 
     /// The Slovak calendar.
@@ -1460,11 +1297,7 @@ impl PyCalendar {
     fn slovakia(market: &str) -> PyResult<Self> {
         use libitofin::time::calendars::slovakia::Market;
         let market = parse_name("Slovakia market", market, &[("BSSE", Market::Bsse)])?;
-        Ok(PyCalendar {
-            inner: Slovakia::new(market),
-            horizon: None,
-            first_year: Date::min_date().year(),
-        })
+        Ok(PyCalendar::with_core_horizon(Slovakia::new(market)))
     }
 
     /// The Slovenian calendar.
@@ -1482,11 +1315,7 @@ impl PyCalendar {
     fn slovenia(market: &str) -> PyResult<Self> {
         use libitofin::time::calendars::slovenia::Market;
         let market = parse_name("Slovenia market", market, &[("LSE", Market::Lse)])?;
-        Ok(PyCalendar {
-            inner: Slovenia::new(market),
-            horizon: None,
-            first_year: Date::min_date().year(),
-        })
+        Ok(PyCalendar::with_core_horizon(Slovenia::new(market)))
     }
 
     /// The South Korean calendar.
@@ -1508,11 +1337,7 @@ impl PyCalendar {
             market,
             &[("Settlement", Market::Settlement), ("KRX", Market::Krx)],
         )?;
-        Ok(PyCalendar {
-            inner: SouthKorea::new(market),
-            horizon: Some(libitofin::time::calendars::southkorea::HOLIDAY_HORIZON),
-            first_year: Date::min_date().year(),
-        })
+        Ok(PyCalendar::with_core_horizon(SouthKorea::new(market)))
     }
 
     /// The Taiwanese calendar.
@@ -1530,11 +1355,7 @@ impl PyCalendar {
     fn taiwan(market: &str) -> PyResult<Self> {
         use libitofin::time::calendars::taiwan::Market;
         let market = parse_name("Taiwan market", market, &[("TSEC", Market::Tsec)])?;
-        Ok(PyCalendar {
-            inner: Taiwan::new(market),
-            horizon: Some(libitofin::time::calendars::taiwan::HOLIDAY_HORIZON),
-            first_year: Date::min_date().year(),
-        })
+        Ok(PyCalendar::with_core_horizon(Taiwan::new(market)))
     }
 
     /// The Ukrainian calendar.
@@ -1552,11 +1373,7 @@ impl PyCalendar {
     fn ukraine(market: &str) -> PyResult<Self> {
         use libitofin::time::calendars::ukraine::Market;
         let market = parse_name("Ukraine market", market, &[("USE", Market::Use)])?;
-        Ok(PyCalendar {
-            inner: Ukraine::new(market),
-            horizon: None,
-            first_year: Date::min_date().year(),
-        })
+        Ok(PyCalendar::with_core_horizon(Ukraine::new(market)))
     }
 
     /// The UK calendar.
@@ -1582,11 +1399,7 @@ impl PyCalendar {
                 ("Metals", Market::Metals),
             ],
         )?;
-        Ok(PyCalendar {
-            inner: UnitedKingdom::new(market),
-            horizon: None,
-            first_year: Date::min_date().year(),
-        })
+        Ok(PyCalendar::with_core_horizon(UnitedKingdom::new(market)))
     }
 
     /// The US calendar.
@@ -1616,11 +1429,7 @@ impl PyCalendar {
                 ("SOFR", Market::Sofr),
             ],
         )?;
-        Ok(PyCalendar {
-            inner: UnitedStates::new(market),
-            horizon: None,
-            first_year: Date::min_date().year(),
-        })
+        Ok(PyCalendar::with_core_horizon(UnitedStates::new(market)))
     }
 
     /// The Uzbek calendar.
@@ -1638,11 +1447,7 @@ impl PyCalendar {
     fn uzbekistan(market: &str) -> PyResult<Self> {
         use libitofin::time::calendars::uzbekistan::Market;
         let market = parse_name("Uzbekistan market", market, &[("UZSE", Market::Uzse)])?;
-        Ok(PyCalendar {
-            inner: Uzbekistan::new(market),
-            horizon: Some(libitofin::time::calendars::uzbekistan::HOLIDAY_HORIZON),
-            first_year: Date::min_date().year(),
-        })
+        Ok(PyCalendar::with_core_horizon(Uzbekistan::new(market)))
     }
 
     /// A calendar combining several others.
@@ -1897,6 +1702,16 @@ impl PyCalendar {
     /// The wrapped core Calendar (cheap `Rc` clone).
     pub(crate) fn inner(&self) -> Calendar {
         self.inner.clone()
+    }
+
+    /// Wraps a core Calendar built by a factory, guarded at the horizon its
+    /// core table reports through `holiday_horizon()`.
+    fn with_core_horizon(inner: Calendar) -> Self {
+        PyCalendar {
+            horizon: inner.holiday_horizon(),
+            inner,
+            first_year: Date::min_date().year(),
+        }
     }
 
     /// Wraps a core Calendar a facade read back off an object it built.
