@@ -48,7 +48,7 @@ jobs:
             python_arch: ''
             sdist: false
             optional: false
-          - os: macos-14
+          - os: macos-15
             name: macos-arm64
             target: aarch64
             python_arch: ''
