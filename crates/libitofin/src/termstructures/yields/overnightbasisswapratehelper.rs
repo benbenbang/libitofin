@@ -151,11 +151,15 @@ impl RateHelper for OvernightIborBasisSwapRateHelper {
         &self.base
     }
 
+    /// The curve is brought up to date before the swap is borrowed, so a
+    /// stale curve re-bootstraps without re-entering this helper's borrowed
+    /// swap, as C++ `LazyObject::calculate` allows (`lazyobject.hpp:257-258`).
     fn implied_quote(&self) -> QlResult<Real> {
         if let Some(error) = self.date_error.borrow().as_ref() {
             return Err(error.clone());
         }
-        self.base.term_structure()?;
+        let curve = self.base.term_structure()?;
+        curve.discount(0.0, true)?;
         let mut guard = self.swap.borrow_mut();
         let swap = guard.as_mut().expect("initialize_dates populates the swap");
         swap.recalculate()?;

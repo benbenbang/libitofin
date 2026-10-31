@@ -283,11 +283,16 @@ impl RateHelper for IborIborBasisSwapRateHelper {
 
     /// The basis that zeroes the swap on the current curve
     /// (`basisswapratehelpers.cpp:106-109`), after a forced recalculation.
+    ///
+    /// The curve is brought up to date before the swap is borrowed, so a
+    /// stale curve re-bootstraps without re-entering this helper's borrowed
+    /// swap, as C++ `LazyObject::calculate` allows (`lazyobject.hpp:257-258`).
     fn implied_quote(&self) -> QlResult<Real> {
         if let Some(error) = self.date_error.borrow().as_ref() {
             return Err(error.clone());
         }
-        self.base.term_structure()?;
+        let curve = self.base.term_structure()?;
+        curve.discount(0.0, true)?;
         let mut guard = self.swap.borrow_mut();
         let swap = guard
             .as_mut()
@@ -404,7 +409,7 @@ mod tests {
     use crate::quotes::SimpleQuote;
     use crate::termstructures::bootstraptraits::Discount;
     use crate::termstructures::yields::{FlatForward, PiecewiseYieldCurve};
-    use crate::test_support::{Flag, as_observer};
+    use crate::test_support::{Flag, as_observer, implied_quote_on_dirty_curve};
     use crate::time::calendars::target::Target;
     use crate::time::date::Month;
     use crate::time::daycounters::actual360::Actual360;
@@ -720,6 +725,32 @@ mod tests {
             assert!((after - before).abs() > 1e-4);
             h.set_term_structure(&m.curve3m);
             assert!(!Flag::is_up(&flag));
+        }
+    }
+
+    /// A direct `implied_quote()` on a dirty curve re-bootstraps first and
+    /// prices on the converged curve, for either bootstrapped leg.
+    #[test]
+    fn implied_quote_on_a_dirty_curve_reprices_the_new_quote() {
+        for bootstrap_base_curve in [true, false] {
+            let m = market();
+            let today = m.settings.evaluation_date().unwrap();
+            let (dirty, fresh) = implied_quote_on_dirty_curve(today, 0.002, 0.003, |quote| {
+                IborIborBasisSwapRateHelper::new(
+                    quote,
+                    Period::new(5, TimeUnit::Years),
+                    m.euribor3m.fixing_days(),
+                    m.euribor3m.fixing_calendar(),
+                    m.euribor3m.business_day_convention(),
+                    m.euribor3m.end_of_month(),
+                    &m.euribor3m,
+                    &m.euribor6m,
+                    m.discount.clone(),
+                    bootstrap_base_curve,
+                ) as Shared<dyn RateHelper>
+            });
+            assert!((dirty - fresh).abs() < 1e-12, "{dirty} vs {fresh}");
+            assert!((dirty - 0.003).abs() < 1e-10, "{dirty}");
         }
     }
 }

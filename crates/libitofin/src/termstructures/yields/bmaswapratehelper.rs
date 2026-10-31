@@ -217,11 +217,15 @@ impl RateHelper for BMASwapRateHelper {
     fn base(&self) -> &BootstrapHelperBase {
         &self.base
     }
+    /// The curve is brought up to date before the swap is borrowed, so a
+    /// stale curve re-bootstraps without re-entering this helper's borrowed
+    /// swap, as C++ `LazyObject::calculate` allows (`lazyobject.hpp:257-258`).
     fn implied_quote(&self) -> QlResult<f64> {
         if let Some(error) = self.date_error.borrow().as_ref() {
             return Err(error.clone());
         }
-        self.base.term_structure()?;
+        let curve = self.base.term_structure()?;
+        curve.discount(0.0, true)?;
         let mut slot = self.swap.borrow_mut();
         let swap = slot.as_mut().expect("validated BMA helper has a swap");
         swap.swap_mut().deep_update();
