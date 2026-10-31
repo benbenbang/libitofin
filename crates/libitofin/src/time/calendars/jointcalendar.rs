@@ -6,7 +6,7 @@
 
 use crate::shared::shared;
 use crate::time::calendar::{Calendar, CalendarImpl};
-use crate::time::date::Date;
+use crate::time::date::{Date, Year};
 use crate::time::weekday::Weekday;
 
 /// How the business days of several calendars are combined.
@@ -99,6 +99,20 @@ impl CalendarImpl for Impl {
             }
         }
     }
+
+    /// The earliest holiday horizon among the members, or `None` if no member
+    /// has one. Past that year at least one member answers from its recurring
+    /// rules only, so the joint answer is no longer fully tabulated under
+    /// either [`JointCalendarRule`].
+    ///
+    /// This is an itofin addition with no QuantLib counterpart (QuantLib has
+    /// no horizon concept), so there is no C++ oracle.
+    fn holiday_horizon(&self) -> Option<Year> {
+        self.calendars
+            .iter()
+            .filter_map(|c| c.holiday_horizon())
+            .min()
+    }
 }
 
 #[cfg(test)]
@@ -131,6 +145,71 @@ mod tests {
 
         fn is_business_day(&self, date: Date) -> bool {
             !self.is_weekend_on(date)
+        }
+    }
+
+    struct HorizonCal(Year);
+
+    impl CalendarImpl for HorizonCal {
+        fn name(&self) -> String {
+            format!("horizon {}", self.0)
+        }
+
+        fn is_weekend(&self, weekday: Weekday) -> bool {
+            crate::time::calendar::is_weekend_sat_sun(weekday)
+        }
+
+        fn is_business_day(&self, date: Date) -> bool {
+            !self.is_weekend(date.weekday())
+        }
+
+        fn holiday_horizon(&self) -> Option<Year> {
+            Some(self.0)
+        }
+    }
+
+    fn horizon(year: Year) -> Calendar {
+        Calendar::from_impl(shared(HorizonCal(year)))
+    }
+
+    const RULES: [JointCalendarRule; 2] = [
+        JointCalendarRule::JoinHolidays,
+        JointCalendarRule::JoinBusinessDays,
+    ];
+
+    #[test]
+    fn horizon_comes_from_the_only_member_that_has_one() {
+        for rule in RULES {
+            let joint = JointCalendar::of_two(horizon(2050), Target::new(), rule);
+            assert_eq!(joint.holiday_horizon(), Some(2050));
+        }
+    }
+
+    #[test]
+    fn horizon_is_the_earliest_of_the_members() {
+        for rule in RULES {
+            let joint = JointCalendar::new(
+                vec![horizon(2050), WeekendsOnly::new(), horizon(2030)],
+                rule,
+            );
+            assert_eq!(joint.holiday_horizon(), Some(2030));
+        }
+    }
+
+    #[test]
+    fn horizon_is_none_without_tabulated_members() {
+        for rule in RULES {
+            let joint = JointCalendar::of_two(Target::new(), WeekendsOnly::new(), rule);
+            assert_eq!(joint.holiday_horizon(), None);
+        }
+    }
+
+    #[test]
+    fn horizon_recurses_into_nested_joint_calendars() {
+        for rule in RULES {
+            let inner = JointCalendar::of_two(horizon(2040), Target::new(), rule);
+            let joint = JointCalendar::of_two(WeekendsOnly::new(), inner, rule);
+            assert_eq!(joint.holiday_horizon(), Some(2040));
         }
     }
 
