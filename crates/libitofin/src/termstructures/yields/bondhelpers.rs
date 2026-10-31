@@ -130,8 +130,13 @@ impl RateHelper for BondHelper {
     /// The bond is force-recalculated first (the C++ `bond_->recalculate()`,
     /// forced because the helper does not observe the curve); then the clean or
     /// dirty price is returned per the helper's price type.
+    ///
+    /// The curve is brought up to date before the bond is borrowed, so a
+    /// stale curve re-bootstraps without re-entering this helper's borrowed
+    /// bond, as C++ `LazyObject::calculate` allows (`lazyobject.hpp:257-258`).
     fn implied_quote(&self) -> QlResult<Real> {
-        self.base.term_structure()?;
+        let curve = self.base.term_structure()?;
+        curve.discount(0.0, true)?;
         let mut bond = self.bond.borrow_mut();
         bond.recalculate()?;
         match self.price_type {
@@ -212,7 +217,7 @@ mod tests {
     use crate::interestrate::Compounding;
     use crate::quotes::SimpleQuote;
     use crate::termstructures::yields::FlatForward;
-    use crate::test_support::{Flag, as_observer};
+    use crate::test_support::{Flag, as_observer, implied_quote_on_dirty_curve};
     use crate::time::businessdayconvention::BusinessDayConvention;
     use crate::time::calendars::nullcalendar::NullCalendar;
     use crate::time::calendars::target::Target;
@@ -590,5 +595,18 @@ mod tests {
                 (estimated - price).abs()
             );
         }
+    }
+
+    /// A direct `implied_quote()` on a dirty curve re-bootstraps first and
+    /// prices on the converged curve.
+    #[test]
+    fn implied_quote_on_a_dirty_curve_reprices_the_new_quote() {
+        let settings = settings_on(today());
+        let (dirty, fresh) = implied_quote_on_dirty_curve(today(), 100.0, 101.0, |price| {
+            a_helper(price, BondPriceType::Clean, Shared::clone(&settings))
+                as Shared<dyn RateHelper>
+        });
+        assert!((dirty - fresh).abs() < 1e-10, "{dirty} vs {fresh}");
+        assert!((dirty - 101.0).abs() < 1e-8, "{dirty}");
     }
 }

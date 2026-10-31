@@ -6,6 +6,7 @@ use crate::math::interpolations::loglinear::LogLinear;
 use crate::quotes::SimpleQuote;
 use crate::termstructures::bootstraptraits::Discount;
 use crate::termstructures::yields::{FlatForward, PiecewiseYieldCurve};
+use crate::test_support::implied_quote_on_dirty_curve;
 use crate::time::date::Month;
 use crate::time::daycounters::{
     actual360::Actual360,
@@ -342,4 +343,27 @@ fn bma_invalid_constructor_inputs_are_fallible() {
         .is_err()
     );
     assert!(m.bma.fixing_schedule(m.today + 1, m.today).is_err());
+}
+
+/// A direct `implied_quote()` on a dirty curve re-bootstraps first and prices
+/// on the converged curve.
+#[test]
+fn implied_quote_on_a_dirty_curve_reprices_the_new_quote() {
+    let m = Market::new();
+    let (dirty, fresh) = implied_quote_on_dirty_curve(m.today, 0.6881, 0.70, |quote| {
+        BMASwapRateHelper::new(
+            quote,
+            Period::new(5, TimeUnit::Years),
+            2,
+            m.calendar.clone(),
+            Period::new(3, TimeUnit::Months),
+            Bdc::Following,
+            ActualActual::with_convention(Convention::ISDA),
+            &m.bma,
+            &m.ibor,
+        )
+        .unwrap() as Shared<dyn RateHelper>
+    });
+    assert!((dirty - fresh).abs() < 1e-12, "{dirty} vs {fresh}");
+    assert!((dirty - 0.70).abs() < 1e-10, "{dirty}");
 }

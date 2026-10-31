@@ -111,8 +111,12 @@ impl RateHelper for OvernightIndexFutureRateHelper {
     fn base(&self) -> &BootstrapHelperBase {
         &self.base
     }
+    /// The curve is brought up to date before the future is borrowed, so a
+    /// stale curve re-bootstraps without re-entering this helper's borrowed
+    /// future, as C++ `LazyObject::calculate` allows (`lazyobject.hpp:257-258`).
     fn implied_quote(&self) -> QlResult<Real> {
-        self.base.term_structure()?;
+        let curve = self.base.term_structure()?;
+        curve.discount(0.0, true)?;
         let mut future = self.future.borrow_mut();
         future.recalculate()?;
         future.npv()
@@ -180,5 +184,35 @@ impl SofrFutureRateHelper {
             averaging,
             pillar,
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_support::implied_quote_on_dirty_curve;
+
+    /// A direct `implied_quote()` on a dirty curve re-bootstraps first and
+    /// prices on the converged curve.
+    #[test]
+    fn implied_quote_on_a_dirty_curve_reprices_the_new_quote() {
+        let today = Date::new(15, Month::June, 2026);
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(today);
+        let sofr = shared(Sofr::new(Handle::empty(), settings));
+        let (dirty, fresh) = implied_quote_on_dirty_curve(today, 96.0, 95.5, |price| {
+            OvernightIndexFutureRateHelper::new(
+                price,
+                Date::new(16, Month::September, 2026),
+                Date::new(16, Month::December, 2026),
+                &sofr,
+                Handle::empty(),
+                RateAveraging::Compound,
+                Pillar::LastRelevantDate,
+            )
+            .unwrap() as Shared<dyn RateHelper>
+        });
+        assert!((dirty - fresh).abs() < 1e-10, "{dirty} vs {fresh}");
+        assert!((dirty - 95.5).abs() < 1e-8, "{dirty}");
     }
 }

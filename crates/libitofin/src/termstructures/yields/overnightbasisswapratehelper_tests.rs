@@ -5,7 +5,7 @@ use crate::math::interpolations::loglinear::LogLinear;
 use crate::quotes::SimpleQuote;
 use crate::termstructures::bootstraptraits::Discount;
 use crate::termstructures::yields::{FlatForward, PiecewiseYieldCurve};
-use crate::test_support::{Flag, as_observer};
+use crate::test_support::{Flag, as_observer, implied_quote_on_dirty_curve};
 use crate::time::calendars::target::Target;
 use crate::time::date::Month;
 use crate::time::daycounters::actual360::Actual360;
@@ -154,4 +154,40 @@ fn malformed_inputs_and_date_updates_return_errors_and_recover() {
         initial_dates
     );
     assert!((h.implied_quote().unwrap() - initial_quote).abs() < 1e-14);
+}
+
+/// A direct `implied_quote()` on a dirty curve re-bootstraps first and prices
+/// on the converged curve.
+#[test]
+fn implied_quote_on_a_dirty_curve_reprices_the_new_quote() {
+    let settings = shared(Settings::<Date>::new());
+    let today = Date::new(23, Month::October, 2025);
+    settings.set_evaluation_date(today);
+    let flat = |rate: Real| {
+        Handle::new(shared(FlatForward::with_rate(
+            today,
+            rate,
+            Actual360::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        )) as Shared<dyn YieldTermStructure>)
+    };
+    let overnight = shared(Estr::new(flat(0.021), settings.clone()));
+    let ibor = shared(Euribor::three_months(Handle::empty(), settings.clone()));
+    let (dirty, fresh) = implied_quote_on_dirty_curve(today, 0.002, 0.003, |quote| {
+        OvernightIborBasisSwapRateHelper::new(
+            quote,
+            Period::new(5, TimeUnit::Years),
+            2,
+            Target::new(),
+            BusinessDayConvention::ModifiedFollowing,
+            false,
+            &overnight,
+            &ibor,
+            flat(0.012),
+        )
+        .unwrap() as Shared<dyn RateHelper>
+    });
+    assert!((dirty - fresh).abs() < 1e-12, "{dirty} vs {fresh}");
+    assert!((dirty - 0.003).abs() < 1e-10, "{dirty}");
 }
