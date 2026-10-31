@@ -89,7 +89,7 @@ jobs:
             platform: linux-arm64
           - os: macos-15-intel
             platform: darwin-amd64
-          - os: macos-14
+          - os: macos-15
             platform: darwin-arm64
     runs-on: ${{ matrix.os }}
     steps:
