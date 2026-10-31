@@ -957,6 +957,93 @@ mod tests {
         );
     }
 
+    /// Re-prices `make`'s helper on a dirty curve, the issue #1350 scenario.
+    ///
+    /// Bootstraps a single-helper curve on `quote_before`, moves the helper's
+    /// own quote to `quote_after`, then calls `implied_quote()` directly while
+    /// the curve is stale. Returns that value together with `implied_quote()`
+    /// of a fresh helper bootstrapped on `quote_after` from the start.
+    fn implied_quote_on_dirty_curve(
+        quote_before: Real,
+        quote_after: Real,
+        make: impl Fn(Handle<dyn Quote>) -> Shared<dyn DefaultProbabilityHelper>,
+    ) -> (Real, Real) {
+        let bootstrap = |quote: &Shared<SimpleQuote>| {
+            let helper = make(Handle::new(Shared::clone(quote) as Shared<dyn Quote>));
+            let curve = PiecewiseDefaultCurve::<HazardRate, BackwardFlat>::new(
+                today(),
+                vec![Shared::clone(&helper)],
+                day_counter(),
+                BackwardFlat,
+            )
+            .unwrap();
+            curve.calculate().unwrap();
+            (helper, curve)
+        };
+
+        let quote = shared(SimpleQuote::new(quote_before));
+        let (helper, _curve) = bootstrap(&quote);
+        quote.set_value(quote_after);
+        let dirty = helper.implied_quote().unwrap();
+
+        let (fresh_helper, _fresh_curve) = bootstrap(&shared(SimpleQuote::new(quote_after)));
+        (dirty, fresh_helper.implied_quote().unwrap())
+    }
+
+    /// A direct `implied_quote()` on a dirty curve re-bootstraps first and
+    /// prices on the converged curve, as C++ does (`lazyobject.hpp:257-258`),
+    /// rather than re-borrowing the contract from inside the nested bootstrap.
+    #[test]
+    fn spread_implied_quote_on_a_dirty_curve_reprices_the_new_quote() {
+        let settings = settings_at(today());
+        let discount = discount_curve(today());
+        let (dirty, fresh) = implied_quote_on_dirty_curve(0.005, 0.02, |quote| {
+            SpreadCdsHelper::new(
+                quote,
+                Period::new(5, TimeUnit::Years),
+                SETTLEMENT_DAYS,
+                Target::new(),
+                Frequency::Quarterly,
+                BusinessDayConvention::Following,
+                DateGeneration::TwentiethIMM,
+                day_counter(),
+                RECOVERY_RATE,
+                discount.clone(),
+                Shared::clone(&settings),
+            )
+            .unwrap() as Shared<dyn DefaultProbabilityHelper>
+        });
+        assert!((dirty - fresh).abs() < 1e-12, "{dirty} vs {fresh}");
+        assert!((dirty - 0.02).abs() <= TOLERANCE, "{dirty}");
+    }
+
+    #[test]
+    fn upfront_implied_quote_on_a_dirty_curve_reprices_the_new_quote() {
+        let settings = settings_at(today());
+        let discount = discount_curve(today());
+        let (dirty, fresh) = implied_quote_on_dirty_curve(0.02, 0.04, |quote| {
+            UpfrontCdsHelper::with_terms(
+                quote,
+                RUNNING_SPREAD,
+                Period::new(5, TimeUnit::Years),
+                SETTLEMENT_DAYS,
+                Target::new(),
+                Frequency::Quarterly,
+                BusinessDayConvention::ModifiedFollowing,
+                DateGeneration::CDS,
+                Actual360::new(),
+                RECOVERY_RATE,
+                discount.clone(),
+                UPFRONT_SETTLEMENT_DAYS,
+                CdsHelperTerms::default(),
+                Shared::clone(&settings),
+            )
+            .unwrap() as Shared<dyn DefaultProbabilityHelper>
+        });
+        assert!((dirty - fresh).abs() < 1e-12, "{dirty} vs {fresh}");
+        assert!((dirty - 0.04).abs() <= TOLERANCE, "{dirty}");
+    }
+
     const UPFRONT_QUOTES: [Real; 4] = [0.01, 0.02, 0.04, 0.06];
     const UPFRONT_TENORS: [i32; 4] = [2, 3, 5, 7];
     const RUNNING_SPREAD: Rate = 0.05;

@@ -334,6 +334,25 @@ impl CdsHelperBase {
             .ok_or_else(|| QlError::new("evaluation date is not set", file!(), line!()))
     }
 
+    /// Brings the bootstrapping curve up to date before the contract is
+    /// borrowed, so a stale curve re-bootstraps without re-entering this
+    /// helper's borrowed contract; the contract is then priced on the
+    /// converged curve, as C++ does through `LazyObject::calculate`
+    /// (`lazyobject.hpp:257-258`). Inside a bootstrap the curve is already
+    /// flagged as calculated and returns at once.
+    ///
+    /// A contract that was never built is reported first, ahead of the curve
+    /// it would be priced on.
+    fn update_curve(&self) -> QlResult<()> {
+        if let Err(error) = &*self.swap.borrow() {
+            return Err(error.clone());
+        }
+        self.base
+            .term_structure()?
+            .survival_probability(0.0, true)?;
+        Ok(())
+    }
+
     /// Stores the rebuilt contract, or the reason it could not be built.
     fn set_swap(&self, swap: QlResult<CreditDefaultSwap>) {
         *self.swap.borrow_mut() = swap;
@@ -648,7 +667,11 @@ impl DefaultProbabilityHelper for SpreadCdsHelper {
     /// weak-links the curve handle the engine prices over, so a node the
     /// bootstrap has just moved does not notify the contract, and a plain
     /// `fair_spread` would answer from the previous iteration's results.
+    ///
+    /// The curve is brought up to date before the contract is borrowed
+    /// ([`CdsHelperBase::update_curve`]).
     fn implied_quote(&self) -> QlResult<Real> {
+        self.cds.update_curve()?;
         let mut swap = self.cds.swap.borrow_mut();
         let swap = swap.as_mut().map_err(|error| error.clone())?;
         swap.recalculate()?;
@@ -821,8 +844,10 @@ impl UpfrontCdsHelper {
     }
 
     /// The contract's fair upfront, off a forced recalculation for the reason
-    /// [`SpreadCdsHelper`]'s is forced.
+    /// [`SpreadCdsHelper`]'s is forced, on a curve brought up to date before
+    /// the contract is borrowed ([`CdsHelperBase::update_curve`]).
     fn fair_upfront(&self) -> QlResult<Real> {
+        self.cds.update_curve()?;
         let mut swap = self.cds.swap.borrow_mut();
         let swap = swap.as_mut().map_err(|error| error.clone())?;
         swap.recalculate()?;
