@@ -679,7 +679,14 @@ impl ZeroInflationHelper for ZeroCouponInflationSwapHelper {
     /// rate is read off the indexed flow, which forecasts through the index copy
     /// on every call and caches nothing, so it already reflects a node the
     /// bootstrap has just moved.
+    ///
+    /// The curve is brought up to date before the swap is borrowed, so a stale
+    /// curve re-bootstraps without re-entering this helper's borrowed swap; the
+    /// rate is then priced on the converged curve, as C++ does through
+    /// `LazyObject::calculate` (`lazyobject.hpp:257-258`).
     fn implied_quote(&self) -> QlResult<Real> {
+        let curve = self.base.term_structure()?;
+        curve.zero_rate(0.0, true)?;
         let mut swap = self.swap.borrow_mut();
         let swap = swap.as_mut().map_err(|error| error.clone())?;
         swap.swap_mut().deep_update();
@@ -1007,7 +1014,14 @@ impl YoYInflationHelper for YearOnYearInflationSwapHelper {
     /// The `deepUpdate` is load-bearing here, unlike in the zero twin: the fair
     /// rate is a *priced* result, cached on the contract behind its lazy flag,
     /// so a node the bootstrap has just moved would otherwise go unseen.
+    ///
+    /// The curve is brought up to date before the swap is borrowed, so a stale
+    /// curve re-bootstraps without re-entering this helper's borrowed swap; the
+    /// rate is then priced on the converged curve, as C++ does through
+    /// `LazyObject::calculate` (`lazyobject.hpp:257-258`).
     fn implied_quote(&self) -> QlResult<Real> {
+        let curve = self.base.term_structure()?;
+        curve.yoy_rate(0.0, true)?;
         let mut swap = self.swap.borrow_mut();
         let swap = swap.as_mut().map_err(|error| error.clone())?;
         swap.swap_mut().deep_update();

@@ -880,4 +880,56 @@ mod yy_term_structure_oracle {
         drop(fixture.curve);
         drop(fixture.handle);
     }
+
+    /// A direct `implied_quote()` on a dirty curve re-bootstraps first and
+    /// prices on the converged curve, as C++ does (`lazyobject.hpp:257-258`),
+    /// rather than re-borrowing the swap from inside the nested bootstrap
+    /// (issue #1350). The value matches a helper bootstrapped on the new quote
+    /// from the start.
+    #[test]
+    fn implied_quote_on_a_dirty_curve_reprices_the_new_quote() {
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(today());
+        let rpi = a_published_rpi(&settings);
+        let index = shared(YoYInflationIndex::from_underlying(Shared::clone(&rpi)));
+        let nominal = a_nominal_curve();
+        let bootstrap = |quote: &Shared<SimpleQuote>| {
+            let helper = YearOnYearInflationSwapHelper::new(
+                Handle::new(quote.clone()),
+                observation_lag(),
+                maturity(4),
+                uk(),
+                BusinessDayConvention::ModifiedFollowing,
+                day_counter(),
+                &index,
+                CpiInterpolationType::Flat,
+                nominal.clone(),
+                Pillar::LastRelevantDate,
+                Shared::clone(&settings),
+            )
+            .unwrap();
+            let curve = PiecewiseYoYInflationCurve::<Linear>::new(
+                today(),
+                rpi.last_fixing_date().unwrap(),
+                quoted_rate(0),
+                index.frequency(),
+                day_counter(),
+                vec![Shared::clone(&helper) as Shared<dyn YoYInflationHelper>],
+                None,
+            )
+            .unwrap();
+            curve.calculate().unwrap();
+            (helper, curve)
+        };
+
+        let quote = shared(SimpleQuote::new(Some(0.0295)));
+        let (helper, _curve) = bootstrap(&quote);
+        quote.set_value(Some(0.035));
+        let dirty = helper.implied_quote().unwrap();
+
+        let (fresh, _fresh_curve) = bootstrap(&shared(SimpleQuote::new(Some(0.035))));
+        let fresh = fresh.implied_quote().unwrap();
+        assert!((dirty - fresh).abs() < 1e-12, "{dirty} vs {fresh}");
+        assert!((dirty - 0.035).abs() < 1e-12, "{dirty}");
+    }
 }

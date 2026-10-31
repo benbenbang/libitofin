@@ -224,7 +224,15 @@ impl YoYOptionletVolatilityHelper for YoYOptionletHelper {
     /// `cpp:68-71`). The `deepUpdate` is load-bearing: the bootstrap moves the
     /// surface's nodes directly, which notifies nobody, so the cached NPV
     /// would otherwise stand.
+    ///
+    /// The surface is brought up to date before the cap/floor is borrowed
+    /// (its `base_date` triggers the bootstrap,
+    /// `piecewiseyoyoptionletvolatility.hpp:181-184`), so a stale
+    /// surface re-bootstraps without re-entering this helper's borrowed
+    /// cap/floor; the price is then taken on the converged surface, as C++
+    /// does through `LazyObject::calculate` (`lazyobject.hpp:257-258`).
     fn implied_quote(&self) -> QlResult<Real> {
+        self.base.term_structure()?.base_date()?;
         let mut capfloor = self.capfloor.borrow_mut();
         capfloor.base().observer().borrow_mut().update();
         capfloor.npv()
@@ -250,9 +258,17 @@ mod tests {
     use super::*;
     use crate::currency::Currency;
     use crate::indexes::inflation::YyGenericCpi;
+    use crate::interestrate::Compounding;
+    use crate::math::interpolations::linear::Linear;
     use crate::quotes::SimpleQuote;
     use crate::shared::{shared, shared_mut};
-    use crate::termstructures::volatility::ConstantYoYOptionletVolatility;
+    use crate::termstructures::inflation::inflationtermstructure::YoYInflationTermStructure;
+    use crate::termstructures::inflation::interpolatedyoyinflationcurve::InterpolatedYoYInflationCurve;
+    use crate::termstructures::volatility::{
+        ConstantYoYOptionletVolatility, PiecewiseYoYOptionletVolatilityCurve,
+    };
+    use crate::termstructures::yields::FlatForward;
+    use crate::termstructures::yieldtermstructure::YieldTermStructure;
     use crate::time::businessdayconvention::BusinessDayConvention;
     use crate::time::calendars::target::Target;
     use crate::time::date::Month::{June, March};
@@ -363,6 +379,130 @@ mod tests {
         assert!(
             fixture.vol_handle.handle().current_link().is_err(),
             "the link must not keep the surface alive"
+        );
+    }
+
+    /// A cap helper whose engine prices off a flat 2 % year-on-year curve and
+    /// a flat 5 % nominal curve, so it can price whichever surface it is given.
+    fn a_priceable_helper(
+        settings: &Shared<Settings<Date>>,
+        price: Handle<dyn Quote>,
+    ) -> Shared<YoYOptionletHelper> {
+        let eval = Date::new(15, June, 2026);
+        let yoy_curve = shared(
+            InterpolatedYoYInflationCurve::<Linear>::new(
+                eval,
+                vec![Date::new(1, March, 2026), Date::new(1, June, 2032)],
+                vec![0.02, 0.02],
+                Frequency::Monthly,
+                Actual365Fixed::new(),
+                Linear,
+                None,
+            )
+            .unwrap(),
+        ) as Shared<dyn YoYInflationTermStructure>;
+        let index = shared(
+            YyGenericCpi::new(
+                Frequency::Monthly,
+                false,
+                lag(),
+                Currency::eur(),
+                Shared::clone(settings),
+            )
+            .with_term_structure(Handle::new(yoy_curve)),
+        );
+        let nominal = Handle::new(shared(FlatForward::with_rate(
+            eval,
+            0.05,
+            Actual365Fixed::new(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        )) as Shared<dyn YieldTermStructure>);
+        let vol_handle = RelinkableHandle::<dyn YoYOptionletVolatilitySurface>::empty();
+        let pricer = shared_mut(YoYInflationCapFloorEngine::unit_displaced(
+            Shared::clone(&index),
+            vol_handle.handle(),
+            nominal,
+        ));
+        YoYOptionletHelper::new(
+            price,
+            10_000.0,
+            CapFloorType::Cap,
+            lag(),
+            Actual365Fixed::new(),
+            Target::new(),
+            0,
+            &index,
+            CpiInterpolationType::Flat,
+            0.02,
+            3,
+            pricer,
+            vol_handle,
+            Shared::clone(settings),
+        )
+        .unwrap()
+    }
+
+    /// A direct `implied_quote()` on a dirty surface re-bootstraps first and
+    /// prices on the converged surface, as C++ does (`lazyobject.hpp:257-258`),
+    /// rather than re-borrowing the cap/floor from inside the nested bootstrap
+    /// (issue #1350). The value matches a helper bootstrapped on the new price
+    /// from the start.
+    #[test]
+    fn implied_quote_on_a_dirty_surface_reprices_the_new_quote() {
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(Date::new(15, June, 2026));
+        let price_at = |volatility: Real| {
+            let helper = a_priceable_helper(&settings, Handle::empty());
+            let surface = shared(ConstantYoYOptionletVolatility::new(
+                volatility,
+                0,
+                Target::new(),
+                BusinessDayConvention::ModifiedFollowing,
+                Actual365Fixed::new(),
+                lag(),
+                Frequency::Monthly,
+                false,
+                -1.0,
+                3.0,
+                Shared::clone(&settings),
+            )) as Shared<dyn YoYOptionletVolatilitySurface>;
+            YoYOptionletVolatilityHelper::set_term_structure(helper.as_ref(), &surface);
+            helper.implied_quote().unwrap()
+        };
+        let (price_before, price_after) = (price_at(0.01), price_at(0.015));
+        let bootstrap = |quote: &Shared<SimpleQuote>| {
+            let helper = a_priceable_helper(&settings, Handle::new(quote.clone()));
+            let surface = PiecewiseYoYOptionletVolatilityCurve::new(
+                0,
+                Target::new(),
+                BusinessDayConvention::ModifiedFollowing,
+                Actual365Fixed::new(),
+                lag(),
+                Frequency::Monthly,
+                false,
+                0.02 - 2e-5,
+                0.02 + 2e-5,
+                0.01,
+                vec![Shared::clone(&helper) as Shared<dyn YoYOptionletVolatilityHelper>],
+                Shared::clone(&settings),
+            )
+            .unwrap();
+            surface.calculate().unwrap();
+            (helper, surface)
+        };
+
+        let quote = shared(SimpleQuote::new(Some(price_before)));
+        let (helper, _surface) = bootstrap(&quote);
+        quote.set_value(Some(price_after));
+        let dirty = helper.implied_quote().unwrap();
+
+        let (fresh, _fresh_surface) = bootstrap(&shared(SimpleQuote::new(Some(price_after))));
+        let fresh = fresh.implied_quote().unwrap();
+        assert!((dirty - fresh).abs() < 1e-9, "{dirty} vs {fresh}");
+        assert!(
+            (dirty - price_after).abs() < 1e-9,
+            "{dirty} vs {price_after}"
         );
     }
 }

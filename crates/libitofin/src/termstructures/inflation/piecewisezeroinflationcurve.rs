@@ -679,6 +679,53 @@ mod tests {
         );
     }
 
+    /// A direct `implied_quote()` on a dirty curve re-bootstraps first and
+    /// prices on the converged curve, as C++ does (`lazyobject.hpp:257-258`),
+    /// rather than re-borrowing the swap from inside the nested bootstrap
+    /// (issue #1350). The value matches a helper bootstrapped on the new quote
+    /// from the start.
+    #[test]
+    fn implied_quote_on_a_dirty_curve_reprices_the_new_quote() {
+        let settings = settings_today();
+        let index = an_index(&settings);
+        let bootstrap = |quote: &Shared<SimpleQuote>| {
+            let helper = ZeroCouponInflationSwapHelper::new(
+                Handle::new(Shared::clone(quote) as Shared<dyn Quote>),
+                Period::new(3, TimeUnit::Months),
+                today() + Period::new(5, TimeUnit::Years),
+                UnitedKingdom::new(Market::Settlement),
+                BusinessDayConvention::ModifiedFollowing,
+                day_counter(),
+                &index,
+                CpiInterpolationType::Flat,
+                Pillar::LastRelevantDate,
+                Shared::clone(&settings),
+            )
+            .unwrap();
+            let curve = PiecewiseZeroInflationCurve::new(
+                today(),
+                base_date(),
+                Frequency::Monthly,
+                day_counter(),
+                vec![Shared::clone(&helper) as Shared<dyn ZeroInflationHelper>],
+                None,
+            )
+            .unwrap();
+            curve.calculate().unwrap();
+            (helper, curve)
+        };
+
+        let quote = shared(SimpleQuote::new(Some(0.029)));
+        let (helper, _curve) = bootstrap(&quote);
+        quote.set_value(Some(0.04));
+        let dirty = helper.implied_quote().unwrap();
+
+        let (fresh, _fresh_curve) = bootstrap(&shared(SimpleQuote::new(Some(0.04))));
+        let fresh = fresh.implied_quote().unwrap();
+        assert!((dirty - fresh).abs() < 1e-12, "{dirty} vs {fresh}");
+        assert!((dirty - 0.04).abs() < 1e-12, "{dirty}");
+    }
+
     #[test]
     fn an_empty_helper_set_is_rejected() {
         let built = PiecewiseZeroInflationCurve::new(
