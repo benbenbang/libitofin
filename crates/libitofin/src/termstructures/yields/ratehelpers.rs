@@ -19,6 +19,10 @@
 //! forwarding handle to keep relink notifications out of the bootstrap, the Rust
 //! helper never observes the cloned index (matching [`DepositRateHelper`]), so
 //! the relink-notification loop is already broken and no unregister is needed.
+//! [`SwapRateHelper`], [`OISRateHelper`] and [`FraRateHelper`] instead subscribe
+//! to the cloned index's fixing history on [`Settings`] directly (D11), which
+//! keeps the fixing notifications the C++ index relays without observing the
+//! clone's forecasting handle.
 
 use std::cell::Cell;
 use std::cell::RefCell;
@@ -673,6 +677,9 @@ impl FraRateHelper {
             let index = source_index.clone_with(term_structure_handle.handle());
             let base =
                 BootstrapHelperBase::new_relative(quote, settings, update_dates, on_eval_change);
+            index
+                .settings()
+                .register_fixing_observer(&index.name(), &base.observer());
             let helper = FraRateHelper {
                 base,
                 date_error: RefCell::new(None),
@@ -1015,6 +1022,7 @@ impl SwapRateHelper {
                 discount.register_observer(&base.observer());
             }
             spread.register_observer(&base.observer());
+            settings.register_fixing_observer(&ibor_index.name(), &base.observer());
             let helper = SwapRateHelper {
                 base,
                 date_error: RefCell::new(None),
@@ -1299,6 +1307,7 @@ impl OISRateHelper {
                 discount.register_observer(&base.observer());
             }
             overnight_spread.register_observer(&base.observer());
+            settings.register_fixing_observer(&cloned_index.name(), &base.observer());
             let helper = OISRateHelper {
                 base,
                 date_error: RefCell::new(None),
@@ -1991,6 +2000,178 @@ mod tests {
             (linked - fresh).abs() < 1e-12,
             "stale curve after linking the spread: {linked} vs fresh {fresh}"
         );
+    }
+
+    /// Bootstraps a curve through the helper `build` makes, records a fixing
+    /// dated on the evaluation date (the first floating coupon's fixing), and
+    /// checks the existing curve re-bootstraps to the same discount factor as a
+    /// curve built fresh with that fixing present (`ratehelpers.cpp:542`,
+    /// `oisratehelper.cpp:118`). Without the helper observing the fixing
+    /// history the existing curve stays stale.
+    fn assert_curve_tracks_todays_fixing(
+        build: impl Fn() -> Shared<dyn RateHelper>,
+        add_fixing: impl FnOnce(),
+    ) {
+        let bootstrap = || {
+            let helper = build();
+            let maturity = helper.maturity_date();
+            let curve = PiecewiseYieldCurve::<Discount, LogLinear>::new(
+                today(),
+                vec![helper],
+                Actual360::new(),
+                LogLinear,
+            )
+            .unwrap();
+            (curve, maturity)
+        };
+
+        let (curve, maturity) = bootstrap();
+        let before = curve.discount_date(maturity, false).unwrap();
+        add_fixing();
+        let moved = curve.discount_date(maturity, false).unwrap();
+        let (fresh_curve, _) = bootstrap();
+        let fresh = fresh_curve.discount_date(maturity, false).unwrap();
+
+        assert!(
+            (fresh - before).abs() > 1e-6,
+            "degenerate fixture: today's fixing does not move the bootstrap"
+        );
+        assert!(
+            (moved - fresh).abs() < 1e-12,
+            "stale curve after today's fixing: {moved} vs fresh {fresh}"
+        );
+    }
+
+    fn five_year_swap_helper(source: &IborIndex) -> Shared<SwapRateHelper> {
+        SwapRateHelper::with_details(
+            Handle::new(shared(SimpleQuote::new(0.03)) as Shared<dyn Quote>),
+            Period::new(5, TimeUnit::Years),
+            Target::new(),
+            Frequency::Annual,
+            BusinessDayConvention::ModifiedFollowing,
+            Actual360::new(),
+            source,
+            Handle::empty(),
+            Period::new(0, TimeUnit::Days),
+            None,
+            Pillar::LastRelevantDate,
+        )
+    }
+
+    #[test]
+    fn swap_helper_observes_todays_fixing() {
+        let (_settings, source) = swap_setup();
+        assert_curve_tracks_todays_fixing(
+            || five_year_swap_helper(&source) as Shared<dyn RateHelper>,
+            || source.add_fixing(today(), 0.08).unwrap(),
+        );
+    }
+
+    #[test]
+    fn ois_helper_observes_todays_fixing() {
+        use crate::indexes::ibor::Estr;
+
+        let settings = settings_on(today());
+        let estr = Estr::new(Handle::empty(), settings.clone());
+        assert_curve_tracks_todays_fixing(
+            || {
+                OISRateHelper::new(
+                    0,
+                    Period::new(1, TimeUnit::Months),
+                    Handle::new(shared(SimpleQuote::new(0.03)) as Shared<dyn Quote>),
+                    &estr,
+                    None,
+                    0,
+                    BusinessDayConvention::Following,
+                    Frequency::Annual,
+                    Period::new(0, TimeUnit::Days),
+                    Handle::empty(),
+                    Pillar::LastRelevantDate,
+                    RateAveraging::Compound,
+                    settings.clone(),
+                ) as Shared<dyn RateHelper>
+            },
+            || estr.add_fixing(today(), 0.08).unwrap(),
+        );
+    }
+
+    /// The FRA helper is notified of a fixing (`ratehelpers.cpp:318`), and so
+    /// invalidates the curve, but its value cannot move: the indexed quote
+    /// forecasts even today's fixing (`ratehelpers.cpp:364`) and the par quote
+    /// reads discount factors only.
+    #[test]
+    fn fra_helper_observes_fixings_without_moving_the_curve() {
+        let (_settings, source) = swap_setup();
+        let helper = FraRateHelper::new(
+            Handle::new(shared(SimpleQuote::new(0.03)) as Shared<dyn Quote>),
+            Period::new(0, TimeUnit::Months),
+            &source,
+            true,
+            Pillar::LastRelevantDate,
+        );
+        let curve = PiecewiseYieldCurve::<Discount, LogLinear>::new(
+            today(),
+            vec![Shared::clone(&helper) as Shared<dyn RateHelper>],
+            Actual360::new(),
+            LogLinear,
+        )
+        .unwrap();
+        let maturity = helper.maturity_date();
+        let before = curve.discount_date(maturity, false).unwrap();
+        let helper_flag = Flag::new();
+        let curve_flag = Flag::new();
+        helper
+            .observable()
+            .register_observer(&as_observer(&helper_flag));
+        curve.register_observer(&as_observer(&curve_flag));
+
+        source.add_fixing(today(), 0.08).unwrap();
+
+        assert!(Flag::is_up(&helper_flag), "a fixing must notify the helper");
+        assert!(
+            Flag::is_up(&curve_flag),
+            "a fixing must invalidate the curve"
+        );
+        let after = curve.discount_date(maturity, false).unwrap();
+        assert!((after - before).abs() < 1e-12);
+    }
+
+    /// Relinking the source index's forwarding handle to the curve the helper
+    /// bootstraps, and away again, neither notifies the helper nor loops; a
+    /// fixing still reaches it through the fixing history.
+    #[test]
+    fn swap_helper_relinks_do_not_loop_and_fixings_still_notify() {
+        let settings = settings_on(today());
+        let forwarding = RelinkableHandle::<dyn YieldTermStructure>::empty();
+        let source = euribor(
+            Period::new(6, TimeUnit::Months),
+            forwarding.handle(),
+            settings,
+        );
+        let helper = five_year_swap_helper(&source);
+        let curve = PiecewiseYieldCurve::<Discount, LogLinear>::new(
+            today(),
+            vec![Shared::clone(&helper) as Shared<dyn RateHelper>],
+            Actual360::new(),
+            LogLinear,
+        )
+        .unwrap();
+        let maturity = helper.maturity_date();
+        let flag = Flag::new();
+        helper.observable().register_observer(&as_observer(&flag));
+
+        forwarding.link_to(Shared::clone(&curve) as Shared<dyn YieldTermStructure>);
+        let linked = curve.discount_date(maturity, false).unwrap();
+        forwarding.link_to(flat_curve(today(), 0.04));
+        let relinked = curve.discount_date(maturity, false).unwrap();
+        assert!(!Flag::is_up(&flag), "a relink must not notify the helper");
+        assert!((linked - relinked).abs() < 1e-12);
+
+        forwarding.link_to(Shared::clone(&curve) as Shared<dyn YieldTermStructure>);
+        source.add_fixing(today(), 0.08).unwrap();
+        assert!(Flag::is_up(&flag), "a fixing must notify the helper");
+        let fixed = curve.discount_date(maturity, false).unwrap();
+        assert!((fixed - linked).abs() > 1e-6);
     }
 
     #[test]
