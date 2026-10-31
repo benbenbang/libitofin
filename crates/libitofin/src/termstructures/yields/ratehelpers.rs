@@ -1014,6 +1014,7 @@ impl SwapRateHelper {
             if let Some(discount) = &discounting_curve {
                 discount.register_observer(&base.observer());
             }
+            spread.register_observer(&base.observer());
             let helper = SwapRateHelper {
                 base,
                 date_error: RefCell::new(None),
@@ -1926,6 +1927,70 @@ mod tests {
                 Pillar::LastRelevantDate,
             ) as Shared<dyn RateHelper>
         });
+    }
+
+    /// Bootstraps a curve through a [`SwapRateHelper`] carrying a market spread,
+    /// moves the spread, and checks the existing curve re-bootstraps to the same
+    /// discount factor as a curve built fresh on the moved spread
+    /// (`ratehelpers.cpp:543`). The spread is observed even through a handle
+    /// that is empty at construction and linked later, as C++ `registerWith`
+    /// registers an empty handle.
+    #[test]
+    fn swap_helper_observes_its_spread() {
+        let (_settings, source) = swap_setup();
+        let bootstrap = |spread: Handle<dyn Quote>| {
+            let helper = SwapRateHelper::with_details(
+                Handle::new(shared(SimpleQuote::new(0.03)) as Shared<dyn Quote>),
+                Period::new(5, TimeUnit::Years),
+                Target::new(),
+                Frequency::Annual,
+                BusinessDayConvention::ModifiedFollowing,
+                Actual360::new(),
+                &source,
+                spread,
+                Period::new(0, TimeUnit::Days),
+                None,
+                Pillar::LastRelevantDate,
+            );
+            let maturity = helper.maturity_date();
+            let curve = PiecewiseYieldCurve::<Discount, LogLinear>::new(
+                today(),
+                vec![helper as Shared<dyn RateHelper>],
+                Actual360::new(),
+                LogLinear,
+            )
+            .unwrap();
+            (curve, maturity)
+        };
+        let quote_handle =
+            |value: Real| Handle::new(shared(SimpleQuote::new(value)) as Shared<dyn Quote>);
+
+        let spread = shared(SimpleQuote::new(0.001));
+        let (curve, maturity) = bootstrap(Handle::new(Shared::clone(&spread) as Shared<dyn Quote>));
+        let before = curve.discount_date(maturity, false).unwrap();
+        spread.set_value(0.004);
+        let moved = curve.discount_date(maturity, false).unwrap();
+        let (fresh_curve, _) = bootstrap(quote_handle(0.004));
+        let fresh = fresh_curve.discount_date(maturity, false).unwrap();
+        assert!(
+            (fresh - before).abs() > 1e-6,
+            "degenerate fixture: the spread does not move the bootstrap"
+        );
+        assert!(
+            (moved - fresh).abs() < 1e-12,
+            "stale curve after the spread moved: {moved} vs fresh {fresh}"
+        );
+
+        let relinkable = RelinkableHandle::<dyn Quote>::empty();
+        let (curve, _) = bootstrap(relinkable.handle());
+        let unspread = curve.discount_date(maturity, false).unwrap();
+        relinkable.link_to(shared(SimpleQuote::new(0.004)) as Shared<dyn Quote>);
+        let linked = curve.discount_date(maturity, false).unwrap();
+        assert!((unspread - fresh).abs() > 1e-6);
+        assert!(
+            (linked - fresh).abs() < 1e-12,
+            "stale curve after linking the spread: {linked} vs fresh {fresh}"
+        );
     }
 
     #[test]
