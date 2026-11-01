@@ -5,6 +5,7 @@ use crate::fra::PyPosition;
 use crate::market::PyBlackScholesProcess;
 use crate::mc_variance_swap::PyMCVarianceSwapEngine;
 use crate::option::PyOptionType;
+use crate::results::Results;
 use crate::settings::PySettings;
 use crate::time::PyDate;
 use libitofin::instrument::Instrument;
@@ -122,6 +123,22 @@ impl PyVarianceSwap {
                 (kind, entry.strike, entry.weight)
             })
             .collect())
+    }
+
+    /// Return a frozen snapshot of the valuation, calculating first.
+    ///
+    /// Monte Carlo engines record the resolved ``"seed"`` in
+    /// ``additional_results``; replication records none. Variance, variance
+    /// error and samples stay on their own accessors.
+    ///
+    /// Returns:
+    ///     Results: A copy of the valuation results.
+    ///
+    /// Raises:
+    ///     ItofinError: On anything that makes the valuation fail.
+    fn results(&mut self) -> PyResult<Results> {
+        self.inner.calculate().map_err(PyQlError::from)?;
+        Ok(Results::snapshot(self.inner.base()))
     }
 
     /// Force a fresh calculation without bypassing live-input validation.

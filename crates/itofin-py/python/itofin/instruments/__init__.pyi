@@ -2486,6 +2486,20 @@ class VarianceSwap:
         Calls ascend, then puts descend. Synthetic terminal strikes are not
         purchased. Expired contracts have no variance or replication weights.
         """
+    def results(self) -> results.Results:
+        r"""
+        Return a frozen snapshot of the valuation, calculating first.
+
+        Monte Carlo engines record the resolved ``"seed"`` in
+        ``additional_results``; replication records none. Variance, variance
+        error and samples stay on their own accessors.
+
+        Returns:
+            Results: A copy of the valuation results.
+
+        Raises:
+            ItofinError: On anything that makes the valuation fail.
+        """
     def recalculate(self) -> None:
         r"""
         Force a fresh calculation without bypassing live-input validation.
