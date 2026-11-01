@@ -213,6 +213,20 @@
       "validation": "Pinned QuantLib finite-strip variance/NPV/typed weight replay, live rate/dividend/volatility updates, retained sources, atomic C errors and session lifecycle"
     },
     {
+      "c": "itofin_variance_swap_results",
+      "go": "VarianceSwap.Results",
+      "go_file": "sdk/go/mc_variance_swap.go",
+      "native_file": "crates/libitofin-ffi/src/variance_swap_api.rs",
+      "python": "itofin.instruments.VarianceSwap.results",
+      "source": "crates/itofin-py/python/itofin/instruments/__init__.pyi",
+      "status": "implemented",
+      "tests": [
+        "TestVarianceSwapResultsReportSeedAndReplay",
+        "results_snapshot_reports_resolved_seed_and_replays_bit_for_bit"
+      ],
+      "validation": "Detached NPV/error/real additional-results snapshot after calculation; MC seed zero reports the resolved seed and replays bit for bit, replication reports no seed"
+    },
+    {
       "c": "itofin_replicating_variance_swap_engine_new",
       "go": "Session.NewReplicatingVarianceSwapEngine",
       "go_file": "sdk/go/variance_swap.go",

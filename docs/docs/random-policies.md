@@ -41,9 +41,10 @@ reported seed is never `0`, because `0` would draw again.
 
 Read `"seed"` from an option's `results()` in Python (including after the
 one-shot `price_mc`, which returns only the NPV), `Results().AdditionalResults`
-in Go, or the C results snapshot. Variance swap MC records `"seed"` in the Rust
-core only: its Python, C and Go bindings have no results snapshot yet, so the
-seed is not reachable there.
+in Go, or the C results snapshot. Variance swaps expose the same snapshot:
+`VarianceSwap.results()` in Python, `VarianceSwap.Results()` in Go and
+`itofin_variance_swap_results` in C. With the replicating engine the snapshot
+has no `"seed"`.
 
 LSM divergence from QuantLib (`mclongstaffschwartzengine.hpp`): QuantLib draws
 two independent random seeds for pricing and calibration. Here the calibration

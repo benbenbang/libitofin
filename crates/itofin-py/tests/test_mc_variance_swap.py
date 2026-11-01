@@ -142,3 +142,31 @@ def test_fixed_samples_respect_an_explicit_larger_sample_budget():
     _, _, _, swap = market(max_samples=1023)
     assert swap.samples() == 32
     assert swap.variance() == pytest.approx(0.04, rel=0, abs=2e-14)
+
+
+def test_results_report_the_resolved_seed_and_replay_bit_for_bit():
+    """Seed zero resolves once; rebuilding with that seed reproduces the run."""
+
+    def run(seed):
+        _, _, _, swap = market(seed=seed)
+        snapshot = swap.results()
+        npv, error = snapshot.npv, snapshot.error_estimate
+        assert npv is not None and error is not None
+        assert (npv, error) == (swap.npv(), swap.error_estimate())
+        return npv, error, snapshot.additional_results["seed"]
+
+    npv, error, seed = run(0)
+    assert seed > 0 and seed == int(seed)
+    replay_npv, replay_error, replay_seed = run(int(seed))
+    assert (replay_npv.hex(), replay_error.hex(), replay_seed) == (npv.hex(), error.hex(), seed)
+    assert run(0)[2] != seed
+    assert run(42)[2] == 42.0
+
+
+def test_replication_results_carry_no_seed():
+    """The replicating engine is deterministic and records no seed."""
+    _, process, _, swap = market()
+    swap.set_engine(ReplicatingVarianceSwapEngine(process, [100.0, 110.0, 120.0], [80.0, 90.0, 100.0]))
+    snapshot = swap.results()
+    assert snapshot.npv == swap.npv()
+    assert "seed" not in snapshot.additional_results
