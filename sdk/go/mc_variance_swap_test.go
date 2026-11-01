@@ -152,3 +152,43 @@ func TestMCVarianceSwapInvalidConfigurationAndSessions(t *testing.T) {
 		t.Fatal("closed session")
 	}
 }
+
+func TestVarianceSwapResultsReportSeedAndReplay(t *testing.T) {
+	m := newVarianceSwapMarket(t)
+	r := pricingMust(m.swap.Results())
+	if r.NPV == nil || *r.NPV != pricingMust(m.swap.NPV()) {
+		t.Fatal("replication snapshot NPV", r.NPV)
+	}
+	if _, ok := r.AdditionalResults["seed"]; ok {
+		t.Fatal("replication must not report a seed")
+	}
+	run := func(seed uint64) (float64, float64, float64) {
+		pricingOK(t, m.swap.SetMCEngine(pricingMust(m.s.NewMCVarianceSwapEngine(m.process, MCVarianceSwapConfig{Steps: 12, Samples: 32, Seed: seed}))))
+		r := pricingMust(m.swap.Results())
+		if r.NPV == nil || r.ErrorEstimate == nil || *r.NPV != pricingMust(m.swap.NPV()) {
+			t.Fatal("MC snapshot", r.NPV, r.ErrorEstimate)
+		}
+		resolved, ok := r.AdditionalResults["seed"]
+		if !ok {
+			t.Fatal("MC snapshot lacks seed")
+		}
+		return *r.NPV, *r.ErrorEstimate, resolved
+	}
+	npv, se, seed := run(0)
+	if seed <= 0 || seed != math.Trunc(seed) {
+		t.Fatal("seed zero must report a nonzero integer seed", seed)
+	}
+	if n, e, sd := run(uint64(seed)); math.Float64bits(n) != math.Float64bits(npv) || math.Float64bits(e) != math.Float64bits(se) || sd != seed {
+		t.Fatal("replay differs", n, npv, e, se, sd, seed)
+	}
+	if _, _, other := run(0); other == seed {
+		t.Fatal("successive random seeds must differ")
+	}
+	if _, _, fixed := run(42); fixed != 42 {
+		t.Fatal(fixed)
+	}
+	var nilSwap *VarianceSwap
+	if _, err := nilSwap.Results(); err == nil {
+		t.Fatal("nil swap")
+	}
+}

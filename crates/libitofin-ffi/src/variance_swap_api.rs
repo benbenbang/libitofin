@@ -240,6 +240,32 @@ pub unsafe extern "C" fn itofin_variance_swap_recalculate(
     }
 }
 
+/// Calculate, then return a detached results snapshot handle. Typed variance,
+/// variance error and samples stay on their own accessors.
+/// # Safety
+/// Outputs follow the crate-level caller contract and stay unchanged on error.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn itofin_variance_swap_results(
+    ctx: *mut Context,
+    swap: u64,
+    out: *mut u64,
+    error: *mut ItofinError,
+) -> i32 {
+    if !valid_error(error) {
+        return INVALID_ARGUMENT;
+    }
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(out)?;
+            let owner = c.get::<SharedMut<SwapOwner>>(swap)?;
+            let mut owner = owner.borrow_mut();
+            owner.swap.calculate()?;
+            let snapshot = crate::results_api::snapshot(owner.swap.base());
+            output(out, c.insert(snapshot)?)
+        })
+    }
+}
+
 /// Return the exact current weight count; unavailable after expiry.
 /// # Safety
 /// Outputs follow the crate-level caller contract and stay unchanged on error.
