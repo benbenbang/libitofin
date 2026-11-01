@@ -197,7 +197,10 @@ mod tests {
 
             assert!(is_increasing(&mesher));
             assert!(
-                mesher.locations().iter().any(|&x| close(x, c_point)),
+                mesher
+                    .locations()
+                    .iter()
+                    .any(|&x| (x - c_point).abs() <= 1.0e-12),
                 "cPoint {c_point} is not on the grid"
             );
         }
