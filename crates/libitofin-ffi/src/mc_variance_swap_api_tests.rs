@@ -1,5 +1,6 @@
 use super::super::tests::helpers::Market;
 use super::*;
+use std::collections::BTreeMap;
 
 fn config() -> ItofinVarianceSwapMcConfig {
     ItofinVarianceSwapMcConfig {
@@ -330,4 +331,78 @@ fn mc_sample_output_rejects_wrong_foreign_and_misaligned_handles() {
         0
     );
     assert_eq!(n, 91);
+}
+
+fn results(
+    m: &mut Market,
+) -> (
+    crate::results_api::ItofinResultsFields,
+    BTreeMap<String, f64>,
+) {
+    use crate::results_api::{itofin_results_additional, itofin_results_fields};
+    let mut id = 91;
+    let mut fields = std::mem::MaybeUninit::uninit();
+    let mut extra = BTreeMap::new();
+    unsafe {
+        assert_eq!(
+            itofin_variance_swap_results(&mut m.c, m.swap, &mut id, std::ptr::null_mut()),
+            0
+        );
+        assert_eq!(
+            itofin_results_fields(&mut m.c, id, fields.as_mut_ptr(), std::ptr::null_mut()),
+            0
+        );
+        let fields = fields.assume_init();
+        for index in 0..fields.additional_count {
+            let mut key = [0u8; 64];
+            let (mut size, mut value) = (0, 0.);
+            assert_eq!(
+                itofin_results_additional(
+                    &mut m.c,
+                    id,
+                    index,
+                    key.as_mut_ptr(),
+                    key.len(),
+                    &mut size,
+                    &mut value,
+                    std::ptr::null_mut()
+                ),
+                0
+            );
+            extra.insert(String::from_utf8(key[..size].to_vec()).unwrap(), value);
+        }
+        (fields, extra)
+    }
+}
+
+#[test]
+fn results_snapshot_reports_resolved_seed_and_replays_bit_for_bit() {
+    let mut m = Market::new();
+    let (fields, extra) = results(&mut m);
+    assert_eq!((fields.has_npv, fields.npv), (1, m.value(0)));
+    assert!(!extra.contains_key("seed"));
+    let mut run = |seed: u64| {
+        attach(&mut m, &ItofinVarianceSwapMcConfig { seed, ..config() });
+        let (fields, extra) = results(&mut m);
+        assert_eq!(fields.has_npv, 1);
+        assert_eq!(fields.has_error_estimate, 1);
+        assert_eq!(fields.npv.to_bits(), m.value(0).to_bits());
+        assert_eq!(fields.error_estimate.to_bits(), m.value(4).to_bits());
+        (
+            fields.npv.to_bits(),
+            fields.error_estimate.to_bits(),
+            extra["seed"],
+        )
+    };
+    let (npv, error, seed) = run(0);
+    assert!(seed > 0. && seed.fract() == 0.);
+    assert_eq!(run(seed as u64), (npv, error, seed));
+    assert_ne!(run(0).2, seed);
+    assert_eq!(run(42).2, 42.);
+    let mut id = 91;
+    assert_ne!(
+        unsafe { itofin_variance_swap_results(&mut m.c, m.engine, &mut id, std::ptr::null_mut()) },
+        0
+    );
+    assert_eq!(id, 91);
 }

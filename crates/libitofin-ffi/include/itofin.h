@@ -9806,6 +9806,17 @@ int32_t itofin_variance_swap_recalculate(struct ItofinContext *ctx,
                                          struct ItofinError *error);
 
 /**
+ * Calculate, then return a detached results snapshot handle. Typed variance,
+ * variance error and samples stay on their own accessors.
+ * # Safety
+ * Outputs follow the crate-level caller contract and stay unchanged on error.
+ */
+int32_t itofin_variance_swap_results(struct ItofinContext *ctx,
+                                     uint64_t swap,
+                                     uint64_t *out,
+                                     struct ItofinError *error);
+
+/**
  * Return the exact current weight count; unavailable after expiry.
  * # Safety
  * Outputs follow the crate-level caller contract and stay unchanged on error.

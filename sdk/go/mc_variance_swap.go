@@ -78,3 +78,27 @@ func (v *VarianceSwap) Samples() (uint, error) {
 	})
 	return uint(out), err
 }
+
+// Results calculates, then returns a detached snapshot including MC "seed".
+// Variance, VarianceError and Samples keep their typed accessors.
+func (v *VarianceSwap) Results() (*Results, error) {
+	if v == nil {
+		return nil, errNilArgument("variance swap")
+	}
+	var result *Results
+	s := v.session
+	err := s.invoke(func() error {
+		if err := sameSession(s, v.object); err != nil {
+			return err
+		}
+		var e C.ItofinError
+		var id C.uint64_t
+		if err := ffiError(C.itofin_variance_swap_results(s.ctx, C.uint64_t(v.id), &id, &e), &e); err != nil {
+			return err
+		}
+		var err error
+		result, err = s.readResults(uint64(id))
+		return err
+	})
+	return result, err
+}
