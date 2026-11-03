@@ -17,10 +17,12 @@
 //!   (`pathgenerator.hpp:60,142`). Rust's [`SequenceGenerator::next_sequence`]
 //!   needs `&mut self`, and returning an owned `Sample<Path>` per call keeps
 //!   the borrow simple; the consumer (`#451`'s model loop) takes it by value.
-//! - **`temp_` dropped**: C++ stages the draws in a `temp_` member so the
-//!   Brownian bridge can transform them in place (`pathgenerator.hpp:73,131`).
-//!   With the bridge deferred, the direct-copy branch reads the draws straight
-//!   from the sequence into a local, so no staging buffer is kept.
+//! - **`temp_` is a per-call local**: C++ stages the draws in a `temp_`
+//!   member (`pathgenerator.hpp:73,130-138`); here they are staged in a local
+//!   buffer, bridged or copied, so `next` keeps no mutable scratch state.
+//! - **the bridge is built only when requested**: C++ always constructs `bb_`
+//!   from the grid (`pathgenerator.hpp:85,99`); here it is built only when
+//!   `brownian_bridge` is `true`, since the copy branch never reads it.
 //! - **`next` is fallible**: `evolve` returns `QlResult` on main
 //!   (`stochasticprocess.rs:81`); a mid-path `Err` is a setup/data error, not a
 //!   per-sample outcome, so it aborts the whole call.
@@ -29,17 +31,12 @@
 //!   undrawn `InverseCumulativeRsg` is a zero vector
 //!   (`inversecumulativersg.rs:34`) and so a silent zero-noise path. Per D4 the
 //!   undrawn case returns `Err` instead.
-//!
-//! Deferred, rejected visibly rather than silently ignored:
-//! - **Brownian bridge** (`pathgenerator.hpp:130-133`): the constructor accepts
-//!   the `brownian_bridge` flag but returns `Err` when it is `true`; only the
-//!   `std::copy` branch (`pathgenerator.hpp:134-138`) is ported.
 
 use crate::errors::QlResult;
 use crate::math::array::Array;
 use crate::math::randomnumbers::rngtraits::SequenceGenerator;
 use crate::math::timegrid::TimeGrid;
-use crate::methods::montecarlo::{Path, PathGen, Sample};
+use crate::methods::montecarlo::{BrownianBridge, Path, PathGen, Sample};
 use crate::require;
 use crate::shared::Shared;
 use crate::stochasticprocess::StochasticProcess1D;
@@ -51,6 +48,7 @@ pub struct PathGenerator<GSG> {
     dimension: Size,
     time_grid: TimeGrid,
     process: Shared<dyn StochasticProcess1D>,
+    bridge: Option<BrownianBridge>,
     drawn: bool,
 }
 
@@ -60,9 +58,9 @@ impl<GSG: SequenceGenerator> PathGenerator<GSG> {
     ///
     /// # Errors
     ///
-    /// Returns `Err` if `brownian_bridge` is `true` (deferred), if the grid is
-    /// degenerate (see [`TimeGrid::new`]), or if the generator's dimensionality
-    /// does not equal `time_steps` (`pathgenerator.hpp:90`).
+    /// Returns `Err` if the grid is degenerate (see [`TimeGrid::new`]) or if
+    /// the generator's dimensionality does not equal `time_steps`
+    /// (`pathgenerator.hpp:90`).
     pub fn new(
         process: Shared<dyn StochasticProcess1D>,
         length: Time,
@@ -78,9 +76,10 @@ impl<GSG: SequenceGenerator> PathGenerator<GSG> {
     ///
     /// # Errors
     ///
-    /// Returns `Err` if `brownian_bridge` is `true` (deferred) or if the
-    /// generator's dimensionality does not equal `time_grid.size() - 1`
-    /// (`pathgenerator.hpp:104`).
+    /// Returns `Err` if the generator's dimensionality does not equal
+    /// `time_grid.size() - 1` (`pathgenerator.hpp:104`), or if
+    /// `brownian_bridge` is `true` on a grid the bridge rejects (see
+    /// [`BrownianBridge::from_time_grid`]).
     pub fn from_time_grid(
         process: Shared<dyn StochasticProcess1D>,
         time_grid: TimeGrid,
@@ -96,22 +95,23 @@ impl<GSG: SequenceGenerator> PathGenerator<GSG> {
         generator: GSG,
         brownian_bridge: bool,
     ) -> QlResult<Self> {
-        require!(
-            !brownian_bridge,
-            "brownian bridge path generation is not yet ported; only the \
-             direct-copy variant is available"
-        );
         let dimension = generator.dimension();
         let time_steps = time_grid.size() - 1;
         require!(
             dimension == time_steps,
             "sequence generator dimensionality ({dimension}) != timeSteps ({time_steps})"
         );
+        let bridge = if brownian_bridge {
+            Some(BrownianBridge::from_time_grid(&time_grid)?)
+        } else {
+            None
+        };
         Ok(PathGenerator {
             generator,
             dimension,
             time_grid,
             process,
+            bridge,
             drawn: false,
         })
     }
@@ -148,8 +148,10 @@ impl<GSG: SequenceGenerator> PathGenerator<GSG> {
         self.generate(true)
     }
 
-    /// The `next(bool)` core (`pathgenerator.hpp:121-154`, the
-    /// `brownian_bridge == false` branch, which is the only one constructed).
+    /// The `next(bool)` core (`pathgenerator.hpp:121-154`): the drawn (or, for
+    /// the antithetic partner, the cached last) sequence is bridged or copied
+    /// into the increments (`:130-138`), which the antithetic path negates
+    /// step by step (`:146-148`).
     fn generate(&mut self, antithetic: bool) -> QlResult<Sample<Path>> {
         require!(
             !antithetic || self.drawn,
@@ -161,7 +163,11 @@ impl<GSG: SequenceGenerator> PathGenerator<GSG> {
             } else {
                 self.generator.next_sequence()
             };
-            (sequence.weight, sequence.value.clone())
+            let mut draws = sequence.value.clone();
+            if let Some(bridge) = &self.bridge {
+                bridge.transform(&sequence.value, &mut draws)?;
+            }
+            (sequence.weight, draws)
         };
         self.drawn = true;
 
@@ -204,17 +210,23 @@ mod tests {
     use super::*;
     use crate::handle::{Handle, RelinkableHandle};
     use crate::interestrate::Compounding;
+    use crate::math::distributions::normal::InverseCumulativeNormal;
     use crate::math::randomnumbers::rngtraits::{McRngTraits, PseudoRandom};
+    use crate::math::randomnumbers::sobol::{DirectionIntegers, SobolRsg};
+    use crate::math::randomnumbers::{InverseCumulativeRsg, SobolSequence};
+    use crate::methods::montecarlo::brownianbridge::tests::Moments;
     use crate::patterns::observable::{AsObservable, Observable};
-    use crate::processes::BlackScholesMertonProcess;
+    use crate::processes::{BlackScholesMertonProcess, GeometricBrownianMotionProcess};
     use crate::quotes::make_quote_handle;
     use crate::shared::shared;
     use crate::termstructures::volatility::{BlackConstantVol, BlackVolTermStructure};
     use crate::termstructures::yields::FlatForward;
     use crate::termstructures::yieldtermstructure::YieldTermStructure;
+    use crate::time::calendars::nullcalendar::NullCalendar;
     use crate::time::calendars::target::Target;
     use crate::time::date::{Date, Month};
     use crate::time::daycounters::actual360::Actual360;
+    use crate::time::daycounters::actual365fixed::Actual365Fixed;
     use crate::time::frequency::Frequency;
     use crate::types::{Rate, Real, Volatility};
 
@@ -297,12 +309,123 @@ mod tests {
         );
     }
 
-    #[test]
-    fn brownian_bridge_is_rejected_as_deferred() {
-        match PathGenerator::new(gbs_process(), 1.0, 12, generator(12, 42), true) {
-            Err(e) => assert!(e.message().contains("brownian bridge")),
-            Ok(_) => panic!("brownian_bridge = true must be rejected as deferred"),
+    /// `test-suite/pathgenerator.cpp:39-85` `testSingle`: seed 42, 12 steps
+    /// over 10 years, the terminal value of the 101st path and of its
+    /// antithetic partner. The grid times are explicit, so the fixture's
+    /// reference date does not enter.
+    fn test_single(
+        process: Shared<dyn StochasticProcess1D>,
+        brownian_bridge: bool,
+        expected: Real,
+        antithetic: Real,
+    ) {
+        let mut pg =
+            PathGenerator::new(process, 10.0, 12, generator(12, 42), brownian_bridge).unwrap();
+        for _ in 0..100 {
+            pg.next().unwrap();
         }
+        let calculated = pg.next().unwrap().value.back();
+        assert!(
+            (calculated - expected).abs() <= 2.0e-8,
+            "bridge={brownian_bridge}: {calculated} vs {expected}"
+        );
+        let calculated = pg.antithetic().unwrap().value.back();
+        assert!(
+            (calculated - antithetic).abs() <= 2.0e-7,
+            "bridge={brownian_bridge} antithetic: {calculated} vs {antithetic}"
+        );
+    }
+
+    /// `pathgenerator.cpp:155-157`.
+    #[test]
+    fn black_scholes_cached_values_without_bridge() {
+        test_single(gbs_process(), false, 26.13784357783, 467.2928561411);
+    }
+
+    /// `pathgenerator.cpp:158-160`.
+    #[test]
+    fn black_scholes_cached_values_with_bridge() {
+        test_single(gbs_process(), true, 60.28215549393, 202.6143139999);
+    }
+
+    /// `pathgenerator.cpp:164-166`.
+    #[test]
+    fn geometric_brownian_cached_values_without_bridge() {
+        let process = shared(GeometricBrownianMotionProcess::new(100.0, 0.03, 0.20).unwrap())
+            as Shared<dyn StochasticProcess1D>;
+        test_single(process, false, 27.62223714065, 483.6026514084);
+    }
+
+    /// `test-suite/brownianbridge.cpp:166` `testPathGeneration`: bridged and
+    /// unbridged Sobol paths share their first two moments. The two generators
+    /// are built identically, as C++ copies one `gsg` into both, and the
+    /// moments are accumulated locally for the reason given on
+    /// `brownianbridge.rs`'s `variates_match_brownian_moments`. Equal moments
+    /// alone would also hold if the bridge were skipped, so the second path
+    /// pair (the first Sobol point is all-zero noise) is required to differ.
+    #[test]
+    fn bridged_paths_match_unbridged_moments() {
+        let times = [
+            0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 2.0, 5.0, 7.0, 9.0, 10.0,
+        ];
+        let n = times.len();
+        let samples = 131_071;
+        let today = reference();
+        let flat = |rate: Rate| {
+            Handle::new(shared(FlatForward::with_rate(
+                today,
+                rate,
+                Actual365Fixed::new(),
+                Compounding::Continuous,
+                Frequency::Annual,
+            )) as Shared<dyn YieldTermStructure>)
+        };
+        let vol = RelinkableHandle::new(shared(BlackConstantVol::new(
+            today,
+            Some(NullCalendar::new()),
+            0.20,
+            Actual365Fixed::new(),
+        )) as Shared<dyn BlackVolTermStructure>);
+        let process = shared(BlackScholesMertonProcess::new(
+            make_quote_handle(100.0).handle(),
+            flat(0.03),
+            flat(0.06),
+            vol.handle(),
+        )) as Shared<dyn StochasticProcess1D>;
+        let grid = TimeGrid::from_mandatory_times(&times).unwrap();
+        let sobol = || {
+            InverseCumulativeRsg::new(
+                SobolSequence::new(SobolRsg::new(n, 42, DirectionIntegers::Jaeckel)),
+                InverseCumulativeNormal::standard(),
+            )
+        };
+        let mut generator1 =
+            PathGenerator::from_time_grid(Shared::clone(&process), grid.clone(), sobol(), false)
+                .unwrap();
+        let mut generator2 = PathGenerator::from_time_grid(process, grid, sobol(), true).unwrap();
+
+        let mut stats1 = Moments::new(n);
+        let mut stats2 = Moments::new(n);
+        for i in 0..samples {
+            let path1 = generator1.next().unwrap().value;
+            let path2 = generator2.next().unwrap().value;
+            if i == 1 {
+                assert_ne!(path1.values(), path2.values(), "the bridge must act");
+            }
+            stats1.add(&path1.values()[1..]);
+            stats2.add(&path2.values()[1..]);
+        }
+
+        let max_rel_diff = |a: &[Real], b: &[Real]| {
+            a.iter()
+                .zip(b)
+                .map(|(x, y)| ((x - y) / y).abs())
+                .fold(0.0, Real::max)
+        };
+        let mean_error = max_rel_diff(&stats2.mean(), &stats1.mean());
+        let cov_error = max_rel_diff(&stats2.covariance(), &stats1.covariance());
+        assert!(mean_error <= 3.0e-5, "mean error {mean_error}");
+        assert!(cov_error <= 3.0e-3, "covariance error {cov_error}");
     }
 
     /// A generator whose draws ADVANCE on every `next_sequence`, so reusing the
