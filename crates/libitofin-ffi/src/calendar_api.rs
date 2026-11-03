@@ -87,14 +87,11 @@ fn country_calendar(country: i32, market: i32) -> BindingResult<NativeCalendar> 
         _ => return Err(BindingError::invalid("unknown calendar or market")),
     };
     let horizon = inner.holiday_horizon();
+    let first_year = inner.holiday_first_year().unwrap_or(1901);
     Ok(NativeCalendar {
         inner,
         horizon,
-        first_year: if country == 35 && market == 1 {
-            russia::MOEX_FIRST_YEAR
-        } else {
-            1901
-        },
+        first_year,
     })
 }
 
@@ -321,6 +318,14 @@ mod tests {
             tabulated,
             [9, 10, 17, 22, 24, 25, 26, 31, 32, 36, 38, 41, 42, 46]
         );
+        let first_years: Vec<(i32, i32, i32)> = (0..47)
+            .flat_map(|country| (0..9).map(move |market| (country, market)))
+            .filter_map(|(country, market)| {
+                let cal = country_calendar(country, market).ok()?;
+                (cal.first_year != 1901).then_some((country, market, cal.first_year))
+            })
+            .collect();
+        assert_eq!(first_years, [(35, 1, 2012)]);
         for (country, year) in [(25, 2014), (36, 2022)] {
             let cal = country_calendar(country, 0).unwrap();
             assert!(cal.checked(Date::new(1, Month::June, year)).is_ok());

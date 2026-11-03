@@ -72,6 +72,13 @@ pub trait CalendarImpl {
     fn holiday_horizon(&self) -> Option<Year> {
         None
     }
+    /// The first year whose holidays are available, for markets whose data
+    /// start at a fixed year. Before it the calendar still answers, falling
+    /// through to its weekend and recurring rules; the bindings use this to
+    /// reject such dates. Defaults to `None`.
+    fn holiday_first_year(&self) -> Option<Year> {
+        None
+    }
 }
 
 /// Whether `w` is a Saturday or Sunday (the Western/Orthodox weekend).
@@ -141,6 +148,12 @@ impl Calendar {
     /// [`CalendarImpl::holiday_horizon`]).
     pub fn holiday_horizon(&self) -> Option<Year> {
         self.imp.holiday_horizon()
+    }
+
+    /// The first year whose holidays are available, if any (see
+    /// [`CalendarImpl::holiday_first_year`]).
+    pub fn holiday_first_year(&self) -> Option<Year> {
+        self.imp.holiday_first_year()
     }
 
     /// The set of holidays added on top of the natural schedule.

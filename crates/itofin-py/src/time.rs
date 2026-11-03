@@ -1211,12 +1211,10 @@ impl PyCalendar {
         let inner = Russia::new(market);
         Ok(PyCalendar {
             horizon: inner.holiday_horizon(),
+            first_year: inner
+                .holiday_first_year()
+                .unwrap_or(Date::min_date().year()),
             inner,
-            first_year: if market == Market::Moex {
-                libitofin::time::calendars::russia::MOEX_FIRST_YEAR
-            } else {
-                Date::min_date().year()
-            },
         })
     }
 

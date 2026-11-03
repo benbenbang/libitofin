@@ -1,6 +1,12 @@
 //! Russian calendars.
 //!
 //! Port of `ql/time/calendars/russia.{hpp,cpp}`.
+//!
+//! Divergence: the Moscow Exchange was formally established in 2011, so its
+//! data start in 2012. QuantLib throws for earlier years (`russia.cpp:230-232`);
+//! this port falls through to the weekend and fixed-date rules instead and
+//! reports the bound through `holiday_first_year()`, which the bindings use to
+//! keep rejecting such dates.
 
 use crate::shared::shared;
 use crate::time::calendar::{Calendar, CalendarImpl, is_weekend_sat_sun};
@@ -198,6 +204,10 @@ fn is_extra_holiday_exchange_impl(d: Day, month: Month, year: Year) -> bool {
 struct ExchangeImpl;
 
 impl CalendarImpl for ExchangeImpl {
+    fn holiday_first_year(&self) -> Option<Year> {
+        Some(MOEX_FIRST_YEAR)
+    }
+
     fn name(&self) -> String {
         "Moscow exchange".to_string()
     }
@@ -211,12 +221,6 @@ impl CalendarImpl for ExchangeImpl {
         let d = date.day_of_month();
         let m = date.month();
         let y = date.year();
-
-        // the exchange was formally established in 2011, so data are only
-        // available from 2012 to present
-        if y < MOEX_FIRST_YEAR {
-            panic!("MOEX calendar for the year {y} does not exist.");
-        }
 
         if is_working_weekend(d, m, y) {
             return true;
@@ -269,6 +273,16 @@ mod tests {
         assert!(c.is_holiday(Date::new(23, Month::February, 2019)));
         // Christmas, Jan 7th.
         assert!(c.is_holiday(Date::new(7, Month::January, 2019)));
+    }
+
+    #[test]
+    fn moex_before_first_year_falls_through() {
+        let c = Russia::new(Market::Moex);
+        assert_eq!(c.holiday_first_year(), Some(MOEX_FIRST_YEAR));
+        assert_eq!(Russia::new(Market::Settlement).holiday_first_year(), None);
+        assert!(c.is_holiday(Date::new(5, Month::February, 2011)));
+        assert!(c.is_holiday(Date::new(23, Month::February, 2011)));
+        assert!(c.is_business_day(Date::new(9, Month::February, 2011)));
     }
 
     #[test]

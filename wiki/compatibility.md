@@ -38,6 +38,12 @@ oversight) and is documented at the point of divergence in the source.
   then silently returns "business day" for later dates, this port panics with a
   clear message once a query passes the last fully-tabulated year. QuantLib's
   tables are kept verbatim; we never fabricate future dates.
+- **The MOEX calendar answers before 2012.** QuantLib throws for Moscow
+  Exchange dates before 2012, the first year of its data
+  (`russia.cpp:230-232`). The core falls through to the weekend and fixed-date
+  rules instead of panicking and reports the bound through
+  `Calendar::holiday_first_year`; the Python, C, and Go bindings use it to keep
+  rejecting such dates with an error.
 - **`Period` comparison is a partial order, and fixes a negative-period bug.**
   QuantLib's `operator<`/`operator==` throw when two periods have overlapping
   day ranges (e.g. `1 Month` vs `30 Days`); this port returns `None` from
