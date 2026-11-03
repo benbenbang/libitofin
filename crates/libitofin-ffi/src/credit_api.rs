@@ -232,6 +232,94 @@ pub unsafe extern "C" fn itofin_piecewise_default_new(
         })
     }
 }
+/// A zero settings handle selects the fixed reference date; a nonzero one
+/// selects a reference date settlement_days business days on calendar past
+/// the evaluation date of settings. settings must be the SAME instance the
+/// helpers carry: a different instance moves the curve's reference date while
+/// the helpers stay put.
+#[repr(C)]
+pub struct ItofinPiecewiseDefaultConfig {
+    pub reference_date: i32,
+    pub settlement_days: u32,
+    pub calendar: u64,
+    pub day_counter: u64,
+    pub settings: u64,
+}
+/// The itofin_piecewise_default_new twin taking a fixed or moving reference
+/// date and multiplicative survival jumps. Empty dates generate year-end jump
+/// dates from the reference year, which on a moving curve needs the
+/// evaluation date already set: an unset one is an error, never a clock
+/// fallback.
+#[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
+pub unsafe extern "C" fn itofin_piecewise_default_with_jumps_new(
+    ctx: *mut Context,
+    config: *const ItofinPiecewiseDefaultConfig,
+    helpers: *const u64,
+    helper_count: usize,
+    jumps: *const u64,
+    jump_count: usize,
+    dates: *const i32,
+    date_count: usize,
+    out: *mut u64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(config)?;
+            check_ptr(out)?;
+            let a = &*config;
+            let helpers = input_slice(helpers, helper_count)?
+                .iter()
+                .map(|id| c.get::<Shared<dyn DefaultProbabilityHelper>>(*id))
+                .collect::<BindingResult<Vec<_>>>()?;
+            let jumps = input_slice(jumps, jump_count)?
+                .iter()
+                .map(|id| {
+                    c.get::<Shared<SimpleQuote>>(*id)
+                        .map(|q| Handle::new(q as Shared<dyn Quote>))
+                })
+                .collect::<BindingResult<Vec<_>>>()?;
+            let dates = input_slice(dates, date_count)?
+                .iter()
+                .map(|d| date(*d))
+                .collect::<BindingResult<Vec<_>>>()?;
+            let dc = day_counter(c, a.day_counter)?;
+            let concrete = if a.settings == 0 {
+                Piecewise::with_jumps(
+                    date(a.reference_date)?,
+                    helpers,
+                    dc,
+                    BackwardFlat,
+                    jumps,
+                    dates,
+                )?
+            } else {
+                Piecewise::moving_with_jumps(
+                    a.settlement_days,
+                    crate::time_api::calendar(c, a.calendar)?,
+                    helpers,
+                    dc,
+                    BackwardFlat,
+                    c.get::<Shared<Settings<Date>>>(a.settings)?,
+                    jumps,
+                    dates,
+                )?
+            };
+            let curve = CreditCurve {
+                handle: Handle::new(concrete.clone()),
+                interpolated: None,
+                piecewise: Some(concrete),
+                density: None,
+            };
+            output(out, c.insert(curve)?)
+        })
+    }
+}
 #[unsafe(no_mangle)]
 /// # Safety
 /// Pointers must be aligned, live and valid for their stated lengths. Outputs
