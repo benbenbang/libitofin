@@ -22,8 +22,7 @@
 //! times land on exact grid nodes.
 //!
 //! The value-semantics mandatory-times constructor preserves only supplied
-//! nodes and an initial zero. Initializer-list conveniences and `closest_time`
-//! remain unexposed.
+//! nodes and an initial zero. Initializer-list conveniences remain unexposed.
 
 use std::ops::Index;
 
@@ -224,6 +223,13 @@ impl TimeGrid {
         }
     }
 
+    /// The grid time closest to `t` (`timegrid.hpp:153`): the node at
+    /// [`closest_index`](TimeGrid::closest_index). Unchecked like C++: panics
+    /// on an empty grid.
+    pub fn closest_time(&self, t: Time) -> Time {
+        self.times[self.closest_index(t)]
+    }
+
     /// The index `i` such that `grid[i] == t` (`timegrid.cpp:43`).
     ///
     /// Finds the [`closest_index`](TimeGrid::closest_index) and requires it to
@@ -403,6 +409,13 @@ mod tests {
         assert_eq!(grid.closest_index(-1.0), 0);
         // A midpoint tie: dt1 (0.25 - 0.125) == dt2, so the lower node wins.
         assert_eq!(grid.closest_index(0.125), 0);
+    }
+
+    #[test]
+    fn closest_time_returns_the_nearest_node() {
+        // test-suite/timegrid.cpp:140 testClosestTime.
+        let grid = TimeGrid::from_mandatory_times(&[1.0, 2.0, 5.0]).unwrap();
+        assert_eq!(grid.closest_time(4.0), 5.0);
     }
 }
 

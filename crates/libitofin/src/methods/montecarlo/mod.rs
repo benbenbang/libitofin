@@ -4,6 +4,7 @@
 //! [`Sample`]; the path generators, path pricers, and Monte Carlo model stack
 //! stack on top in later tickets.
 
+mod brownianbridge;
 mod earlyexercisepathpricer;
 pub mod gjr_paths;
 mod longstaffschwartzpathpricer;
@@ -21,6 +22,7 @@ mod pathgenerator;
 mod sample;
 pub mod simulation_kernel;
 
+pub use brownianbridge::BrownianBridge;
 pub use earlyexercisepathpricer::EarlyExercisePathPricer;
 pub use longstaffschwartzpathpricer::LongstaffSchwartzPathPricer;
 pub use lsmbasissystem::{LsmBasisSystem, PolynomialType};
