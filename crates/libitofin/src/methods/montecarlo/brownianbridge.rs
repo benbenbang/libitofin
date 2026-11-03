@@ -199,7 +199,7 @@ impl BrownianBridge {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::math::distributions::normal::InverseCumulativeNormal;
     use crate::math::randomnumbers::sobol::{DirectionIntegers, SobolRsg};
@@ -212,7 +212,7 @@ mod tests {
             .fold(0.0, Real::max)
     }
 
-    struct Moments {
+    pub(crate) struct Moments {
         n: usize,
         samples: usize,
         sum: Vec<Real>,
@@ -220,7 +220,7 @@ mod tests {
     }
 
     impl Moments {
-        fn new(n: usize) -> Self {
+        pub(crate) fn new(n: usize) -> Self {
             Moments {
                 n,
                 samples: 0,
@@ -229,7 +229,7 @@ mod tests {
             }
         }
 
-        fn add(&mut self, x: &[Real]) {
+        pub(crate) fn add(&mut self, x: &[Real]) {
             for i in 0..self.n {
                 for j in 0..self.n {
                     self.quadratic_sum[i * self.n + j] += x[i] * x[j];
@@ -239,12 +239,12 @@ mod tests {
             self.samples += 1;
         }
 
-        fn mean(&self) -> Vec<Real> {
+        pub(crate) fn mean(&self) -> Vec<Real> {
             let count = self.samples as Real;
             self.sum.iter().map(|s| s / count).collect()
         }
 
-        fn covariance(&self) -> Vec<Real> {
+        pub(crate) fn covariance(&self) -> Vec<Real> {
             let count = self.samples as Real;
             let mean = self.mean();
             let mut result = vec![0.0; self.n * self.n];
