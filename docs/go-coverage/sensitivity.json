@@ -23,6 +23,20 @@
       ]
     },
     {
+      "c": "itofin_sensitivity_bucket",
+      "go": [
+        "Session.KeyRateAnalysis",
+        "LabelledQuote",
+        "KeyRate"
+      ],
+      "python": "itofin.risk.bucket_analysis",
+      "status": "implemented",
+      "tests": [
+        "TestSensitivityKeyRatesKeepTheInputOrder",
+        "TestSensitivityKeyRatesRejectDuplicateLabels"
+      ]
+    },
+    {
       "go": "SensitivityAnalysis",
       "python": "itofin.risk.SensitivityAnalysis",
       "status": "implemented",
@@ -54,5 +68,5 @@
       "status": "language-specific"
     }
   ],
-  "scope": "Parallel and bucket PV01 over SimpleQuotes for bonds, vanilla swaps and OIS. Python bucket_analysis also returns a labelled dict for a Mapping of quotes; the Go labelled report is deferred (#1323). Options, swaptions, cap/floors and CDS are deferred (#1322)."
+  "scope": "Parallel and bucket PV01 over SimpleQuotes for bonds, vanilla swaps and OIS. Python bucket_analysis also returns a labelled dict for a Mapping of quotes; Go KeyRateAnalysis returns the labelled report as an ordered slice and rejects duplicate labels. Options, swaptions, cap/floors and CDS are deferred (#1322)."
 }

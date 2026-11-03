@@ -242,3 +242,79 @@ func TestSensitivityPreflightRejectsCalendarBounds(t *testing.T) {
 		t.Fatalf("quote moved: %g", v)
 	}
 }
+
+func zeroBondBuckets(t *testing.T, s *Session) ([]*SimpleQuote, []Instrument) {
+	t.Helper()
+	var quotes []*SimpleQuote
+	var instruments []Instrument
+	for _, face := range []float64{100, 200, 300, 400} {
+		bond, quote, _, _, _, _, _, _ := bondFixture(t, s, "zero", face)
+		quotes = append(quotes, quote)
+		instruments = append(instruments, bond)
+	}
+	return quotes, instruments
+}
+
+func keyRates(t *testing.T, s *Session, quotes []*SimpleQuote, instruments []Instrument, order []int) []KeyRate {
+	t.Helper()
+	labels := []string{"3M", "6M", "1Y", "2Y"}
+	labelled := make([]LabelledQuote, len(order))
+	plain := make([]*SimpleQuote, len(order))
+	for i, k := range order {
+		labelled[i] = LabelledQuote{labels[k], quotes[k]}
+		plain[i] = quotes[k]
+	}
+	report, e := s.KeyRateAnalysis(labelled, instruments, nil, DefaultShift, Centered)
+	bondCheck(t, e)
+	buckets, e := s.BucketAnalysis(plain, instruments, nil, DefaultShift, Centered)
+	bondCheck(t, e)
+	if len(report) != len(order) {
+		t.Fatalf("report %v for %d quotes", report, len(order))
+	}
+	for i, r := range report {
+		if r.Label != labelled[i].Label || r.Sensitivity.First != buckets[i].First || r.Sensitivity.Second == nil || *r.Sensitivity.Second != *buckets[i].Second {
+			t.Fatalf("key rate %d %+v vs %s %+v", i, r, labelled[i].Label, buckets[i])
+		}
+	}
+	return report
+}
+
+func TestSensitivityKeyRatesKeepTheInputOrder(t *testing.T) {
+	s, e := NewSession()
+	bondCheck(t, e)
+	defer s.Close()
+	quotes, instruments := zeroBondBuckets(t, s)
+	first := keyRates(t, s, quotes, instruments, []int{3, 0, 2, 1})
+	second := keyRates(t, s, quotes, instruments, []int{1, 2, 0, 3})
+	byLabel := map[string]float64{}
+	for _, r := range first {
+		byLabel[r.Label] = r.Sensitivity.First
+	}
+	if len(byLabel) != len(quotes) {
+		t.Fatalf("labels lost: %v", first)
+	}
+	distinct := map[float64]bool{}
+	for _, r := range second {
+		distinct[r.Sensitivity.First] = true
+		if byLabel[r.Label] != r.Sensitivity.First {
+			t.Fatalf("%s moved between orders: %g vs %g", r.Label, r.Sensitivity.First, byLabel[r.Label])
+		}
+	}
+	if len(distinct) != len(quotes) {
+		t.Fatalf("buckets not distinct, order unobservable: %v", second)
+	}
+}
+
+func TestSensitivityKeyRatesRejectDuplicateLabels(t *testing.T) {
+	s, e := NewSession()
+	bondCheck(t, e)
+	defer s.Close()
+	quotes, instruments := zeroBondBuckets(t, s)
+	labelled := []LabelledQuote{{"1Y", quotes[2]}, {"2Y", quotes[3]}, {"1Y", quotes[1]}}
+	if _, e := s.KeyRateAnalysis(labelled, instruments, nil, DefaultShift, Centered); e == nil || !strings.Contains(e.Error(), `duplicate key-rate label "1Y"`) {
+		t.Fatalf("duplicate label accepted: %v", e)
+	}
+	if v := sessionMust(quotes[2].Value()); v != .04 {
+		t.Fatalf("quote moved: %g", v)
+	}
+}
