@@ -4,6 +4,7 @@ package itofin
 #include "itofin.h"
 */
 import "C"
+import "fmt"
 
 // DefaultShift is the QuantLib default bump, one basis point.
 const DefaultShift = 1e-4
@@ -135,4 +136,40 @@ func (s *Session) BucketAnalysis(quotes []*SimpleQuote, instruments []Instrument
 		results[k] = sensitivity(out[k])
 	}
 	return results, nil
+}
+
+// LabelledQuote names one quote of a key-rate report.
+type LabelledQuote struct {
+	Label string
+	Quote *SimpleQuote
+}
+
+// KeyRate is the bucket sensitivity of one labelled quote.
+type KeyRate struct {
+	Label       string
+	Sensitivity Sensitivity
+}
+
+// KeyRateAnalysis is BucketAnalysis over labelled quotes, the Go mirror of
+// the Python bucket_analysis mapping overload: one KeyRate per quote, in input
+// order. Duplicate labels are an error, as mapping keys are unique.
+func (s *Session) KeyRateAnalysis(quotes []LabelledQuote, instruments []Instrument, quantities []float64, shift float64, kind SensitivityAnalysis) ([]KeyRate, error) {
+	plain := make([]*SimpleQuote, len(quotes))
+	seen := make(map[string]struct{}, len(quotes))
+	for i, q := range quotes {
+		if _, ok := seen[q.Label]; ok {
+			return nil, fmt.Errorf("duplicate key-rate label %q", q.Label)
+		}
+		seen[q.Label] = struct{}{}
+		plain[i] = q.Quote
+	}
+	buckets, err := s.BucketAnalysis(plain, instruments, quantities, shift, kind)
+	if err != nil {
+		return nil, err
+	}
+	report := make([]KeyRate, len(buckets))
+	for i, b := range buckets {
+		report[i] = KeyRate{quotes[i].Label, b}
+	}
+	return report, nil
 }
