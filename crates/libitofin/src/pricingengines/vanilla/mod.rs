@@ -17,6 +17,7 @@
 //!   does not handle is an explicit error from there rather than a silently
 //!   wrong price.
 
+pub mod analyticdividendeuropeanengine;
 pub mod analytichestonengine;
 pub mod batesengine;
 pub mod coshestonengine;
@@ -31,6 +32,7 @@ pub mod mceuropeanengine;
 pub mod mceuropeanhestonengine;
 pub mod mcvanillaengine;
 
+pub use analyticdividendeuropeanengine::AnalyticDividendEuropeanEngine;
 pub use analytichestonengine::HestonChf;
 pub use batesengine::BatesEngine;
 pub use fdblackscholesvanillaengine::FdBlackScholesVanillaEngine;
