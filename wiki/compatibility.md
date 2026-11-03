@@ -33,11 +33,15 @@ oversight) and is documented at the point of divergence in the source.
   Arabia's Thu/Fri→Fri/Sat in 2013, Israel/TASE's Fri/Sat→Sat/Sun in 2026). This
   port filters with a date-aware `is_weekend_on`; fixed-weekend calendars are
   unaffected (the default equals the weekday rule).
-- **Table-backed calendars fail loudly past their data horizon.** Where QuantLib
-  tabulates lunar / religious / observed holidays only up to a fixed year and
-  then silently returns "business day" for later dates, this port panics with a
-  clear message once a query passes the last fully-tabulated year. QuantLib's
-  tables are kept verbatim; we never fabricate future dates.
+- **Table-backed calendars report their data bounds; the bindings reject dates
+  outside them.** Where QuantLib tabulates lunar / religious / observed holidays
+  only up to a fixed year, the core matches it past the tables: it falls through
+  to the weekend and recurring rules and never panics. It reports the last
+  fully-tabulated year through `Calendar::holiday_horizon` (and the first year
+  of a market's data through `Calendar::holiday_first_year`), and the C, Go, and
+  Python bindings return an error for dates after `holiday_horizon()` or before
+  `holiday_first_year()`. QuantLib's tables are kept verbatim; we never
+  fabricate future dates. The one core divergence is MOEX before 2012, below.
 - **The MOEX calendar answers before 2012.** QuantLib throws for Moscow
   Exchange dates before 2012, the first year of its data
   (`russia.cpp:230-232`). The core falls through to the weekend and fixed-date
