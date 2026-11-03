@@ -776,6 +776,21 @@ typedef struct ItofinFlatHazardConfig {
   uint64_t settings;
 } ItofinFlatHazardConfig;
 
+/**
+ * A zero settings handle selects the fixed reference date; a nonzero one
+ * selects a reference date settlement_days business days on calendar past
+ * the evaluation date of settings. settings must be the SAME instance the
+ * helpers carry: a different instance moves the curve's reference date while
+ * the helpers stay put.
+ */
+typedef struct ItofinPiecewiseDefaultConfig {
+  int32_t reference_date;
+  uint32_t settlement_days;
+  uint64_t calendar;
+  uint64_t day_counter;
+  uint64_t settings;
+} ItofinPiecewiseDefaultConfig;
+
 typedef struct ItofinCreditNode {
   int32_t date;
   double time;
@@ -4466,6 +4481,29 @@ int32_t itofin_piecewise_default_new(struct ItofinContext *ctx,
                                      uint64_t dc,
                                      uint64_t *out,
                                      struct ItofinError *error);
+
+/**
+ * The itofin_piecewise_default_new twin taking a fixed or moving reference
+ * date and multiplicative survival jumps. Empty dates generate year-end jump
+ * dates from the reference year, which on a moving curve needs the
+ * evaluation date already set: an unset one is an error, never a clock
+ * fallback.
+ * # Safety
+ * Pointers must be aligned, live and valid for their stated lengths. Outputs
+ * must not overlap inputs or other outputs. Any context and its handles must
+ * belong to the calling thread; serialize calls including destruction.
+ * See the crate-level C caller contract for lifetime requirements.
+ */
+int32_t itofin_piecewise_default_with_jumps_new(struct ItofinContext *ctx,
+                                                const struct ItofinPiecewiseDefaultConfig *config,
+                                                const uint64_t *helpers,
+                                                size_t helper_count,
+                                                const uint64_t *jumps,
+                                                size_t jump_count,
+                                                const int32_t *dates,
+                                                size_t date_count,
+                                                uint64_t *out,
+                                                struct ItofinError *error);
 
 /**
  * # Safety

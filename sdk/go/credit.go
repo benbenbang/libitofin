@@ -220,6 +220,79 @@ func (s *Session) NewPiecewiseDefaultCurve(reference Date, helpers []*DefaultPro
 	}
 	return &PiecewiseDefaultCurve{object{s, uint64(id)}}, nil
 }
+
+// PiecewiseDefaultConfig selects a moving reference date when Settings is set;
+// Settings must be the same instance the helpers carry.
+type PiecewiseDefaultConfig struct {
+	Helpers        []*DefaultProbabilityHelper
+	JumpQuotes     []*SimpleQuote
+	JumpDates      []Date
+	ReferenceDate  Date
+	SettlementDays uint32
+	Calendar       *Calendar
+	DayCounter     *DayCounter
+	Settings       *Settings
+}
+
+// NewPiecewiseDefaultCurveWithConfig supports fixed/moving dates and survival jumps.
+func (s *Session) NewPiecewiseDefaultCurveWithConfig(a PiecewiseDefaultConfig) (*PiecewiseDefaultCurve, error) {
+	if a.DayCounter == nil {
+		return nil, errNilArgument("credit argument")
+	}
+	args := []object{a.DayCounter.object}
+	c := C.ItofinPiecewiseDefaultConfig{reference_date: C.int32_t(a.ReferenceDate.Serial()), settlement_days: C.uint32_t(a.SettlementDays), day_counter: C.uint64_t(a.DayCounter.id)}
+	if a.Settings != nil {
+		if a.Calendar == nil {
+			return nil, errNilArgument("credit argument")
+		}
+		args = append(args, a.Settings.object, a.Calendar.object)
+		c.settings = C.uint64_t(a.Settings.id)
+		c.calendar = C.uint64_t(a.Calendar.id)
+	}
+	helpers := make([]C.uint64_t, len(a.Helpers))
+	for i, h := range a.Helpers {
+		if h == nil {
+			return nil, errNilArgument("credit argument")
+		}
+		args = append(args, h.object)
+		helpers[i] = C.uint64_t(h.id)
+	}
+	jumps := make([]C.uint64_t, len(a.JumpQuotes))
+	for i, q := range a.JumpQuotes {
+		if q == nil {
+			return nil, errNilArgument("jump quote")
+		}
+		args = append(args, q.object)
+		jumps[i] = C.uint64_t(q.id)
+	}
+	dates := make([]C.int32_t, len(a.JumpDates))
+	for i, d := range a.JumpDates {
+		dates[i] = C.int32_t(d.Serial())
+	}
+	var hp, qp *C.uint64_t
+	var dp *C.int32_t
+	if len(helpers) > 0 {
+		hp = &helpers[0]
+	}
+	if len(jumps) > 0 {
+		qp = &jumps[0]
+	}
+	if len(dates) > 0 {
+		dp = &dates[0]
+	}
+	var id C.uint64_t
+	err := s.invoke(func() error {
+		if e := sameSession(s, args...); e != nil {
+			return e
+		}
+		var e C.ItofinError
+		return ffiError(C.itofin_piecewise_default_with_jumps_new(s.ctx, &c, hp, C.size_t(len(helpers)), qp, C.size_t(len(jumps)), dp, C.size_t(len(dates)), &id, &e), &e)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &PiecewiseDefaultCurve{object{s, uint64(id)}}, nil
+}
 func (c *DefaultProbabilityTermStructure) value(kind int, t float64, date Date, useDate, extrapolate bool) (float64, error) {
 	if c == nil {
 		return 0, errNilArgument("credit argument")
