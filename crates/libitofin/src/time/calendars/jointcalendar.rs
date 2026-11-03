@@ -113,6 +113,20 @@ impl CalendarImpl for Impl {
             .filter_map(|c| c.holiday_horizon())
             .min()
     }
+
+    /// The latest first holiday year among the members, or `None` if no
+    /// member has one. Before that year at least one member answers from its
+    /// recurring rules only, so the joint answer is incomplete under either
+    /// [`JointCalendarRule`].
+    ///
+    /// This is an itofin addition with no QuantLib counterpart (QuantLib has
+    /// no first-year concept), so there is no C++ oracle.
+    fn holiday_first_year(&self) -> Option<Year> {
+        self.calendars
+            .iter()
+            .filter_map(|c| c.holiday_first_year())
+            .max()
+    }
 }
 
 #[cfg(test)]
@@ -172,6 +186,30 @@ mod tests {
         Calendar::from_impl(shared(HorizonCal(year)))
     }
 
+    struct FirstYearCal(Year);
+
+    impl CalendarImpl for FirstYearCal {
+        fn name(&self) -> String {
+            format!("first year {}", self.0)
+        }
+
+        fn is_weekend(&self, weekday: Weekday) -> bool {
+            crate::time::calendar::is_weekend_sat_sun(weekday)
+        }
+
+        fn is_business_day(&self, date: Date) -> bool {
+            !self.is_weekend(date.weekday())
+        }
+
+        fn holiday_first_year(&self) -> Option<Year> {
+            Some(self.0)
+        }
+    }
+
+    fn first_year(year: Year) -> Calendar {
+        Calendar::from_impl(shared(FirstYearCal(year)))
+    }
+
     const RULES: [JointCalendarRule; 2] = [
         JointCalendarRule::JoinHolidays,
         JointCalendarRule::JoinBusinessDays,
@@ -210,6 +248,42 @@ mod tests {
             let inner = JointCalendar::of_two(horizon(2040), Target::new(), rule);
             let joint = JointCalendar::of_two(WeekendsOnly::new(), inner, rule);
             assert_eq!(joint.holiday_horizon(), Some(2040));
+        }
+    }
+
+    #[test]
+    fn first_year_comes_from_the_only_member_that_has_one() {
+        for rule in RULES {
+            let joint = JointCalendar::of_two(first_year(2012), Target::new(), rule);
+            assert_eq!(joint.holiday_first_year(), Some(2012));
+        }
+    }
+
+    #[test]
+    fn first_year_is_the_latest_of_the_members() {
+        for rule in RULES {
+            let joint = JointCalendar::new(
+                vec![first_year(2012), WeekendsOnly::new(), first_year(2000)],
+                rule,
+            );
+            assert_eq!(joint.holiday_first_year(), Some(2012));
+        }
+    }
+
+    #[test]
+    fn first_year_is_none_without_bounded_members() {
+        for rule in RULES {
+            let joint = JointCalendar::of_two(Target::new(), WeekendsOnly::new(), rule);
+            assert_eq!(joint.holiday_first_year(), None);
+        }
+    }
+
+    #[test]
+    fn first_year_recurses_into_nested_joint_calendars() {
+        for rule in RULES {
+            let inner = JointCalendar::of_two(first_year(2012), Target::new(), rule);
+            let joint = JointCalendar::of_two(WeekendsOnly::new(), inner, rule);
+            assert_eq!(joint.holiday_first_year(), Some(2012));
         }
     }
 
