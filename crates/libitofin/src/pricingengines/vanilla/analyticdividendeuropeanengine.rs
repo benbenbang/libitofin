@@ -187,6 +187,7 @@ mod tests {
     use crate::interestrate::Compounding;
     use crate::option::OptionType;
     use crate::pricingengine::PricingEngine;
+    use crate::pricingengines::vanilla::AnalyticEuropeanEngine;
     use crate::pricingengines::vanilla::test_market::{quote_handle, today};
     use crate::processes::{BlackScholesMertonProcess, GeneralizedBlackScholesProcess};
     use crate::quotes::SimpleQuote;
@@ -199,9 +200,12 @@ mod tests {
     use crate::time::date::Date;
     use crate::time::daycounters::actual360::Actual360;
     use crate::time::frequency::Frequency;
-    use crate::types::Real;
+    use crate::time::period::Period;
+    use crate::time::timeunit::TimeUnit;
+    use crate::types::{Rate, Real, Volatility};
 
     const U: Real = 100.0;
+    const TOLERANCE: Real = 1.0e-5;
 
     struct Market {
         settings: Shared<Settings<Date>>,
@@ -291,6 +295,220 @@ mod tests {
                 strike,
                 shared(EuropeanExercise::new(expiry)),
             )
+        }
+
+        fn reference(&self, option_type: OptionType, strike: Real, expiry: Date) -> EuropeanOption {
+            let engine = shared_mut(AnalyticEuropeanEngine::new(Shared::clone(&self.process)));
+            self.option(
+                engine,
+                option_type,
+                strike,
+                shared(EuropeanExercise::new(expiry)),
+            )
+        }
+    }
+
+    fn contracts() -> Vec<(OptionType, Real, Date)> {
+        let mut contracts = Vec::new();
+        for option_type in [OptionType::Call, OptionType::Put] {
+            for strike in [50.0, 99.5, 100.0, 100.5, 150.0] {
+                for length in [1, 2] {
+                    let expiry = today() + Period::new(length, TimeUnit::Years);
+                    contracts.push((option_type, strike, expiry));
+                }
+            }
+        }
+        contracts
+    }
+
+    fn scenarios(vols: [Volatility; 3]) -> Vec<(Rate, Rate, Volatility)> {
+        let mut scenarios = Vec::new();
+        for q in [0.00, 0.10, 0.30] {
+            for r in [0.01, 0.05, 0.15] {
+                for v in vols {
+                    scenarios.push((q, r, v));
+                }
+            }
+        }
+        scenarios
+    }
+
+    fn semiannual_dates(expiry: Date) -> Vec<Date> {
+        let mut dates = Vec::new();
+        let mut d = today() + Period::new(3, TimeUnit::Months);
+        while d < expiry {
+            dates.push(d);
+            d = d + Period::new(6, TimeUnit::Months);
+        }
+        dates
+    }
+
+    #[test]
+    fn no_dividends_in_the_window_match_the_plain_european_engine() {
+        let m = Market::new();
+        for (option_type, strike, expiry) in contracts() {
+            let dates = semiannual_dates(expiry);
+            let mut reference = m.reference(option_type, strike, expiry);
+            let mut zero_amounts =
+                m.dividend(option_type, strike, expiry, &dates, &vec![0.0; dates.len()]);
+            let after_expiry = expiry + Period::new(6, TimeUnit::Months);
+            let mut outside = m.dividend(option_type, strike, expiry, &[after_expiry], &[1.0]);
+            for (q, r, v) in scenarios([0.05, 0.20, 0.70]) {
+                m.set(q, r, v);
+                let expected = reference.npv().unwrap();
+                for calculated in [zero_amounts.npv().unwrap(), outside.npv().unwrap()] {
+                    assert!(
+                        (calculated - expected).abs() <= TOLERANCE,
+                        "{option_type:?} K={strike} {expiry:?} q={q} r={r} v={v}: \
+                         {calculated} vs {expected}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn dividend_on_the_settlement_date_comes_straight_off_the_spot() {
+        let dividend = 10.0;
+        let m = Market::new();
+        let settlement = m
+            .process
+            .risk_free_rate()
+            .current_link()
+            .unwrap()
+            .reference_date()
+            .unwrap();
+        assert_eq!(settlement, today());
+        for (option_type, strike, expiry) in contracts() {
+            let mut reference = m.reference(option_type, strike, expiry);
+            let mut option = m.dividend(option_type, strike, expiry, &[today()], &[dividend]);
+            for (q, r, v) in scenarios([0.05, 0.20, 0.70]) {
+                m.set(q, r, v);
+                let calculated = option.npv().unwrap();
+                m.spot.set_value(U - dividend);
+                let expected = reference.npv().unwrap();
+                assert!(
+                    (calculated - expected).abs() <= TOLERANCE,
+                    "{option_type:?} K={strike} {expiry:?} q={q} r={r} v={v}: \
+                     {calculated} vs {expected}"
+                );
+            }
+        }
+    }
+
+    /// Not a QuantLib oracle: `testEuropeanEndLimit` is commented out in the
+    /// test suite (`dividendoption.cpp:303`, "need to use discounted values").
+    /// This pins the closed window of `analyticdividendeuropeanengine.cpp:49-50`
+    /// using those discounted values.
+    #[test]
+    fn dividend_window_is_closed_on_both_ends() {
+        let dividend = 10.0;
+        let (q, r, v) = (0.10, 0.05, 0.20);
+        let m = Market::new();
+        for (option_type, strike, expiry) in contracts() {
+            let mut reference = m.reference(option_type, strike, expiry);
+            let mut on_expiry = m.dividend(option_type, strike, expiry, &[expiry], &[dividend]);
+            let mut outside = m.dividend(
+                option_type,
+                strike,
+                expiry,
+                &[today() - 1, expiry + 1],
+                &[dividend, dividend],
+            );
+            m.set(q, r, v);
+            let undividended = reference.npv().unwrap();
+            let calculated = outside.npv().unwrap();
+            assert!(
+                (calculated - undividended).abs() <= TOLERANCE,
+                "{option_type:?} K={strike} {expiry:?}: {calculated} vs {undividended}"
+            );
+
+            let risk_free = m.process.risk_free_rate().current_link().unwrap();
+            let yield_curve = m.process.dividend_yield().current_link().unwrap();
+            let pv = dividend * risk_free.discount_date(expiry, false).unwrap()
+                / yield_curve.discount_date(expiry, false).unwrap();
+            let calculated = on_expiry.npv().unwrap();
+            m.spot.set_value(U - pv);
+            let expected = reference.npv().unwrap();
+            assert!(
+                (calculated - expected).abs() <= TOLERANCE,
+                "{option_type:?} K={strike} {expiry:?}: {calculated} vs {expected}"
+            );
+        }
+    }
+
+    #[test]
+    fn greeks_are_consistent_with_finite_differences() {
+        let m = Market::new();
+        for (option_type, strike, expiry) in contracts() {
+            let dates = semiannual_dates(expiry);
+            let amounts = vec![5.0; dates.len()];
+            let mut option = m.dividend(option_type, strike, expiry, &dates, &amounts);
+            for (q, r, v) in scenarios([0.05, 0.20, 0.40]) {
+                m.set(q, r, v);
+                let value = option.npv().unwrap();
+                let delta = option.delta().unwrap();
+                let gamma = option.gamma().unwrap();
+                let theta = option.theta().unwrap();
+                let rho = option.rho().unwrap();
+                let vega = option.vega().unwrap();
+
+                if value <= U * 1.0e-5 {
+                    continue;
+                }
+
+                let du = U * 1.0e-4;
+                m.spot.set_value(U + du);
+                let value_p = option.npv().unwrap();
+                let delta_p = option.delta().unwrap();
+                m.spot.set_value(U - du);
+                let value_m = option.npv().unwrap();
+                let delta_m = option.delta().unwrap();
+                m.spot.set_value(U);
+                let expected_delta = (value_p - value_m) / (2.0 * du);
+                let expected_gamma = (delta_p - delta_m) / (2.0 * du);
+
+                let dr = r * 1.0e-4;
+                m.r_rate.set_value(r + dr);
+                let value_p = option.npv().unwrap();
+                m.r_rate.set_value(r - dr);
+                let value_m = option.npv().unwrap();
+                m.r_rate.set_value(r);
+                let expected_rho = (value_p - value_m) / (2.0 * dr);
+
+                let dv = v * 1.0e-4;
+                m.vol.set_value(v + dv);
+                let value_p = option.npv().unwrap();
+                m.vol.set_value(v - dv);
+                let value_m = option.npv().unwrap();
+                m.vol.set_value(v);
+                let expected_vega = (value_p - value_m) / (2.0 * dv);
+
+                let dt = Actual360::new().year_fraction(today() - 1, today() + 1);
+                m.settings.set_evaluation_date(today() - 1);
+                let value_m = option.npv().unwrap();
+                m.settings.set_evaluation_date(today() + 1);
+                let value_p = option.npv().unwrap();
+                m.settings.set_evaluation_date(today());
+                let expected_theta = (value_p - value_m) / dt;
+
+                let checks = [
+                    ("delta", expected_delta, delta),
+                    ("gamma", expected_gamma, gamma),
+                    ("theta", expected_theta, theta),
+                    ("rho", expected_rho, rho),
+                    ("vega", expected_vega, vega),
+                ];
+                for (name, expected, calculated) in checks {
+                    let error = (expected - calculated).abs() / U;
+                    assert!(
+                        error <= TOLERANCE,
+                        "{name} of {option_type:?} K={strike} {expiry:?} q={q} r={r} v={v}: \
+                         analytic {calculated} vs finite difference {expected} \
+                         (relative error {error})"
+                    );
+                }
+            }
         }
     }
 
