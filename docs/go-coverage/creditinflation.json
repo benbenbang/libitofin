@@ -3,6 +3,7 @@
     "Inflation is tracked separately by its implementation owner.",
     "Implemented does not imply individually tested: empty tests lists identify remaining direct test gaps.",
     "FlatHazardRate constructors select quote/rate and moving/fixed modes through FlatHazardConfig.",
+    "PiecewiseDefaultCurve moving and jumped constructors select their modes through PiecewiseDefaultConfig.",
     "MakeCreditDefaultSwap constructor/build map to one stateless Go build call.",
     "Credit class base operations apply to all derived curve aliases."
   ],
@@ -687,6 +688,37 @@
       "tests": [
         "TestCreditJumpsQuantLibOracle",
         "TestCreditJumpsInvalidArguments"
+      ]
+    },
+    {
+      "c": "itofin_piecewise_default_with_jumps_new",
+      "go": "Session.NewPiecewiseDefaultCurveWithConfig",
+      "python": "PiecewiseDefaultCurve.with_jumps",
+      "status": "implemented",
+      "tests": [
+        "TestPiecewiseDefaultJumpsQuantLibOracle",
+        "TestPiecewiseDefaultConfigInvalidArguments"
+      ]
+    },
+    {
+      "c": "itofin_piecewise_default_with_jumps_new",
+      "go": "Session.NewPiecewiseDefaultCurveWithConfig",
+      "python": "PiecewiseDefaultCurve.moving",
+      "status": "implemented",
+      "tests": [
+        "TestPiecewiseDefaultMovingRollMatchesFreshFixed",
+        "TestPiecewiseDefaultConfigInvalidArguments"
+      ]
+    },
+    {
+      "c": "itofin_piecewise_default_with_jumps_new",
+      "go": "Session.NewPiecewiseDefaultCurveWithConfig",
+      "python": "PiecewiseDefaultCurve.moving_with_jumps",
+      "status": "implemented",
+      "tests": [
+        "TestPiecewiseDefaultJumpsQuantLibOracle",
+        "TestPiecewiseDefaultMovingRollMatchesFreshFixed",
+        "TestPiecewiseDefaultConfigInvalidArguments"
       ]
     },
     {

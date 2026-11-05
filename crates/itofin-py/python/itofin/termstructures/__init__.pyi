@@ -2421,7 +2421,8 @@ class PiecewiseDefaultCurve(DefaultProbabilityTermStructure):
 
     Lazy: the bootstrap runs on the first read, so the helpers' Settings flags
     and evaluation date must be in place before that read, not merely before
-    the constructor. A helper quote moving invalidates the cache.
+    the constructor. A helper quote moving invalidates the cache, as does a jump
+    quote moving or, on the moving forms, an evaluation date change.
     """
     def __init__(self, reference_date: time.Date, helpers: typing.Sequence[DefaultProbabilityHelper], day_counter: time.DayCounter) -> None:
         r"""
@@ -2435,6 +2436,91 @@ class PiecewiseDefaultCurve(DefaultProbabilityTermStructure):
 
         Raises:
             ItofinError: On an empty helper list.
+        """
+    @staticmethod
+    def with_jumps(reference_date: time.Date, helpers: typing.Sequence[DefaultProbabilityHelper], day_counter: time.DayCounter, jumps: typing.Sequence[quotes.SimpleQuote], jump_dates: typing.Optional[typing.Sequence[time.Date]] = None) -> PiecewiseDefaultCurve:
+        r"""
+        Build a fixed-reference curve retaining multiplicative survival jump quotes.
+
+        The helpers price off the jump-adjusted survival probability, and a
+        jump quote moving re-bootstraps the curve. Jumps apply strictly after
+        their date.
+
+        Args:
+            reference_date (Date): The curve's reference date.
+            helpers (list[DefaultProbabilityHelper]): The bootstrap
+                instruments; any subclass is accepted.
+            day_counter (DayCounter): The day count turning dates into times.
+            jumps (list[SimpleQuote]): The survival factors; the curve retains
+                them.
+            jump_dates (list[Date] | None): One date per jump. Empty selects
+                consecutive year-end dates from the reference year.
+
+        Returns:
+            PiecewiseDefaultCurve: The jumped curve.
+
+        Raises:
+            ItofinError: On an empty helper list, or a jumps and jump_dates
+                mismatch.
+        """
+    @staticmethod
+    def moving(settlement_days: builtins.int, calendar: time.Calendar, helpers: typing.Sequence[DefaultProbabilityHelper], day_counter: time.DayCounter, settings: itofin.Settings) -> PiecewiseDefaultCurve:
+        r"""
+        Build the curve on a reference date that moves with the evaluation date.
+
+        The reference date sits settlement_days business days on calendar past
+        the evaluation date of settings; a roll re-bootstraps the curve. A
+        query made before settings carries an evaluation date raises rather
+        than falling back to a system clock.
+
+        settings must be the same Settings instance the helpers carry: a
+        different instance moves the curve's reference date while the helpers'
+        dates stay put.
+
+        Args:
+            settlement_days (int): The business days the reference date sits
+                past the evaluation date.
+            calendar (Calendar): The calendar those days are counted on.
+            helpers (list[DefaultProbabilityHelper]): The bootstrap
+                instruments; any subclass is accepted.
+            day_counter (DayCounter): The day count turning dates into times.
+            settings (Settings): The settings supplying the evaluation date.
+
+        Returns:
+            PiecewiseDefaultCurve: The moving curve.
+
+        Raises:
+            ItofinError: On an empty helper list.
+        """
+    @staticmethod
+    def moving_with_jumps(settlement_days: builtins.int, calendar: time.Calendar, helpers: typing.Sequence[DefaultProbabilityHelper], day_counter: time.DayCounter, settings: itofin.Settings, jumps: typing.Sequence[quotes.SimpleQuote], jump_dates: typing.Optional[typing.Sequence[time.Date]] = None) -> PiecewiseDefaultCurve:
+        r"""
+        Build a moving-reference curve with retained jump quotes and fixed jump dates.
+
+        As moving(), settings must be the same Settings instance the helpers
+        carry. The jump dates stay fixed through a roll while the jump times
+        follow the reference date. Empty jump_dates generates year-end dates
+        from the reference year at construction, so settings must already carry
+        an evaluation date: an unset one raises here, never a clock fallback.
+
+        Args:
+            settlement_days (int): The business days the reference date sits
+                past the evaluation date.
+            calendar (Calendar): The calendar those days are counted on.
+            helpers (list[DefaultProbabilityHelper]): The bootstrap
+                instruments; any subclass is accepted.
+            day_counter (DayCounter): The day count turning dates into times.
+            settings (Settings): The settings supplying the evaluation date.
+            jumps (list[SimpleQuote]): The survival factors; the curve retains
+                them.
+            jump_dates (list[Date] | None): One date per jump.
+
+        Returns:
+            PiecewiseDefaultCurve: The moving jumped curve.
+
+        Raises:
+            ItofinError: On an empty helper list, a jumps and jump_dates
+                mismatch, or generated jump dates without an evaluation date.
         """
     def calculate(self) -> None:
         r"""

@@ -650,7 +650,8 @@ impl PyInterpolatedHazardRateCurve {
 ///
 /// Lazy: the bootstrap runs on the first read, so the helpers' Settings flags
 /// and evaluation date must be in place before that read, not merely before
-/// the constructor. A helper quote moving invalidates the cache.
+/// the constructor. A helper quote moving invalidates the cache, as does a jump
+/// quote moving or, on the moving forms, an evaluation date change.
 #[gen_stub_pyclass]
 #[pyclass(name = "PiecewiseDefaultCurve", extends = PyDefaultProbabilityTermStructure, unsendable, module = "itofin.termstructures")]
 pub struct PyPiecewiseDefaultCurve {
@@ -693,6 +694,157 @@ impl PyPiecewiseDefaultCurve {
             )))
             .add_subclass(PyPiecewiseDefaultCurve { concrete }),
         )
+    }
+
+    /// Build a fixed-reference curve retaining multiplicative survival jump quotes.
+    ///
+    /// The helpers price off the jump-adjusted survival probability, and a
+    /// jump quote moving re-bootstraps the curve. Jumps apply strictly after
+    /// their date.
+    ///
+    /// Args:
+    ///     reference_date (Date): The curve's reference date.
+    ///     helpers (list[DefaultProbabilityHelper]): The bootstrap
+    ///         instruments; any subclass is accepted.
+    ///     day_counter (DayCounter): The day count turning dates into times.
+    ///     jumps (list[SimpleQuote]): The survival factors; the curve retains
+    ///         them.
+    ///     jump_dates (list[Date] | None): One date per jump. Empty selects
+    ///         consecutive year-end dates from the reference year.
+    ///
+    /// Returns:
+    ///     PiecewiseDefaultCurve: The jumped curve.
+    ///
+    /// Raises:
+    ///     ItofinError: On an empty helper list, or a jumps and jump_dates
+    ///         mismatch.
+    #[staticmethod]
+    #[pyo3(signature = (reference_date, helpers, day_counter, jumps, jump_dates = None))]
+    fn with_jumps(
+        py: Python<'_>,
+        reference_date: &PyDate,
+        helpers: Vec<PyRef<PyDefaultProbabilityHelper>>,
+        day_counter: &PyDayCounter,
+        jumps: Vec<PyRef<PySimpleQuote>>,
+        jump_dates: Option<Vec<PyRef<PyDate>>>,
+    ) -> PyResult<Py<Self>> {
+        let concrete = PiecewiseDefaultCurve::<HazardRate, BackwardFlat>::with_jumps(
+            reference_date.inner(),
+            helpers.iter().map(|helper| helper.shared()).collect(),
+            day_counter.inner(),
+            BackwardFlat,
+            jumps.iter().map(|quote| quote.handle()).collect(),
+            jump_dates
+                .unwrap_or_default()
+                .iter()
+                .map(|date| date.inner())
+                .collect(),
+        )
+        .map_err(PyQlError::from)?;
+        Self::from_concrete(py, concrete)
+    }
+
+    /// Build the curve on a reference date that moves with the evaluation date.
+    ///
+    /// The reference date sits settlement_days business days on calendar past
+    /// the evaluation date of settings; a roll re-bootstraps the curve. A
+    /// query made before settings carries an evaluation date raises rather
+    /// than falling back to a system clock.
+    ///
+    /// settings must be the same Settings instance the helpers carry: a
+    /// different instance moves the curve's reference date while the helpers'
+    /// dates stay put.
+    ///
+    /// Args:
+    ///     settlement_days (int): The business days the reference date sits
+    ///         past the evaluation date.
+    ///     calendar (Calendar): The calendar those days are counted on.
+    ///     helpers (list[DefaultProbabilityHelper]): The bootstrap
+    ///         instruments; any subclass is accepted.
+    ///     day_counter (DayCounter): The day count turning dates into times.
+    ///     settings (Settings): The settings supplying the evaluation date.
+    ///
+    /// Returns:
+    ///     PiecewiseDefaultCurve: The moving curve.
+    ///
+    /// Raises:
+    ///     ItofinError: On an empty helper list.
+    #[staticmethod]
+    fn moving(
+        py: Python<'_>,
+        settlement_days: Natural,
+        calendar: &PyCalendar,
+        helpers: Vec<PyRef<PyDefaultProbabilityHelper>>,
+        day_counter: &PyDayCounter,
+        settings: &PySettings,
+    ) -> PyResult<Py<Self>> {
+        let concrete = PiecewiseDefaultCurve::<HazardRate, BackwardFlat>::moving(
+            settlement_days,
+            calendar.inner(),
+            helpers.iter().map(|helper| helper.shared()).collect(),
+            day_counter.inner(),
+            BackwardFlat,
+            settings.inner(),
+        )
+        .map_err(PyQlError::from)?;
+        Self::from_concrete(py, concrete)
+    }
+
+    /// Build a moving-reference curve with retained jump quotes and fixed jump dates.
+    ///
+    /// As moving(), settings must be the same Settings instance the helpers
+    /// carry. The jump dates stay fixed through a roll while the jump times
+    /// follow the reference date. Empty jump_dates generates year-end dates
+    /// from the reference year at construction, so settings must already carry
+    /// an evaluation date: an unset one raises here, never a clock fallback.
+    ///
+    /// Args:
+    ///     settlement_days (int): The business days the reference date sits
+    ///         past the evaluation date.
+    ///     calendar (Calendar): The calendar those days are counted on.
+    ///     helpers (list[DefaultProbabilityHelper]): The bootstrap
+    ///         instruments; any subclass is accepted.
+    ///     day_counter (DayCounter): The day count turning dates into times.
+    ///     settings (Settings): The settings supplying the evaluation date.
+    ///     jumps (list[SimpleQuote]): The survival factors; the curve retains
+    ///         them.
+    ///     jump_dates (list[Date] | None): One date per jump.
+    ///
+    /// Returns:
+    ///     PiecewiseDefaultCurve: The moving jumped curve.
+    ///
+    /// Raises:
+    ///     ItofinError: On an empty helper list, a jumps and jump_dates
+    ///         mismatch, or generated jump dates without an evaluation date.
+    #[staticmethod]
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (settlement_days, calendar, helpers, day_counter, settings, jumps, jump_dates = None))]
+    fn moving_with_jumps(
+        py: Python<'_>,
+        settlement_days: Natural,
+        calendar: &PyCalendar,
+        helpers: Vec<PyRef<PyDefaultProbabilityHelper>>,
+        day_counter: &PyDayCounter,
+        settings: &PySettings,
+        jumps: Vec<PyRef<PySimpleQuote>>,
+        jump_dates: Option<Vec<PyRef<PyDate>>>,
+    ) -> PyResult<Py<Self>> {
+        let concrete = PiecewiseDefaultCurve::<HazardRate, BackwardFlat>::moving_with_jumps(
+            settlement_days,
+            calendar.inner(),
+            helpers.iter().map(|helper| helper.shared()).collect(),
+            day_counter.inner(),
+            BackwardFlat,
+            settings.inner(),
+            jumps.iter().map(|quote| quote.handle()).collect(),
+            jump_dates
+                .unwrap_or_default()
+                .iter()
+                .map(|date| date.inner())
+                .collect(),
+        )
+        .map_err(PyQlError::from)?;
+        Self::from_concrete(py, concrete)
     }
 
     /// Run the bootstrap if the cache is stale.
@@ -760,6 +912,23 @@ impl PyPiecewiseDefaultCurve {
             .into_iter()
             .map(|(date, rate)| (PyDate::from_inner(date), rate))
             .collect())
+    }
+}
+
+impl PyPiecewiseDefaultCurve {
+    /// The Python object over a built core curve, for the staticmethod forms.
+    fn from_concrete(
+        py: Python<'_>,
+        concrete: Shared<PiecewiseDefaultCurve<HazardRate, BackwardFlat>>,
+    ) -> PyResult<Py<Self>> {
+        let erased = Shared::clone(&concrete) as Shared<dyn DefaultProbabilityTermStructure>;
+        Py::new(
+            py,
+            PyClassInitializer::from(PyDefaultProbabilityTermStructure::from_handle(Handle::new(
+                erased,
+            )))
+            .add_subclass(PyPiecewiseDefaultCurve { concrete }),
+        )
     }
 }
 
