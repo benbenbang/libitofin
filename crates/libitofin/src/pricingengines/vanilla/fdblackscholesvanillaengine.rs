@@ -158,6 +158,7 @@ impl PricingEngine for FdBlackScholesVanillaEngine {
             fail!("no day counter provided for the risk-free curve");
         };
         let condition = FdmStepConditionComposite::vanilla_composite(
+            &[],
             &exercise,
             Shared::clone(&mesher),
             Shared::clone(&calculator),
