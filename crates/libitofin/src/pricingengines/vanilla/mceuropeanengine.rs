@@ -26,13 +26,13 @@
 //! live: it was deferred as an Err-at-build (#262 class) until #762 ported the
 //! single-factor antithetic draw, and #772 lifted the stale rejection, so
 //! [`with_antithetic_variate`](MakeMcEuropeanEngine::with_antithetic_variate)
-//! now threads the flag through to the engine.
+//! now threads the flag through to the engine. The Brownian bridge is live the
+//! same way since #1362: [`with_brownian_bridge`](MakeMcEuropeanEngine::with_brownian_bridge)
+//! ports `withBrownianBridge` (`mceuropeanengine.hpp:76`).
 //!
 //! Deferred, rejected visibly rather than silently ignored:
-//! - **Brownian bridge / control variate**: the C++ builder's
-//!   `withBrownianBridge` (`mceuropeanengine.hpp:76`) and the control-variate
-//!   machinery are omitted from the builder entirely; the base is always driven
-//!   with both flags `false`.
+//! - **control variate**: the machinery is omitted from the builder entirely;
+//!   the base is always driven with the flag `false` (#453).
 //!
 //! Oracle note (divergence catalogue): the MC-vs-analytic test in this module
 //! INTENTIONALLY STRENGTHENS QuantLib's own `0.01 * underlying` relative band
@@ -210,6 +210,7 @@ pub struct MakeMcEuropeanEngine<RNG> {
     max_samples: Option<Size>,
     tolerance: Option<Real>,
     antithetic: bool,
+    brownian_bridge: bool,
     seed: u32,
     _rng: std::marker::PhantomData<RNG>,
 }
@@ -226,6 +227,7 @@ impl<RNG: McRngTraits> MakeMcEuropeanEngine<RNG> {
             max_samples: None,
             tolerance: None,
             antithetic: false,
+            brownian_bridge: false,
             seed: 0,
             _rng: std::marker::PhantomData,
         }
@@ -242,6 +244,15 @@ impl<RNG: McRngTraits> MakeMcEuropeanEngine<RNG> {
     #[must_use]
     pub fn with_steps_per_year(mut self, steps: Size) -> Self {
         self.steps_per_year = Some(steps);
+        self
+    }
+
+    /// Requests Brownian-bridge path construction (`mceuropeanengine.hpp:76`).
+    /// On a one-step grid the bridge is the identity, so the flag only changes
+    /// the paths from two steps up.
+    #[must_use]
+    pub fn with_brownian_bridge(mut self, brownian_bridge: bool) -> Self {
+        self.brownian_bridge = brownian_bridge;
         self
     }
 
@@ -333,7 +344,7 @@ impl<RNG: McRngTraits> MakeMcEuropeanEngine<RNG> {
             self.process,
             self.steps,
             self.steps_per_year,
-            false,
+            self.brownian_bridge,
             self.antithetic,
             self.samples,
             self.tolerance,
@@ -393,6 +404,18 @@ mod builder_tests {
                 .with_steps(1)
                 .with_samples(1_000)
                 .with_antithetic_variate(true)
+                .build()
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn brownian_bridge_config_builds() {
+        assert!(
+            maker()
+                .with_steps(12)
+                .with_samples(1_000)
+                .with_brownian_bridge(true)
                 .build()
                 .is_ok()
         );
@@ -534,6 +557,94 @@ mod oracle {
         assert_ne!(
             antithetic_se, plain_se,
             "antithetic must change the error estimate at the same seed"
+        );
+    }
+
+    fn bridge_option(
+        market: &Market,
+        expiry: Date,
+        steps: usize,
+        brownian_bridge: bool,
+        antithetic: bool,
+    ) -> EuropeanOption {
+        let payoff = shared(PlainVanillaPayoff::new(OptionType::Call, 100.0));
+        let exercise = shared(EuropeanExercise::new(expiry));
+        let mut option = EuropeanOption::new(payoff, exercise, Shared::clone(&market.settings));
+        let engine = shared_mut(
+            MakeMcEuropeanEngine::<PseudoRandom>::new(Shared::clone(&market.process))
+                .with_steps(steps)
+                .with_samples(40_000)
+                .with_brownian_bridge(brownian_bridge)
+                .with_antithetic_variate(antithetic)
+                .with_seed(42)
+                .build()
+                .unwrap(),
+        );
+        option
+            .base_mut()
+            .set_pricing_engine(engine as SharedMut<dyn PricingEngine>);
+        option
+    }
+
+    /// Bridge oracle (#1362). No C++ fixture prices an MC European with
+    /// `withBrownianBridge` (`brownianbridge.cpp:166` stops at the
+    /// `PathGenerator`, ported in `pathgenerator.rs`), so the pin is the module's
+    /// `3 * error_estimate()` band on a 12-step grid, plain and antithetic, plus
+    /// the stream check at the same seed and grid.
+    #[test]
+    fn brownian_bridge_prices_within_band_and_changes_the_stream() {
+        let market = market();
+        market.set(100.0, 0.02, 0.05, 0.20);
+        let expiry = today() + time_to_days(1.0);
+        let analytic = market
+            .option(OptionType::Call, 100.0, expiry)
+            .npv()
+            .unwrap();
+
+        for antithetic in [false, true] {
+            let mut plain = bridge_option(&market, expiry, 12, false, antithetic);
+            let plain_npv = plain.npv().unwrap();
+            let plain_se = plain.error_estimate().unwrap();
+            let mut bridged = bridge_option(&market, expiry, 12, true, antithetic);
+            let bridged_npv = bridged.npv().unwrap();
+            let bridged_se = bridged.error_estimate().unwrap();
+
+            assert!(bridged_se > 0.0, "error estimate must be positive");
+            let diff = (bridged_npv - analytic).abs();
+            assert!(
+                diff < 3.0 * bridged_se,
+                "antithetic={antithetic}: |mc - analytic|={diff} not within 3*se={}",
+                3.0 * bridged_se
+            );
+            assert_ne!(
+                bridged_npv, plain_npv,
+                "antithetic={antithetic}: the bridge must change the paths at the same seed"
+            );
+            assert_ne!(
+                bridged_se, plain_se,
+                "antithetic={antithetic}: the bridge must change the error estimate"
+            );
+        }
+    }
+
+    /// On one step the bridge is the identity (`brownianbridge.hpp:114,136`
+    /// reduce to `sqrt(dt) * z / sqrt(dt)`), so the flag cannot change a
+    /// `with_steps(1)` price: why the oracle above runs on 12 steps.
+    #[test]
+    fn brownian_bridge_is_the_identity_on_one_step() {
+        let market = market();
+        market.set(100.0, 0.02, 0.05, 0.20);
+        let expiry = today() + time_to_days(1.0);
+
+        let plain = bridge_option(&market, expiry, 1, false, false)
+            .npv()
+            .unwrap();
+        let bridged = bridge_option(&market, expiry, 1, true, false)
+            .npv()
+            .unwrap();
+        assert!(
+            (plain - bridged).abs() <= 1e-12 * plain,
+            "{plain} vs {bridged}"
         );
     }
 

@@ -35,9 +35,10 @@
 //!   alone (or from both when the calibration seed was set explicitly).
 //!
 //! Deferred, omitted visibly rather than accepted and ignored:
-//! - **`brownianBridgeCalibration`** (`:145`): deferred with the Brownian bridge
-//!   itself (#453); the calibration generator is always built without one, as
-//!   the American engine's `false` (`mcamericanengine.hpp:161`) asks.
+//! - **`brownianBridgeCalibration`** (`:83,143-144`): the independent override
+//!   is not accepted (#453). Both passes follow `brownian_bridge`, which is what
+//!   C++ does when the override is unset (`:143-144`); the American engine fixes
+//!   both to `false` (`mcamericanengine.hpp:161,169`).
 //! - **control variate**: still rejected by
 //!   [`McSimulation`](crate::methods::montecarlo::McSimulation).
 
@@ -282,6 +283,7 @@ mod tests {
     ) -> McLongstaffSchwartzEngineBase<PseudoRandom> {
         seeded_driver(
             market,
+            false,
             antithetic_variate,
             antithetic_variate_calibration,
             n_calibration_samples,
@@ -292,6 +294,7 @@ mod tests {
 
     fn seeded_driver(
         market: &Market,
+        brownian_bridge: bool,
         antithetic_variate: bool,
         antithetic_variate_calibration: Option<bool>,
         n_calibration_samples: Option<Size>,
@@ -302,7 +305,7 @@ mod tests {
             Shared::clone(&market.process) as Shared<dyn StochasticProcess1D>,
             Some(4),
             None,
-            false,
+            brownian_bridge,
             antithetic_variate,
             false,
             Some(512),
@@ -418,8 +421,35 @@ mod tests {
         assert!((0.0..=1.0).contains(&pricer.exercise_probability().unwrap()));
     }
 
+    /// The driver's bridge flag is live since #1362: both passes build their
+    /// generator through `path_generator_on_grid`. Bridged and unbridged runs
+    /// estimate the same price, so they agree within their combined error, and
+    /// differ at the same seed.
+    #[test]
+    fn the_brownian_bridge_flag_reaches_the_paths() {
+        let market = flat_market();
+        let price = |brownian_bridge: bool| {
+            let mut engine =
+                seeded_driver(&market, brownian_bridge, false, None, Some(256), 42, None);
+            let pricer = lsm(&market, &engine);
+            engine.calculate_with(pricer).unwrap();
+            let results = instrument_results(&engine);
+            (results.value.unwrap(), results.error_estimate.unwrap())
+        };
+        let (plain, plain_error) = price(false);
+        let (bridged, bridged_error) = price(true);
+
+        assert_ne!(plain, bridged, "the bridge must change the paths");
+        let band = 3.0 * plain_error.hypot(bridged_error);
+        assert!(
+            (plain - bridged).abs() < band,
+            "{plain} vs {bridged} not within {band}"
+        );
+    }
+
     fn run(market: &Market, seed: u32, seed_calibration: Option<u32>) -> (u64, u64, Real, Real) {
-        let mut engine = seeded_driver(market, false, None, Some(64), seed, seed_calibration);
+        let mut engine =
+            seeded_driver(market, false, false, None, Some(64), seed, seed_calibration);
         let pricer = lsm(market, &engine);
         engine.calculate_with(pricer).unwrap();
         let results = instrument_results(&engine);

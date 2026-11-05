@@ -83,6 +83,64 @@ fn qmc_rejects_missing_samples_tolerances_and_zero_steps() {
     );
 }
 
+/// The Sobol engine with the bridge (#1362). `LowDiscrepancy` has no error
+/// estimate, so the band is `testQmcEngines`' (`europeanoption.cpp:1291`). The
+/// structural pin is what proves the bridge runs: under exact Black-Scholes
+/// evolution the terminal value depends only on the sum of the scaled draws,
+/// which the bridge reduces to `sqrt(T) * z[0]` (`brownianbridge.hpp:114`).
+/// Sobol's first coordinate does not depend on the dimension or the seed, so a
+/// bridged 16-step run must reprice the 1-step run, which an unbridged one does
+/// not.
+#[test]
+fn qmc_bridge_reprices_the_one_step_run_from_the_first_sobol_dimension() {
+    let market = market();
+    market.set(100.0, 0.02, 0.05, 0.20);
+    let expiry = today() + 360;
+    let price = |steps: usize, brownian_bridge: bool, seed: u32| {
+        let engine = MakeMcEuropeanEngine::<LowDiscrepancy>::new(Shared::clone(&market.process))
+            .with_steps(steps)
+            .with_samples(4095)
+            .with_brownian_bridge(brownian_bridge)
+            .with_seed(seed)
+            .build()
+            .unwrap();
+        let mut option = EuropeanOption::new(
+            shared(PlainVanillaPayoff::new(OptionType::Call, 100.0)),
+            shared(EuropeanExercise::new(expiry)),
+            Shared::clone(&market.settings),
+        );
+        option
+            .base_mut()
+            .set_pricing_engine(shared_mut(engine) as SharedMut<dyn PricingEngine>);
+        option.npv().unwrap()
+    };
+
+    let analytic = market
+        .option(OptionType::Call, 100.0, expiry)
+        .npv()
+        .unwrap();
+    let one_step = price(1, false, 0);
+    let bridged = price(16, true, 0);
+    let unbridged = price(16, false, 0);
+
+    assert!(
+        (bridged - analytic).abs() / 100.0 <= 0.01,
+        "{bridged} vs {analytic}"
+    );
+    assert!(
+        (bridged - one_step).abs() <= 1e-9,
+        "bridged {bridged} vs one-step {one_step}"
+    );
+    assert!(
+        (unbridged - one_step).abs() > 1e-5,
+        "unbridged {unbridged} must differ from one-step {one_step}"
+    );
+    assert!(
+        (price(16, true, 7) - bridged).abs() <= 1e-9,
+        "only the seed-free first dimension may drive the bridged terminal"
+    );
+}
+
 /// Sobol draws its direction integers above the 31 tabulated Jaeckel dimensions
 /// from the seed (`sobol/mod.rs:194`), so seed 0 must stay a fixed seed for QMC:
 /// the NPV is pinned to its value before seed reporting, and the reported seed
