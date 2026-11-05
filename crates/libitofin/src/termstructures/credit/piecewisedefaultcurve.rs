@@ -48,7 +48,7 @@
 //!   [`moving_with_jumps`](PiecewiseDefaultCurve::moving_with_jumps). The
 //!   quotes register with the curve's own updater, so a jump change
 //!   re-bootstraps: helpers price off the jump-adjusted survival probability,
-//!   as in C++. Bindings are deferred (#1321).
+//!   as in C++. The C, Go and Python bindings expose both.
 //! - Jump times are calculated on demand against the current reference date
 //!   (the [`defaulttermstructure`](crate::termstructures::credit::defaulttermstructure)
 //!   divergence), so a rolled moving curve's jump times follow the new
@@ -57,8 +57,8 @@
 //!   `DefaultProbabilityTermStructure::update`, the only re-caller of
 //!   `setJumps` (`defaulttermstructure.hpp:243-247`), so a rolled C++ moving
 //!   curve keeps its construction-time `jumpTimes_`.
-//! - The moving constructor is core-only: it is not exposed through the C, Go or
-//!   Python bindings yet (tracked by #1318).
+//! - The moving constructor is exposed through the C, Go and Python bindings; a
+//!   binding caller passes the same [`Settings`] instance the helpers carry.
 
 use std::cell::RefCell;
 use std::marker::PhantomData;
