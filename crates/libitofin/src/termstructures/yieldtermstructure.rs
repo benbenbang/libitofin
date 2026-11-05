@@ -19,7 +19,8 @@
 //!   construction reference date. As in QuantLib, automatic year-end dates
 //!   are generated once; a moving reference date changes jump times, not the
 //!   generated dates.
-//! - Jumps on `InterpolatedZeroCurve` / `InterpolatedForwardCurve` are deferred (#1319). Curves that override
+//! - The interpolated discount, zero, forward and simple-zero curves take
+//!   jumps through their `with_jumps` constructors. Curves that override
 //!   [`discount`](YieldTermStructure::discount) (`PiecewiseYieldCurve`)
 //!   multiply in [`jump_factor`](YieldTermStructure::jump_factor) themselves.
 //!   Bindings are deferred (#1320).

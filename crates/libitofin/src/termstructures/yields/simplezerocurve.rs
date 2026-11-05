@@ -17,9 +17,11 @@
 //!   [`InterpolatedZeroCurve`](super::InterpolatedZeroCurve) uses: that
 //!   adapter's base converts a zero rate continuously, which is exactly the
 //!   compounding this curve does not use.
-//! - Jump quotes (`jumps`/`jumpDates`) are not wired yet: the
-//!   [`YieldTermStructure`] jump support is taken by the discount and
-//!   piecewise curves only.
+//! - Jump quotes (`jumps`/`jumpDates`) are taken by
+//!   [`with_jumps`](InterpolatedSimpleZeroCurve::with_jumps); the C++
+//!   defaulted arguments otherwise collapse to
+//!   [`new`](InterpolatedSimpleZeroCurve::new) and
+//!   [`with_interpolator`](InterpolatedSimpleZeroCurve::with_interpolator).
 //! - The protected detached / reference-date / settlement-days constructors
 //!   (`interpolatedsimplezerocurve.hpp:65-74`) exist only for bootstrapped
 //!   subclasses and are not ported, matching the sibling curves.
@@ -27,12 +29,14 @@
 //!   [`SimpleZeroCurve`] is a port convenience mirroring `ZeroCurve`.
 
 use crate::errors::QlResult;
+use crate::handle::Handle;
 use crate::math::interpolations::linear::Linear;
 use crate::math::interpolations::{Interpolation, Interpolator};
 use crate::patterns::observable::{AsObservable, Observable};
+use crate::quotes::Quote;
 use crate::require;
 use crate::termstructures::interpolatedcurve::InterpolatedCurve;
-use crate::termstructures::yieldtermstructure::YieldTermStructure;
+use crate::termstructures::yieldtermstructure::{YieldJumps, YieldTermStructure};
 use crate::termstructures::{TermStructure, TermStructureBase};
 use crate::time::calendar::Calendar;
 use crate::time::date::Date;
@@ -47,6 +51,7 @@ pub struct InterpolatedSimpleZeroCurve<I: Interpolator> {
     base: TermStructureBase,
     dates: Vec<Date>,
     curve: InterpolatedCurve<I>,
+    jumps: Option<YieldJumps>,
 }
 
 /// Term structure based on linear interpolation of simply compounded zero
@@ -91,7 +96,34 @@ impl<I: Interpolator> InterpolatedSimpleZeroCurve<I> {
             base: TermStructureBase::with_reference_date(dates[0], calendar, Some(day_counter)),
             dates,
             curve,
+            jumps: None,
         })
+    }
+
+    /// Builds the curve as [`with_interpolator`](Self::with_interpolator) with
+    /// multiplicative discount jumps (C++'s `jumps`/`jumpDates` constructor
+    /// arguments, `:44`).
+    ///
+    /// Empty `jump_dates` generates consecutive year-end dates from the
+    /// reference year. Jump values are read and validated only after their
+    /// dates have been crossed.
+    ///
+    /// # Errors
+    /// Returns the [`with_interpolator`](Self::with_interpolator) errors, or a
+    /// [`YieldJumps`] construction error.
+    pub fn with_jumps(
+        dates: Vec<Date>,
+        yields: Vec<Rate>,
+        day_counter: DayCounter,
+        calendar: Option<Calendar>,
+        interpolator: I,
+        jumps: Vec<Handle<dyn Quote>>,
+        jump_dates: Vec<Date>,
+    ) -> QlResult<InterpolatedSimpleZeroCurve<I>> {
+        let mut curve =
+            Self::with_interpolator(dates, yields, day_counter, calendar, interpolator)?;
+        curve.jumps = Some(YieldJumps::new(&curve.base, jumps, jump_dates)?);
+        Ok(curve)
     }
 
     /// The node times.
@@ -141,6 +173,10 @@ impl<I: Interpolator> TermStructure for InterpolatedSimpleZeroCurve<I> {
 }
 
 impl<I: Interpolator> YieldTermStructure for InterpolatedSimpleZeroCurve<I> {
+    fn jumps(&self) -> Option<&YieldJumps> {
+        self.jumps.as_ref()
+    }
+
     /// The port of `discountImpl` (`:114-128`): the rate is interpolated in
     /// range and continues the last instantaneous forward flat past the last
     /// node, and the discount factor is the simply compounded `1/(1 + R*t)`.
@@ -170,8 +206,13 @@ impl<I: Interpolator> YieldTermStructure for InterpolatedSimpleZeroCurve<I> {
 mod tests {
     use super::*;
     use crate::errors::QlError;
+    use crate::interestrate::Compounding;
+    use crate::quotes::SimpleQuote;
+    use crate::shared::{Shared, shared};
+    use crate::test_support::{Flag, as_observer};
     use crate::time::date::Month;
     use crate::time::daycounters::actual360::Actual360;
+    use crate::time::frequency::Frequency;
 
     fn reference() -> Date {
         Date::new(15, Month::June, 2026)
@@ -286,5 +327,143 @@ mod tests {
         assert_eq!(negative.nodes()[3], (reference() + 720, 0.01));
         assert_eq!(negative.dates(), &sample_dates()[..]);
         assert_eq!(negative.data()[1], -0.005);
+    }
+
+    fn quote(value: Real) -> Handle<dyn Quote> {
+        Handle::new(shared(SimpleQuote::new(value)) as Shared<dyn Quote>)
+    }
+
+    fn jumped_curve(
+        jumps: Vec<Handle<dyn Quote>>,
+        jump_dates: Vec<Date>,
+    ) -> QlResult<SimpleZeroCurve> {
+        SimpleZeroCurve::with_jumps(
+            sample_dates(),
+            sample_rates(),
+            Actual360::new(),
+            None,
+            Linear,
+            jumps,
+            jump_dates,
+        )
+    }
+
+    /// The analytic oracle `base(t) * prod(jumps with 0 < t_i < t)`
+    /// (`yieldtermstructure.cpp:83-95`), with `base(t)` written out as the
+    /// simply compounded `1/(1 + R*t)` on the linearly interpolated rate.
+    #[test]
+    fn discount_is_the_base_discount_times_every_jump_before_t() {
+        let base = sample_curve();
+        let first = reference() + 90;
+        let second = reference() + 450;
+        let curve = jumped_curve(vec![quote(0.99), quote(0.98)], vec![first, second]).unwrap();
+        assert!(base.jumps().is_none());
+        assert_eq!(curve.jump_dates(), [first, second]);
+        assert_eq!(curve.jump_times().unwrap(), vec![0.25, 1.25]);
+        for (t, rate, factor) in [
+            (0.1, 0.041, 1.0),
+            (0.25, 0.0425, 1.0),
+            (0.75, 0.0475, 0.99),
+            (1.25, 0.05125, 0.99),
+            (1.5, 0.0525, 0.99 * 0.98),
+            (2.0, 0.055, 0.99 * 0.98),
+        ] {
+            let expected = factor / (1.0 + rate * t);
+            let discount = curve.discount(t, false).unwrap();
+            assert!(
+                (discount - expected).abs() < 1.0e-15,
+                "t {t}: discount {discount} vs analytic {expected}"
+            );
+        }
+        for (date, before, jump) in [(first, 1.0, 0.99), (second, 0.99, 0.98)] {
+            let at = curve.discount_date(date, false).unwrap();
+            let expected = before * base.discount_date(date, false).unwrap();
+            assert!((at - expected).abs() < 1.0e-15);
+            let after = curve.discount_date(date + 1, false).unwrap();
+            let expected = before * jump * base.discount_date(date + 1, false).unwrap();
+            assert!((after - expected).abs() < 1.0e-15);
+        }
+        let expected = 0.99 * 0.98 * base.discount(3.0, true).unwrap();
+        assert!((curve.discount(3.0, true).unwrap() - expected).abs() < 1.0e-15);
+    }
+
+    /// The zero rate is implied from the jumped discount, so both conventions
+    /// include the jumps: the simple rate is not the node-interpolated 0.0525.
+    #[test]
+    fn zero_rate_includes_the_jumps() {
+        let curve = jumped_curve(
+            vec![quote(0.99), quote(0.98)],
+            vec![reference() + 90, reference() + 450],
+        )
+        .unwrap();
+        let t = 1.5;
+        let compound = (1.0 + 0.0525 * t) / (0.99 * 0.98);
+        for (comp, expected) in [
+            (Compounding::Simple, (compound - 1.0) / t),
+            (Compounding::Continuous, f64::ln(compound) / t),
+        ] {
+            let rate = curve
+                .zero_rate(t, comp, Frequency::Annual, false)
+                .unwrap()
+                .rate();
+            assert!(
+                (rate - expected).abs() < 1.0e-14,
+                "zero rate {rate} vs analytic {expected}"
+            );
+        }
+    }
+
+    #[test]
+    fn out_of_order_jump_dates_are_all_applied() {
+        let base = sample_curve();
+        let curve = jumped_curve(
+            vec![quote(0.97), quote(0.99)],
+            vec![reference() + 450, reference() + 90],
+        )
+        .unwrap();
+        let expected = 0.99 * base.discount(1.0, false).unwrap();
+        assert!((curve.discount(1.0, false).unwrap() - expected).abs() < 1.0e-15);
+        let expected = 0.99 * 0.97 * base.discount(1.5, false).unwrap();
+        assert!((curve.discount(1.5, false).unwrap() - expected).abs() < 1.0e-15);
+    }
+
+    #[test]
+    fn empty_jump_dates_generate_year_ends() {
+        let curve = jumped_curve(vec![quote(0.99), quote(1.01)], vec![]).unwrap();
+        let year_end = Date::new(31, Month::December, 2026);
+        assert_eq!(
+            curve.jump_dates(),
+            [year_end, Date::new(31, Month::December, 2027)]
+        );
+        let after = curve.discount_date(year_end + 1, false).unwrap();
+        let expected = 0.99 * sample_curve().discount_date(year_end + 1, false).unwrap();
+        assert!((after - expected).abs() < 1.0e-15);
+    }
+
+    #[test]
+    fn invalid_jumps_are_rejected() {
+        let date = reference() + 90;
+        assert!(jumped_curve(vec![quote(0.99)], vec![date, date + 1]).is_err());
+        let curve = jumped_curve(vec![quote(0.0)], vec![date]).unwrap();
+        assert!(curve.discount(0.2, false).is_ok());
+        assert!(curve.discount(0.3, false).is_err());
+        let curve = jumped_curve(vec![Handle::empty()], vec![date]).unwrap();
+        assert!(curve.discount(0.3, false).is_err());
+    }
+
+    #[test]
+    fn jump_quote_change_notifies_and_reprices() {
+        let jump = shared(SimpleQuote::new(0.99));
+        let curve = jumped_curve(
+            vec![Handle::new(jump.clone() as Shared<dyn Quote>)],
+            vec![reference() + 90],
+        )
+        .unwrap();
+        let flag = Flag::new();
+        curve.observable().register_observer(&as_observer(&flag));
+        jump.set_value(0.95);
+        assert!(Flag::is_up(&flag));
+        let expected = 0.95 * sample_curve().discount(1.0, false).unwrap();
+        assert!((curve.discount(1.0, false).unwrap() - expected).abs() < 1.0e-15);
     }
 }
