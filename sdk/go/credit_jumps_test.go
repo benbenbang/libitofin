@@ -153,6 +153,20 @@ func unjumpedSurvival(curve *PiecewiseDefaultCurve, t float64) float64 {
 	return math.Exp(-integral)
 }
 
+func requireNodesMoved(t *testing.T, before, after []float64, what string) {
+	t.Helper()
+	if len(before) != len(after) {
+		t.Fatalf("%s: node count changed from %d to %d", what, len(before), len(after))
+	}
+	moved := 0.0
+	for i := range before {
+		moved = math.Max(moved, math.Abs(before[i]-after[i]))
+	}
+	if moved <= 1e-6 {
+		t.Fatalf("%s: bootstrapped nodes moved by only %g", what, moved)
+	}
+}
+
 func TestPiecewiseDefaultJumpsQuantLibOracle(t *testing.T) {
 	s := pricingMust(NewSession())
 	defer s.Close()
@@ -170,6 +184,7 @@ func TestPiecewiseDefaultJumpsQuantLibOracle(t *testing.T) {
 	second := pricingMust(s.NewSimpleQuote(.8))
 	cfg := PiecewiseDefaultConfig{Helpers: piecewiseJumpHelpers(s, settings, discount), ReferenceDate: today, DayCounter: dc, JumpQuotes: []*SimpleQuote{first, second}, JumpDates: []Date{pricingMust(today.AddDays(100)), pricingMust(today.AddDays(200))}}
 	explicit := pricingMust(s.NewPiecewiseDefaultCurveWithConfig(cfg))
+	requireNodesMoved(t, pricingMust(plain.Data()), pricingMust(explicit.Data()), "jumps entering the bootstrap")
 	cfg.Helpers, cfg.Settings, cfg.Calendar, cfg.JumpDates = piecewiseJumpHelpers(s, settings, discount), settings, pricingMust(s.NullCalendar()), nil
 	moving := pricingMust(s.NewPiecewiseDefaultCurveWithConfig(cfg))
 	jumpDates := pricingMust(moving.JumpDates())
@@ -185,7 +200,9 @@ func TestPiecewiseDefaultJumpsQuantLibOracle(t *testing.T) {
 		curve := explicit
 		switch row[0] {
 		case "quote_changed":
+			before := pricingMust(explicit.Data())
 			pricingOK(t, first.SetValue(.85))
+			requireNodesMoved(t, before, pricingMust(explicit.Data()), "jump quote change")
 		case "moving_initial":
 			pricingOK(t, first.SetValue(.9))
 			curve = moving
@@ -263,6 +280,11 @@ func TestPiecewiseDefaultMovingRollMatchesFreshFixed(t *testing.T) {
 	}
 }
 
+// TestPiecewiseDefaultConfigInvalidArguments reaches the curve's own unset-date
+// errors through helpers on a different, dated Settings, the mismatch
+// PiecewiseDefaultConfig warns against. The SDK has no other route: a CDS helper
+// needs the evaluation date at construction and nothing can unset one later.
+// credit_api.rs covers the same errors on one shared Settings at the C ABI.
 func TestPiecewiseDefaultConfigInvalidArguments(t *testing.T) {
 	s := pricingMust(NewSession())
 	defer s.Close()
@@ -273,8 +295,12 @@ func TestPiecewiseDefaultConfigInvalidArguments(t *testing.T) {
 	settings := pricingMust(s.NewSettings())
 	helperSettings := pricingMust(s.NewSettings())
 	pricingOK(t, helperSettings.SetEvaluationDate(today))
+	pricingOK(t, helperSettings.SetIncludeTodaysCashFlows(pricingPtr(true)))
 	discount := pricingMust(s.NewFlatForward(today, .03, dc))
 	jump := pricingMust(today.AddDays(100))
+	if _, err := s.NewSpreadCdsHelper(SpreadCdsHelperConfig{RunningSpread: pricingMust(s.NewSimpleQuote(.3)), Tenor: Period{1, Years}, SettlementDays: 1, Calendar: pricingMust(s.Target()), Frequency: Quarterly, PaymentConvention: Following, Rule: TwentiethIMM, DayCounter: dc, RecoveryRate: .4, DiscountCurve: discount, Settings: settings}); err == nil {
+		t.Fatal("CDS helper accepted missing evaluation date")
+	}
 	cfg := PiecewiseDefaultConfig{Helpers: piecewiseJumpHelpers(s, helperSettings, discount), Settings: settings, Calendar: pricingMust(s.NullCalendar()), DayCounter: dc, JumpQuotes: []*SimpleQuote{pricingMust(s.NewSimpleQuote(.9))}}
 	if _, err := s.NewPiecewiseDefaultCurveWithConfig(cfg); err == nil {
 		t.Fatal("automatic jump dates accepted missing evaluation date")
@@ -287,11 +313,19 @@ func TestPiecewiseDefaultConfigInvalidArguments(t *testing.T) {
 	if _, err := curve.JumpTimes(); err == nil {
 		t.Fatal("jump time accepted missing evaluation date")
 	}
-	if _, err := curve.SurvivalProbability(1, false); err == nil {
-		t.Fatal("moving curve read accepted missing evaluation date")
+	plain := pricingMust(s.NewPiecewiseDefaultCurveWithConfig(PiecewiseDefaultConfig{Helpers: piecewiseJumpHelpers(s, helperSettings, discount), Settings: settings, Calendar: cfg.Calendar, DayCounter: dc}))
+	for _, moving := range []*PiecewiseDefaultCurve{curve, plain} {
+		if _, err := moving.SurvivalProbability(1, false); err == nil {
+			t.Fatal("moving curve read accepted missing evaluation date")
+		}
 	}
 	pricingOK(t, settings.SetEvaluationDate(today))
 	pricingNear(t, pricingMust(curve.JumpTimes())[0], 100.0/365, 1e-15)
+	for _, moving := range []*PiecewiseDefaultCurve{curve, plain} {
+		if survival := pricingMust(moving.SurvivalProbability(1, false)); survival <= 0 || survival >= 1 {
+			t.Fatalf("moving curve survival %g after setting the evaluation date", survival)
+		}
+	}
 	for name, bad := range map[string]PiecewiseDefaultConfig{
 		"no helpers":         {ReferenceDate: today, DayCounter: dc},
 		"nil helper":         {Helpers: []*DefaultProbabilityHelper{nil}, ReferenceDate: today, DayCounter: dc},

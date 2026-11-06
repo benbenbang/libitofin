@@ -631,8 +631,102 @@ pub unsafe extern "C" fn itofin_default_curve_jumps(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::calendar_api::NativeCalendar;
+    use libitofin::interestrate::Compounding;
+    use libitofin::termstructures::credit::defaultprobabilityhelpers::SpreadCdsHelper;
+    use libitofin::termstructures::yields::FlatForward;
+    use libitofin::termstructures::yieldtermstructure::YieldTermStructure;
+    use libitofin::time::businessdayconvention::BusinessDayConvention;
+    use libitofin::time::calendars::{NullCalendar, Target};
     use libitofin::time::date::Month;
+    use libitofin::time::dategenerationrule::DateGeneration;
     use libitofin::time::daycounters::actual365fixed::Actual365Fixed;
+    use libitofin::time::frequency::Frequency;
+    use libitofin::time::period::Period;
+    use libitofin::time::timeunit::TimeUnit;
+
+    /// The same-Settings contract reaches the unset-date errors only after a
+    /// reset: helpers need the date at construction, and only the core can
+    /// clear it.
+    #[test]
+    fn moving_piecewise_on_the_helpers_reset_settings_errs_until_the_date_returns() {
+        let mut c = Context::new();
+        let today = Date::new(15, Month::June, 2026);
+        let dc = Actual365Fixed::new();
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(today);
+        settings.set_include_todays_cash_flows(Some(true));
+        let discount = Handle::new(shared(FlatForward::with_rate(
+            today,
+            0.03,
+            dc.clone(),
+            Compounding::Continuous,
+            Frequency::Annual,
+        )) as Shared<dyn YieldTermStructure>);
+        let helper = SpreadCdsHelper::new(
+            Handle::new(shared(SimpleQuote::new(0.3))),
+            Period::new(1, TimeUnit::Years),
+            1,
+            Target::new(),
+            Frequency::Quarterly,
+            BusinessDayConvention::Following,
+            DateGeneration::TwentiethIMM,
+            dc.clone(),
+            0.4,
+            discount,
+            settings.clone(),
+        )
+        .unwrap() as Shared<dyn DefaultProbabilityHelper>;
+        let helpers = [c.insert(helper).unwrap()];
+        let jumps = [c.insert(shared(SimpleQuote::new(0.9))).unwrap()];
+        let jump_date = (today + 100).serial_number();
+        let config = ItofinPiecewiseDefaultConfig {
+            reference_date: 0,
+            settlement_days: 0,
+            calendar: c
+                .insert(NativeCalendar {
+                    inner: NullCalendar::new(),
+                    horizon: None,
+                    first_year: 1901,
+                })
+                .unwrap(),
+            day_counter: c.insert(dc).unwrap(),
+            settings: c.insert(settings.clone()).unwrap(),
+        };
+        let null = std::ptr::null_mut();
+        settings.reset_evaluation_date();
+        let (mut jumped, mut plain, mut v) = (0, 0, 0.0);
+        unsafe {
+            let new = |c: &mut Context, jumps: &[u64], dates: &[i32], out: &mut u64| {
+                itofin_piecewise_default_with_jumps_new(
+                    c,
+                    &config,
+                    helpers.as_ptr(),
+                    helpers.len(),
+                    jumps.as_ptr(),
+                    jumps.len(),
+                    dates.as_ptr(),
+                    dates.len(),
+                    out,
+                    null,
+                )
+            };
+            assert_ne!(new(&mut c, &jumps, &[], &mut jumped), 0);
+            assert_eq!(new(&mut c, &jumps, &[jump_date], &mut jumped), 0);
+            assert_eq!(new(&mut c, &[], &[], &mut plain), 0);
+            for id in [jumped, plain] {
+                let read = itofin_default_curve_value(&mut c, id, 0, 1.0, 0, 0, 0, &mut v, null);
+                assert_ne!(read, 0);
+            }
+            settings.set_evaluation_date(today);
+            for id in [jumped, plain] {
+                let read = itofin_default_curve_value(&mut c, id, 0, 1.0, 0, 0, 0, &mut v, null);
+                assert_eq!(read, 0);
+                assert!(v > 0.0 && v < 1.0);
+            }
+        }
+    }
+
     #[test]
     fn flat_hazard_live_quote_lifetime_and_foreign_handle() {
         let mut c = Context::new();

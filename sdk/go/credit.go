@@ -223,6 +223,15 @@ func (s *Session) NewPiecewiseDefaultCurve(reference Date, helpers []*DefaultPro
 
 // PiecewiseDefaultConfig selects a moving reference date when Settings is set;
 // Settings must be the same instance the helpers carry.
+//
+// A fixed curve (nil Settings) requires ReferenceDate and ignores Calendar and
+// SettlementDays. A moving curve requires Calendar and ignores ReferenceDate;
+// its reads return an error until Settings has an evaluation date. CDS helpers
+// need that date too, at their own construction.
+//
+// JumpQuotes with empty JumpDates generate consecutive December 31 jump dates
+// from the reference year. On a moving curve that needs the evaluation date at
+// construction: an unset one is an error, never a clock fallback.
 type PiecewiseDefaultConfig struct {
 	Helpers        []*DefaultProbabilityHelper
 	JumpQuotes     []*SimpleQuote

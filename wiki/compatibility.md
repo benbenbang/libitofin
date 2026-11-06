@@ -191,6 +191,18 @@ oversight) and is documented at the point of divergence in the source.
   returns an honest `Err` naming the dropped contributor, never a silent
   single-curve fallback.
 
+- **A rolled moving `PiecewiseDefaultCurve` or `PiecewiseYieldCurve` follows the
+  new reference date for its jump times; C++ keeps the construction-time ones.**
+  Both C++ curves override `update()` without calling their base class
+  (`piecewisedefaultcurve.hpp:248-258`, `piecewiseyieldcurve.hpp:220-231`), and
+  that base `update()` is the only caller of `setJumps` after construction
+  (`defaulttermstructure.hpp:243-247`, `yieldtermstructure.cpp:174-180`). A rolled
+  C++ curve therefore keeps its `jumpTimes_`, so each jump drifts forward in
+  calendar terms by the size of the roll. The port keeps the jump dates fixed and
+  computes the times on demand against the current reference date, which is the
+  base-class contract and what a fresh curve at the new reference gives, so a
+  rolled curve matches a freshly built one.
+
 ## Indexes (EPIC-6)
 
 - **`Currency` is always valid; there is no empty placeholder.** QuantLib's

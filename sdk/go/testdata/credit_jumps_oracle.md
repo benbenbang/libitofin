@@ -26,6 +26,8 @@ length/date validation, input ordering, quote ownership and cached CDS repricing
 `TestPiecewiseDefaultJumpsQuantLibOracle` replays the same rows on a bootstrapped
 `PiecewiseDefaultCurve`, whose nodes are not a flat 2%: it checks the jump factor
 `survival * hazard / density` of each row against the curve's survival over its
-unjumped node integral at `1e-13`. Rolled moving rows follow the base contract;
-a C++ `PiecewiseDefaultCurve` keeps its construction-time jump times
+unjumped node integral at `1e-13`. That ratio reads the curve's own nodes, so it
+cannot see a broken bootstrap: the test also requires `Data()` to differ from the
+unjumped curve and to move when a jump quote moves. Rolled moving rows follow the
+base contract; a C++ `PiecewiseDefaultCurve` keeps its construction-time jump times
 (`ql/termstructures/credit/piecewisedefaultcurve.hpp:248-258`).
