@@ -203,8 +203,15 @@ def test_piecewise_moving_jumped_roll_matches_a_fresh_fixed_curve(explicit_dates
 
 
 def test_piecewise_moving_without_evaluation_date_raises_instead_of_using_a_clock():
+    """Helpers sit on a different, dated Settings: the mismatch the constructors warn against.
+
+    Python has no other route to these errors, since a CDS helper needs the date at construction
+    and nothing can unset one later. credit_api.rs covers them on one shared Settings at the C ABI.
+    """
     dc = DayCounter.actual365_fixed()
     settings = Settings()
+    with pytest.raises(ItofinError):
+        piecewise_helpers(settings, dc)
     helper_settings = dated_settings()
     calendar = Calendar.null_calendar()
     with pytest.raises(ItofinError):
