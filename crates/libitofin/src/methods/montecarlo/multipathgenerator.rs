@@ -17,10 +17,9 @@
 //!   single-factor precedent).
 //! - **Brownian bridge rejected at construction**: C++ stores the flag and
 //!   `QL_FAIL`s at call time inside `next(bool)` (`multipathgenerator.hpp:106-108`).
-//!   Here the constructor returns `Err` when `brownian_bridge` is `true`,
-//!   matching the single-factor [`PathGenerator`](super::PathGenerator)
-//!   precedent (`pathgenerator.rs:95-99`); the flag is never stored. Visible
-//!   deferral naming #453.
+//!   Here the constructor returns `Err` when `brownian_bridge` is `true`; the
+//!   flag is never stored. Visible deferral naming #453. The single-factor
+//!   [`PathGenerator`](super::PathGenerator) supports the bridge since #1362.
 //! - **Guard reorder**: C++ checks the dimension invariant before
 //!   `times.size() > 1` (`multipathgenerator.hpp:79-87`). Here `times.size() > 1`
 //!   is checked first so the `times.size() - 1` in the dimension message cannot

@@ -58,9 +58,10 @@ impl<GSG: SequenceGenerator> PathGenerator<GSG> {
     ///
     /// # Errors
     ///
-    /// Returns `Err` if the grid is degenerate (see [`TimeGrid::new`]) or if
-    /// the generator's dimensionality does not equal `time_steps`
-    /// (`pathgenerator.hpp:90`).
+    /// Returns `Err` if the grid is degenerate (see [`TimeGrid::new`]), if the
+    /// generator's dimensionality does not equal `time_steps`
+    /// (`pathgenerator.hpp:90`), or if `brownian_bridge` is `true` on a grid the
+    /// bridge rejects (see [`BrownianBridge::from_time_grid`]).
     pub fn new(
         process: Shared<dyn StochasticProcess1D>,
         length: Time,

@@ -817,7 +817,9 @@ mod oracle {
     //! The five remaining parameter cases below use independently generated
     //! QuantLib FD references and the original band/probability tolerances.
     //! The first-case cached-MC exception above remains explicit and unchanged.
-    //! Brownian bridge, control variate and multi-asset LSM remain separate work.
+    //! The Brownian bridge is not separate work: C++ fixes it to `false`
+    //! (`mcamericanengine.hpp:161,169`). Control variate and multi-asset LSM
+    //! remain separate work.
 
     use super::MakeMcAmericanEngine;
     use crate::exercise::{AmericanExercise, EuropeanExercise, Exercise};
