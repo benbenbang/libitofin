@@ -522,6 +522,7 @@ mod tests {
         m.vol.set_value(0.30);
         let calculated = option.npv().unwrap();
         assert!((calculated - 3.67).abs() <= 1.0e-2, "{calculated}");
+        assert!(option.dividend_rho().is_err());
     }
 
     #[test]
@@ -548,6 +549,12 @@ mod tests {
             &[150.0],
         );
         m.set(0.0, 0.05, 0.20);
-        assert!(option.npv().is_err());
+        let error = option.npv().unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("negative or null underlying after subtracting dividends"),
+            "{error}"
+        );
     }
 }
