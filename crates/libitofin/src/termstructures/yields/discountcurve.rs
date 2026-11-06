@@ -12,8 +12,9 @@
 //! - Jump quotes (`jumps`/`jumpDates`) are taken by
 //!   [`with_jumps`](InterpolatedDiscountCurve::with_jumps), which builds with
 //!   a default-constructed interpolator factory; there is no constructor
-//!   taking both an explicit interpolator and jumps. Jumps on the zero and
-//!   forward curves are deferred (#1319), bindings (#1320).
+//!   taking both an explicit interpolator and jumps. The zero, forward and
+//!   simple-zero curves take jumps through their own `with_jumps`; bindings
+//!   are deferred (#1320).
 //! - The protected detached/moving constructors exist only for bootstrapped
 //!   curves and follow with the bootstrap; the public data constructors are
 //!   ported, with the empty calendar an `Option` per the base convention.
