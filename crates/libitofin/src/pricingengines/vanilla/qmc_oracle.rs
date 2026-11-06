@@ -89,8 +89,10 @@ fn qmc_rejects_missing_samples_tolerances_and_zero_steps() {
 /// evolution the terminal value depends only on the sum of the scaled draws,
 /// which the bridge reduces to `sqrt(T) * z[0]` (`brownianbridge.hpp:114`).
 /// Sobol's first coordinate does not depend on the dimension or the seed, so a
-/// bridged 16-step run must reprice the 1-step run, which an unbridged one does
-/// not.
+/// bridged 40-step run must reprice the 1-step run and ignore the seed. Forty
+/// steps is deliberate: the Jaeckel table fixes the first 32 dimensions and only
+/// the rest draw from the seed (`sobol/mod.rs:195-196`), so a shorter grid
+/// matches across seeds with or without the bridge.
 #[test]
 fn qmc_bridge_reprices_the_one_step_run_from_the_first_sobol_dimension() {
     let market = market();
@@ -120,12 +122,16 @@ fn qmc_bridge_reprices_the_one_step_run_from_the_first_sobol_dimension() {
         .npv()
         .unwrap();
     let one_step = price(1, false, 0);
-    let bridged = price(16, true, 0);
-    let unbridged = price(16, false, 0);
+    let bridged = price(40, true, 0);
+    let unbridged = price(40, false, 0);
 
     assert!(
         (bridged - analytic).abs() / 100.0 <= 0.01,
         "{bridged} vs {analytic}"
+    );
+    assert!(
+        (price(40, true, 7) - bridged).abs() <= 1e-9,
+        "only the seed-free first dimension may drive the bridged terminal"
     );
     assert!(
         (bridged - one_step).abs() <= 1e-9,
@@ -136,8 +142,8 @@ fn qmc_bridge_reprices_the_one_step_run_from_the_first_sobol_dimension() {
         "unbridged {unbridged} must differ from one-step {one_step}"
     );
     assert!(
-        (price(16, true, 7) - bridged).abs() <= 1e-9,
-        "only the seed-free first dimension may drive the bridged terminal"
+        (price(40, false, 7) - unbridged).abs() > 1e-5,
+        "the seed must move the unbridged price, or the seed check above is hollow"
     );
 }
 
