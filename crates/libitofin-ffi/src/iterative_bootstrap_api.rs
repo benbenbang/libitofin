@@ -174,18 +174,74 @@ pub unsafe extern "C" fn itofin_piecewise_curve_new_with_options(
 ) -> i32 {
     unsafe {
         with_context(ctx, error, |c| {
-            check_ptr(out)?;
-            check_ptr(options)?;
-            let options = (*options).parse()?;
-            let reference = date(reference)?;
-            let dc = day_counter(c, dc)?;
-            let helpers = input_slice(helpers, len)?
-                .iter()
-                .map(|id| crate::helpers_api::helper(c, *id))
-                .collect::<BindingResult<Vec<_>>>()?;
-            let curve = iterative_curve(CurveAnchor::Fixed(reference), helpers, dc, kind, options)?;
-            output(out, c.insert(Handle::new(curve))?)
+            let anchor = CurveAnchor::Fixed(date(reference)?);
+            options_curve(c, anchor, helpers, len, dc, kind, options, out)
         })
+    }
+}
+
+/// The itofin_piecewise_curve_new_with_options twin whose reference date moves
+/// with the evaluation date of settings, settlement_days business days on
+/// calendar; settings must be the instance the helpers' index carries.
+/// # Safety
+/// Pointers and arrays must follow the crate C caller contract.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn itofin_piecewise_curve_new_with_options_moving(
+    ctx: *mut Context,
+    settlement_days: u32,
+    calendar: u64,
+    settings: u64,
+    helpers: *const u64,
+    len: usize,
+    dc: u64,
+    kind: i32,
+    options: *const ItofinIterativeBootstrapOptions,
+    out: *mut u64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            let anchor = moving_anchor(c, settlement_days, calendar, settings)?;
+            options_curve(c, anchor, helpers, len, dc, kind, options, out)
+        })
+    }
+}
+
+pub(crate) fn moving_anchor(
+    c: &Context,
+    settlement_days: u32,
+    calendar: u64,
+    settings: u64,
+) -> BindingResult<CurveAnchor> {
+    Ok(CurveAnchor::Moving(
+        settlement_days,
+        crate::time_api::calendar(c, calendar)?,
+        c.get::<Shared<Settings<Date>>>(settings)?,
+    ))
+}
+
+#[allow(clippy::too_many_arguments)]
+unsafe fn options_curve(
+    c: &mut Context,
+    anchor: CurveAnchor,
+    helpers: *const u64,
+    len: usize,
+    dc: u64,
+    kind: i32,
+    options: *const ItofinIterativeBootstrapOptions,
+    out: *mut u64,
+) -> BindingResult<()> {
+    unsafe {
+        check_ptr(out)?;
+        check_ptr(options)?;
+        let options = (*options).parse()?;
+        let dc = day_counter(c, dc)?;
+        let helpers = input_slice(helpers, len)?
+            .iter()
+            .map(|id| crate::helpers_api::helper(c, *id))
+            .collect::<BindingResult<Vec<_>>>()?;
+        let curve = iterative_curve(anchor, helpers, dc, kind, options)?;
+        output(out, c.insert(Handle::new(curve))?)
     }
 }
 

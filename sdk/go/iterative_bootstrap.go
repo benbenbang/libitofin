@@ -37,5 +37,8 @@ func (s *Session) iterativeCurve(cfg PiecewiseCurveConfig, kind int, ids []C.uin
 		opts.dont_throw = 1
 	}
 	var e C.ItofinError
+	if cfg.Settings != nil {
+		return ffiError(C.itofin_piecewise_curve_new_with_options_moving(s.ctx, C.uint32_t(cfg.SettlementDays), C.uint64_t(cfg.Calendar.id), C.uint64_t(cfg.Settings.id), unsafe.SliceData(ids), C.size_t(len(ids)), C.uint64_t(cfg.DayCounter.id), C.int32_t(kind), &opts, out, &e), &e)
+	}
 	return ffiError(C.itofin_piecewise_curve_new_with_options(s.ctx, C.int32_t(cfg.ReferenceDate.Serial()), unsafe.SliceData(ids), C.size_t(len(ids)), C.uint64_t(cfg.DayCounter.id), C.int32_t(kind), &opts, out, &e), &e)
 }

@@ -80,5 +80,8 @@ func (s *Session) globalCurve(cfg PiecewiseCurveConfig, kind int, ids, extra []C
 		callbacks.dates = (C.goBootstrapFn)(C.goBootstrapDates)
 	}
 	var e C.ItofinError
+	if cfg.Settings != nil {
+		return ffiError(C.itofin_global_curve_new_moving(s.ctx, C.uint32_t(cfg.SettlementDays), C.uint64_t(cfg.Calendar.id), C.uint64_t(cfg.Settings.id), unsafe.SliceData(ids), C.size_t(len(ids)), C.uint64_t(cfg.DayCounter.id), C.int32_t(kind), unsafe.SliceData(extra), C.size_t(len(extra)), variables, &callbacks, &adopted, out, &e), &e)
+	}
 	return ffiError(C.itofin_global_curve_new(s.ctx, C.int32_t(cfg.ReferenceDate.Serial()), unsafe.SliceData(ids), C.size_t(len(ids)), C.uint64_t(cfg.DayCounter.id), C.int32_t(kind), unsafe.SliceData(extra), C.size_t(len(extra)), variables, &callbacks, &adopted, out, &e), &e)
 }

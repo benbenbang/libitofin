@@ -136,7 +136,11 @@
       ]
     },
     {
-      "c": "itofin_piecewise_curve_new_moving",
+      "c": [
+        "itofin_piecewise_curve_new_moving",
+        "itofin_piecewise_curve_new_with_options_moving",
+        "itofin_global_curve_new_moving"
+      ],
       "go": "Session.NewPiecewiseYieldCurve",
       "python": "itofin.termstructures.PiecewiseYieldCurve.moving",
       "status": "implemented",

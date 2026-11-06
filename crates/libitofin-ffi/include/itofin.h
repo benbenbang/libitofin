@@ -3067,6 +3067,30 @@ int32_t itofin_global_curve_new(struct ItofinContext *ctx,
                                 struct ItofinError *error);
 
 /**
+ * The itofin_global_curve_new twin whose reference date moves with the
+ * evaluation date of settings, settlement_days business days on calendar;
+ * settings must be the instance the helpers' index carries. Callback
+ * ownership follows itofin_global_curve_new.
+ * # Safety
+ * As itofin_global_curve_new.
+ */
+int32_t itofin_global_curve_new_moving(struct ItofinContext *ctx,
+                                       uint32_t settlement_days,
+                                       uint64_t calendar,
+                                       uint64_t settings,
+                                       const uint64_t *helpers,
+                                       size_t len,
+                                       uint64_t dc,
+                                       int32_t kind,
+                                       const uint64_t *additional,
+                                       size_t additional_len,
+                                       uint64_t variables,
+                                       const struct ItofinBootstrapCallbacks *callbacks,
+                                       bool *adopted,
+                                       uint64_t *out,
+                                       struct ItofinError *error);
+
+/**
  * Copy one callback result into native storage. Dates use integer serial values.
  * # Safety
  * `out` must be the current callback's output; values must satisfy the slice contract.
@@ -7190,6 +7214,25 @@ int32_t itofin_piecewise_curve_new_with_options(struct ItofinContext *ctx,
                                                 const struct ItofinIterativeBootstrapOptions *options,
                                                 uint64_t *out,
                                                 struct ItofinError *error);
+
+/**
+ * The itofin_piecewise_curve_new_with_options twin whose reference date moves
+ * with the evaluation date of settings, settlement_days business days on
+ * calendar; settings must be the instance the helpers' index carries.
+ * # Safety
+ * Pointers and arrays must follow the crate C caller contract.
+ */
+int32_t itofin_piecewise_curve_new_with_options_moving(struct ItofinContext *ctx,
+                                                       uint32_t settlement_days,
+                                                       uint64_t calendar,
+                                                       uint64_t settings,
+                                                       const uint64_t *helpers,
+                                                       size_t len,
+                                                       uint64_t dc,
+                                                       int32_t kind,
+                                                       const struct ItofinIterativeBootstrapOptions *options,
+                                                       uint64_t *out,
+                                                       struct ItofinError *error);
 
 /**
  * Construct a basis helper retaining its quotes, indices and discount curve.

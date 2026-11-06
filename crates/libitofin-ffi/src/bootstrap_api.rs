@@ -2,15 +2,14 @@
 use crate::bootstrap_callbacks::{Callbacks, ItofinBootstrapCallbacks, ItofinBootstrapState};
 use crate::bootstrap_variables::Variables;
 use crate::boundary::*;
+use crate::iterative_bootstrap_api::{CurveAnchor, anchored, moving_anchor};
 use crate::time_api::{date, day_counter};
 use libitofin::handle::Handle;
 use libitofin::math::interpolations::{linear::Linear, loglinear::LogLinear};
 use libitofin::quotes::Quote;
-use libitofin::shared::{Shared, shared};
+use libitofin::shared::shared;
 use libitofin::termstructures::bootstraptraits::Discount;
 use libitofin::termstructures::globalbootstrap::GlobalBootstrap;
-use libitofin::termstructures::yields::PiecewiseYieldCurve;
-use libitofin::termstructures::yieldtermstructure::YieldTermStructure;
 use std::cell::Cell;
 
 /// Construct a global discount curve, kind 0 log-linear or 1 linear.
@@ -37,6 +36,86 @@ pub unsafe extern "C" fn itofin_global_curve_new(
     error: *mut ItofinError,
 ) -> i32 {
     unsafe {
+        let anchor = move |_: &Context| Ok(CurveAnchor::Fixed(date(reference)?));
+        global_curve(
+            ctx,
+            anchor,
+            helpers,
+            len,
+            dc,
+            kind,
+            additional,
+            additional_len,
+            variables,
+            callbacks,
+            adopted,
+            out,
+            error,
+        )
+    }
+}
+
+/// The itofin_global_curve_new twin whose reference date moves with the
+/// evaluation date of settings, settlement_days business days on calendar;
+/// settings must be the instance the helpers' index carries. Callback
+/// ownership follows itofin_global_curve_new.
+/// # Safety
+/// As itofin_global_curve_new.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn itofin_global_curve_new_moving(
+    ctx: *mut Context,
+    settlement_days: u32,
+    calendar: u64,
+    settings: u64,
+    helpers: *const u64,
+    len: usize,
+    dc: u64,
+    kind: i32,
+    additional: *const u64,
+    additional_len: usize,
+    variables: u64,
+    callbacks: *const ItofinBootstrapCallbacks,
+    adopted: *mut bool,
+    out: *mut u64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        let anchor = move |c: &Context| moving_anchor(c, settlement_days, calendar, settings);
+        global_curve(
+            ctx,
+            anchor,
+            helpers,
+            len,
+            dc,
+            kind,
+            additional,
+            additional_len,
+            variables,
+            callbacks,
+            adopted,
+            out,
+            error,
+        )
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+unsafe fn global_curve(
+    ctx: *mut Context,
+    anchor: impl FnOnce(&Context) -> BindingResult<CurveAnchor>,
+    helpers: *const u64,
+    len: usize,
+    dc: u64,
+    kind: i32,
+    additional: *const u64,
+    additional_len: usize,
+    variables: u64,
+    callbacks: *const ItofinBootstrapCallbacks,
+    adopted: *mut bool,
+    out: *mut u64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
         with_context(ctx, error, |c| {
             check_ptr(out)?;
             check_ptr(callbacks)?;
@@ -49,7 +128,7 @@ pub unsafe extern "C" fn itofin_global_curve_new(
             }
             output(adopted, true)?;
             let callbacks = shared(Callbacks(callbacks));
-            let reference = date(reference)?;
+            let anchor = anchor(c)?;
             let dc = day_counter(c, dc)?;
             let helpers = input_slice(helpers, len)?
                 .iter()
@@ -140,13 +219,9 @@ pub unsafe extern "C" fn itofin_global_curve_new(
             if let Some(variables) = variables {
                 bootstrap = bootstrap.with_additional_variables(Box::new(variables.build()?));
             }
-            let curve: Shared<dyn YieldTermStructure> = match kind {
-                0 => PiecewiseYieldCurve::<Discount, LogLinear, GlobalBootstrap>::with_bootstrap(
-                    reference, helpers, dc, LogLinear, bootstrap,
-                )?,
-                1 => PiecewiseYieldCurve::<Discount, Linear, GlobalBootstrap>::with_bootstrap(
-                    reference, helpers, dc, Linear, bootstrap,
-                )?,
+            let curve = match kind {
+                0 => anchored::<Discount, _, _>(anchor, helpers, dc, LogLinear, bootstrap)?,
+                1 => anchored::<Discount, _, _>(anchor, helpers, dc, Linear, bootstrap)?,
                 _ => {
                     return Err(BindingError::invalid(
                         "global callbacks require a log-linear or linear discount curve",
