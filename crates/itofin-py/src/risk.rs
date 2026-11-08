@@ -1,4 +1,5 @@
-//! Bump-and-reprice sensitivities: parallel and bucket PV01 over SimpleQuotes.
+//! Bump-and-reprice sensitivities: parallel, bucket and matrix bucket PV01 over
+//! SimpleQuotes.
 //!
 //! Supported instruments: every bond (each runs the same refresh and
 //! floating-coupon preflight as `Bond.npv` once, before the first reprice),
@@ -20,7 +21,7 @@ use crate::swap::PyVanillaSwap;
 use crate::swaption::PySwaption;
 use libitofin::instrument::Instrument;
 use libitofin::quotes::SimpleQuote;
-use libitofin::risk::{self, DEFAULT_SHIFT, SensitivityAnalysis};
+use libitofin::risk::{self, DEFAULT_SHIFT, Rows, SensitivityAnalysis};
 use libitofin::shared::{Shared, SharedMut};
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
@@ -175,4 +176,38 @@ pub(crate) fn bucket_analysis<'py>(
         }
         None => results.collect::<Vec<_>>().into_pyobject(py),
     }
+}
+
+/// Bucket PV01 over a ragged matrix of quotes, each bumped alone, against one
+/// shared reference NPV.
+///
+/// Returns a list of lists of `(first, second)` shaped like `quotes`. Empty
+/// rows are allowed and stay empty; an empty outer sequence is an error. Same
+/// conventions as `parallel_analysis`.
+///
+/// Under a Monte Carlo engine each reprice carries sampling error that does not
+/// shrink with the shift, so the result is noisy; prefer an analytic, tree or
+/// finite-difference engine.
+#[gen_stub_pyfunction(module = "itofin.risk")]
+#[pyfunction]
+#[pyo3(signature = (quotes, instruments, quantities = Vec::new(), shift = DEFAULT_SHIFT, kind = PySensitivityAnalysis::Centered))]
+pub(crate) fn bucket_analysis_matrix(
+    quotes: Vec<Vec<PyRef<'_, PySimpleQuote>>>,
+    #[gen_stub(override_type(type_repr = "typing.Sequence[instruments.Bond | instruments.VanillaSwap | instruments.OvernightIndexedSwap | instruments.VanillaOption | instruments.Swaption | instruments.CapFloor | instruments.CreditDefaultSwap]", imports = ("typing", "itofin.instruments")))]
+    instruments: Vec<Bound<'_, PyAny>>,
+    quantities: Vec<f64>,
+    shift: f64,
+    kind: PySensitivityAnalysis,
+) -> PyResult<Rows<(f64, Option<f64>)>> {
+    crate::bootstrap::ensure_quote_mutation_allowed()?;
+    let instruments = self::instruments(&instruments)?;
+    let rows: Vec<_> = quotes.iter().map(|row| shared(row)).collect();
+    let (first, second) =
+        risk::bucket_analysis_matrix(&rows, &instruments, &quantities, shift, kind.inner())
+            .map_err(PyQlError::from)?;
+    Ok(first
+        .into_iter()
+        .zip(second)
+        .map(|(first, second)| first.into_iter().zip(second).collect())
+        .collect())
 }

@@ -681,6 +681,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     risk.add_class::<risk::PySensitivityAnalysis>()?;
     risk.add_function(wrap_pyfunction!(risk::parallel_analysis, &risk)?)?;
     risk.add_function(wrap_pyfunction!(risk::bucket_analysis, &risk)?)?;
+    risk.add_function(wrap_pyfunction!(risk::bucket_analysis_matrix, &risk)?)?;
 
     let submodules = [
         ("time", &time),

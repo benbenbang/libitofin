@@ -13,7 +13,7 @@ from itofin.instruments import CapFloor, CapFloorType, CreditDefaultSwap, Europe
 from itofin.pricingengines import BlackCapFloorEngine, BlackSwaptionEngine, DiscountingBondEngine, MidPointCdsEngine
 from itofin.processes import BlackScholesProcess
 from itofin.quotes import SimpleQuote
-from itofin.risk import SensitivityAnalysis, bucket_analysis, parallel_analysis
+from itofin.risk import SensitivityAnalysis, bucket_analysis, bucket_analysis_matrix, parallel_analysis
 from itofin.termstructures import BlackConstantVol, FlatForward, FlatHazardRate
 from itofin.time import BusinessDayConvention as BDC, Calendar, Date, DayCounter, Frequency, Period, Schedule
 
@@ -185,3 +185,34 @@ def test_swaption_and_cap_floor_are_bit_identical_to_a_manual_curve_bump():
     for instrument in (swaption, cap):
         _assert_kind(discount, instrument)
     assert discount.value() == 0.03
+
+
+def test_matrix_buckets_are_bit_identical_to_a_manual_bump_of_each_quote():
+    """A ragged matrix with an empty row keeps its shape; each cell bumps one quote alone."""
+    _, curve_quotes, portfolio = _portfolio()
+    option, spot, rate, vol = _option()
+    instruments, quantities = [*portfolio, option], [1.0, 2.0, -1.0, 3.0]
+    rows = [[curve_quotes[0], spot], [], [vol, rate]]
+    centered = bucket_analysis_matrix(rows, instruments, quantities, H)
+    one_side = bucket_analysis_matrix(rows, instruments, quantities, H, SensitivityAnalysis.OneSide)
+    assert [len(row) for row in centered] == [len(row) for row in one_side] == [2, 0, 2]
+    for row, got, got_one_side in zip(rows, centered, one_side):
+        for quote, cell, cell_one_side in zip(row, got, got_one_side):
+            _, first, second, forward = _manual([quote], instruments, quantities)
+            assert first != 0.0
+            assert cell == (first, second)
+            assert cell_one_side == (forward, None)
+    assert bucket_analysis_matrix([[]], instruments, quantities) == [[]]
+    assert (curve_quotes[0].value(), spot.value(), rate.value(), vol.value()) == (0.03, 100.0, 0.05, 0.2)
+
+
+def test_matrix_rejects_an_empty_range_and_a_non_instrument():
+    """An empty outer sequence is a core error; a non-instrument is a TypeError."""
+    _, quotes, instruments = _portfolio()
+    with pytest.raises(ItofinError, match="empty SimpleQuote range"):
+        bucket_analysis_matrix([], instruments)
+    with pytest.raises(TypeError, match="CapFloor or CreditDefaultSwap"):
+        bucket_analysis_matrix([quotes], cast(Any, [quotes[0]]))
+    with pytest.raises(TypeError):
+        bucket_analysis_matrix(cast(Any, [[instruments[0]]]), instruments)
+    assert quotes[0].value() == 0.03

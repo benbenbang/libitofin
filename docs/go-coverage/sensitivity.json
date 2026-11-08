@@ -41,6 +41,16 @@
       ]
     },
     {
+      "c": "itofin_sensitivity_bucket_matrix",
+      "go": "Session.BucketAnalysisMatrix",
+      "python": "itofin.risk.bucket_analysis_matrix",
+      "status": "implemented",
+      "tests": [
+        "TestSensitivityBucketMatrixMatchesManualBump",
+        "TestSensitivityBucketMatrixErrors"
+      ]
+    },
+    {
       "go": "SensitivityAnalysis",
       "python": "itofin.risk.SensitivityAnalysis",
       "status": "implemented",
@@ -72,5 +82,5 @@
       "status": "language-specific"
     }
   ],
-  "scope": "Parallel and bucket PV01 over SimpleQuotes for bonds, vanilla swaps, OIS, vanilla options, swaptions, cap/floors and CDS. Python bucket_analysis also returns a labelled dict for a Mapping of quotes; Go KeyRateAnalysis returns the labelled report as an ordered slice and rejects duplicate labels."
+  "scope": "Parallel and bucket PV01 over SimpleQuotes for bonds, vanilla swaps, OIS, vanilla options, swaptions, cap/floors and CDS. Matrix bucket PV01 over a ragged quote matrix (C row-major buffers plus row lengths, Go [][] slices, Python list of lists). Python bucket_analysis also returns a labelled dict for a Mapping of quotes; Go KeyRateAnalysis returns the labelled report as an ordered slice and rejects duplicate labels."
 }
