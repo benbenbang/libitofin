@@ -101,7 +101,7 @@ impl FdBlackScholesVanillaEngine {
     }
 
     /// The engine of [`new`](FdBlackScholesVanillaEngine::new) paying the cash
-    /// `dividends` under the `Spot` model (`hpp:52-60`, `cpp:122-124`).
+    /// `dividends` under the `Spot` model (`hpp:63-72`, `cpp:122-124`).
     ///
     /// The schedule is laid into the mesher bounds and rolled back through the
     /// dividend step condition as given; dividends dated outside the option
@@ -1217,11 +1217,14 @@ mod test_fd_spot_cash_dividends {
 
     /// `(type, american, npv, delta, gamma, theta)` as printed by the C++
     /// program; theta is not required by the ticket but matches as well.
+    type Cached = [(OptionType, bool, Real, Real, Real, Real); 4];
+
+    /// The single dividend of 10 at today + 10M.
     #[allow(
         clippy::excessive_precision,
         reason = "Preserve the exact digits QuantLib printed"
     )]
-    const CACHED: [(OptionType, bool, Real, Real, Real, Real); 4] = [
+    const CACHED: Cached = [
         (
             Call,
             false,
@@ -1256,17 +1259,59 @@ mod test_fd_spot_cash_dividends {
         ),
     ];
 
-    #[test]
-    fn mid_life_cash_dividend_reproduces_the_cached_quantlib_values() {
+    /// Two dividends, 5 at today + 4M and 10 at today + 10M, from the same
+    /// C++ program: distinct amounts pin the date and amount pairing.
+    #[allow(
+        clippy::excessive_precision,
+        reason = "Preserve the exact digits QuantLib printed"
+    )]
+    const CACHED_TWO: Cached = [
+        (
+            Call,
+            false,
+            4.7378522931954965,
+            0.29403066310229198,
+            0.011428251048714312,
+            -3.7809558264983743,
+        ),
+        (
+            Call,
+            true,
+            7.9057708867966641,
+            0.49147953278341305,
+            0.01871370359184878,
+            -6.1496514215378504,
+        ),
+        (
+            Put,
+            false,
+            22.763590143100142,
+            -0.62808693189317422,
+            0.011427611391172732,
+            -6.748690838527442,
+        ),
+        (
+            Put,
+            true,
+            22.772363862240606,
+            -0.6287703683761644,
+            0.011478776299872184,
+            -6.7740649495887144,
+        ),
+    ];
+
+    fn check_cached(months: &[i32], amounts: &[Real], cached: &Cached) {
         let today = Date::new(27, Month::February, 2021);
         let market = Market::new(today, Actual360::new());
         market.set(100.0, 0.08, 0.04, 0.3);
         let maturity = today + Period::new(12, TimeUnit::Months);
-        let dividend_date = today + Period::new(10, TimeUnit::Months);
         assert_eq!(maturity, Date::new(27, Month::February, 2022));
-        assert_eq!(dividend_date, Date::new(27, Month::December, 2021));
+        let dates: Vec<Date> = months
+            .iter()
+            .map(|&m| today + Period::new(m, TimeUnit::Months))
+            .collect();
 
-        for (option_type, is_american, npv, delta, gamma, theta) in CACHED {
+        for &(option_type, is_american, npv, delta, gamma, theta) in cached {
             let exercise = if is_american {
                 american(today, maturity)
             } else {
@@ -1276,7 +1321,7 @@ mod test_fd_spot_cash_dividends {
                 option_type,
                 100.0,
                 &exercise,
-                Some((&[dividend_date], &[10.0])),
+                Some((&dates, amounts)),
                 (100, 400),
             );
             for (name, value, expected) in [
@@ -1287,11 +1332,28 @@ mod test_fd_spot_cash_dividends {
             ] {
                 assert!(
                     (value - expected).abs() < 1.0e-8,
-                    "{option_type:?} american {is_american} {name}: \
+                    "{dates:?} {option_type:?} american {is_american} {name}: \
                      calculated {value} expected {expected}"
                 );
             }
         }
+    }
+
+    #[test]
+    fn mid_life_cash_dividend_reproduces_the_cached_quantlib_values() {
+        check_cached(&[10], &[10.0], &CACHED);
+    }
+
+    #[test]
+    fn two_cash_dividends_reproduce_the_cached_quantlib_values() {
+        check_cached(&[4, 10], &[5.0, 10.0], &CACHED_TWO);
+    }
+
+    /// A dividend of 7 at today + 14M, after maturity, is dropped: C++ prints
+    /// the single-dividend values bit for bit.
+    #[test]
+    fn a_dividend_after_maturity_is_dropped() {
+        check_cached(&[10, 14], &[10.0, 7.0], &CACHED);
     }
 
     /// `testFdGreeks` (`dividendoption.cpp:623-719`), Spot arm: the engine
