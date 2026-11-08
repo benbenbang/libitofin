@@ -236,11 +236,37 @@ fn smile_moves_the_local_vol_price() {
     for (kind, strike, sign) in [(0, 115.0, -1.0), (1, 85.0, 1.0)] {
         let (flat, _) = m.price(flat, kind, strike, 180, 0).unwrap();
         let (mc, se) = m.price(process, kind, strike, 180, 20_000).unwrap();
+        let (implied, _) = m.price(process, kind, strike, 180, 0).unwrap();
         assert!(
             sign * (mc - flat) > 5.0 * se,
             "K={strike}: mc {mc} flat {flat} se {se}"
         );
+        assert!(
+            (mc - implied).abs() < 3.0 * se + 0.01,
+            "K={strike}: mc {mc} black implied {implied} se {se}"
+        );
     }
+}
+
+#[test]
+fn smile_surface_observes_the_shared_spot() {
+    let mut m = market();
+    let surface = m.smile_surface();
+    let (_, process) = m.local_process(surface);
+    let option = m.option(process, 0, 115.0, 180, 20_000).unwrap();
+    let before = m.value(option, 0).unwrap();
+    let spot = m.spot;
+    m.ok(|c, e| unsafe { itofin_quote_set(c, spot, 105.0, e) });
+    let after = m.value(option, 0).unwrap();
+
+    let mut fresh = market();
+    let spot = fresh.spot;
+    fresh.ok(|c, e| unsafe { itofin_quote_set(c, spot, 105.0, e) });
+    let surface = fresh.smile_surface();
+    let (_, process) = fresh.local_process(surface);
+    let (rebuilt, _) = fresh.price(process, 0, 115.0, 180, 20_000).unwrap();
+    assert_ne!(after, before);
+    assert_eq!(after.to_bits(), rebuilt.to_bits(), "{after} vs {rebuilt}");
 }
 
 #[test]
@@ -366,4 +392,35 @@ fn tanh_smile_grid_under_bilinear_returns_the_core_error() {
         message.contains("negative local vol^2") && message.contains("not smooth enough"),
         "{message}"
     );
+}
+
+#[test]
+fn surface_query_matches_the_core_argument_order() {
+    use libitofin::handle::Handle;
+    use libitofin::quotes::{Quote, SimpleQuote};
+    use libitofin::shared::Shared;
+    use libitofin::termstructures::volatility::{
+        BlackVolTermStructure, LocalVolSurface, LocalVolTermStructure,
+    };
+    use libitofin::termstructures::yieldtermstructure::YieldTermStructure;
+    let mut m = market();
+    let black = m.smile_surface();
+    let (local, _) = m.local_process(black);
+    let curve = |id| m.c.get::<Handle<dyn YieldTermStructure>>(id).unwrap();
+    let core = LocalVolSurface::new(
+        m.c.get::<Handle<dyn BlackVolTermStructure>>(black).unwrap(),
+        curve(m.risk_free),
+        curve(m.dividend),
+        Handle::new(m.c.get::<Shared<SimpleQuote>>(m.spot).unwrap() as Shared<dyn Quote>),
+    );
+    for strike in [90.0, 110.0] {
+        let expected = core.local_vol(0.25, strike, false).unwrap();
+        let mut v = 0.0;
+        m.ok(|c, e| unsafe { itofin_local_vol_query(c, local, 0.25, strike, 0, &mut v, e) });
+        assert_eq!(
+            v.to_bits(),
+            expected.to_bits(),
+            "K={strike}: {v} vs {expected}"
+        );
+    }
 }

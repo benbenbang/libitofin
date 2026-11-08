@@ -96,7 +96,9 @@ def test_smile_moves_the_local_vol_price():
     for option_type, strike, sign in ((OptionType.Call, 115.0, -1), (OptionType.Put, 85.0, 1)):
         base = m.analytic(flat, option_type, strike, 180)
         _, mc, se = m.mc(process, option_type, strike, 180)
+        implied = m.analytic(process, option_type, strike, 180)
         assert sign * (mc - base) > 5 * se, (strike, mc, base, se)
+        assert abs(mc - implied) < 3 * se + 0.01, (strike, mc, implied, se)
 
 
 def test_shared_quote_reprices():
