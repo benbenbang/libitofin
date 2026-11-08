@@ -2,7 +2,7 @@
 use crate::bootstrap_callbacks::{Callbacks, ItofinBootstrapCallbacks, ItofinBootstrapState};
 use crate::bootstrap_variables::Variables;
 use crate::boundary::*;
-use crate::iterative_bootstrap_api::{CurveAnchor, anchored, moving_anchor};
+use crate::iterative_bootstrap_api::{CurveAnchor, CurveJumps, anchored, moving_anchor};
 use crate::time_api::{date, day_counter};
 use libitofin::handle::Handle;
 use libitofin::math::interpolations::{linear::Linear, loglinear::LogLinear};
@@ -36,7 +36,8 @@ pub unsafe extern "C" fn itofin_global_curve_new(
     error: *mut ItofinError,
 ) -> i32 {
     unsafe {
-        let anchor = move |_: &Context| Ok(CurveAnchor::Fixed(date(reference)?));
+        let anchor =
+            move |_: &Context| Ok((CurveAnchor::Fixed(date(reference)?), CurveJumps::default()));
         global_curve(
             ctx,
             anchor,
@@ -80,7 +81,12 @@ pub unsafe extern "C" fn itofin_global_curve_new_moving(
     error: *mut ItofinError,
 ) -> i32 {
     unsafe {
-        let anchor = move |c: &Context| moving_anchor(c, settlement_days, calendar, settings);
+        let anchor = move |c: &Context| {
+            Ok((
+                moving_anchor(c, settlement_days, calendar, settings)?,
+                CurveJumps::default(),
+            ))
+        };
         global_curve(
             ctx,
             anchor,
@@ -100,9 +106,9 @@ pub unsafe extern "C" fn itofin_global_curve_new_moving(
 }
 
 #[allow(clippy::too_many_arguments)]
-unsafe fn global_curve(
+pub(crate) unsafe fn global_curve(
     ctx: *mut Context,
-    anchor: impl FnOnce(&Context) -> BindingResult<CurveAnchor>,
+    anchor: impl FnOnce(&Context) -> BindingResult<(CurveAnchor, CurveJumps)>,
     helpers: *const u64,
     len: usize,
     dc: u64,
@@ -128,7 +134,7 @@ unsafe fn global_curve(
             }
             output(adopted, true)?;
             let callbacks = shared(Callbacks(callbacks));
-            let anchor = anchor(c)?;
+            let (anchor, jumps) = anchor(c)?;
             let dc = day_counter(c, dc)?;
             let helpers = input_slice(helpers, len)?
                 .iter()
@@ -220,8 +226,8 @@ unsafe fn global_curve(
                 bootstrap = bootstrap.with_additional_variables(Box::new(variables.build()?));
             }
             let curve = match kind {
-                0 => anchored::<Discount, _, _>(anchor, helpers, dc, LogLinear, bootstrap)?,
-                1 => anchored::<Discount, _, _>(anchor, helpers, dc, Linear, bootstrap)?,
+                0 => anchored::<Discount, _, _>(anchor, helpers, dc, LogLinear, bootstrap, jumps)?,
+                1 => anchored::<Discount, _, _>(anchor, helpers, dc, Linear, bootstrap, jumps)?,
                 _ => {
                     return Err(BindingError::invalid(
                         "global callbacks require a log-linear or linear discount curve",
