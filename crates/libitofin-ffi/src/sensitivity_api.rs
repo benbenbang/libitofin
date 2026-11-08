@@ -195,3 +195,71 @@ pub unsafe extern "C" fn itofin_sensitivity_bucket(
         })
     }
 }
+#[unsafe(no_mangle)]
+/// Bucket PV01 over a ragged matrix of quotes, each bumped alone, with one
+/// shared reference NPV. `quotes` holds the rows back to back (row-major) and
+/// `row_lengths` the `row_count` row sizes, which must sum to `quote_count`;
+/// empty rows are allowed, zero rows is an error. Writes `quote_count` results
+/// to `out` in the same row-major layout. Same `kind`, `quantities` and restore
+/// conventions as `itofin_sensitivity_parallel`.
+/// Under a Monte Carlo engine each reprice carries sampling error that does not
+/// shrink with the shift, so the result is noisy; prefer an analytic, tree or
+/// finite-difference engine.
+/// # Safety
+/// Pointers and thread ownership must satisfy the crate-level C caller contract.
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn itofin_sensitivity_bucket_matrix(
+    ctx: *mut Context,
+    quotes: *const u64,
+    quote_count: usize,
+    row_lengths: *const usize,
+    row_count: usize,
+    instruments: *const u64,
+    instrument_count: usize,
+    quantities: *const f64,
+    quantity_count: usize,
+    shift: f64,
+    kind: i32,
+    out: *mut ItofinSensitivity,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(out)?;
+            let kind = self::kind(kind)?;
+            let lengths = input_slice(row_lengths, row_count)?;
+            let total = lengths
+                .iter()
+                .try_fold(0usize, |sum, &n| sum.checked_add(n))
+                .filter(|&sum| sum == quote_count)
+                .ok_or_else(|| BindingError::invalid("row lengths do not sum to quote_count"))?;
+            let (flat, instruments) = inputs(c, (quotes, total), (instruments, instrument_count))?;
+            let mut rest = flat.as_slice();
+            let rows: Vec<_> = lengths
+                .iter()
+                .map(|&n| {
+                    let (row, tail) = rest.split_at(n);
+                    rest = tail;
+                    row.to_vec()
+                })
+                .collect();
+            let (first, second) = risk::bucket_analysis_matrix(
+                &rows,
+                &instruments,
+                input_slice(quantities, quantity_count)?,
+                finite(shift)?,
+                kind,
+            )?;
+            let out = std::slice::from_raw_parts_mut(out, quote_count);
+            for (slot, value) in out.iter_mut().zip(
+                first
+                    .into_iter()
+                    .flatten()
+                    .zip(second.into_iter().flatten()),
+            ) {
+                *slot = value.into();
+            }
+            Ok(())
+        })
+    }
+}

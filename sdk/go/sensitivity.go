@@ -169,6 +169,45 @@ func (s *Session) BucketAnalysis(quotes []*SimpleQuote, instruments []Instrument
 	return results, nil
 }
 
+// BucketAnalysisMatrix is BucketAnalysis over a ragged matrix of quotes: each
+// quote bumped alone against one shared reference NPV, with results shaped
+// like quotes. Empty rows are allowed and yield empty rows; an empty outer
+// slice is an error. Same conventions as ParallelAnalysis.
+func (s *Session) BucketAnalysisMatrix(quotes [][]*SimpleQuote, instruments []Instrument, quantities []float64, shift float64, kind SensitivityAnalysis) ([][]Sensitivity, error) {
+	var flat []*SimpleQuote
+	lengths := make([]C.size_t, len(quotes))
+	for r, row := range quotes {
+		flat = append(flat, row...)
+		lengths[r] = C.size_t(len(row))
+	}
+	q, i, err := sensitivityIDs(s, flat, instruments)
+	if err != nil {
+		return nil, err
+	}
+	var rows *C.size_t
+	if len(lengths) > 0 {
+		rows = &lengths[0]
+	}
+	out := make([]C.ItofinSensitivity, max(len(q), 1))
+	err = s.invoke(func() error {
+		var e C.ItofinError
+		return ffiError(C.itofin_sensitivity_bucket_matrix(s.ctx, idPointer(q), C.size_t(len(q)), rows, C.size_t(len(lengths)), idPointer(i), C.size_t(len(i)), doubles(quantities), C.size_t(len(quantities)), C.double(shift), C.int32_t(kind), &out[0], &e), &e)
+	})
+	if err != nil {
+		return nil, err
+	}
+	results := make([][]Sensitivity, len(quotes))
+	k := 0
+	for r, row := range quotes {
+		results[r] = make([]Sensitivity, len(row))
+		for c := range row {
+			results[r][c] = sensitivity(out[k])
+			k++
+		}
+	}
+	return results, nil
+}
+
 // LabelledQuote names one quote of a key-rate report.
 type LabelledQuote struct {
 	Label string
