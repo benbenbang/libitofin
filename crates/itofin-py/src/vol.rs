@@ -383,8 +383,14 @@ impl PyBlackVolTimeExtrapolation {
 #[gen_stub_pyclass]
 #[pyclass(name = "BlackVarianceCurve", extends = PyBlackVolTermStructure, unsendable, module = "itofin.termstructures")]
 pub struct PyBlackVarianceCurve {
-    #[allow(dead_code)]
     concrete: Handle<BlackVarianceCurve<Linear>>,
+}
+
+impl PyBlackVarianceCurve {
+    /// The concrete linear curve handle the local-volatility curve wraps.
+    pub(crate) fn concrete(&self) -> Handle<BlackVarianceCurve<Linear>> {
+        self.concrete.clone()
+    }
 }
 
 #[gen_stub_pymethods]

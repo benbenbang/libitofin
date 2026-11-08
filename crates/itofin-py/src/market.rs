@@ -2,6 +2,7 @@
 
 use crate::PyQlError;
 use crate::curve::PyYieldTermStructure;
+use crate::localvol::PyLocalVolTermStructure;
 use crate::time::{PyDate, PyDayCounter};
 use crate::vol::PyBlackVolTermStructure;
 use libitofin::handle::Handle;
@@ -203,6 +204,41 @@ impl PyBlackScholesProcess {
                 dividend.handle(),
                 risk_free.handle(),
                 vol.handle(),
+            )),
+        }
+    }
+
+    /// Build a process with an external local volatility over a spot quote.
+    ///
+    /// The supplied local volatility replaces the one the process would
+    /// derive from vol, so a smile surface prices by Monte Carlo.
+    ///
+    /// Args:
+    ///     spot (SimpleQuote): The spot quote the process observes.
+    ///     risk_free (YieldTermStructure): The risk-free discount curve.
+    ///     dividend (YieldTermStructure): The dividend curve.
+    ///     vol (BlackVolTermStructure): The Black volatility surface.
+    ///     local_vol (LocalVolTermStructure): The local volatility the
+    ///         process evolves with.
+    ///
+    /// Returns:
+    ///     BlackScholesProcess: A process over the quote, the three term
+    ///     structures and the local volatility.
+    #[staticmethod]
+    fn with_local_vol(
+        spot: &PySimpleQuote,
+        risk_free: &PyYieldTermStructure,
+        dividend: &PyYieldTermStructure,
+        vol: &PyBlackVolTermStructure,
+        local_vol: &PyLocalVolTermStructure,
+    ) -> Self {
+        PyBlackScholesProcess {
+            inner: shared(GeneralizedBlackScholesProcess::with_local_vol(
+                spot.handle(),
+                dividend.handle(),
+                risk_free.handle(),
+                vol.handle(),
+                local_vol.handle(),
             )),
         }
     }

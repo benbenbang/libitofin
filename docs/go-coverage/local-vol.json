@@ -1,0 +1,51 @@
+{
+  "domain": "local-volatility",
+  "entries": [
+    {
+      "c": "itofin_local_vol_surface_new",
+      "go": "Session.NewLocalVolSurface",
+      "go_file": "sdk/go/local_vol.go",
+      "python": "itofin.termstructures.LocalVolSurface.__init__",
+      "rust_file": "crates/libitofin-ffi/src/local_vol_api.rs",
+      "status": "implemented",
+      "tests": [
+        "sdk/go/local_vol_test.go::TestLocalVolTimeOnlyMatchesAnalytic",
+        "sdk/go/local_vol_test.go::TestLocalVolSmileMovesPrice"
+      ]
+    },
+    {
+      "c": "itofin_local_vol_curve_new",
+      "go": "Session.NewLocalVolCurve",
+      "go_file": "sdk/go/local_vol.go",
+      "python": "itofin.termstructures.LocalVolCurve.__init__",
+      "rust_file": "crates/libitofin-ffi/src/local_vol_api.rs",
+      "status": "implemented",
+      "tests": [
+        "sdk/go/local_vol_test.go::TestLocalVolCurveQueriesAndPrices"
+      ]
+    },
+    {
+      "c": "itofin_local_vol_query",
+      "go": "LocalVolTermStructure.LocalVol",
+      "go_file": "sdk/go/local_vol.go",
+      "python": "itofin.termstructures.LocalVolTermStructure.local_vol",
+      "rust_file": "crates/libitofin-ffi/src/local_vol_api.rs",
+      "status": "implemented",
+      "tests": [
+        "sdk/go/local_vol_test.go::TestLocalVolCoreErrors",
+        "sdk/go/local_vol_test.go::TestLocalVolCurveQueriesAndPrices"
+      ]
+    },
+    {
+      "c": "itofin_black_scholes_with_local_vol",
+      "go": "Session.NewBlackScholesProcessWithLocalVol",
+      "go_file": "sdk/go/local_vol.go",
+      "python": "itofin.processes.BlackScholesProcess.with_local_vol",
+      "rust_file": "crates/libitofin-ffi/src/market_api.rs",
+      "status": "implemented",
+      "tests": [
+        "sdk/go/local_vol_test.go::TestLocalVolQuoteRepricesAndHandlesOutliveCallers"
+      ]
+    }
+  ]
+}
