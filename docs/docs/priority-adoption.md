@@ -84,23 +84,23 @@ amounts are valid; exchange rates must be finite and positive.
 
 | High rows | Existing owner | Excluded work |
 | --- | --- | --- |
-| 11 | [#466](https://github.com/benbenbang/libitofin/issues/466) | Two-factor short-rate model contract |
-| 14-15 | [#636](https://github.com/benbenbang/libitofin/issues/636) | Concrete and multidimensional boundary conditions |
-| 17-21 | [#636](https://github.com/benbenbang/libitofin/issues/636) | Mixed operators, ADI schemes, expanded rollback and 2D solver |
-| 24-25 | [#636](https://github.com/benbenbang/libitofin/issues/636) | Heston and Hull-White finite-difference engines |
+| 11 | [#466](https://github.com/bitbrew-dev/libitofin/issues/466) | Two-factor short-rate model contract |
+| 14-15 | [#636](https://github.com/bitbrew-dev/libitofin/issues/636) | Concrete and multidimensional boundary conditions |
+| 17-21 | [#636](https://github.com/bitbrew-dev/libitofin/issues/636) | Mixed operators, ADI schemes, expanded rollback and 2D solver |
+| 24-25 | [#636](https://github.com/bitbrew-dev/libitofin/issues/636) | Heston and Hull-White finite-difference engines |
 
 These tickets are neither closed nor activated by this batch. Temporary excluded
 drafts are not production code and do not establish delivered coverage.
 
 Two superficially similar existing tickets do not own the retained capabilities:
-[#1166](https://github.com/benbenbang/libitofin/issues/1166) estimates weighted
+[#1166](https://github.com/bitbrew-dev/libitofin/issues/1166) estimates weighted
 sample covariance, rather than converting standard deviations and correlation;
-[#350](https://github.com/benbenbang/libitofin/issues/350) tracks cap/floor implied
+[#350](https://github.com/bitbrew-dev/libitofin/issues/350) tracks cap/floor implied
 volatility, rather than swaption implied volatility.
 
 ## Independent evidence
 
-The [fixture provenance and replay instructions](https://github.com/benbenbang/libitofin/tree/main/crates/libitofin/tests/fixtures/high28)
+The [fixture provenance and replay instructions](https://github.com/bitbrew-dev/libitofin/tree/main/crates/libitofin/tests/fixtures/high28)
 identify compiled `QuantLib==1.43` independently from inspected source revision
 `9863b578af0caa4cecabf697196533e84a8308b6` (`1.43-dev`). No same-revision build
 claim is made. Rust tests bake the independently generated values and require no

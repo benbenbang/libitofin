@@ -1,8 +1,8 @@
 site_name: itofin
 site_description: Python, Rust, and Go documentation for itofin, the Rust QuantLib port (libitofin).
-site_url: https://benbenbang.github.io/libitofin/
-repo_url: https://github.com/benbenbang/libitofin
-repo_name: benbenbang/libitofin
+site_url: https://bitbrew-dev.github.io/libitofin/
+repo_url: https://github.com/bitbrew-dev/libitofin
+repo_name: bitbrew-dev/libitofin
 edit_uri: ""
 
 theme:
@@ -172,10 +172,10 @@ nav:
   - Rust API: rust.md
   - Project:
       - Release recovery: release-recovery.md
-      - Repository index: https://github.com/benbenbang/libitofin#readme
-      - Status and scope: https://github.com/benbenbang/libitofin/blob/main/wiki/status.md
-      - Development: https://github.com/benbenbang/libitofin/blob/main/wiki/development.md
-      - Design: https://github.com/benbenbang/libitofin/blob/main/wiki/design.md
-      - QuantLib compatibility: https://github.com/benbenbang/libitofin/blob/main/wiki/compatibility.md
+      - Repository index: https://github.com/bitbrew-dev/libitofin#readme
+      - Status and scope: https://github.com/bitbrew-dev/libitofin/blob/main/wiki/status.md
+      - Development: https://github.com/bitbrew-dev/libitofin/blob/main/wiki/development.md
+      - Design: https://github.com/bitbrew-dev/libitofin/blob/main/wiki/design.md
+      - QuantLib compatibility: https://github.com/bitbrew-dev/libitofin/blob/main/wiki/compatibility.md
   - Constant GSR process: gsr-process.md
   - Plain float-float swaps: float-float-swaps.md

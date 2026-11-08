@@ -53,7 +53,7 @@ cumulative weight reaches probability in `(0, 1]`.
 === "Go"
 
     ```go
-    import itofin "github.com/benbenbang/libitofin/sdk/go"
+    import itofin "github.com/bitbrew-dev/libitofin/sdk/go"
 
     observations := []float64{-5, -2, 1, 2}
     weights := []float64{1, 10, 1, 8}
@@ -96,7 +96,7 @@ need only samples. `reset` empties the set.
 === "Go"
 
     ```go
-    import itofin "github.com/benbenbang/libitofin/sdk/go"
+    import itofin "github.com/bitbrew-dev/libitofin/sdk/go"
 
     session, err := itofin.NewSession()
     if err != nil { panic(err) }
@@ -216,7 +216,7 @@ retain the pinned native conventions.
 === "Go"
 
     ```go
-    import itofin "github.com/benbenbang/libitofin/sdk/go"
+    import itofin "github.com/bitbrew-dev/libitofin/sdk/go"
 
     rows := [][]float64{{1, 4}, {3, 2}, {100, -20}}
     weights := []float64{1, 3, 0}
@@ -247,7 +247,7 @@ sample-count or work-limit capacity.
 Rust also provides `SequenceStatistics::new(dimension)` and `add_weighted` for
 an owned accumulator; the binding APIs expose only these batch operations.
 Independent native and exact-centered fixtures are in
-[`sdk/go/testdata/sequence-statistics`](https://github.com/benbenbang/libitofin/tree/main/sdk/go/testdata/sequence-statistics).
+[`sdk/go/testdata/sequence-statistics`](https://github.com/bitbrew-dev/libitofin/tree/main/sdk/go/testdata/sequence-statistics).
 
 ## Ordered portfolio drawdown
 
@@ -300,7 +300,7 @@ nonnegative, equal-length and have a finite positive sum.
 === "Go"
 
     ```go
-    import itofin "github.com/benbenbang/libitofin/sdk/go"
+    import itofin "github.com/bitbrew-dev/libitofin/sdk/go"
 
     beta, err := itofin.BenchmarkBeta(
         []float64{-0.01, 0.02, 0.05, 0.03},

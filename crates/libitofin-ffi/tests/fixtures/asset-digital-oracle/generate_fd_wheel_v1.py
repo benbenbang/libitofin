@@ -10,7 +10,7 @@ import stat
 import sys
 import traceback
 
-Q = Path('/Users/bn/Git/benbenbang/ito-fin/local/codex/binding-wave7-20261024/qa-math')
+Q = Path('/Users/bn/Git/bitbrew-dev/ito-fin/local/codex/binding-wave7-20261024/qa-math')
 PINS = {'independent_payoff_laws.py': '1f6d862f7c2193286e0aba73e5c566d1c69f1a09ed638717ed81514c4ab8a262', 'fd-cases-v1.json': '178a30f8183447bca1f695096e53d9aafd8756a8c27521e071ed829a96d533ce', 'oracle-metadata-v1.json': 'b59188edbc218455e73c5ce650e038b059834cb81f85786a162a9a6dd89f78e2'}
 
 

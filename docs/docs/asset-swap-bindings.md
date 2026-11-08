@@ -64,7 +64,7 @@ curve, fixings and Settings. Silent flow/fixing policy changes invalidate the
 swap directly. Freeze pins cached values; explicit recalculate reprices while
 frozen. Distinct Settings allocations or mixed Go sessions are rejected.
 
-See the [Go binding contract](https://github.com/benbenbang/libitofin/blob/main/docs/go-binding-contract.md) for session/thread,
+See the [Go binding contract](https://github.com/bitbrew-dev/libitofin/blob/main/docs/go-binding-contract.md) for session/thread,
 Close and pointer requirements. This bounded facade adds no core pricing math.
 
 ## Numerical evidence

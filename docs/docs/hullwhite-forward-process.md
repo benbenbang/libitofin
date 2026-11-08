@@ -93,7 +93,7 @@ underflow is retained. Nonfinite returned process values are rejected.
 Tracked tests cover seven direct compiled QuantLib cases, independent
 80-digit small-`a` integrals, Simpson integration, live relinks/notifications,
 horizon validation, zero steps and malformed/domain inputs. See the
-[oracle provenance](https://github.com/benbenbang/libitofin/tree/main/crates/libitofin/tests/fixtures/medium2_hullwhite_forward).
+[oracle provenance](https://github.com/bitbrew-dev/libitofin/tree/main/crates/libitofin/tests/fixtures/medium2_hullwhite_forward).
 
 The original source pin and compiled QuantLib 1.43 wheel are distinct.
 Spot-measure `HullWhiteProcess`, Hull-White model calibration, bond-option

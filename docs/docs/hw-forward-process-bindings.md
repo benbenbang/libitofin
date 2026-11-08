@@ -44,7 +44,7 @@ C query kinds are exactly 0 `x0`, 1 `a`, 2 `sigma`, 3 horizon, 4 `alpha(t)`,
 10 standard deviation, 11 variance, 12 evolve. For kinds 5/6, `dt` is an
 absolute maturity and kind 6 also uses `x` as its second endpoint. Unused inputs
 are ignored. Outputs are written only on success. Context ownership/thread and
-pointer requirements remain those of the [C/Go contract](https://github.com/benbenbang/libitofin/blob/main/docs/go-binding-contract.md).
+pointer requirements remain those of the [C/Go contract](https://github.com/bitbrew-dev/libitofin/blob/main/docs/go-binding-contract.md).
 Go objects belong to their session, reject mixed sessions and require explicit
 Close. Python instances are unsendable and retain native dependencies.
 
@@ -77,5 +77,5 @@ Source reference: QuantLib `9863b578af0caa4cecabf697196533e84a8308b6`,
 checkout from the separately compiled QuantLib 1.43 wheel and independent
 high-precision limits. Bindings do not establish full QuantLib/model parity.
 
-[Python example](https://github.com/benbenbang/libitofin/blob/main/example/python/hw_forward_process.py)
-and [Go example](https://github.com/benbenbang/libitofin/tree/main/sdk/go/examples/hw_forward_process).
+[Python example](https://github.com/bitbrew-dev/libitofin/blob/main/example/python/hw_forward_process.py)
+and [Go example](https://github.com/bitbrew-dev/libitofin/tree/main/sdk/go/examples/hw_forward_process).

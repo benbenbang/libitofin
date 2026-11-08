@@ -60,8 +60,8 @@ QuantLib parity. Existing core behavior, including errors, is retained.
 
 ## Examples
 
-Python: [cash digital example](https://github.com/benbenbang/libitofin/blob/main/example/python/cash_digital.py).
-Go: [cash digital example](https://github.com/benbenbang/libitofin/blob/main/sdk/go/examples/cash_digital/main.go).
+Python: [cash digital example](https://github.com/bitbrew-dev/libitofin/blob/main/example/python/cash_digital.py).
+Go: [cash digital example](https://github.com/bitbrew-dev/libitofin/blob/main/sdk/go/examples/cash_digital/main.go).
 
 Fixtures compare regular positive-volatility prices and Greeks to an independent
 normal-distribution formula, while boundary regressions explicitly pin original

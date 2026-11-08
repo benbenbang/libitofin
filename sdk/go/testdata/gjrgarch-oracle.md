@@ -1,6 +1,6 @@
 # GJR-GARCH process and seeded-path oracle
 
-Issue [#1164](https://github.com/benbenbang/libitofin/issues/1164) covers processes
+Issue [#1164](https://github.com/bitbrew-dev/libitofin/issues/1164) covers processes
 and simulation only. Calibration/models/engines remain #1165.
 
 ## Independent provenance

@@ -59,7 +59,7 @@ C uses `itofin_black_delta_new`, `itofin_black_delta_delta_from_strike`,
 `itofin_black_delta_strike_from_delta` and `itofin_black_delta_atm_strike`.
 Release the handle with `itofin_handle_release`. Scalar/handle outputs are
 written only on success. Context thread confinement and the
-[C caller contract](https://github.com/benbenbang/libitofin/blob/main/docs/go-binding-contract.md) still apply.
+[C caller contract](https://github.com/bitbrew-dev/libitofin/blob/main/docs/go-binding-contract.md) still apply.
 
 ## Domains and ambiguity
 

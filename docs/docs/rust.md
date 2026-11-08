@@ -32,12 +32,12 @@ use libitofin::settings::Settings;
 
 ## Numerical optimization
 
-[`itofin-optimize`](https://github.com/benbenbang/libitofin/tree/main/crates/itofin-optimize)
+[`itofin-optimize`](https://github.com/bitbrew-dev/libitofin/tree/main/crates/itofin-optimize)
 is a separate, finance-independent crate with a SciPy-inspired `minimize` over plain
 `f64` slices; it never depends on `libitofin`. Its objective trait carries its own error
 type, so a failing objective reaches the caller unchanged. It is not yet published on
 crates.io; Python reaches it as [`itofin.optimize`](api/optimize.md) and Go as
 `itofin.Minimize`.
 
-Runnable Rust examples live in [`crates/libitofin/examples`](https://github.com/benbenbang/libitofin/tree/main/crates/libitofin/examples);
+Runnable Rust examples live in [`crates/libitofin/examples`](https://github.com/bitbrew-dev/libitofin/tree/main/crates/libitofin/examples);
 the Python and Go introductions are on the [Getting started](getting-started.md) page.

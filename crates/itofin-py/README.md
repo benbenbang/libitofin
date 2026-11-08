@@ -1,32 +1,32 @@
 # itofin
 
-Idiomatic Python bindings over the [`libitofin`](https://github.com/benbenbang/libitofin) Rust core, a ground-up port of [QuantLib](https://github.com/lballabio/QuantLib) for pricing, risk, and calibration. The heavy numerics run in Rust; Python drives them. The pricing snippets below reproduce the cached Rust test oracles exactly; the abbreviated calibration snippets converge to the same targets within the tests' calibration tolerance (the full matrices live in `tests/`).
+Idiomatic Python bindings over the [`libitofin`](https://github.com/bitbrew-dev/libitofin) Rust core, a ground-up port of [QuantLib](https://github.com/lballabio/QuantLib) for pricing, risk, and calibration. The heavy numerics run in Rust; Python drives them. The pricing snippets below reproduce the cached Rust test oracles exactly; the abbreviated calibration snippets converge to the same targets within the tests' calibration tolerance (the full matrices live in `tests/`).
 
 The API mirrors QuantLib's `ql/` layout: types live in submodules (`itofin.time`, `itofin.instruments`, `itofin.models`, ...), while `Settings` and `ItofinError` stay at the top level.
 
-Source API guides: [currency fields](https://github.com/benbenbang/libitofin/blob/main/docs/docs/currency-bindings.md),
-[currency presets including TWD](https://github.com/benbenbang/libitofin/blob/main/docs/docs/currency-presets.md),
-and [Black FX delta conventions](https://github.com/benbenbang/libitofin/blob/main/docs/docs/black-delta-bindings.md).
+Source API guides: [currency fields](https://github.com/bitbrew-dev/libitofin/blob/main/docs/docs/currency-bindings.md),
+[currency presets including TWD](https://github.com/bitbrew-dev/libitofin/blob/main/docs/docs/currency-presets.md),
+and [Black FX delta conventions](https://github.com/bitbrew-dev/libitofin/blob/main/docs/docs/black-delta-bindings.md).
 These helpers do not add currency rounding, conversion or a new option pricing engine.
 
-Standalone [constant-parameter GSR process](https://github.com/benbenbang/libitofin/blob/main/docs/docs/gsr-process-bindings.md)
+Standalone [constant-parameter GSR process](https://github.com/bitbrew-dev/libitofin/blob/main/docs/docs/gsr-process-bindings.md)
 bindings expose forward-measure transitions, not a fitted GSR model.
 
 ## Pricing and process binding guides
 
 | Scope | Guide | Example |
 | --- | --- | --- |
-| Ordinary bond coupon helpers | [BPS and ATM rate](https://github.com/benbenbang/libitofin/blob/main/docs/docs/bond-coupon-analytics.md) | [Example](https://github.com/benbenbang/libitofin/blob/main/example/python/bond_coupon_analytics.py) |
-| Price-fed bond ATM | [Price-fed ATM](https://github.com/benbenbang/libitofin/blob/main/docs/docs/bond-price-atm-bindings.md) | [Example](https://github.com/benbenbang/libitofin/blob/main/example/python/bond_price_atm.py) |
-| European asset-or-nothing FD pricing | [Asset digitals](https://github.com/benbenbang/libitofin/blob/main/docs/docs/asset-digital-bindings.md) | [Example](https://github.com/benbenbang/libitofin/blob/main/example/python/asset_digital.py) |
-| European signed gap FD pricing | [Gap options](https://github.com/benbenbang/libitofin/blob/main/docs/docs/gap-option-bindings.md) | [Example](https://github.com/benbenbang/libitofin/blob/main/example/python/gap_option.py) |
-| European percentage-strike FD pricing | [Percentage-strike options](https://github.com/benbenbang/libitofin/blob/main/docs/docs/percentage-strike-bindings.md) | [Example](https://github.com/benbenbang/libitofin/blob/main/example/python/percentage_strike.py) |
-| Amortizing fixed-rate bonds | [Fixed amortization](https://github.com/benbenbang/libitofin/blob/main/docs/docs/amortizing-fixed-bonds.md) | [Example](https://github.com/benbenbang/libitofin/blob/main/example/python/amortizing_fixed_bond.py) |
-| Amortizing plain-Ibor bonds | [Ibor amortization](https://github.com/benbenbang/libitofin/blob/main/docs/docs/amortizing-floating-bond-bindings.md) | [Example](https://github.com/benbenbang/libitofin/blob/main/example/python/amortizing_floating_bond.py) |
-| European analytic cash digitals | [Cash-or-nothing](https://github.com/benbenbang/libitofin/blob/main/docs/docs/cash-digital-bindings.md) | [Example](https://github.com/benbenbang/libitofin/blob/main/example/python/cash_digital.py) |
-| Standalone Gaussian state process | [MF state](https://github.com/benbenbang/libitofin/blob/main/docs/docs/mf-state-process-bindings.md) | [Example](https://github.com/benbenbang/libitofin/blob/main/example/python/mf_state_process.py) |
-| Standalone live-curve forward process | [Hull-White forward](https://github.com/benbenbang/libitofin/blob/main/docs/docs/hw-forward-process-bindings.md) | [Example](https://github.com/benbenbang/libitofin/blob/main/example/python/hw_forward_process.py) |
-| Constant-notional Ibor cross-currency swaps | [Xccy basis](https://github.com/benbenbang/libitofin/blob/main/docs/docs/xccy-basis-bindings.md) | [Example](https://github.com/benbenbang/libitofin/blob/main/example/python/xccy_basis.py) |
+| Ordinary bond coupon helpers | [BPS and ATM rate](https://github.com/bitbrew-dev/libitofin/blob/main/docs/docs/bond-coupon-analytics.md) | [Example](https://github.com/bitbrew-dev/libitofin/blob/main/example/python/bond_coupon_analytics.py) |
+| Price-fed bond ATM | [Price-fed ATM](https://github.com/bitbrew-dev/libitofin/blob/main/docs/docs/bond-price-atm-bindings.md) | [Example](https://github.com/bitbrew-dev/libitofin/blob/main/example/python/bond_price_atm.py) |
+| European asset-or-nothing FD pricing | [Asset digitals](https://github.com/bitbrew-dev/libitofin/blob/main/docs/docs/asset-digital-bindings.md) | [Example](https://github.com/bitbrew-dev/libitofin/blob/main/example/python/asset_digital.py) |
+| European signed gap FD pricing | [Gap options](https://github.com/bitbrew-dev/libitofin/blob/main/docs/docs/gap-option-bindings.md) | [Example](https://github.com/bitbrew-dev/libitofin/blob/main/example/python/gap_option.py) |
+| European percentage-strike FD pricing | [Percentage-strike options](https://github.com/bitbrew-dev/libitofin/blob/main/docs/docs/percentage-strike-bindings.md) | [Example](https://github.com/bitbrew-dev/libitofin/blob/main/example/python/percentage_strike.py) |
+| Amortizing fixed-rate bonds | [Fixed amortization](https://github.com/bitbrew-dev/libitofin/blob/main/docs/docs/amortizing-fixed-bonds.md) | [Example](https://github.com/bitbrew-dev/libitofin/blob/main/example/python/amortizing_fixed_bond.py) |
+| Amortizing plain-Ibor bonds | [Ibor amortization](https://github.com/bitbrew-dev/libitofin/blob/main/docs/docs/amortizing-floating-bond-bindings.md) | [Example](https://github.com/bitbrew-dev/libitofin/blob/main/example/python/amortizing_floating_bond.py) |
+| European analytic cash digitals | [Cash-or-nothing](https://github.com/bitbrew-dev/libitofin/blob/main/docs/docs/cash-digital-bindings.md) | [Example](https://github.com/bitbrew-dev/libitofin/blob/main/example/python/cash_digital.py) |
+| Standalone Gaussian state process | [MF state](https://github.com/bitbrew-dev/libitofin/blob/main/docs/docs/mf-state-process-bindings.md) | [Example](https://github.com/bitbrew-dev/libitofin/blob/main/example/python/mf_state_process.py) |
+| Standalone live-curve forward process | [Hull-White forward](https://github.com/bitbrew-dev/libitofin/blob/main/docs/docs/hw-forward-process-bindings.md) | [Example](https://github.com/bitbrew-dev/libitofin/blob/main/example/python/hw_forward_process.py) |
+| Constant-notional Ibor cross-currency swaps | [Xccy basis](https://github.com/bitbrew-dev/libitofin/blob/main/docs/docs/xccy-basis-bindings.md) | [Example](https://github.com/bitbrew-dev/libitofin/blob/main/example/python/xccy_basis.py) |
 
 These helpers do not complete the wider `BondFunctions` overload set. The
 process facades are not fitted models; cash digitals cover European analytic
@@ -313,7 +313,7 @@ Avoid callbacks that strongly capture the curve or an engine/model/index that
 retains it. Those mixed native/Python cycles need the user to break the capture;
 use `weakref.ref(curve)` for trial-curve queries. Capturing an additional helper
 is supported. Full mixed-graph garbage collection is tracked in
-[#1028](https://github.com/benbenbang/libitofin/issues/1028).
+[#1028](https://github.com/bitbrew-dev/libitofin/issues/1028).
 
 ## Typing checks
 
@@ -321,19 +321,19 @@ See [typing acceptance](TYPING.md) for the pinned, bidirectional Pyright gate.
 
 ## License
 
-BSD-3-Clause, matching the `libitofin` core. See the [repository](https://github.com/benbenbang/libitofin) for the layer status table, the divergences-from-QuantLib catalogue, and the Rust test oracles behind the numbers above.
+BSD-3-Clause, matching the `libitofin` core. See the [repository](https://github.com/bitbrew-dev/libitofin) for the layer status table, the divergences-from-QuantLib catalogue, and the Rust test oracles behind the numbers above.
 
 ## Standalone plain-vanilla BlackCalculator
 
 Immutable Black 1976 value and scalar Greeks are available through `BlackCalculator`.
-See the [bounded scope and edge-case contract](https://github.com/benbenbang/libitofin/blob/main/docs/docs/black-calculator-bindings.md).
+See the [bounded scope and edge-case contract](https://github.com/bitbrew-dev/libitofin/blob/main/docs/docs/black-calculator-bindings.md).
 
 ### Par asset swap bindings
 
 Plain fixed/zero bullet-bond `AssetSwap` supports live discounting, signed leg
 values, floating BPS and fair spread/clean price. Market, amortizing, callable
 and overnight variants are excluded. See the [bounded scope and lifecycle
-contract](https://github.com/benbenbang/libitofin/blob/main/docs/docs/asset-swap-bindings.md).
+contract](https://github.com/bitbrew-dev/libitofin/blob/main/docs/docs/asset-swap-bindings.md).
 
 ## Bounded CPI pricing
 

@@ -69,7 +69,7 @@ After the fourth, the current mean is `25/3` but the table is unchanged.
 === "Go"
 
     ```go
-    import itofin "github.com/benbenbang/libitofin/sdk/go"
+    import itofin "github.com/bitbrew-dev/libitofin/sdk/go"
 
     observations := []float64{2, 100, 8, 12}
     weights := []float64{1, 0, 3, 2}
@@ -96,10 +96,10 @@ is needed.
 
 Executable examples:
 
-- [Rust](https://github.com/benbenbang/libitofin/blob/main/crates/libitofin/examples/convergence_statistics.rs)
-- [Python](https://github.com/benbenbang/libitofin/blob/main/example/python/convergence_statistics.py)
-- [Go](https://github.com/benbenbang/libitofin/blob/main/sdk/go/examples/convergence-statistics/main.go)
-- [Pinned oracle and regeneration](https://github.com/benbenbang/libitofin/tree/main/sdk/go/testdata/convergence-statistics)
+- [Rust](https://github.com/bitbrew-dev/libitofin/blob/main/crates/libitofin/examples/convergence_statistics.rs)
+- [Python](https://github.com/bitbrew-dev/libitofin/blob/main/example/python/convergence_statistics.py)
+- [Go](https://github.com/bitbrew-dev/libitofin/blob/main/sdk/go/examples/convergence-statistics/main.go)
+- [Pinned oracle and regeneration](https://github.com/bitbrew-dev/libitofin/tree/main/sdk/go/testdata/convergence-statistics)
 
 Use [weighted statistics](statistics.md) for other scalar moments.
 Mean stability does not establish point-set coverage.

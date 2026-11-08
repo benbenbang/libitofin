@@ -34,7 +34,7 @@ between releases that add symbols. Keep the header and library together.
 
 ## Use from an external Go module
 
-The module is `github.com/benbenbang/libitofin/sdk/go`. Choose a release with
+The module is `github.com/bitbrew-dev/libitofin/sdk/go`. Choose a release with
 a matching `sdk/go/vVERSION` tag and native assets. Set `version` to that
 release number without `v`,
 and `platform` to `darwin-arm64`, `darwin-amd64`, `linux-amd64`, or
@@ -45,7 +45,7 @@ checksum from the main LibItoFin release:
 ```sh
 version=VERSION
 platform=darwin-arm64
-gh release download "v$version" --repo benbenbang/libitofin \
+gh release download "v$version" --repo bitbrew-dev/libitofin \
   --pattern "itofin-native-$version-$platform.tar.gz*"
 shasum -a 256 -c "itofin-native-$version-$platform.tar.gz.sha256"
 tar -xzf "itofin-native-$version-$platform.tar.gz"
@@ -75,7 +75,7 @@ the GNU toolchain and does not provide an MSVC import library.
 For a published coordinated release, run these commands in your application's module:
 
 ```sh
-go get "github.com/benbenbang/libitofin/sdk/go@v$version"
+go get "github.com/bitbrew-dev/libitofin/sdk/go@v$version"
 go test -tags itofin_external ./...
 go build -tags itofin_external ./...
 ```
@@ -100,12 +100,12 @@ its install name; production application signing remains the consumer's step.
 
 The published `bindings/go/v0.22.0` and core `v0.22.0` tags remain unchanged.
 Existing applications can keep
-`github.com/benbenbang/libitofin/bindings/go@v0.22.0` with its matching native
+`github.com/bitbrew-dev/libitofin/bindings/go@v0.22.0` with its matching native
 package. There is no `sdk/go/v0.22.0` release.
 
 When the first SDK release is available, replace imports of
-`github.com/benbenbang/libitofin/bindings/go` with
-`github.com/benbenbang/libitofin/sdk/go`, require the new module version, and
+`github.com/bitbrew-dev/libitofin/bindings/go` with
+`github.com/bitbrew-dev/libitofin/sdk/go`, require the new module version, and
 install its matching native package. Run `go mod tidy` to remove the old module
 requirement. The Go package name remains `itofin`; this move does not change its
 API. For development before that release, use the local replacement above.
@@ -176,4 +176,4 @@ PR validation does not publish tags or assets. Native Linux compatibility must
 be checked on deployment targets; these are not manylinux or musl packages.
 Private application migration and production budgets remain consumer work.
 Legacy v0.22.0 published-release evidence is recorded in
-[#1025](https://github.com/benbenbang/libitofin/issues/1025).
+[#1025](https://github.com/bitbrew-dev/libitofin/issues/1025).

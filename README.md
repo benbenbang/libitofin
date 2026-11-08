@@ -9,7 +9,7 @@
 A Rust port of [QuantLib](https://github.com/lballabio/QuantLib) for pricing,
 risk, and numerical methods, with Python and Go bindings over the same core.
 Pre-1.0: APIs may change. See [status and scope](wiki/status.md) and the
-[release history](https://github.com/benbenbang/libitofin/releases).
+[release history](https://github.com/bitbrew-dev/libitofin/releases).
 
 ## Install
 
@@ -29,20 +29,20 @@ Requires Python 3.10 or newer.
 pip install itofin
 ```
 
-[Python guide and examples](wiki/python.md) · [API reference](https://benbenbang.github.io/libitofin/api/core/)
+[Python guide and examples](wiki/python.md) · [API reference](https://bitbrew-dev.github.io/libitofin/api/core/)
 
 ### Go
 
 Requires Go 1.27.1, cgo, a C compiler, and the matching native release package.
-Follow the [native installation guide](https://benbenbang.github.io/libitofin/go/#install-in-an-application)
+Follow the [native installation guide](https://bitbrew-dev.github.io/libitofin/go/#install-in-an-application)
 first, then add the matching module version:
 
 ```sh
-go get github.com/benbenbang/libitofin/sdk/go@v0.24.0
+go get github.com/bitbrew-dev/libitofin/sdk/go@v0.24.0
 ```
 
 Use `-tags itofin_external` for builds, runs, tests, and vet outside this checkout.
-[Go guide and examples](wiki/go.md) · [API reference](https://pkg.go.dev/github.com/benbenbang/libitofin/sdk/go)
+[Go guide and examples](wiki/go.md) · [API reference](https://pkg.go.dev/github.com/bitbrew-dev/libitofin/sdk/go)
 
 ## Documentation
 
@@ -58,8 +58,8 @@ Use `-tags itofin_external` for builds, runs, tests, and vet outside this checko
 | Bond price and principal schedules | [Price-fed ATM](docs/docs/bond-price-atm-bindings.md) · [Amortizing fixed bonds](docs/docs/amortizing-fixed-bonds.md) · [Amortizing Ibor bonds](docs/docs/amortizing-floating-bond-bindings.md) |
 | Retained instruments | [Par asset swaps](docs/docs/asset-swap-bindings.md) · [Fixed-date FX forwards](docs/docs/fx-forward-bindings.md) · [Constant-notional Ibor Xccy](docs/docs/xccy-basis-bindings.md) |
 | Standalone Gaussian processes | [Constant-parameter GSR](docs/docs/gsr-process-bindings.md) · [Hull-White forward](docs/docs/hw-forward-process-bindings.md) · [MF state](docs/docs/mf-state-process-bindings.md) |
-| Worked pricing walkthrough | [Python, Rust, and Go](https://benbenbang.github.io/libitofin/getting-started/) |
-| Releases, coverage, and remaining work | [Status and scope](wiki/status.md) · [Issues](https://github.com/benbenbang/libitofin/issues) |
+| Worked pricing walkthrough | [Python, Rust, and Go](https://bitbrew-dev.github.io/libitofin/getting-started/) |
+| Releases, coverage, and remaining work | [Status and scope](wiki/status.md) · [Issues](https://github.com/bitbrew-dev/libitofin/issues) |
 | Build, test, and repository layout | [Development](wiki/development.md) |
 | Architecture and porting principles | [Design](wiki/design.md) |
 | Deliberate differences from QuantLib | [Compatibility notes](wiki/compatibility.md) |
@@ -70,7 +70,7 @@ pricing retains documented grid limitations. Amortizing constructors cover only
 positive, nonincreasing balances.
 
 The tracked `wiki/` pages hold detailed guides; the
-[MkDocs site](https://benbenbang.github.io/libitofin/) provides language tabs and
+[MkDocs site](https://bitbrew-dev.github.io/libitofin/) provides language tabs and
 API navigation.
 
 ## License

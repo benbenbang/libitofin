@@ -85,6 +85,6 @@ C++ source reference is `9863b578af0caa4cecabf697196533e84a8308b6`; it is a sepa
 reference, not a claim that the wheel was built from that source.
 
 Runnable examples:
-[`example/python/cash_digital_black_calculator.py`](https://github.com/benbenbang/libitofin/blob/main/example/python/cash_digital_black_calculator.py)
+[`example/python/cash_digital_black_calculator.py`](https://github.com/bitbrew-dev/libitofin/blob/main/example/python/cash_digital_black_calculator.py)
 and
-[`sdk/go/examples/cash_digital_black_calculator/main.go`](https://github.com/benbenbang/libitofin/blob/main/sdk/go/examples/cash_digital_black_calculator/main.go).
+[`sdk/go/examples/cash_digital_black_calculator/main.go`](https://github.com/bitbrew-dev/libitofin/blob/main/sdk/go/examples/cash_digital_black_calculator/main.go).

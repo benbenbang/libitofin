@@ -44,4 +44,4 @@ parameters correctly admit subtype lists accepted at runtime.
 
 The tenth temporary disappearance was **not accepted**: the invalid
 `Date - "a week"` diagnostic must remain. Restoring typed subtraction overloads
-in `99111f24` recovered it. [Issue #993 records the source and runtime evidence](https://github.com/benbenbang/libitofin/issues/993#issuecomment-5565178722).
+in `99111f24` recovered it. [Issue #993 records the source and runtime evidence](https://github.com/bitbrew-dev/libitofin/issues/993#issuecomment-5565178722).

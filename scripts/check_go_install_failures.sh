@@ -37,8 +37,8 @@ export CGO_CFLAGS="\"-I$link_root/include\""
 unset CGO_CPPFLAGS CGO_CXXFLAGS LIBRARY_PATH CPATH C_INCLUDE_PATH
 unset LD_LIBRARY_PATH LD_PRELOAD DYLD_LIBRARY_PATH DYLD_INSERT_LIBRARIES DYLD_FALLBACK_LIBRARY_PATH
 cd "$work"
-go mod edit -replace="github.com/benbenbang/libitofin/sdk/go=$binding_root"
-test "$(go list -tags itofin_external -f '{{.CgoCFLAGS}} {{.CgoLDFLAGS}}' github.com/benbenbang/libitofin/sdk/go)" = '[] []'
+go mod edit -replace="github.com/bitbrew-dev/libitofin/sdk/go=$binding_root"
+test "$(go list -tags itofin_external -f '{{.CgoCFLAGS}} {{.CgoLDFLAGS}}' github.com/bitbrew-dev/libitofin/sdk/go)" = '[] []'
 go build -tags itofin_external -o "$executable" .
 test "$(./$executable)" = 'native session ready'
 printf '%s\n' 'PASS: valid native installation creates and closes a session'

@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"testing"
 
-	itofin "github.com/benbenbang/libitofin/sdk/go"
+	itofin "github.com/bitbrew-dev/libitofin/sdk/go"
 )
 
 func TestExternalNativeVersion(t *testing.T) {

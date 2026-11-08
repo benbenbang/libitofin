@@ -44,7 +44,7 @@ limit remains 16 million doubles, with an additional native result buffer.
 ## Integrated package CI
 
 Linux amd64 and macOS arm64 package/consumer validation for `b169fabe15d86623b24f3dd76489533d59a3a4da`
-passed in the [CI run](https://github.com/benbenbang/libitofin/actions/runs/35302175566). These jobs build matching
+passed in the [CI run](https://github.com/bitbrew-dev/libitofin/actions/runs/35302175566). These jobs build matching
 archives, verify checksums, and run the standalone fixture. They do not measure
 the private application or validate a published Go tag.
 
@@ -63,6 +63,6 @@ It checks the requested version and revision against module checksums and native
 metadata before running the functional fixture. Version queries retry briefly
 for public-proxy propagation. Legacy `bindings/go/v0.22.0` passed this acceptance
 on both platforms; release evidence is recorded in
-[#1025](https://github.com/benbenbang/libitofin/issues/1025). The source module has
+[#1025](https://github.com/bitbrew-dev/libitofin/issues/1025). The source module has
 since moved to `sdk/go`; its published-release acceptance is recorded in
-[#1037](https://github.com/benbenbang/libitofin/issues/1037).
+[#1037](https://github.com/bitbrew-dev/libitofin/issues/1037).

@@ -1,6 +1,6 @@
 # Conditional exotic-option scope
 
-[Request #1173](https://github.com/benbenbang/libitofin/issues/1173) records
+[Request #1173](https://github.com/bitbrew-dev/libitofin/issues/1173) records
 scope for aquor, not blanket authorization to implement exotic pricing.
 The following audit uses source checkpoint `2fb97c85` and QuantLib
 `9863b578af0caa4cecabf697196533e84a8308b6`.
@@ -41,7 +41,7 @@ Examples of bounded contracts, not selected work:
 ## Backlog ownership
 
 Selected children must coordinate with
-[instrument epic #70](https://github.com/benbenbang/libitofin/issues/70) and
-[pricing epic #73](https://github.com/benbenbang/libitofin/issues/73).
+[instrument epic #70](https://github.com/bitbrew-dev/libitofin/issues/70) and
+[pricing epic #73](https://github.com/bitbrew-dev/libitofin/issues/73).
 Those broader epics remain open. Recording pending-demand dispositions does not
 deliver an exotic API, activate an implementation child or establish family parity.

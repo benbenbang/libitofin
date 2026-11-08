@@ -53,7 +53,7 @@ The initial **0.36.0** publication is available on
 [crates.io](https://crates.io/crates/itofin-optimize/0.36.0). Bootstrap and the
 GitHub trusted-publisher configuration are verified:
 
-- Owner `benbenbang`, repository `libitofin`, workflow `semantic-release.yml`;
+- Owner `bitbrew-dev`, repository `libitofin`, workflow `semantic-release.yml`;
   no GitHub environment is configured for the Rust publish jobs.
 - Future coordinated releases publish `itofin-optimize` before `libitofin`, using
   the same released tag, committed-version checks and OIDC authentication.
@@ -62,8 +62,8 @@ GitHub trusted-publisher configuration are verified:
   existing artifacts bundle optimizer code without an additional runtime install.
 - CI dry runs perform no publication. The first coordinated **v0.37.0** release
   verified optimizer-before-core OIDC publishing in
-  [CI run 37492675222](https://github.com/benbenbang/libitofin/actions/runs/37492675222).
-  [#1091](https://github.com/benbenbang/libitofin/issues/1091) was closed by the maintainer
+  [CI run 37492675222](https://github.com/bitbrew-dev/libitofin/actions/runs/37492675222).
+  [#1091](https://github.com/bitbrew-dev/libitofin/issues/1091) was closed by the maintainer
   and retains historical bootstrap details.
 
 See [Trusted Publishing](https://crates.io/docs/trusted-publishing) for authentication

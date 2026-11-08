@@ -3,63 +3,63 @@
     {
       "classification": "accuracy-improvement",
       "count": 1,
-      "evidence": "#625: 1bb39b61 -> 99111f24; reproduced with Pyright 1.1.411. https://github.com/benbenbang/libitofin/issues/993#issuecomment-5565178722",
+      "evidence": "#625: 1bb39b61 -> 99111f24; reproduced with Pyright 1.1.411. https://github.com/bitbrew-dev/libitofin/issues/993#issuecomment-5565178722",
       "id": "b4fe8915a9659b79",
       "reason": "test_credit_bootstrap.py: generated Sequence helper arguments accept covariant subtype lists without changing runtime behavior."
     },
     {
       "classification": "accuracy-improvement",
       "count": 1,
-      "evidence": "#625: 1bb39b61 -> 99111f24; reproduced with Pyright 1.1.411. https://github.com/benbenbang/libitofin/issues/993#issuecomment-5565178722",
+      "evidence": "#625: 1bb39b61 -> 99111f24; reproduced with Pyright 1.1.411. https://github.com/bitbrew-dev/libitofin/issues/993#issuecomment-5565178722",
       "id": "59d64fcdff6775ba",
       "reason": "test_isda_markit.py: generated Sequence helper arguments accept covariant subtype lists without changing runtime behavior."
     },
     {
       "classification": "accuracy-improvement",
       "count": 1,
-      "evidence": "#625: 1bb39b61 -> 99111f24; reproduced with Pyright 1.1.411. https://github.com/benbenbang/libitofin/issues/993#issuecomment-5565178722",
+      "evidence": "#625: 1bb39b61 -> 99111f24; reproduced with Pyright 1.1.411. https://github.com/bitbrew-dev/libitofin/issues/993#issuecomment-5565178722",
       "id": "5b6da3f7e950f588",
       "reason": "test_isda_reconcile.py: generated Sequence helper arguments accept covariant subtype lists without changing runtime behavior."
     },
     {
       "classification": "accuracy-improvement",
       "count": 1,
-      "evidence": "#625: 1bb39b61 -> 99111f24; reproduced with Pyright 1.1.411. https://github.com/benbenbang/libitofin/issues/993#issuecomment-5565178722",
+      "evidence": "#625: 1bb39b61 -> 99111f24; reproduced with Pyright 1.1.411. https://github.com/bitbrew-dev/libitofin/issues/993#issuecomment-5565178722",
       "id": "7952171d32b5cead",
       "reason": "test_piecewise_yield_curve.py: generated Sequence helper arguments accept covariant subtype lists without changing runtime behavior."
     },
     {
       "classification": "accuracy-improvement",
       "count": 1,
-      "evidence": "#625: 1bb39b61 -> 99111f24; reproduced with Pyright 1.1.411. https://github.com/benbenbang/libitofin/issues/993#issuecomment-5565178722",
+      "evidence": "#625: 1bb39b61 -> 99111f24; reproduced with Pyright 1.1.411. https://github.com/bitbrew-dev/libitofin/issues/993#issuecomment-5565178722",
       "id": "dfa649b090c5a27f",
       "reason": "test_yoy_inflation_capfloor.py: generated Sequence helper arguments accept covariant subtype lists without changing runtime behavior."
     },
     {
       "classification": "accuracy-improvement",
       "count": 1,
-      "evidence": "#625: 1bb39b61 -> 99111f24; reproduced with Pyright 1.1.411. https://github.com/benbenbang/libitofin/issues/993#issuecomment-5565178722",
+      "evidence": "#625: 1bb39b61 -> 99111f24; reproduced with Pyright 1.1.411. https://github.com/bitbrew-dev/libitofin/issues/993#issuecomment-5565178722",
       "id": "e307cfd388b95574",
       "reason": "test_yoy_inflation_leg.py: generated Sequence helper arguments accept covariant subtype lists without changing runtime behavior."
     },
     {
       "classification": "accuracy-improvement",
       "count": 1,
-      "evidence": "#625: 1bb39b61 -> 99111f24; reproduced with Pyright 1.1.411. https://github.com/benbenbang/libitofin/issues/993#issuecomment-5565178722",
+      "evidence": "#625: 1bb39b61 -> 99111f24; reproduced with Pyright 1.1.411. https://github.com/bitbrew-dev/libitofin/issues/993#issuecomment-5565178722",
       "id": "dd03ab63bab9266e",
       "reason": "test_yoy_inflation_reprice.py: generated Sequence helper arguments accept covariant subtype lists without changing runtime behavior."
     },
     {
       "classification": "accuracy-improvement",
       "count": 1,
-      "evidence": "#625: 1bb39b61 -> 99111f24; reproduced with Pyright 1.1.411. https://github.com/benbenbang/libitofin/issues/993#issuecomment-5565178722",
+      "evidence": "#625: 1bb39b61 -> 99111f24; reproduced with Pyright 1.1.411. https://github.com/bitbrew-dev/libitofin/issues/993#issuecomment-5565178722",
       "id": "a4fb6cd88d48afd1",
       "reason": "test_yoy_optionlet_vol.py: generated Sequence helper arguments accept covariant subtype lists without changing runtime behavior."
     },
     {
       "classification": "accuracy-improvement",
       "count": 1,
-      "evidence": "#625: 1bb39b61 -> 99111f24; reproduced with Pyright 1.1.411. https://github.com/benbenbang/libitofin/issues/993#issuecomment-5565178722",
+      "evidence": "#625: 1bb39b61 -> 99111f24; reproduced with Pyright 1.1.411. https://github.com/bitbrew-dev/libitofin/issues/993#issuecomment-5565178722",
       "id": "49157ade48dc9ee5",
       "reason": "test_zc_inflation_reprice.py: generated Sequence helper arguments accept covariant subtype lists without changing runtime behavior."
     }

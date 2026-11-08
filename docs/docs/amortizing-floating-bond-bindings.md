@@ -84,8 +84,8 @@ index wrapper does not change that map.
 
 ## Examples
 
-- [Python example](https://github.com/benbenbang/libitofin/blob/main/example/python/amortizing_floating_bond.py)
-- [Go example](https://github.com/benbenbang/libitofin/blob/main/sdk/go/examples/amortizing_floating_bond/main.go)
+- [Python example](https://github.com/bitbrew-dev/libitofin/blob/main/example/python/amortizing_floating_bond.py)
+- [Go example](https://github.com/bitbrew-dev/libitofin/blob/main/sdk/go/examples/amortizing_floating_bond/main.go)
 
 See [bond bindings](bond-bindings.md) for common pricing/lifecycle contracts and
-[Go ownership](https://github.com/benbenbang/libitofin/blob/main/docs/go-binding-contract.md) for context and session rules.
+[Go ownership](https://github.com/bitbrew-dev/libitofin/blob/main/docs/go-binding-contract.md) for context and session rules.

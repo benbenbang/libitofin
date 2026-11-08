@@ -55,10 +55,10 @@ that would misstate QuantLib process-construction conventions are not added.
 | --- | --- |
 | Coupon getters and Merton handle getters | Already delivered; not duplicated. |
 | Latest-date American constructor | Existing checked `AmericanExercise::until` already covers the valid-date use case. The fork's unchecked `from_latest` is not copied. |
-| Hull-White `a`, `r0`, curve, `phi`, dynamics | `r0`/curve are delivered. An inherent zero-argument `a` could shadow the existing affine `a(t, maturity)` trait call. Fitting/dynamics remain owned by [#466](https://github.com/benbenbang/libitofin/issues/466). |
+| Hull-White `a`, `r0`, curve, `phi`, dynamics | `r0`/curve are delivered. An inherent zero-argument `a` could shadow the existing affine `a(t, maturity)` trait call. Fitting/dynamics remain owned by [#466](https://github.com/bitbrew-dev/libitofin/issues/466). |
 | Three Black-Scholes process aliases | Withheld: unrestricted generalized aliases do not enforce QuantLib's zero-dividend, forward-carry or named FX constructor conventions. |
-| AUD LIBOR | Additional currency-Libor family owned by [#306](https://github.com/benbenbang/libitofin/issues/306); skipped. |
-| Swing condition and FD swing engine | Depend on deferred multidimensional machinery under [#636](https://github.com/benbenbang/libitofin/issues/636); skipped. |
+| AUD LIBOR | Additional currency-Libor family owned by [#306](https://github.com/bitbrew-dev/libitofin/issues/306); skipped. |
+| Swing condition and FD swing engine | Depend on deferred multidimensional machinery under [#636](https://github.com/bitbrew-dev/libitofin/issues/636); skipped. |
 | Small exotic instrument wrappers | A small file is not a complete priced product. Matching engines, payoff/product prerequisites and binding consumers need larger verticals. No wrapper-only pricing support is claimed. |
 | Writer-extensible pair | Its 122-line wrapper plus 189-line engine form a 311-line pricing vertical before bindings and consumer validation, outside this standalone-helper slice. |
 
@@ -69,7 +69,7 @@ under-200-total-file screen; narrower future slices need a separate review.
 
 ## Independent evidence
 
-[Reference generation instructions](https://github.com/benbenbang/libitofin/tree/main/crates/libitofin/tests/fixtures/low_small)
+[Reference generation instructions](https://github.com/bitbrew-dev/libitofin/tree/main/crates/libitofin/tests/fixtures/low_small)
 separate inspected QuantLib source `9863b578af0caa4cecabf697196533e84a8308b6`
 from the independent PyPI QuantLib 1.43 compiled wheel.
 

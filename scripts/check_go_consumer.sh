@@ -29,7 +29,7 @@ export CGO_CFLAGS="\"-I$link_root/include\""
 unset LD_LIBRARY_PATH DYLD_LIBRARY_PATH
 cd "$consumer_root"
 go version
-go mod edit -replace="github.com/benbenbang/libitofin/sdk/go=$binding_root"
+go mod edit -replace="github.com/bitbrew-dev/libitofin/sdk/go=$binding_root"
 go vet -tags itofin_external ./...
 GOEXPERIMENT=cgocheck2 go test -tags itofin_external -race -count=1 -v ./...
 case "$(uname -s)" in

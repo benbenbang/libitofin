@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/benbenbang/libitofin/sdk/go"
+	"github.com/bitbrew-dev/libitofin/sdk/go"
 )
 
 func must[T any](v T, err error) T {

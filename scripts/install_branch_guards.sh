@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# @Author: benbenbang
+# @Author: bitbrew-dev
 # Install local git guards for local-only branches:
 #   1. pre-push             - refuse to push a protected branch to any remote
 #   2. reference-transaction - refuse to delete a protected branch locally

@@ -16,7 +16,7 @@ From a source checkout, run the European option example with the repository's
 cargo run --example european_option
 ```
 
-The [European option walkthrough](https://benbenbang.github.io/libitofin/getting-started/)
+The [European option walkthrough](https://bitbrew-dev.github.io/libitofin/getting-started/)
 includes the full [runnable source](../crates/libitofin/examples/european_option.rs).
 It builds a market, attaches an analytic engine, and reads the option value and
 greeks.
@@ -24,11 +24,11 @@ greeks.
 ## More examples and reference
 
 - [Example sources](../crates/libitofin/examples/): Monte Carlo, swaps, yield curves, credit, inflation, and finite-difference option pricing.
-- [Rust documentation entry point](https://benbenbang.github.io/libitofin/rust/).
+- [Rust documentation entry point](https://bitbrew-dev.github.io/libitofin/rust/).
 - [Core source](../crates/libitofin/src/) and [tests](../crates/libitofin/tests/).
 - [Project status](status.md): implementation scope and remaining work.
 
 ## Global optimization examples
 
 - [Particle swarm](../crates/libitofin/examples/particle_swarm.rs): seeded signed-scalar minimization, with checked analytic value `-3`.
-- [Shared global-search contract](https://benbenbang.github.io/libitofin/global-optimization/): DE/PSO controls, feasible calibration boxes, budgets and numerical limits.
+- [Shared global-search contract](https://bitbrew-dev.github.io/libitofin/global-optimization/): DE/PSO controls, feasible calibration boxes, budgets and numerical limits.

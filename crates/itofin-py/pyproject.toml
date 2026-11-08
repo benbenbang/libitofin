@@ -6,7 +6,7 @@ build-backend = "maturin"
 name = "itofin"
 description = "Python bindings for libitofin: a Rust port of QuantLib for pricing, risk, and calibration."
 license = "BSD-3-Clause"
-authors = [{ name = "benbenbang", email = "bn@bitbrew.dev" }]
+authors = [{ name = "bitbrew-dev", email = "bn@bitbrew.dev" }]
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = ["numpy>=1.21"]
@@ -26,9 +26,9 @@ classifiers = [
 dynamic = ["version"]
 
 [project.urls]
-Homepage = "https://github.com/benbenbang/libitofin"
-Repository = "https://github.com/benbenbang/libitofin"
-Issues = "https://github.com/benbenbang/libitofin/issues"
+Homepage = "https://github.com/bitbrew-dev/libitofin"
+Repository = "https://github.com/bitbrew-dev/libitofin"
+Issues = "https://github.com/bitbrew-dev/libitofin/issues"
 
 [tool.maturin]
 module-name = "itofin"

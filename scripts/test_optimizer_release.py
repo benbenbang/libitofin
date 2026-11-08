@@ -141,11 +141,11 @@ class OptimizerReleaseTests(unittest.TestCase):
     def test_release_docs_record_verified_bootstrap_and_first_coordinated_ci(self):
         readme = (ROOT / "crates/itofin-optimize/README.md").read_text()
         for required in ("initial **0.36.0** publication", "configuration are verified",
-                         "Owner `benbenbang`, repository `libitofin`, workflow `semantic-release.yml`",
+                         "Owner `bitbrew-dev`, repository `libitofin`, workflow `semantic-release.yml`",
                          "no GitHub environment", "`itofin-optimize` before `libitofin`",
                          "committed-version checks and OIDC", "CI dry runs perform no publication",
                          "first coordinated **v0.37.0** release", "verified optimizer-before-core OIDC",
-                         "https://github.com/benbenbang/libitofin/actions/runs/37492675222",
+                         "https://github.com/bitbrew-dev/libitofin/actions/runs/37492675222",
                          "was closed by the maintainer"):
             with self.subTest(text=required):
                 self.assertIn(required, readme)

@@ -1,6 +1,6 @@
 # Independent sequence-statistics references
 
-These fixtures support [#1166](https://github.com/benbenbang/libitofin/issues/1166).
+These fixtures support [#1166](https://github.com/bitbrew-dev/libitofin/issues/1166).
 They contain no itofin-generated expected values.
 
 ## Reproduce

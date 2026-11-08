@@ -72,6 +72,6 @@ independent wheel and records that mixed provenance, not a full-source build.
 Its entire numerical matrix was also independently reconstructed through SWIG.
 See the two provenance JSON files under `sdk/go/testdata/cpi-base-date-*`.
 
-- [Python example](https://github.com/benbenbang/libitofin/blob/main/example/python/cpi_base_date.py)
-- [Go example](https://github.com/benbenbang/libitofin/blob/main/sdk/go/examples/cpi_base_date/main.go)
+- [Python example](https://github.com/bitbrew-dev/libitofin/blob/main/example/python/cpi_base_date.py)
+- [Go example](https://github.com/bitbrew-dev/libitofin/blob/main/sdk/go/examples/cpi_base_date/main.go)
 - [Existing plain CPI contract](cpi-cashflow-bindings.md)
