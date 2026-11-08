@@ -80,3 +80,42 @@ fn unsupported_instruments_and_kinds_are_errors_that_leave_the_quote() {
     };
     assert_eq!(code, INVALID_ARGUMENT);
 }
+
+#[test]
+fn black_scholes_from_quote_rejects_a_wrong_type_spot_handle() {
+    use crate::market_api::itofin_black_scholes_from_quote;
+    use libitofin::handle::Handle;
+    use libitofin::interestrate::Compounding;
+    use libitofin::termstructures::volatility::{BlackConstantVol, BlackVolTermStructure};
+    use libitofin::termstructures::yields::FlatForward;
+    use libitofin::termstructures::yieldtermstructure::YieldTermStructure;
+    use libitofin::time::date::{Date, Month};
+    use libitofin::time::daycounters::actual365fixed::Actual365Fixed;
+    use libitofin::time::frequency::Frequency;
+    let mut c = Context::new();
+    let today = Date::new(15, Month::June, 2026);
+    let curve = Handle::new(shared(FlatForward::with_rate(
+        today,
+        0.05,
+        Actual365Fixed::new(),
+        Compounding::Continuous,
+        Frequency::Annual,
+    )) as libitofin::shared::Shared<dyn YieldTermStructure>);
+    let vol = Handle::new(shared(BlackConstantVol::new(
+        today,
+        None,
+        0.2,
+        Actual365Fixed::new(),
+    ))
+        as libitofin::shared::Shared<dyn BlackVolTermStructure>);
+    let curve = c.insert(curve).unwrap();
+    let vol = c.insert(vol).unwrap();
+    let spot = c.insert(shared(SimpleQuote::new(100.0))).unwrap();
+    let mut out = 0;
+    let mut call = |spot| unsafe {
+        itofin_black_scholes_from_quote(&mut c, spot, curve, curve, vol, &mut out, null_mut())
+    };
+    assert_eq!(call(curve), INVALID_HANDLE);
+    assert_eq!(call(vol), INVALID_HANDLE);
+    assert_eq!(call(spot), 0);
+}

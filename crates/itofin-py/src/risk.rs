@@ -88,6 +88,10 @@ fn shared(quotes: &[PyRef<'_, PySimpleQuote>]) -> Vec<Shared<SimpleQuote>> {
 /// Returns `(first, second)`; `second` is None for `OneSide`. Empty
 /// `quantities` mean unit weights; a None `reference_npv` is computed from the
 /// instruments. A zero shift is an error. Quotes are restored on return.
+///
+/// Under a Monte Carlo engine each reprice carries sampling error that does not
+/// shrink with the shift, so the result is noisy; prefer an analytic, tree or
+/// finite-difference engine.
 #[gen_stub_pyfunction(module = "itofin.risk")]
 #[pyfunction]
 #[pyo3(signature = (quotes, instruments, quantities = Vec::new(), shift = DEFAULT_SHIFT, kind = PySensitivityAnalysis::Centered, reference_npv = None))]
@@ -118,6 +122,10 @@ pub(crate) fn parallel_analysis(
 /// A sequence of quotes returns a list of `(first, second)` in quote order; a
 /// mapping of labels to quotes returns a dict with the same labels, in the
 /// mapping's order. Same conventions as `parallel_analysis`.
+///
+/// Under a Monte Carlo engine each reprice carries sampling error that does not
+/// shrink with the shift, so the result is noisy; prefer an analytic, tree or
+/// finite-difference engine.
 #[gen_stub_pyfunction(
     module = "itofin.risk",
     python_overload = r#"

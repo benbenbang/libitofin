@@ -1,3 +1,6 @@
+# standard library
+from typing import Any, cast
+
 # pypi/conda library
 import pytest
 
@@ -63,6 +66,8 @@ def test_from_quote_links_the_spot_so_a_set_value_reprices():
     assert opt.npv() == _gate_row_1_npv(BlackScholesProcess.from_curves(60.0, *curves))
     spot.set_value(66.0)
     assert opt.npv() == _gate_row_1_npv(BlackScholesProcess.from_curves(66.0, *curves))
+    with pytest.raises(TypeError):
+        BlackScholesProcess.from_quote(cast(Any, curves[0]), *curves)
 
 
 def test_european_prices_off_surface_equal_constant_vol_at_a_grid_node():
