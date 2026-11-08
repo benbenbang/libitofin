@@ -7401,6 +7401,33 @@ int32_t itofin_flat_forward_from_quote(struct ItofinContext *ctx,
                                        struct ItofinError *error);
 
 /**
+ * Dupire local volatility over a Black vol handle, risk-free and dividend
+ * curve handles and the session quote `spot`, which the surface observes.
+ * # Safety
+ * Follow the crate C caller contract; outputs must be live and non-overlapping.
+ */
+int32_t itofin_local_vol_surface_new(struct ItofinContext *ctx,
+                                     uint64_t black_vol,
+                                     uint64_t risk_free,
+                                     uint64_t dividend,
+                                     uint64_t spot,
+                                     uint64_t *out,
+                                     struct ItofinError *error);
+
+/**
+ * Local volatility at time `t` (a year fraction) and underlying level `strike`.
+ * # Safety
+ * Follow the crate C caller contract; outputs must be live and non-overlapping.
+ */
+int32_t itofin_local_vol_query(struct ItofinContext *ctx,
+                               uint64_t id,
+                               double t,
+                               double strike,
+                               int32_t extrapolate,
+                               double *out,
+                               struct ItofinError *error);
+
+/**
  * # Safety
  * Pointers must be aligned, live and valid for their stated lengths. Outputs
  * must not overlap inputs or other outputs. Any context and its handles must
@@ -7484,6 +7511,24 @@ int32_t itofin_black_scholes_from_quote(struct ItofinContext *ctx,
                                         uint64_t volatility,
                                         uint64_t *out,
                                         struct ItofinError *error);
+
+/**
+ * Build a process over the session quote `spot`, three term structures and
+ * an external local volatility, which replaces the one derived from `volatility`.
+ * # Safety
+ * Pointers must be aligned, live and valid for their stated lengths. Outputs
+ * must not overlap inputs or other outputs. Any context and its handles must
+ * belong to the calling thread; serialize calls including destruction.
+ * See the crate-level C caller contract for lifetime requirements.
+ */
+int32_t itofin_black_scholes_with_local_vol(struct ItofinContext *ctx,
+                                            uint64_t spot,
+                                            uint64_t risk_free,
+                                            uint64_t dividend,
+                                            uint64_t volatility,
+                                            uint64_t local_vol,
+                                            uint64_t *out,
+                                            struct ItofinError *error);
 
 /**
  * # Safety
