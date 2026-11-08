@@ -7,17 +7,22 @@
 //! [`FdmStepConditionComposite::vanilla_composite`] and reads value, delta,
 //! gamma and theta off the rolled grid at the spot (`cpp:109-215`).
 //!
-//! Deferred to #636, and omitted rather than accepted and ignored:
+//! Cash dividends follow the `Spot` model (`cpp:122-124`): the schedule
+//! given to [`FdBlackScholesVanillaEngine::with_cash_dividends`] reaches the
+//! mesher and the step conditions unchanged, the early-exercise calculator is
+//! the payoff calculator and the spot adjustment is zero.
 //!
-//! - cash dividends, both the `Spot` and the `Escrowed` model (`cpp:111-152`,
-//!   `cpp:172-184`). The dividend schedule is always empty and the spot
-//!   adjustment always zero, as on the C++ default path;
+//! Deferred to #828, and omitted rather than accepted and ignored:
+//!
+//! - the `Escrowed` cash-dividend model (`cpp:125-148`, `cpp:178-181`). No
+//!   `CashDividendModel` parameter is taken, so it cannot be requested;
 //! - the quanto branch (`cpp:163`) and the local-volatility branch
 //!   (`cpp:206`), which neither
 //!   [`fdm_black_scholes_mesher`] nor [`FdmBlackScholesSolver`] carries;
-//! - the `MakeFdBlackScholesVanillaEngine` builder and the three extra
-//!   constructors (`hpp:62-95`).
+//! - the `MakeFdBlackScholesVanillaEngine` builder and the quanto and
+//!   local-volatility constructors (`hpp:62-95`).
 
+use crate::cashflows::Dividend;
 use crate::errors::QlResult;
 use crate::fail;
 use crate::instruments::{Greeks, OneAssetOptionEngine, OneAssetOptionResults, OptionArguments};
@@ -58,6 +63,7 @@ const C_POINT_DENSITY: f64 = 0.1;
 pub struct FdBlackScholesVanillaEngine {
     base: OneAssetOptionEngine,
     process: Shared<GeneralizedBlackScholesProcess>,
+    dividends: Vec<Shared<dyn Dividend>>,
     t_grid: Size,
     x_grid: Size,
     damping_steps: Size,
@@ -84,12 +90,37 @@ impl FdBlackScholesVanillaEngine {
         damping_steps: Size,
         scheme_desc: FdmSchemeDesc,
     ) -> FdBlackScholesVanillaEngine {
+        FdBlackScholesVanillaEngine::with_cash_dividends(
+            process,
+            Vec::new(),
+            t_grid,
+            x_grid,
+            damping_steps,
+            scheme_desc,
+        )
+    }
+
+    /// The engine of [`new`](FdBlackScholesVanillaEngine::new) paying the cash
+    /// `dividends` under the `Spot` model (`hpp:52-60`, `cpp:122-124`).
+    ///
+    /// The schedule is laid into the mesher bounds and rolled back through the
+    /// dividend step condition as given; dividends dated outside the option
+    /// life are dropped there, as in C++.
+    pub fn with_cash_dividends(
+        process: Shared<GeneralizedBlackScholesProcess>,
+        dividends: Vec<Shared<dyn Dividend>>,
+        t_grid: Size,
+        x_grid: Size,
+        damping_steps: Size,
+        scheme_desc: FdmSchemeDesc,
+    ) -> FdBlackScholesVanillaEngine {
         let base =
             OneAssetOptionEngine::new(OptionArguments::default(), OneAssetOptionResults::default());
         base.register_with(process.observable());
         FdBlackScholesVanillaEngine {
             base,
             process,
+            dividends,
             t_grid,
             x_grid,
             damping_steps,
@@ -142,7 +173,7 @@ impl PricingEngine for FdBlackScholesVanillaEngine {
             EPS,
             SCALE_FACTOR,
             Some((strike, C_POINT_DENSITY)),
-            &[],
+            &self.dividends,
             0.0,
         )?;
         let mesher = shared(FdmMesherComposite::new(vec![equity_mesher])) as Shared<dyn FdmMesher>;
@@ -158,7 +189,7 @@ impl PricingEngine for FdBlackScholesVanillaEngine {
             fail!("no day counter provided for the risk-free curve");
         };
         let condition = FdmStepConditionComposite::vanilla_composite(
-            &[],
+            &self.dividends,
             &exercise,
             Shared::clone(&mesher),
             Shared::clone(&calculator),
