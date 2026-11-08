@@ -123,10 +123,10 @@ pub unsafe extern "C" fn itofin_global_curve_with_jumps_new(
     error: *mut ItofinError,
 ) -> i32 {
     unsafe {
-        let dc = if config.is_null() {
-            0
-        } else {
+        let dc = if check_ptr(config).is_ok() {
             (*config).day_counter
+        } else {
+            0
         };
         let anchor = move |c: &Context| {
             check_ptr(config)?;
