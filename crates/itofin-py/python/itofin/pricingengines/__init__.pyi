@@ -540,7 +540,8 @@ class MCAmericanEngine:
     r"""
     The Longstaff-Schwartz least-squares Monte Carlo engine for American
     and Bermudan payoffs, over the pseudo-random RNG policy. Sobol, Brownian
-    bridge, control variates and multi-asset paths are not exposed.
+    bridge and multi-asset paths are not exposed; the control variate is
+    (#1363).
 
     The option must have American or Bermudan exercise: a
     European-exercise option raises ItofinError ("wrong exercise given") when
@@ -551,7 +552,7 @@ class MCAmericanEngine:
     VanillaOption.error_estimate() and the early-exercise fraction through
     VanillaOption.exercise_probability().
     """
-    def __init__(self, process: processes.BlackScholesProcess, steps: typing.Optional[builtins.int] = None, steps_per_year: typing.Optional[builtins.int] = None, samples: typing.Optional[builtins.int] = None, absolute_tolerance: typing.Optional[builtins.float] = None, max_samples: typing.Optional[builtins.int] = None, seed: typing.Optional[builtins.int] = None, antithetic: typing.Optional[builtins.bool] = None, polynomial_order: typing.Optional[builtins.int] = None, calibration_samples: typing.Optional[builtins.int] = None, basis_system: builtins.int = 0) -> None:
+    def __init__(self, process: processes.BlackScholesProcess, steps: typing.Optional[builtins.int] = None, steps_per_year: typing.Optional[builtins.int] = None, samples: typing.Optional[builtins.int] = None, absolute_tolerance: typing.Optional[builtins.float] = None, max_samples: typing.Optional[builtins.int] = None, seed: typing.Optional[builtins.int] = None, antithetic: typing.Optional[builtins.bool] = None, polynomial_order: typing.Optional[builtins.int] = None, calibration_samples: typing.Optional[builtins.int] = None, basis_system: builtins.int = 0, control_variate: typing.Optional[builtins.bool] = None) -> None:
         r"""
         Build an engine over process, configured through the core factory.
 
@@ -580,6 +581,9 @@ class MCAmericanEngine:
                 3 Hyperbolic, or 6 Chebyshev2nd. Legendre (4) and Chebyshev (5)
                 are rejected, matching QuantLib's American path pricer.
                 Chebyshev2nd supports put payoffs only; call pricing returns an error.
+            control_variate (bool | None): Use the analytic European twin as a
+                control variate (#1363). Defaults to false. It leaves the
+                exercise probability unchanged.
 
         Raises:
             ItofinError: If neither or both of steps and steps_per_year are
@@ -596,7 +600,7 @@ class MCEuropeanEngine:
     bitwise, and the standard error is read back through
     VanillaOption.error_estimate().
     """
-    def __init__(self, process: processes.BlackScholesProcess, steps: typing.Optional[builtins.int] = None, steps_per_year: typing.Optional[builtins.int] = None, samples: typing.Optional[builtins.int] = None, absolute_tolerance: typing.Optional[builtins.float] = None, max_samples: typing.Optional[builtins.int] = None, seed: typing.Optional[builtins.int] = None, antithetic: typing.Optional[builtins.bool] = None) -> None:
+    def __init__(self, process: processes.BlackScholesProcess, steps: typing.Optional[builtins.int] = None, steps_per_year: typing.Optional[builtins.int] = None, samples: typing.Optional[builtins.int] = None, absolute_tolerance: typing.Optional[builtins.float] = None, max_samples: typing.Optional[builtins.int] = None, seed: typing.Optional[builtins.int] = None, antithetic: typing.Optional[builtins.bool] = None, brownian_bridge: typing.Optional[builtins.bool] = None) -> None:
         r"""
         Build an engine over process, configured through the core factory.
 
@@ -617,6 +621,9 @@ class MCEuropeanEngine:
                 bitwise.
             antithetic (bool | None): The antithetic variate, supported since
                 #772 lifted the former construction-time rejection.
+            brownian_bridge (bool | None): Build paths with the Brownian bridge
+                (#1362). Defaults to false. The control variate is not offered
+                on European engines (#453).
 
         Raises:
             ItofinError: If neither or both of steps and steps_per_year are
@@ -731,13 +738,27 @@ class QMCEuropeanEngine:
     r"""
     Fixed-sample Sobol European engine, without an error estimate.
     """
-    def __init__(self, process: processes.BlackScholesProcess, steps: typing.Optional[builtins.int] = None, steps_per_year: typing.Optional[builtins.int] = None, samples: typing.Optional[builtins.int] = None, absolute_tolerance: typing.Optional[builtins.float] = None, max_samples: typing.Optional[builtins.int] = None, seed: typing.Optional[builtins.int] = None, antithetic: typing.Optional[builtins.bool] = None) -> None:
+    def __init__(self, process: processes.BlackScholesProcess, steps: typing.Optional[builtins.int] = None, steps_per_year: typing.Optional[builtins.int] = None, samples: typing.Optional[builtins.int] = None, absolute_tolerance: typing.Optional[builtins.float] = None, max_samples: typing.Optional[builtins.int] = None, seed: typing.Optional[builtins.int] = None, antithetic: typing.Optional[builtins.bool] = None, brownian_bridge: typing.Optional[builtins.bool] = None) -> None:
         r"""
         Build a Sobol engine with a positive fixed sample count.
 
         No statistical error estimate is available. Absolute tolerance and
         max_samples are rejected. Seed selects Sobol direction initialization;
         it is deterministic even when omitted or zero.
+
+        Args:
+            process (BlackScholesProcess): The process paths are drawn from.
+            steps (int | None): The fixed number of time steps per path.
+            steps_per_year (int | None): The time steps per year, the
+                alternative to steps.
+            samples (int | None): The fixed number of Sobol paths to draw.
+            absolute_tolerance (float | None): Rejected: QMC has no error
+                estimate.
+            max_samples (int | None): Rejected with a fixed sample count.
+            seed (int | None): The Sobol direction initialization seed.
+            antithetic (bool | None): The antithetic variate.
+            brownian_bridge (bool | None): Build paths with the Brownian bridge
+                over the Sobol dimensions (#1362). Defaults to false.
         """
 
 @typing.final
