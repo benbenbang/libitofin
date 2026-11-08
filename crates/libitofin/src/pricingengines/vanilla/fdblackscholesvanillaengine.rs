@@ -1088,6 +1088,7 @@ mod test_fd_spot_cash_dividends {
     use crate::methods::finitedifferences::solvers::FdmSchemeDesc;
     use crate::option::OptionType::{self, Call, Put};
     use crate::pricingengine::PricingEngine;
+    use crate::pricingengines::vanilla::AnalyticDividendEuropeanEngine;
     use crate::pricingengines::vanilla::test_market::quote_handle;
     use crate::processes::{BlackScholesMertonProcess, GeneralizedBlackScholesProcess};
     use crate::quotes::SimpleQuote;
@@ -1099,12 +1100,16 @@ mod test_fd_spot_cash_dividends {
     use crate::time::date::{Date, Month};
     use crate::time::daycounter::DayCounter;
     use crate::time::daycounters::actual360::Actual360;
+    use crate::time::daycounters::actual365fixed::Actual365Fixed;
     use crate::time::frequency::Frequency;
     use crate::time::period::Period;
     use crate::time::timeunit::TimeUnit;
     use crate::types::{Real, Size};
 
     use super::FdBlackScholesVanillaEngine;
+
+    /// The grid `MakeFdBlackScholesVanillaEngine` defaults to (`hpp:141`).
+    const DEFAULT_GRID: Size = 100;
 
     /// Quote-backed flat curves on `day_counter`, as `flatRate` and `flatVol`
     /// of `test-suite/utilities.hpp` build them for a fixed evaluation date.
@@ -1287,5 +1292,177 @@ mod test_fd_spot_cash_dividends {
                 );
             }
         }
+    }
+
+    /// `testFdGreeks` (`dividendoption.cpp:623-719`), Spot arm: the engine
+    /// delta and gamma against bump-and-reprice, relative to the underlying.
+    fn check_fd_greeks(today: Date, exercise: &Shared<dyn Exercise>) {
+        let market = Market::new(today, Actual365Fixed::new());
+        let u = 100.0;
+        let last = exercise.last_date();
+        let mut dates = Vec::new();
+        let mut d = today + Period::new(3, TimeUnit::Months);
+        while d < last {
+            dates.push(d);
+            d = d + Period::new(6, TimeUnit::Months);
+        }
+        let amounts = vec![5.0; dates.len()];
+
+        for option_type in [Call, Put] {
+            for strike in [50.0, 99.5, 100.0, 100.5, 150.0] {
+                let mut option = market.option(
+                    option_type,
+                    strike,
+                    exercise,
+                    Some((&dates, &amounts)),
+                    (DEFAULT_GRID, DEFAULT_GRID),
+                );
+                for q in [0.00, 0.10, 0.20] {
+                    for r in [0.01, 0.05, 0.15] {
+                        for v in [0.05, 0.20, 0.50] {
+                            market.set(u, q, r, v);
+                            let value = option.npv().unwrap();
+                            let delta = option.delta().unwrap();
+                            let gamma = option.gamma().unwrap();
+                            if value <= u * 1.0e-5 {
+                                continue;
+                            }
+                            let du = u * 1.0e-4;
+                            market.spot.set_value(u + du);
+                            let (value_p, delta_p) =
+                                (option.npv().unwrap(), option.delta().unwrap());
+                            market.spot.set_value(u - du);
+                            let (value_m, delta_m) =
+                                (option.npv().unwrap(), option.delta().unwrap());
+                            market.spot.set_value(u);
+                            for (name, expected, calculated, tolerance) in [
+                                ("delta", (value_p - value_m) / (2.0 * du), delta, 5.0e-3),
+                                ("gamma", (delta_p - delta_m) / (2.0 * du), gamma, 7.0e-3),
+                            ] {
+                                let error = (expected - calculated).abs() / u;
+                                assert!(
+                                    error <= tolerance,
+                                    "{name} {option_type:?} K {strike} q {q} r {r} v {v} \
+                                     expiry {last:?}: expected {expected} calculated \
+                                     {calculated} error {error}"
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn greeks_today() -> Date {
+        Date::new(15, Month::June, 2026)
+    }
+
+    #[test]
+    fn european_greeks_match_bump_and_reprice() {
+        let today = greeks_today();
+        for years in [1, 2] {
+            let expiry = today + Period::new(years, TimeUnit::Years);
+            check_fd_greeks(today, &european(expiry));
+        }
+    }
+
+    #[test]
+    fn american_greeks_match_bump_and_reprice() {
+        let today = greeks_today();
+        for years in [1, 2] {
+            let expiry = today + Period::new(years, TimeUnit::Years);
+            check_fd_greeks(today, &american(today, expiry));
+        }
+    }
+
+    /// The market of `testFdDegenerate` and `testFdDividendAtTZero`
+    /// (`dividendoption.cpp:752-919`), with the dates of their test cases.
+    fn degenerate_fixture(r: Real) -> (Market, Date, Date) {
+        let today = Date::new(27, Month::February, 2005);
+        let market = Market::new(today, Actual360::new());
+        market.set(54.625, 0.0, r, 0.282922);
+        (market, today, Date::new(13, Month::April, 2005))
+    }
+
+    /// `testFdDegenerate` (`dividendoption.cpp:752-823`), Spot arm: an empty
+    /// schedule and up to six zero-amount dividends leave the NPV unchanged.
+    fn check_fd_degenerate(market: &Market, today: Date, exercise: &Shared<dyn Exercise>) {
+        let grid = (100, 300);
+        let reference = market
+            .option(Call, 55.0, exercise, None, grid)
+            .npv()
+            .unwrap();
+        let mut dates = Vec::new();
+        let mut amounts = Vec::new();
+        for i in 0..=6 {
+            if i > 0 {
+                dates.push(today + i);
+                amounts.push(0.0);
+            }
+            let value = market
+                .option(Call, 55.0, exercise, Some((&dates, &amounts)), grid)
+                .npv()
+                .unwrap();
+            assert!(
+                (reference - value).abs() <= 1.0e-6,
+                "{i} null dividends: reference {reference} value {value}"
+            );
+        }
+    }
+
+    #[test]
+    fn european_null_dividends_leave_the_price_unchanged() {
+        let (market, today, expiry) = degenerate_fixture(0.052706);
+        check_fd_degenerate(&market, today, &european(expiry));
+    }
+
+    #[test]
+    fn american_null_dividends_leave_the_price_unchanged() {
+        let (market, today, expiry) = degenerate_fixture(0.052706);
+        check_fd_degenerate(&market, today, &american(today, expiry));
+    }
+
+    /// `testFdDividendAtTZero` (`dividendoption.cpp:856-919`), Spot arm. The
+    /// dividend dated today puts a stopping time at `t = 0`, so
+    /// `Fdm1DimSolver::theta_at` has no theta to give (`fdm1dimsolver.rs:144`)
+    /// and the option reports it as an error (`oneassetoption.rs:214`), as the
+    /// C++ throws (`:889-892`). The NPV is checked against the analytic
+    /// dividend engine on the European exercise.
+    fn check_fd_dividend_at_t_zero(market: &Market, today: Date, exercise: &Shared<dyn Exercise>) {
+        let (dates, amounts) = ([today], [1.0]);
+        let mut option = market.option(Call, 55.0, exercise, Some((&dates, &amounts)), (50, 400));
+        let calculated = option.npv().unwrap();
+        assert!(option.theta().is_err());
+
+        let mut reference = OneAssetOption::new(
+            shared(PlainVanillaPayoff::new(Call, 55.0)),
+            european(exercise.last_date()),
+            Shared::clone(&market.settings),
+        );
+        let engine = AnalyticDividendEuropeanEngine::new(
+            Shared::clone(&market.process),
+            dividend_vector(&dates, &amounts).unwrap(),
+        );
+        reference
+            .base_mut()
+            .set_pricing_engine(shared_mut(engine) as SharedMut<dyn PricingEngine>);
+        let expected = reference.npv().unwrap();
+        assert!(
+            (calculated - expected).abs() <= 1.0e-4,
+            "calculated {calculated} expected {expected}"
+        );
+    }
+
+    #[test]
+    fn european_dividend_today_matches_the_analytic_engine() {
+        let (market, today, expiry) = degenerate_fixture(0.0);
+        check_fd_dividend_at_t_zero(&market, today, &european(expiry));
+    }
+
+    #[test]
+    fn american_dividend_today_matches_the_analytic_engine() {
+        let (market, today, expiry) = degenerate_fixture(0.0);
+        check_fd_dividend_at_t_zero(&market, today, &american(today, expiry));
     }
 }
