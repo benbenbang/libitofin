@@ -30,24 +30,33 @@
 //! nodes; this deliberate correction is covered by deterministic path and FD
 //! oracles. All positive contractual dates remain mandatory simulation nodes.
 //!
+//! The control variate (`mcamericanengine.hpp:76-78`) is the European twin:
+//! [`control_path_pricer`](MCAmericanEngine::control_path_pricer) prices the
+//! discounted terminal payoff of each pricing path, and
+//! [`control_variate_value`](MCAmericanEngine::control_variate_value) reprices
+//! the option analytically with a European exercise on its last date. Under
+//! the control variate the value is floored at zero (`:176-183`). The C++
+//! "StrikedTypePayoff needed for control variate" downcast (`:214-217`) cannot
+//! fail here, for the same reason as the scaling above.
+//!
 //! Deferred, rejected visibly rather than silently ignored:
-//! - **control variate** (`mcamericanengine.hpp:74-77,176-180`): the CV path
-//!   pricer, the analytic control engine, and the `max(0, value)` floor
-//!   `calculate()` applies under it are omitted, as are the builder's
-//!   `withControlVariate`.
 //! - **the multi-asset `MCAmericanBasketEngine`**, needing the `MultiPath` form
 //!   of the Longstaff-Schwartz pricer.
 
+use std::any::Any;
+
 use crate::errors::QlResult;
-use crate::exercise::ExerciseType;
-use crate::instruments::StrikedTypePayoff;
+use crate::exercise::{EuropeanExercise, Exercise, ExerciseType};
+use crate::instruments::{OneAssetOptionResults, OptionArguments, StrikedTypePayoff};
 use crate::math::randomnumbers::rngtraits::McRngTraits;
 use crate::methods::montecarlo::{
-    EarlyExercisePathPricer, LongstaffSchwartzPathPricer, LsmBasisSystem, Path, PolynomialType,
+    ControlVariate, EarlyExercisePathPricer, LongstaffSchwartzPathPricer, LsmBasisSystem, Path,
+    PolynomialType,
 };
 use crate::patterns::observable::{AsObservable, Observable};
 use crate::pricingengine::{Arguments, PricingEngine, Results};
 use crate::pricingengines::McLongstaffSchwartzEngineBase;
+use crate::pricingengines::vanilla::{AnalyticEuropeanEngine, EuropeanPathPricer};
 use crate::processes::GeneralizedBlackScholesProcess;
 use crate::shared::{Shared, shared};
 use crate::stochasticprocess::StochasticProcess1D;
@@ -140,6 +149,7 @@ impl<RNG: McRngTraits> MCAmericanEngine<RNG> {
         time_steps: Option<Size>,
         time_steps_per_year: Option<Size>,
         antithetic_variate: bool,
+        control_variate: bool,
         required_samples: Option<Size>,
         required_tolerance: Option<Real>,
         max_samples: Option<Size>,
@@ -163,7 +173,7 @@ impl<RNG: McRngTraits> MCAmericanEngine<RNG> {
             time_steps_per_year,
             false,
             antithetic_variate,
-            false,
+            control_variate,
             required_samples,
             required_tolerance,
             max_samples,
@@ -244,6 +254,65 @@ impl<RNG: McRngTraits> MCAmericanEngine<RNG> {
     }
 }
 
+impl<RNG: McRngTraits> MCAmericanEngine<RNG> {
+    /// The C++ `controlPathPricer()` hook (`mcamericanengine.hpp:211-229`): a
+    /// [`EuropeanPathPricer`] on the option type and strike, discounted from
+    /// the last node of the simulation grid.
+    ///
+    /// # Errors
+    ///
+    /// Errors on a missing payoff or a negative strike; propagates a grid or
+    /// discount failure.
+    pub fn control_path_pricer(&self) -> QlResult<EuropeanPathPricer> {
+        let Some(payoff) = &self.base.arguments().payoff else {
+            fail!("no payoff given");
+        };
+        let grid = self.base.time_grid()?;
+        let Some(last_time) = grid.back() else {
+            fail!("empty time grid");
+        };
+        let discount = self
+            .process
+            .risk_free_rate()
+            .current_link()?
+            .discount(last_time, false)?;
+        EuropeanPathPricer::new(payoff.option_type(), payoff.strike(), discount)
+    }
+
+    /// The C++ `controlVariateValue()` hook (`mcamericanengine.hpp:244-265`):
+    /// an [`AnalyticEuropeanEngine`] on the same process prices the option's
+    /// payoff with a European exercise on the last exercise date. The inner
+    /// engine reads only the arguments and the process, no `Settings`.
+    ///
+    /// # Errors
+    ///
+    /// Errors on a missing exercise; propagates the analytic engine's failure.
+    pub fn control_variate_value(&self) -> QlResult<Real> {
+        let arguments = self.base.arguments();
+        let Some(exercise) = &arguments.exercise else {
+            fail!("no exercise given");
+        };
+        let mut engine = AnalyticEuropeanEngine::new(Shared::clone(&self.process));
+        let Some(control_arguments) =
+            (engine.arguments_mut() as &mut dyn Any).downcast_mut::<OptionArguments>()
+        else {
+            fail!("engine is using inconsistent arguments");
+        };
+        control_arguments.payoff = arguments.payoff.clone();
+        control_arguments.exercise =
+            Some(shared(EuropeanExercise::new(exercise.last_date())) as Shared<dyn Exercise>);
+        engine.calculate()?;
+        let Some(results) = (engine.results() as &dyn Any).downcast_ref::<OneAssetOptionResults>()
+        else {
+            fail!("engine is using inconsistent results");
+        };
+        let Some(value) = results.instrument.value else {
+            fail!("control variation pricing engine returned no value");
+        };
+        Ok(value)
+    }
+}
+
 impl<RNG: McRngTraits> AsObservable for MCAmericanEngine<RNG> {
     fn observable(&self) -> &Observable {
         self.base.observable()
@@ -263,16 +332,29 @@ impl<RNG: McRngTraits> PricingEngine for MCAmericanEngine<RNG> {
         self.base.reset();
     }
 
-    /// Builds a fresh path pricer and runs both passes
-    /// (`mcamericanengine.hpp:175-181`).
+    /// Builds a fresh path pricer and runs both passes, then floors the value
+    /// at zero under the control variate (`mcamericanengine.hpp:175-183`).
     ///
     /// # Errors
     ///
-    /// Propagates a [`lsm_path_pricer`](MCAmericanEngine::lsm_path_pricer) or
-    /// simulation failure.
+    /// Propagates a [`lsm_path_pricer`](MCAmericanEngine::lsm_path_pricer),
+    /// control-variate, or simulation failure.
     fn calculate(&mut self) -> QlResult<()> {
         let pricer = self.lsm_path_pricer()?;
-        self.base.calculate_with(pricer)
+        let control_variate = if self.base.control_variate() {
+            Some(ControlVariate {
+                value: self.control_variate_value()?,
+                path_pricer: Box::new(self.control_path_pricer()?),
+            })
+        } else {
+            None
+        };
+        self.base.calculate_with(pricer, control_variate)?;
+        if self.base.control_variate() {
+            let instrument = &mut self.base.results_mut().instrument;
+            instrument.value = instrument.value.map(|value| value.max(0.0));
+        }
+        Ok(())
     }
 }
 
@@ -290,6 +372,7 @@ pub struct MakeMcAmericanEngine<RNG> {
     max_samples: Option<Size>,
     tolerance: Option<Real>,
     antithetic: bool,
+    control_variate: bool,
     seed: u32,
     polynomial_order: Size,
     calibration_samples: Option<Size>,
@@ -310,6 +393,7 @@ impl<RNG: McRngTraits> MakeMcAmericanEngine<RNG> {
             max_samples: None,
             tolerance: None,
             antithetic: false,
+            control_variate: false,
             seed: 0,
             polynomial_order: 2,
             calibration_samples: None,
@@ -369,6 +453,14 @@ impl<RNG: McRngTraits> MakeMcAmericanEngine<RNG> {
         self
     }
 
+    /// Requests the control variate (`mcamericanengine.hpp:119,358-361`): the
+    /// analytic European twin, on the pricing pass only.
+    #[must_use]
+    pub fn with_control_variate(mut self, control_variate: bool) -> Self {
+        self.control_variate = control_variate;
+        self
+    }
+
     /// Sets the regression order (`mcamericanengine.hpp:266`).
     #[must_use]
     pub fn with_polynomial_order(mut self, order: Size) -> Self {
@@ -423,6 +515,7 @@ impl<RNG: McRngTraits> MakeMcAmericanEngine<RNG> {
             self.steps,
             self.steps_per_year,
             self.antithetic,
+            self.control_variate,
             self.samples,
             self.tolerance,
             self.max_samples,
@@ -818,16 +911,22 @@ mod oracle {
     //! QuantLib FD references and the original band/probability tolerances.
     //! The first-case cached-MC exception above remains explicit and unchanged.
     //! The Brownian bridge is not separate work: C++ fixes it to `false`
-    //! (`mcamericanengine.hpp:161,169`). Control variate and multi-asset LSM
-    //! remain separate work.
+    //! (`mcamericanengine.hpp:161,169`). Multi-asset LSM remains separate
+    //! work; the control-variate oracles close this module.
 
-    use super::MakeMcAmericanEngine;
+    use std::any::Any;
+
+    use super::{MCAmericanEngine, MakeMcAmericanEngine};
     use crate::exercise::{AmericanExercise, EuropeanExercise, Exercise};
     use crate::handle::Handle;
     use crate::instrument::Instrument;
+    use crate::instruments::{OneAssetOptionResults, OptionArguments};
     use crate::instruments::{PlainVanillaPayoff, StrikedTypePayoff, VanillaOption};
     use crate::interestrate::Compounding;
+    use crate::math::randomnumbers::rngtraits::McRngTraits;
     use crate::math::randomnumbers::rngtraits::PseudoRandom;
+    use crate::math::statistics::{GeneralStatistics, MeanStdDev, Statistics};
+    use crate::methods::montecarlo::{MonteCarloModel, PathGenerator};
     use crate::option::OptionType;
     use crate::pricingengine::PricingEngine;
     use crate::pricingengines::vanilla::AnalyticEuropeanEngine;
@@ -835,12 +934,14 @@ mod oracle {
     use crate::quotes::{Quote, SimpleQuote};
     use crate::settings::Settings;
     use crate::shared::{Shared, SharedMut, shared, shared_mut};
+    use crate::stochasticprocess::StochasticProcess1D;
     use crate::termstructures::volatility::{BlackConstantVol, BlackVolTermStructure};
     use crate::termstructures::yields::FlatForward;
     use crate::termstructures::yieldtermstructure::YieldTermStructure;
     use crate::time::date::{Date, Month};
     use crate::time::daycounters::actual365fixed::Actual365Fixed;
     use crate::time::frequency::Frequency;
+    use crate::types::Size;
     use crate::types::{Rate, Real, Volatility};
 
     const UNDERLYING: Real = 36.0;
@@ -1037,5 +1138,171 @@ mod oracle {
                 "steps={steps}: {value} +/- {error} vs {expected}"
             );
         }
+    }
+
+    const CV_SAMPLES: Size = 4096;
+
+    fn cv_engine(
+        strike: Real,
+        control_variate: bool,
+        samples: Size,
+        seed: u32,
+    ) -> MCAmericanEngine<PseudoRandom> {
+        let mut engine = MakeMcAmericanEngine::<PseudoRandom>::new(process())
+            .with_steps(75)
+            .with_antithetic_variate(true)
+            .with_control_variate(control_variate)
+            .with_samples(samples)
+            .with_seed(seed)
+            .with_polynomial_order(3)
+            .build()
+            .unwrap();
+        let args = (engine.arguments_mut() as &mut dyn Any)
+            .downcast_mut::<OptionArguments>()
+            .unwrap();
+        args.payoff = Some(shared(PlainVanillaPayoff::new(OptionType::Put, strike))
+            as Shared<dyn StrikedTypePayoff>);
+        args.exercise = Some(
+            shared(AmericanExercise::over(settlement_date(), maturity()).unwrap())
+                as Shared<dyn Exercise>,
+        );
+        engine.calculate().unwrap();
+        engine
+    }
+
+    /// The value, error estimate, and exercise probability of a calculation.
+    fn outcome(engine: &MCAmericanEngine<PseudoRandom>) -> (Real, Real, Real) {
+        let results = (engine.results() as &dyn Any)
+            .downcast_ref::<OneAssetOptionResults>()
+            .unwrap();
+        let probability = *results.instrument.additional_results["exerciseProbability"]
+            .downcast_ref::<Real>()
+            .unwrap();
+        (
+            results.instrument.value.unwrap(),
+            results.instrument.error_estimate.unwrap(),
+            probability,
+        )
+    }
+
+    /// The mean and error of the engine's own control pricer over the pricing
+    /// paths, rebuilt independently: same grid, same seed, same antithetic
+    /// pairing.
+    fn european_over_the_pricing_paths(
+        engine: &MCAmericanEngine<PseudoRandom>,
+        samples: Size,
+        seed: u32,
+    ) -> (Real, Real) {
+        let grid = engine.lsm_base().time_grid().unwrap();
+        let generator = PseudoRandom::make_sequence_generator(grid.size() - 1, seed).unwrap();
+        let paths = PathGenerator::from_time_grid(
+            process() as Shared<dyn StochasticProcess1D>,
+            grid,
+            generator,
+            false,
+        )
+        .unwrap();
+        let mut model = MonteCarloModel::new(
+            paths,
+            engine.control_path_pricer().unwrap(),
+            GeneralStatistics::new(),
+            true,
+        )
+        .unwrap();
+        model.add_samples(samples).unwrap();
+        let accumulator = model.sample_accumulator();
+        (
+            accumulator.mean().unwrap(),
+            accumulator.error_estimate().unwrap(),
+        )
+    }
+
+    /// The CV oracles on the `mclongstaffschwartzengine.cpp:123` fixture, at
+    /// a fixed sample count so both runs draw the SAME pricing paths. No QL
+    /// test constructs `MCAmericanEngine` with a control variate, so the
+    /// oracles are the deterministic consequences of the formula
+    /// (`montecarlomodel.hpp:98-117`) rather than a cached number:
+    /// - the CV run minus the plain run is exactly `analytic - mean(european)`
+    ///   over those paths (the shift is material, so skipping the adjustment
+    ///   fails);
+    /// - the exercise probability is bit-identical, since the control never
+    ///   reaches the Longstaff-Schwartz pricer (`mclongstaffschwartzengine.hpp:204`);
+    /// - the control value is the analytic European twin and the control
+    ///   pricer is an unbiased estimator of it.
+    ///
+    /// No FD band is asserted: a control variate does not remove the LSM low
+    /// bias, so a smaller error would fail a band the plain run only just meets.
+    #[test]
+    fn control_variate_shifts_by_the_european_error_on_the_same_paths() {
+        const SEED: u32 = 42;
+        let plain = cv_engine(UNDERLYING, false, CV_SAMPLES, SEED);
+        let controlled = cv_engine(UNDERLYING, true, CV_SAMPLES, SEED);
+        let (v0, e0, p0) = outcome(&plain);
+        let (v1, e1, p1) = outcome(&controlled);
+        let analytic = controlled.control_variate_value().unwrap();
+        let (mean, mean_error) = european_over_the_pricing_paths(&controlled, CV_SAMPLES, SEED);
+
+        assert!(
+            ((v1 - v0) - (analytic - mean)).abs() < 1e-12,
+            "cv {v1} - plain {v0} != analytic {analytic} - european mean {mean}"
+        );
+        assert!((analytic - mean).abs() > 1e-4, "the shift must be material");
+        assert_eq!(p1, p0, "the control must not touch the exercise decision");
+        assert!(e0.is_finite() && e1.is_finite() && e1 > 0.0);
+
+        let settings = shared(Settings::new());
+        settings.set_evaluation_date(todays_date());
+        let mut european = VanillaOption::new(
+            payoff(),
+            shared(EuropeanExercise::new(maturity())) as Shared<dyn Exercise>,
+            settings,
+        );
+        european.base_mut().set_pricing_engine(
+            shared_mut(AnalyticEuropeanEngine::new(process())) as SharedMut<dyn PricingEngine>
+        );
+        assert_eq!(analytic, european.npv().unwrap());
+        assert!(
+            (mean - analytic).abs() < 4.0 * mean_error,
+            "control pricer mean {mean} +/- {mean_error} vs analytic {analytic}"
+        );
+    }
+
+    /// The error estimate shrinks where the European twin tracks the American
+    /// value: the out-of-the-money K=32 put of the same fixture, 0.01184
+    /// against 0.01380. QuantLib's control enters with a fixed coefficient of
+    /// one (`montecarlomodel.hpp:100`), so it reduces the variance only when
+    /// `2 cov(american, european) > var(european)`. At the money (K=36) it
+    /// does not: 0.02278 against 0.01662, with the same exercise
+    /// probability, so the reduction is pinned on the case where it holds.
+    #[test]
+    fn control_variate_reduces_the_error_where_the_twin_tracks_the_value() {
+        let (_, plain, _) = outcome(&cv_engine(32.0, false, CV_SAMPLES, 42));
+        let (_, controlled, _) = outcome(&cv_engine(32.0, true, CV_SAMPLES, 42));
+        assert!(
+            controlled < plain,
+            "cv error {controlled} must fall below plain error {plain}"
+        );
+    }
+
+    /// The `max(0, value)` floor under the control variate
+    /// (`mcamericanengine.hpp:178-181`). On this deep-OTM put and seed, found
+    /// by scanning, the unfloored CV estimate `plain + analytic - mean` is
+    /// about `-0.029`; the engine must report exactly zero.
+    #[test]
+    fn a_negative_control_variate_estimate_is_floored_at_zero() {
+        const STRIKE: Real = 22.0;
+        const SAMPLES: Size = 64;
+        const SEED: u32 = 16;
+        let plain = cv_engine(STRIKE, false, SAMPLES, SEED);
+        let controlled = cv_engine(STRIKE, true, SAMPLES, SEED);
+        let analytic = controlled.control_variate_value().unwrap();
+        let (mean, _) = european_over_the_pricing_paths(&controlled, SAMPLES, SEED);
+        let raw = outcome(&plain).0 + analytic - mean;
+
+        assert!(
+            raw < -0.01,
+            "fixture must produce a negative raw estimate: {raw}"
+        );
+        assert_eq!(outcome(&controlled).0, 0.0);
     }
 }

@@ -39,18 +39,22 @@
 //!   is not accepted (#453). Both passes follow `brownian_bridge`, which is what
 //!   C++ does when the override is unset (`:143-144`); the American engine fixes
 //!   both to `false` (`mcamericanengine.hpp:161,169`).
-//! - **control variate**: still rejected by
-//!   [`McSimulation`](crate::methods::montecarlo::McSimulation).
+//!
+//! The control variate reaches the pricing pass only: the calling engine
+//! supplies it to [`calculate_with`](McLongstaffSchwartzEngineBase::calculate_with),
+//! and the calibration model is built without one, as in C++ (`:192-195`).
 
 use std::any::Any;
 
 use crate::errors::QlResult;
-use crate::instruments::OptionArguments;
+use crate::instruments::{OneAssetOptionResults, OptionArguments};
 use crate::math::randomnumbers::rngtraits::McRngTraits;
 use crate::math::randomnumbers::seedgenerator;
 use crate::math::statistics::GeneralStatistics;
 use crate::math::timegrid::TimeGrid;
-use crate::methods::montecarlo::{LongstaffSchwartzPathPricer, MonteCarloModel};
+use crate::methods::montecarlo::{
+    ControlVariate, LongstaffSchwartzPathPricer, MonteCarloModel, Path,
+};
 use crate::patterns::observable::Observable;
 use crate::pricingengine::{Arguments, Results};
 use crate::pricingengines::vanilla::McVanillaEngineBase;
@@ -133,6 +137,16 @@ impl<RNG: McRngTraits> McLongstaffSchwartzEngineBase<RNG> {
         self.base.results()
     }
 
+    /// The results being filled, for an engine post-processing the value.
+    pub fn results_mut(&mut self) -> &mut OneAssetOptionResults {
+        self.base.results_mut()
+    }
+
+    /// Whether the engine was built with the control-variate flag (`:137`).
+    pub fn control_variate(&self) -> bool {
+        self.base.control_variate()
+    }
+
     /// Clears the results ahead of a calculation.
     pub fn reset(&mut self) {
         self.base.reset();
@@ -175,13 +189,18 @@ impl<RNG: McRngTraits> McLongstaffSchwartzEngineBase<RNG> {
     /// exercise probability lands in the additional results under
     /// `exerciseProbability` (`:205-206`). `pricer` is the C++ `lsmPathPricer()`
     /// hook, built fresh by the calling engine on every calculation so no stale
-    /// calibration survives a reprice.
+    /// calibration survives a reprice. `control_variate` is what the engine's
+    /// C++ control hooks return; it applies to the pricing pass alone.
     ///
     /// # Errors
     ///
     /// Propagates a grid, generator, sampling, regression, or simulation
     /// failure.
-    pub fn calculate_with(&mut self, pricer: Shared<LongstaffSchwartzPathPricer>) -> QlResult<()> {
+    pub fn calculate_with(
+        &mut self,
+        pricer: Shared<LongstaffSchwartzPathPricer>,
+        control_variate: Option<ControlVariate<Path>>,
+    ) -> QlResult<()> {
         let grid = self.time_grid()?;
         let seed = self.base.resolve_seed();
         let seed_calibration = match self.seed_calibration {
@@ -202,7 +221,8 @@ impl<RNG: McRngTraits> McLongstaffSchwartzEngineBase<RNG> {
         pricer.calibrate()?;
 
         let generator = self.base.path_generator_on_grid(grid, Some(seed))?;
-        self.base.run_with(generator, Shared::clone(&pricer))?;
+        self.base
+            .run_with_control_variate(generator, Shared::clone(&pricer), control_variate)?;
         self.base.record_seed("seed", seed);
         self.base.record_seed("seed_calibration", seed_calibration);
 
@@ -392,7 +412,7 @@ mod tests {
         let market = flat_market();
         let mut engine = driver(&market, false, None, Some(256), None);
         let pricer = lsm(&market, &engine);
-        engine.calculate_with(Shared::clone(&pricer)).unwrap();
+        engine.calculate_with(Shared::clone(&pricer), None).unwrap();
 
         let results = instrument_results(&engine);
         let value = results.value.unwrap();
@@ -414,7 +434,7 @@ mod tests {
         let market = flat_market();
         let mut engine = driver(&market, false, Some(true), Some(16), None);
         let pricer = lsm(&market, &engine);
-        engine.calculate_with(Shared::clone(&pricer)).unwrap();
+        engine.calculate_with(Shared::clone(&pricer), None).unwrap();
 
         let results = instrument_results(&engine);
         assert!(results.value.unwrap() > 0.0);
@@ -432,7 +452,7 @@ mod tests {
             let mut engine =
                 seeded_driver(&market, brownian_bridge, false, None, Some(256), 42, None);
             let pricer = lsm(&market, &engine);
-            engine.calculate_with(pricer).unwrap();
+            engine.calculate_with(pricer, None).unwrap();
             let results = instrument_results(&engine);
             (results.value.unwrap(), results.error_estimate.unwrap())
         };
@@ -451,7 +471,7 @@ mod tests {
         let mut engine =
             seeded_driver(market, false, false, None, Some(64), seed, seed_calibration);
         let pricer = lsm(market, &engine);
-        engine.calculate_with(pricer).unwrap();
+        engine.calculate_with(pricer, None).unwrap();
         let results = instrument_results(&engine);
         let seed = |key: &str| {
             *results.additional_results[key]
