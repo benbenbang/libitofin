@@ -1148,9 +1148,19 @@ mod oracle {
         samples: Size,
         seed: u32,
     ) -> MCAmericanEngine<PseudoRandom> {
+        cv_engine_with(strike, true, control_variate, samples, seed)
+    }
+
+    fn cv_engine_with(
+        strike: Real,
+        antithetic_variate: bool,
+        control_variate: bool,
+        samples: Size,
+        seed: u32,
+    ) -> MCAmericanEngine<PseudoRandom> {
         let mut engine = MakeMcAmericanEngine::<PseudoRandom>::new(process())
             .with_steps(75)
-            .with_antithetic_variate(true)
+            .with_antithetic_variate(antithetic_variate)
             .with_control_variate(control_variate)
             .with_samples(samples)
             .with_seed(seed)
@@ -1268,20 +1278,35 @@ mod oracle {
     }
 
     /// The error estimate shrinks where the European twin tracks the American
-    /// value: the out-of-the-money K=32 put of the same fixture, 0.01184
-    /// against 0.01380. QuantLib's control enters with a fixed coefficient of
-    /// one (`montecarlomodel.hpp:100`), so it reduces the variance only when
-    /// `2 cov(american, european) > var(european)`. At the money (K=36) it
-    /// does not: 0.02278 against 0.01662, with the same exercise
-    /// probability, so the reduction is pinned on the case where it holds.
+    /// value. QuantLib's control enters with a fixed coefficient of one
+    /// (`montecarlomodel.hpp:100`), so it reduces the variance only when
+    /// `2 cov(american, european) > var(european)`, that is when the optimal
+    /// coefficient `beta*` exceeds one half. Two pins on the same fixture:
+    /// - the antithetic out-of-the-money K=32 put: 0.01184 against 0.01380;
+    /// - the NON-antithetic at-the-money K=36 put: 0.03257 against 0.03817
+    ///   (`beta* = 0.59`).
+    ///
+    /// The at-the-money failure needs the antithetic variate as well: with it,
+    /// K=36 gives 0.02278 against 0.01662 under the same exercise probability.
+    /// Antithetic pairing cuts `var(american)` sharply but leaves the residual
+    /// `american - european`, which is almost even in the Gaussian draw,
+    /// untouched; the review's probe on its own calibration seed measures se
+    /// 0.0278 to 0.0174 for the former and 0.02198 single against 0.02191
+    /// paired for the latter (`docs/internal/reviews-2026-11-08/1363.md`).
+    /// After that cut the fixed coefficient overshoots: `beta*` falls to 0.32
+    /// on this engine's calibration (0.37 in the review's probe).
     #[test]
     fn control_variate_reduces_the_error_where_the_twin_tracks_the_value() {
-        let (_, plain, _) = outcome(&cv_engine(32.0, false, CV_SAMPLES, 42));
-        let (_, controlled, _) = outcome(&cv_engine(32.0, true, CV_SAMPLES, 42));
-        assert!(
-            controlled < plain,
-            "cv error {controlled} must fall below plain error {plain}"
-        );
+        for (strike, antithetic) in [(32.0, true), (UNDERLYING, false)] {
+            let (_, plain, _) = outcome(&cv_engine_with(strike, antithetic, false, CV_SAMPLES, 42));
+            let (_, controlled, _) =
+                outcome(&cv_engine_with(strike, antithetic, true, CV_SAMPLES, 42));
+            assert!(
+                controlled < plain,
+                "K={strike}, antithetic={antithetic}: cv error {controlled} \
+                 must fall below plain error {plain}"
+            );
+        }
     }
 
     /// The `max(0, value)` floor under the control variate
