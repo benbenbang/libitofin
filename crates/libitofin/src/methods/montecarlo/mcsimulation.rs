@@ -22,19 +22,25 @@
 //! - **`QL_MAX_INTEGER` default becomes [`Size::MAX`]**: the unbounded
 //!   `maxSamples` default (`mcsimulation.hpp:55`) is expressed as `Size::MAX`.
 //!
-//! Deferred, rejected visibly rather than silently ignored:
-//! - **control variate** (`mcsimulation.hpp:167-188`): [`new`] keeps the
-//!   `control_variate` flag but [`calculate`](McSimulation::calculate) returns
-//!   `Err` when it is `true`; the CV model-construction branch is omitted.
+//! - **the control-variate hooks become one argument**: C++ asks the derived
+//!   engine for `controlVariateValue()`, `controlPathPricer()`, and
+//!   `controlPathGenerator()` (`mcsimulation.hpp:76-87`). Here the engine
+//!   passes an `Option<`[`ControlVariate`]`>`, consulted only when the
+//!   `control_variate` flag is set, as the C++ hooks are (`:167`). `None`
+//!   under the flag is the C++ missing-price `Err` (`:170-173`); the
+//!   missing-pricer `Err` (`:175-178`) is unrepresentable, since
+//!   [`ControlVariate`] carries the value and the pricer together.
+//!
+//! Deferred, omitted visibly rather than accepted and ignored:
+//! - **the control-variate path generator** (`mcsimulation.hpp:180-181`), as in
+//!   [`MonteCarloModel`].
 //! - **`maxError` over a sequence** (`mcsimulation.hpp:89-95`): the multi-variate
 //!   `max_element` reduction is dropped; the single-variate `result_type = Real`
 //!   is its own error.
-//!
-//! [`new`]: McSimulation::new
 
 use crate::errors::QlResult;
 use crate::math::statistics::{GeneralStatistics, Statistics};
-use crate::methods::montecarlo::{MonteCarloModel, PathGen, PathPricer};
+use crate::methods::montecarlo::{ControlVariate, MonteCarloModel, PathGen, PathPricer};
 use crate::types::{Real, Size};
 use crate::{fail, require};
 
@@ -44,7 +50,7 @@ pub const DEFAULT_MIN_SAMPLES: Size = 1023;
 /// Owns the Monte Carlo model and runs the sampling loops.
 ///
 /// `S` defaults to [`GeneralStatistics`], QuantLib's default `Statistics` tool.
-pub struct McSimulation<PG, P, S = GeneralStatistics> {
+pub struct McSimulation<PG: PathGen, P, S = GeneralStatistics> {
     model: Option<MonteCarloModel<PG, P, S>>,
     antithetic_variate: bool,
     control_variate: bool,
@@ -163,11 +169,13 @@ where
     /// # Errors
     ///
     /// Errors if neither `required_tolerance` nor `required_samples` is set, if
-    /// control variate is requested (deferred), or on an accumulation failure.
+    /// the `control_variate` flag is set but `control_variate` is `None`
+    /// (`mcsimulation.hpp:170-173`), or on an accumulation failure.
     pub fn calculate(
         &mut self,
         path_generator: PG,
         path_pricer: P,
+        control_variate: Option<ControlVariate<PG::PathType>>,
         required_tolerance: Option<Real>,
         required_samples: Option<Size>,
         max_samples: Option<Size>,
@@ -176,14 +184,21 @@ where
             required_tolerance.is_some() || required_samples.is_some(),
             "neither tolerance nor number of samples set"
         );
-        require!(!self.control_variate, "control variate not supported");
 
-        self.model = Some(MonteCarloModel::new(
+        let model = MonteCarloModel::new(
             path_generator,
             path_pricer,
             S::default(),
             self.antithetic_variate,
-        )?);
+        )?;
+        self.model = Some(if self.control_variate {
+            let Some(control_variate) = control_variate else {
+                fail!("engine does not provide control-variation price");
+            };
+            model.with_control_variate(control_variate)
+        } else {
+            model
+        });
 
         match required_tolerance {
             Some(tolerance) => {
@@ -273,7 +288,7 @@ mod tests {
     #[test]
     fn value_with_samples_equals_the_accumulator_mean() {
         let mut sim = McSimulation::<PathGenerator<Rsg>, fn(&Path) -> Real>::new(false, false);
-        sim.calculate(path_generator(42), terminal, None, Some(5_000), None)
+        sim.calculate(path_generator(42), terminal, None, None, Some(5_000), None)
             .unwrap();
 
         assert_eq!(sim.sample_accumulator().unwrap().samples(), 5_000);
@@ -284,7 +299,7 @@ mod tests {
     #[test]
     fn value_with_fewer_samples_than_simulated_is_rejected() {
         let mut sim = McSimulation::<PathGenerator<Rsg>, fn(&Path) -> Real>::new(false, false);
-        sim.calculate(path_generator(42), terminal, None, Some(5_000), None)
+        sim.calculate(path_generator(42), terminal, None, None, Some(5_000), None)
             .unwrap();
         assert!(sim.value_with_samples(4_999).is_err());
     }
@@ -293,31 +308,87 @@ mod tests {
     fn tolerance_path_converges_below_the_tolerance() {
         const TOL: Real = 1.0;
         let mut sim = McSimulation::<PathGenerator<Rsg>, fn(&Path) -> Real>::new(false, false);
-        sim.calculate(path_generator(42), terminal, Some(TOL), None, Some(100_000))
-            .unwrap();
+        sim.calculate(
+            path_generator(42),
+            terminal,
+            None,
+            Some(TOL),
+            None,
+            Some(100_000),
+        )
+        .unwrap();
         assert!(sim.error_estimate().unwrap() <= TOL);
     }
 
     #[test]
     fn tolerance_path_errors_when_max_samples_is_exhausted() {
         let mut sim = McSimulation::<PathGenerator<Rsg>, fn(&Path) -> Real>::new(false, false);
-        let result = sim.calculate(path_generator(42), terminal, Some(1e-4), None, Some(1_500));
+        let result = sim.calculate(
+            path_generator(42),
+            terminal,
+            None,
+            Some(1e-4),
+            None,
+            Some(1_500),
+        );
         assert!(result.is_err());
     }
 
     #[test]
     fn calculate_without_tolerance_or_samples_is_rejected() {
         let mut sim = McSimulation::<PathGenerator<Rsg>, fn(&Path) -> Real>::new(false, false);
-        let result = sim.calculate(path_generator(42), terminal, None, None, None);
+        let result = sim.calculate(path_generator(42), terminal, None, None, None, None);
         assert!(result.is_err());
     }
 
     #[test]
-    fn control_variate_is_rejected_as_deferred() {
+    fn control_variate_without_a_control_is_rejected() {
         let mut sim = McSimulation::<PathGenerator<Rsg>, fn(&Path) -> Real>::new(false, true);
-        match sim.calculate(path_generator(42), terminal, None, Some(2_000), None) {
-            Err(e) => assert!(e.message().contains("control variate")),
-            Ok(()) => panic!("control_variate = true must be rejected as deferred"),
-        }
+        let error = sim
+            .calculate(path_generator(42), terminal, None, None, Some(2_000), None)
+            .unwrap_err();
+        assert_eq!(
+            error.message(),
+            "engine does not provide control-variation price"
+        );
+    }
+
+    /// Under the flag the control reaches the model: a control equal to the
+    /// main pricer pins every sample to its value. Without the flag the same
+    /// control is not consulted (`mcsimulation.hpp:167`).
+    #[test]
+    fn the_control_variate_is_applied_only_under_the_flag() {
+        const V: Real = 100.0;
+        let control = || {
+            Some(ControlVariate {
+                value: V,
+                path_pricer: Box::new(terminal) as Box<dyn PathPricer<Path>>,
+            })
+        };
+
+        let mut on = McSimulation::<PathGenerator<Rsg>, fn(&Path) -> Real>::new(false, true);
+        on.calculate(
+            path_generator(42),
+            terminal,
+            control(),
+            None,
+            Some(2_000),
+            None,
+        )
+        .unwrap();
+        assert!((on.sample_accumulator().unwrap().mean().unwrap() - V).abs() < 1e-12);
+        assert!(on.error_estimate().unwrap() < 1e-12);
+
+        let mut off = McSimulation::<PathGenerator<Rsg>, fn(&Path) -> Real>::new(false, false);
+        off.calculate(
+            path_generator(42),
+            terminal,
+            control(),
+            None,
+            Some(2_000),
+            None,
+        )
+        .unwrap();
+        assert!(off.error_estimate().unwrap() > 0.1);
     }
 }

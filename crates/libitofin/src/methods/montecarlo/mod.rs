@@ -28,7 +28,7 @@ pub use longstaffschwartzpathpricer::LongstaffSchwartzPathPricer;
 pub use lsmbasissystem::{LsmBasisSystem, PolynomialType};
 pub use mcsimulation::{DEFAULT_MIN_SAMPLES, McSimulation};
 pub use mctraits::{McTraits, MultiVariate, SingleVariate};
-pub use montecarlomodel::{MonteCarloModel, PathPricer};
+pub use montecarlomodel::{ControlVariate, MonteCarloModel, PathPricer};
 pub use multipath::MultiPath;
 pub use multipathgenerator::MultiPathGenerator;
 pub use path::Path;

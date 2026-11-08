@@ -37,10 +37,11 @@
 //!   `u32`), so a random run can be replayed by passing that seed back. A
 //!   low-discrepancy seed is reported as given.
 //!
-//! Deferred, rejected visibly rather than silently ignored:
-//! - **control variate**: the flag threads to [`McSimulation`], which rejects
-//!   it as deferred; `controlVariateValue` and the control
-//!   pricing engine (`mcvanillaengine.hpp:82,126`) are not ported.
+//! The control variate is supplied by the concrete engine through
+//! [`run_with_control_variate`](McVanillaEngineBase::run_with_control_variate).
+//! An engine without a control (C++'s default `controlPricingEngine()`,
+//! `mcvanillaengine.hpp:82`) runs under the flag into the C++
+//! `controlVariateValue` `Err` (`mcvanillaengine.hpp:126-134`).
 
 use std::any::Any;
 use std::marker::PhantomData;
@@ -51,7 +52,9 @@ use crate::math::randomnumbers::rngtraits::McRngTraits;
 use crate::math::randomnumbers::seedgenerator;
 use crate::math::statistics::MeanStdDev;
 use crate::math::timegrid::TimeGrid;
-use crate::methods::montecarlo::{McSimulation, McTraits, PathGen, PathPricer, SingleVariate};
+use crate::methods::montecarlo::{
+    ControlVariate, McSimulation, McTraits, PathGen, PathPricer, SingleVariate,
+};
 use crate::patterns::observable::{AsObservable, Observable};
 use crate::pricingengine::{Arguments, Results};
 use crate::shared::{Shared, shared};
@@ -308,11 +311,43 @@ impl<RNG: McRngTraits, MC: McTraits> McVanillaEngineBase<RNG, MC> {
         PG: PathGen,
         P: PathPricer<PG::PathType>,
     {
+        self.run_with_control_variate(generator, path_pricer, None)
+    }
+
+    /// Whether the engine was built with the control-variate flag.
+    pub fn control_variate(&self) -> bool {
+        self.control_variate
+    }
+
+    /// As [`run_with`](Self::run_with), with the control variate the concrete
+    /// engine provides (the C++ `controlPathPricer()` and
+    /// `controlVariateValue()` hooks), applied when the flag is set.
+    ///
+    /// # Errors
+    ///
+    /// Errors if the flag is set and `control_variate` is `None`
+    /// (`mcvanillaengine.hpp:130-134`); propagates a simulation or
+    /// accumulation failure.
+    pub fn run_with_control_variate<PG, P>(
+        &mut self,
+        generator: PG,
+        path_pricer: P,
+        control_variate: Option<ControlVariate<PG::PathType>>,
+    ) -> QlResult<()>
+    where
+        PG: PathGen,
+        P: PathPricer<PG::PathType>,
+    {
+        require!(
+            !self.control_variate || control_variate.is_some(),
+            "engine does not provide control variation pricing engine"
+        );
         let mut simulation =
             McSimulation::<PG, P>::new(self.antithetic_variate, self.control_variate);
         simulation.calculate(
             generator,
             path_pricer,
+            control_variate,
             self.required_tolerance,
             self.required_samples,
             self.max_samples,
@@ -444,6 +479,30 @@ mod tests {
             .unwrap();
         assert_eq!(results.instrument.value, Some(K));
         assert!(results.instrument.error_estimate.is_some());
+    }
+
+    /// An engine without a control, run under the flag, fails as the C++
+    /// default `controlPricingEngine()` makes it (`mcvanillaengine.hpp:130-134`).
+    #[test]
+    fn control_variate_without_a_control_engine_is_rejected() {
+        let mut e = McVanillaEngineBase::<PseudoRandom>::new(
+            gbs_process(),
+            Some(4),
+            None,
+            false,
+            false,
+            true,
+            Some(1_000),
+            None,
+            None,
+            42,
+        )
+        .unwrap();
+        set_option(&mut e, Date::new(15, Month::June, 2027));
+        assert_eq!(
+            e.run(|_: &Path| 1.0).unwrap_err().message(),
+            "engine does not provide control variation pricing engine"
+        );
     }
 
     /// The `MultiVariate` policy drives the same `run` over a
