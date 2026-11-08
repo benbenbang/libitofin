@@ -56,15 +56,15 @@ type BlackVarianceCurveConfig struct {
 	TimeExtrapolation     BlackVolTimeExtrapolation
 }
 
-func (s *Session) BlackVarianceCurve(cfg BlackVarianceCurveConfig) (*BlackVolTermStructure, error) {
+func (s *Session) varianceCurveArgs(cfg BlackVarianceCurveConfig) ([]C.int32_t, []C.double, C.int32_t, error) {
 	if cfg.DayCounter == nil {
-		return nil, fmt.Errorf("day counter is required")
+		return nil, nil, 0, fmt.Errorf("day counter is required")
 	}
 	if len(cfg.Dates) == 0 || len(cfg.Dates) != len(cfg.Volatilities) {
-		return nil, fmt.Errorf("dates and volatilities must have equal nonzero lengths")
+		return nil, nil, 0, fmt.Errorf("dates and volatilities must have equal nonzero lengths")
 	}
 	if err := sameSession(s, cfg.DayCounter.object); err != nil {
-		return nil, err
+		return nil, nil, 0, err
 	}
 	dates := make([]C.int32_t, len(cfg.Dates))
 	vols := make([]C.double, len(cfg.Volatilities))
@@ -76,8 +76,16 @@ func (s *Session) BlackVarianceCurve(cfg BlackVarianceCurveConfig) (*BlackVolTer
 	if cfg.ForceMonotoneVariance {
 		monotone = 1
 	}
+	return dates, vols, monotone, nil
+}
+
+func (s *Session) BlackVarianceCurve(cfg BlackVarianceCurveConfig) (*BlackVolTermStructure, error) {
+	dates, vols, monotone, err := s.varianceCurveArgs(cfg)
+	if err != nil {
+		return nil, err
+	}
 	var id C.uint64_t
-	err := s.invoke(func() error {
+	err = s.invoke(func() error {
 		var e C.ItofinError
 		return ffiError(C.itofin_black_variance_curve_new(s.ctx, C.int32_t(cfg.ReferenceDate.serial), &dates[0], &vols[0], C.size_t(len(dates)), C.uint64_t(cfg.DayCounter.id), monotone, C.int32_t(cfg.TimeExtrapolation), &id, &e), &e)
 	})
