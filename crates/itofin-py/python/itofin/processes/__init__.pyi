@@ -134,6 +134,26 @@ class BlackScholesProcess:
         Returns:
             BlackScholesProcess: A process over the quote and the three term structures.
         """
+    @staticmethod
+    def with_local_vol(spot: quotes.SimpleQuote, risk_free: termstructures.YieldTermStructure, dividend: termstructures.YieldTermStructure, vol: termstructures.BlackVolTermStructure, local_vol: termstructures.LocalVolTermStructure) -> BlackScholesProcess:
+        r"""
+        Build a process with an external local volatility over a spot quote.
+
+        The supplied local volatility replaces the one the process would
+        derive from vol, so a smile surface prices by Monte Carlo.
+
+        Args:
+            spot (SimpleQuote): The spot quote the process observes.
+            risk_free (YieldTermStructure): The risk-free discount curve.
+            dividend (YieldTermStructure): The dividend curve.
+            vol (BlackVolTermStructure): The Black volatility surface.
+            local_vol (LocalVolTermStructure): The local volatility the
+                process evolves with.
+
+        Returns:
+            BlackScholesProcess: A process over the quote, the three term
+            structures and the local volatility.
+        """
     def risk_free_rate(self) -> builtins.float:
         r"""
         Return the risk-free rate carried by the process.

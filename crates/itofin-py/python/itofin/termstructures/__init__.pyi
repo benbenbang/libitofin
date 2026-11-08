@@ -43,6 +43,9 @@ __all__ = [
     "JointYieldCurves",
     "KInterpolatedYoYOptionletVolatilitySurface",
     "KerkhofSeasonality",
+    "LocalVolCurve",
+    "LocalVolSurface",
+    "LocalVolTermStructure",
     "MultiplicativePriceSeasonality",
     "OISRateHelper",
     "OptionletSmileSection",
@@ -1962,6 +1965,66 @@ class KerkhofSeasonality(MultiplicativePriceSeasonality):
     def seasonality_factor(self, to: time.Date) -> builtins.float:
         r"""
         Return the cumulative monthly factor relative to the anchor date.
+        """
+
+@typing.final
+class LocalVolCurve(LocalVolTermStructure):
+    r"""
+    The local volatility of a Black variance curve: time-only, unbounded in
+    strike.
+    """
+    def __init__(self, curve: BlackVarianceCurve) -> None:
+        r"""
+        Build the local volatility curve.
+
+        Args:
+            curve (BlackVarianceCurve): The Black variance curve it derives from.
+        """
+
+@typing.final
+class LocalVolSurface(LocalVolTermStructure):
+    r"""
+    The Dupire local volatility derived from a Black volatility surface.
+
+    Observes the spot quote and every input, so setting the quote reprices
+    the processes built over it. Over a bilinear BlackVarianceSurface the
+    local volatility dips at the strike nodes, where the finite-difference
+    curvature meets the interpolation kink.
+    """
+    def __init__(self, black_vol: BlackVolTermStructure, risk_free: YieldTermStructure, dividend: YieldTermStructure, spot: quotes.SimpleQuote) -> None:
+        r"""
+        Build the local volatility surface.
+
+        Args:
+            black_vol (BlackVolTermStructure): The Black volatility surface.
+            risk_free (YieldTermStructure): The risk-free discount curve.
+            dividend (YieldTermStructure): The dividend curve.
+            spot (SimpleQuote): The spot quote the surface observes.
+        """
+
+class LocalVolTermStructure:
+    r"""
+    Shared base for every local-volatility structure.
+
+    Concrete structures subclass this and supply only their constructor; the
+    local volatility query below is inherited.
+    """
+    def local_vol(self, t: builtins.float, strike: builtins.float, extrapolate: builtins.bool = False) -> builtins.float:
+        r"""
+        Return the local volatility at year-fraction t and underlying level.
+
+        Args:
+            t (float): The year fraction, in the structure's own day count.
+            strike (float): The underlying level the volatility is read at.
+            extrapolate (bool): Whether to answer past the structure's maximum
+                time.
+
+        Returns:
+            float: The local volatility.
+
+        Raises:
+            ItofinError: If the query falls past the maximum time and
+                extrapolation is not allowed, or the core rejects the inputs.
         """
 
 class MultiplicativePriceSeasonality:

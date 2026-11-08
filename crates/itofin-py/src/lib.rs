@@ -65,6 +65,7 @@ mod inflation;
 mod inflation_principal;
 mod iterativebootstrap;
 mod jointcurves;
+mod localvol;
 mod makeswaption;
 mod market;
 mod mc_variance_swap;
@@ -281,6 +282,9 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     termstructures.add_class::<PyBlackVolTimeExtrapolation>()?;
     termstructures.add_class::<PyBlackVarianceCurve>()?;
     termstructures.add_class::<PyBlackVarianceSurface>()?;
+    termstructures.add_class::<localvol::PyLocalVolTermStructure>()?;
+    termstructures.add_class::<localvol::PyLocalVolSurface>()?;
+    termstructures.add_class::<localvol::PyLocalVolCurve>()?;
     termstructures.add_class::<PyRateHelper>()?;
     termstructures.add_class::<bma::PyBMASwapRateHelper>()?;
     termstructures.add_class::<jointcurves::PyIborIborBasisSwapRateHelper>()?;
