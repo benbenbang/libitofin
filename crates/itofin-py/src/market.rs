@@ -180,6 +180,33 @@ impl PyBlackScholesProcess {
         }
     }
 
+    /// Build a process linking a spot quote, so setting it reprices dependents.
+    ///
+    /// Args:
+    ///     spot (SimpleQuote): The spot quote the process observes.
+    ///     risk_free (YieldTermStructure): The risk-free discount curve.
+    ///     dividend (YieldTermStructure): The dividend curve.
+    ///     vol (BlackVolTermStructure): The Black volatility surface.
+    ///
+    /// Returns:
+    ///     BlackScholesProcess: A process over the quote and the three term structures.
+    #[staticmethod]
+    fn from_quote(
+        spot: &PySimpleQuote,
+        risk_free: &PyYieldTermStructure,
+        dividend: &PyYieldTermStructure,
+        vol: &PyBlackVolTermStructure,
+    ) -> Self {
+        PyBlackScholesProcess {
+            inner: shared(GeneralizedBlackScholesProcess::new(
+                spot.handle(),
+                dividend.handle(),
+                risk_free.handle(),
+                vol.handle(),
+            )),
+        }
+    }
+
     /// Return the risk-free rate carried by the process.
     ///
     /// Returns:

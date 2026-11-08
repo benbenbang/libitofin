@@ -7430,6 +7430,23 @@ int32_t itofin_black_scholes_from_curves(struct ItofinContext *ctx,
                                          struct ItofinError *error);
 
 /**
+ * Build a process over the session quote `spot` and three term structures.
+ * The process links the quote, so setting it reprices dependent instruments.
+ * # Safety
+ * Pointers must be aligned, live and valid for their stated lengths. Outputs
+ * must not overlap inputs or other outputs. Any context and its handles must
+ * belong to the calling thread; serialize calls including destruction.
+ * See the crate-level C caller contract for lifetime requirements.
+ */
+int32_t itofin_black_scholes_from_quote(struct ItofinContext *ctx,
+                                        uint64_t spot,
+                                        uint64_t risk_free,
+                                        uint64_t dividend,
+                                        uint64_t volatility,
+                                        uint64_t *out,
+                                        struct ItofinError *error);
+
+/**
  * # Safety
  * Pointers must be aligned, live and valid for their stated lengths. Outputs
  * must not overlap inputs or other outputs. Any context and its handles must

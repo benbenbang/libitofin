@@ -5,6 +5,7 @@ import pytest
 from itofin import Settings
 from itofin.instruments import OptionType, VanillaOption
 from itofin.processes import BlackScholesProcess
+from itofin.quotes import SimpleQuote
 from itofin.termstructures import BlackConstantVol, BlackVarianceSurface, FlatForward
 from itofin.time import Date, DayCounter
 
@@ -47,6 +48,21 @@ def test_from_curves_reproduces_scalar_gate_row_1_npv_bit_for_bit():
     )
     assert _gate_row_1_npv(obj) == _gate_row_1_npv(scalar)
     assert _gate_row_1_npv(obj) == pytest.approx(2.1333684449161985, abs=1e-10)
+
+
+def test_from_quote_links_the_spot_so_a_set_value_reprices():
+    """from_quote observes the spot quote: after set_value(66) the option prices
+    exactly as one built on from_curves(66.0, ...); a copied f64 would not move."""
+    dc = DayCounter.actual360()
+    curves = (FlatForward(REF, 0.08, dc), FlatForward(REF, 0.0, dc), BlackConstantVol(REF, 0.30, dc))
+    spot = SimpleQuote(60.0)
+    s = Settings()
+    s.set_evaluation_date(REF)
+    opt = VanillaOption(OptionType.Call, 65.0, REF + 90, s)
+    opt.set_engine(BlackScholesProcess.from_quote(spot, *curves))
+    assert opt.npv() == _gate_row_1_npv(BlackScholesProcess.from_curves(60.0, *curves))
+    spot.set_value(66.0)
+    assert opt.npv() == _gate_row_1_npv(BlackScholesProcess.from_curves(66.0, *curves))
 
 
 def test_european_prices_off_surface_equal_constant_vol_at_a_grid_node():
