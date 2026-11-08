@@ -8,6 +8,9 @@ import "C"
 // MCConfig preserves omitted versus explicit zero settings. Pseudo-random
 // engines repeat with an explicit nonzero seed; zero uses native seed generation.
 // QMCEuropeanEngine is deterministic even with an omitted or zero seed.
+// BrownianBridge applies to MCEuropeanEngine and QMCEuropeanEngine only;
+// ControlVariate applies to MCAmericanEngine only. Other engines reject them.
+// Both map to fields appended to the C McConfig layout by #1364.
 type MCConfig struct {
 	Steps, StepsPerYear, Samples        *uint
 	AbsoluteTolerance                   *float64
@@ -15,6 +18,7 @@ type MCConfig struct {
 	Seed                                *uint32
 	Antithetic                          *bool
 	PolynomialOrder, CalibrationSamples *uint
+	BrownianBridge, ControlVariate      *bool
 }
 type MCEuropeanEngine struct{ object }
 
@@ -62,6 +66,18 @@ func (cfg MCConfig) native() C.McConfig {
 	if cfg.CalibrationSamples != nil {
 		c.present |= 256
 		c.calibration_samples = C.size_t(*cfg.CalibrationSamples)
+	}
+	if cfg.BrownianBridge != nil {
+		c.present |= 512
+		if *cfg.BrownianBridge {
+			c.brownian_bridge = 1
+		}
+	}
+	if cfg.ControlVariate != nil {
+		c.present |= 1024
+		if *cfg.ControlVariate {
+			c.control_variate = 1
+		}
 	}
 	return c
 }

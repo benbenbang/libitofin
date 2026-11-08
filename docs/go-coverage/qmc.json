@@ -9,7 +9,9 @@
       "tests": [
         "TestQMCEuropeanQuantLib108Cases",
         "TestQMCEuropeanLiveQuotesAndRetainedInputs",
-        "TestQMCEuropeanInvalidConfigurationAndRecovery"
+        "TestQMCEuropeanInvalidConfigurationAndRecovery",
+        "TestMCEuropeanBrownianBridgeOracle",
+        "TestMCVarianceReductionLifetimeAndRejections"
       ]
     },
     {
@@ -20,7 +22,9 @@
       "tests": [
         "TestQMCEuropeanQuantLib108Cases",
         "TestQMCEuropeanLiveQuotesAndRetainedInputs",
-        "TestQMCEuropeanInvalidConfigurationAndRecovery"
+        "TestQMCEuropeanInvalidConfigurationAndRecovery",
+        "TestMCEuropeanBrownianBridgeOracle",
+        "TestMCVarianceReductionLifetimeAndRejections"
       ]
     },
     {

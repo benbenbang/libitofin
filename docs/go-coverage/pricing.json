@@ -603,7 +603,9 @@
         "TestMCAmericanCachedOracle",
         "TestMCAmericanBasisAndLatestOnly",
         "TestMCBermudanQuantLibOracles",
-        "TestMCAmericanBasisQuantLibOracles"
+        "TestMCAmericanBasisQuantLibOracles",
+        "TestMCAmericanControlVariateOracle",
+        "TestMCVarianceReductionLifetimeAndRejections"
       ],
       "validation": "Go feature-subset tests passed with Go 1.27.1"
     },
@@ -616,7 +618,9 @@
       "source": "crates/itofin-py/python/itofin/pricingengines/__init__.pyi",
       "status": "implemented",
       "tests": [
-        "TestMCEuropeanOracleAndValidation"
+        "TestMCEuropeanOracleAndValidation",
+        "TestMCEuropeanBrownianBridgeOracle",
+        "TestMCVarianceReductionLifetimeAndRejections"
       ],
       "validation": "Go feature-subset tests passed with Go 1.27.1"
     },
@@ -629,7 +633,8 @@
       "source": "crates/itofin-py/python/itofin/pricingengines/__init__.pyi",
       "status": "implemented",
       "tests": [
-        "TestMCHestonCachedOracle"
+        "TestMCHestonCachedOracle",
+        "TestMCVarianceReductionLifetimeAndRejections"
       ],
       "validation": "Go feature-subset tests passed with Go 1.27.1"
     },
