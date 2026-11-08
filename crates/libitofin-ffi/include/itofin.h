@@ -1536,7 +1536,11 @@ typedef struct ItofinBasisHelperConfig {
 
 /**
  * Presence bits: steps=1, steps/year=2, samples=4, tolerance=8, max_samples=16,
- * seed=32, antithetic=64, polynomial_order=128, calibration_samples=256.
+ * seed=32, antithetic=64, polynomial_order=128, calibration_samples=256,
+ * brownian_bridge=512, control_variate=1024. The two trailing fields were
+ * appended by #1364: C callers must rebuild against the regenerated header.
+ * The bridge applies to kinds 0 and 3 only; the control variate to American
+ * engines only. Both booleans require 0/1.
  */
 typedef struct McConfig {
   uint32_t present;
@@ -1549,6 +1553,8 @@ typedef struct McConfig {
   int32_t antithetic;
   size_t polynomial_order;
   size_t calibration_samples;
+  int32_t brownian_bridge;
+  int32_t control_variate;
 } McConfig;
 
 /**
@@ -7512,7 +7518,7 @@ int32_t itofin_mc_engine_new(struct ItofinContext *ctx,
  * American/Bermudan engine with an explicit basis: 0 Monomial, 1 Laguerre,
  * 2 Hermite, 3 Hyperbolic, 6 Chebyshev2nd. Values 4 and 5 are unsupported.
  * Chebyshev2nd supports put payoffs only; call pricing returns an error.
- * The existing McConfig layout and default engine entrypoint are unchanged.
+ * Accepts the control variate (bit 1024) and rejects the bridge (bit 512).
  * # Safety
  * Outputs must be aligned, live and non-overlapping. Context and handles must
  * belong to the calling thread; serialize calls including destruction.

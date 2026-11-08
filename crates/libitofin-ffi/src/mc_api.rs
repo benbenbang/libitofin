@@ -10,7 +10,11 @@ use libitofin::processes::{GeneralizedBlackScholesProcess, HestonProcess};
 use libitofin::shared::{Shared, SharedMut, shared_mut};
 
 /// Presence bits: steps=1, steps/year=2, samples=4, tolerance=8, max_samples=16,
-/// seed=32, antithetic=64, polynomial_order=128, calibration_samples=256.
+/// seed=32, antithetic=64, polynomial_order=128, calibration_samples=256,
+/// brownian_bridge=512, control_variate=1024. The two trailing fields were
+/// appended by #1364: C callers must rebuild against the regenerated header.
+/// The bridge applies to kinds 0 and 3 only; the control variate to American
+/// engines only. Both booleans require 0/1.
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
 pub struct McConfig {
@@ -24,6 +28,8 @@ pub struct McConfig {
     pub antithetic: i32,
     pub polynomial_order: usize,
     pub calibration_samples: usize,
+    pub brownian_bridge: i32,
+    pub control_variate: i32,
 }
 macro_rules! configure {
     ($maker:expr, $cfg:expr) => {{
@@ -53,6 +59,23 @@ macro_rules! configure {
         maker
     }};
 }
+fn validate(cfg: &McConfig) -> Result<(), BindingError> {
+    let flag = |bit: u32, value: i32| cfg.present & bit != 0 && !(0..=1).contains(&value);
+    if cfg.present & !2047 != 0
+        || flag(64, cfg.antithetic)
+        || flag(512, cfg.brownian_bridge)
+        || flag(1024, cfg.control_variate)
+    {
+        return Err(BindingError::invalid("invalid MC presence mask or boolean"));
+    }
+    Ok(())
+}
+fn bridge(cfg: &McConfig) -> bool {
+    cfg.present & 512 != 0 && cfg.brownian_bridge != 0
+}
+fn control_variate(cfg: &McConfig) -> bool {
+    cfg.present & 1024 != 0 && cfg.control_variate != 0
+}
 /// Kind 0 European BSM, 1 European Heston, 2 American BSM, 3 Sobol European BSM.
 /// Kind 3 requires positive fixed samples/steps and rejects max_samples.
 #[unsafe(no_mangle)]
@@ -72,10 +95,16 @@ pub unsafe extern "C" fn itofin_mc_engine_new(
     unsafe {
         with_context(ctx, error, |c| {
             check_ptr(out)?;
-            if cfg.present & !511 != 0
-                || (cfg.present & 64 != 0 && !(0..=1).contains(&cfg.antithetic))
-            {
-                return Err(BindingError::invalid("invalid MC presence mask or boolean"));
+            validate(&cfg)?;
+            if matches!(kind, 1 | 2) && cfg.present & 512 != 0 {
+                return Err(BindingError::invalid(
+                    "brownian bridge requires a single-asset European engine",
+                ));
+            }
+            if kind != 2 && cfg.present & 1024 != 0 {
+                return Err(BindingError::invalid(
+                    "control variate requires American engine",
+                ));
             }
             if kind != 2 && cfg.present & (128 | 256) != 0 {
                 return Err(BindingError::invalid(
@@ -92,6 +121,7 @@ pub unsafe extern "C" fn itofin_mc_engine_new(
                         )?),
                         cfg
                     )
+                    .with_brownian_bridge(bridge(&cfg))
                     .build()?,
                 ),
                 1 => shared_mut(
@@ -111,7 +141,8 @@ pub unsafe extern "C" fn itofin_mc_engine_new(
                             process
                         )?),
                         cfg
-                    );
+                    )
+                    .with_control_variate(control_variate(&cfg));
                     if cfg.present & 128 != 0 {
                         maker = maker.with_polynomial_order(cfg.polynomial_order);
                     }
@@ -129,6 +160,7 @@ pub unsafe extern "C" fn itofin_mc_engine_new(
                         )?),
                         cfg
                     )
+                    .with_brownian_bridge(bridge(&cfg))
                     .build()?,
                 ),
                 _ => return Err(BindingError::invalid("unknown MC engine kind")),
@@ -141,7 +173,7 @@ pub unsafe extern "C" fn itofin_mc_engine_new(
 /// American/Bermudan engine with an explicit basis: 0 Monomial, 1 Laguerre,
 /// 2 Hermite, 3 Hyperbolic, 6 Chebyshev2nd. Values 4 and 5 are unsupported.
 /// Chebyshev2nd supports put payoffs only; call pricing returns an error.
-/// The existing McConfig layout and default engine entrypoint are unchanged.
+/// Accepts the control variate (bit 1024) and rejects the bridge (bit 512).
 /// # Safety
 /// Outputs must be aligned, live and non-overlapping. Context and handles must
 /// belong to the calling thread; serialize calls including destruction.
@@ -157,10 +189,11 @@ pub unsafe extern "C" fn itofin_mc_american_engine_new(
     unsafe {
         with_context(ctx, error, |c| {
             check_ptr(out)?;
-            if cfg.present & !511 != 0
-                || (cfg.present & 64 != 0 && !(0..=1).contains(&cfg.antithetic))
-            {
-                return Err(BindingError::invalid("invalid MC presence mask or boolean"));
+            validate(&cfg)?;
+            if cfg.present & 512 != 0 {
+                return Err(BindingError::invalid(
+                    "brownian bridge requires a single-asset European engine",
+                ));
             }
             let basis = match basis {
                 0 => PolynomialType::Monomial,
@@ -178,7 +211,8 @@ pub unsafe extern "C" fn itofin_mc_american_engine_new(
                 ),
                 cfg
             )
-            .with_basis_system(basis);
+            .with_basis_system(basis)
+            .with_control_variate(control_variate(&cfg));
             if cfg.present & 128 != 0 {
                 maker = maker.with_polynomial_order(cfg.polynomial_order);
             }
@@ -190,6 +224,10 @@ pub unsafe extern "C" fn itofin_mc_american_engine_new(
         })
     }
 }
+
+#[cfg(test)]
+#[path = "mc_api_variance_tests.rs"]
+mod variance_tests;
 
 #[cfg(test)]
 mod tests {
@@ -251,7 +289,7 @@ mod tests {
             }
             for bad in [
                 McConfig {
-                    present: 1024,
+                    present: 2048,
                     ..cfg
                 },
                 McConfig {
@@ -358,7 +396,7 @@ mod tests {
                     0,
                     0,
                     McConfig {
-                        present: 1024,
+                        present: 2048,
                         ..McConfig::default()
                     },
                     &mut out,
@@ -440,7 +478,7 @@ mod tests {
             );
             for bad in [
                 McConfig {
-                    present: 1024,
+                    present: 2048,
                     ..cfg
                 },
                 McConfig {
