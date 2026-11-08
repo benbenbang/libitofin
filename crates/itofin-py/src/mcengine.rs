@@ -55,6 +55,9 @@ impl PyMCEuropeanEngine {
     ///         bitwise.
     ///     antithetic (bool | None): The antithetic variate, supported since
     ///         #772 lifted the former construction-time rejection.
+    ///     brownian_bridge (bool | None): Build paths with the Brownian bridge
+    ///         (#1362). Defaults to false. The control variate is not offered
+    ///         on European engines (#453).
     ///
     /// Raises:
     ///     ItofinError: If neither or both of steps and steps_per_year are
@@ -69,6 +72,7 @@ impl PyMCEuropeanEngine {
         max_samples = None,
         seed = None,
         antithetic = None,
+        brownian_bridge = None,
     ))]
     #[allow(clippy::too_many_arguments)]
     fn new(
@@ -80,6 +84,7 @@ impl PyMCEuropeanEngine {
         max_samples: Option<usize>,
         seed: Option<u32>,
         antithetic: Option<bool>,
+        brownian_bridge: Option<bool>,
     ) -> PyResult<Self> {
         let mut maker = MakeMcEuropeanEngine::<PseudoRandom>::new(process.inner());
         if let Some(steps) = steps {
@@ -102,6 +107,9 @@ impl PyMCEuropeanEngine {
         }
         if let Some(antithetic) = antithetic {
             maker = maker.with_antithetic_variate(antithetic);
+        }
+        if let Some(brownian_bridge) = brownian_bridge {
+            maker = maker.with_brownian_bridge(brownian_bridge);
         }
         let engine = maker.build().map_err(PyQlError::from)?;
         Ok(PyMCEuropeanEngine {
@@ -219,7 +227,8 @@ impl PyMCEuropeanHestonEngine {
 
 /// The Longstaff-Schwartz least-squares Monte Carlo engine for American
 /// and Bermudan payoffs, over the pseudo-random RNG policy. Sobol, Brownian
-/// bridge, control variates and multi-asset paths are not exposed.
+/// bridge and multi-asset paths are not exposed; the control variate is
+/// (#1363).
 ///
 /// The option must have American or Bermudan exercise: a
 /// European-exercise option raises ItofinError ("wrong exercise given") when
@@ -269,6 +278,9 @@ impl PyMCAmericanEngine {
     ///         3 Hyperbolic, or 6 Chebyshev2nd. Legendre (4) and Chebyshev (5)
     ///         are rejected, matching QuantLib's American path pricer.
     ///         Chebyshev2nd supports put payoffs only; call pricing returns an error.
+    ///     control_variate (bool | None): Use the analytic European twin as a
+    ///         control variate (#1363). Defaults to false. It leaves the
+    ///         exercise probability unchanged.
     ///
     /// Raises:
     ///     ItofinError: If neither or both of steps and steps_per_year are
@@ -286,6 +298,7 @@ impl PyMCAmericanEngine {
         polynomial_order = None,
         calibration_samples = None,
         basis_system = 0,
+        control_variate = None,
     ))]
     #[allow(clippy::too_many_arguments)]
     fn new(
@@ -300,6 +313,7 @@ impl PyMCAmericanEngine {
         polynomial_order: Option<usize>,
         calibration_samples: Option<usize>,
         basis_system: i32,
+        control_variate: Option<bool>,
     ) -> PyResult<Self> {
         let basis = match basis_system {
             0 => PolynomialType::Monomial,
@@ -344,6 +358,9 @@ impl PyMCAmericanEngine {
         if let Some(samples) = calibration_samples {
             maker = maker.with_calibration_samples(samples);
         }
+        if let Some(control_variate) = control_variate {
+            maker = maker.with_control_variate(control_variate);
+        }
         let engine = maker.build().map_err(PyQlError::from)?;
         Ok(PyMCAmericanEngine {
             inner: shared_mut(engine),
@@ -377,6 +394,20 @@ impl PyQMCEuropeanEngine {
     /// No statistical error estimate is available. Absolute tolerance and
     /// max_samples are rejected. Seed selects Sobol direction initialization;
     /// it is deterministic even when omitted or zero.
+    ///
+    /// Args:
+    ///     process (BlackScholesProcess): The process paths are drawn from.
+    ///     steps (int | None): The fixed number of time steps per path.
+    ///     steps_per_year (int | None): The time steps per year, the
+    ///         alternative to steps.
+    ///     samples (int | None): The fixed number of Sobol paths to draw.
+    ///     absolute_tolerance (float | None): Rejected: QMC has no error
+    ///         estimate.
+    ///     max_samples (int | None): Rejected with a fixed sample count.
+    ///     seed (int | None): The Sobol direction initialization seed.
+    ///     antithetic (bool | None): The antithetic variate.
+    ///     brownian_bridge (bool | None): Build paths with the Brownian bridge
+    ///         over the Sobol dimensions (#1362). Defaults to false.
     #[new]
     #[pyo3(signature = (
         process,
@@ -387,6 +418,7 @@ impl PyQMCEuropeanEngine {
         max_samples = None,
         seed = None,
         antithetic = None,
+        brownian_bridge = None,
     ))]
     #[allow(clippy::too_many_arguments)]
     fn new(
@@ -398,6 +430,7 @@ impl PyQMCEuropeanEngine {
         max_samples: Option<usize>,
         seed: Option<u32>,
         antithetic: Option<bool>,
+        brownian_bridge: Option<bool>,
     ) -> PyResult<Self> {
         let mut maker = MakeMcEuropeanEngine::<LowDiscrepancy>::new(process.inner());
         if let Some(steps) = steps {
@@ -420,6 +453,9 @@ impl PyQMCEuropeanEngine {
         }
         if let Some(antithetic) = antithetic {
             maker = maker.with_antithetic_variate(antithetic);
+        }
+        if let Some(brownian_bridge) = brownian_bridge {
+            maker = maker.with_brownian_bridge(brownian_bridge);
         }
         let engine = maker.build().map_err(PyQlError::from)?;
         Ok(PyQMCEuropeanEngine {
