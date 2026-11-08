@@ -116,8 +116,9 @@ func TestLocalVolSmileMovesPrice(t *testing.T) {
 		base := pricingMust(m.option(c.kind, c.strike, 180).Price(flat))
 		_, mc, se, err := m.mc(p, c.kind, c.strike, 180)
 		pricingOK(t, err)
-		if c.sign*(mc-base) <= 5*se {
-			t.Fatalf("K=%g: mc %g flat %g se %g", c.strike, mc, base, se)
+		implied := pricingMust(m.option(c.kind, c.strike, 180).Price(p))
+		if c.sign*(mc-base) <= 5*se || math.Abs(mc-implied) >= 3*se+.01 {
+			t.Fatalf("K=%g: mc %g flat %g implied %g se %g", c.strike, mc, base, implied, se)
 		}
 	}
 }
