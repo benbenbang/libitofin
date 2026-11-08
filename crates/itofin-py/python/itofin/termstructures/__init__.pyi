@@ -2900,9 +2900,15 @@ class PiecewiseYieldCurve(YieldTermStructure):
                 them.
             jump_dates (list[Date] | None): One date per jump. Empty selects
                 consecutive December 31 dates from the reference year.
-            interpolation, bootstrap, additional_helpers, additional_penalties,
-                additional_dates, additional_variables, iterative_options: As
-                in the constructor.
+            interpolation (str): As in the constructor.
+            bootstrap (str): As in the constructor.
+            additional_helpers (list[RateHelper] | None): As in the constructor.
+            additional_penalties (Callable | None): As in the constructor.
+            additional_dates (Callable | None): As in the constructor.
+            additional_variables (SimpleQuoteVariables | None): As in the
+                constructor.
+            iterative_options (IterativeBootstrapOptions | None): Controls for
+                bootstrap="iterative" only.
 
         Returns:
             PiecewiseYieldCurve: The jumped curve.
@@ -2930,9 +2936,15 @@ class PiecewiseYieldCurve(YieldTermStructure):
             settings (Settings): The settings supplying the evaluation date.
             jumps (list[SimpleQuote]): As in with_jumps.
             jump_dates (list[Date] | None): As in with_jumps.
-            interpolation, bootstrap, additional_helpers, additional_penalties,
-                additional_dates, additional_variables, iterative_options: As
-                in the constructor.
+            interpolation (str): As in the constructor.
+            bootstrap (str): As in the constructor.
+            additional_helpers (list[RateHelper] | None): As in the constructor.
+            additional_penalties (Callable | None): As in the constructor.
+            additional_dates (Callable | None): As in the constructor.
+            additional_variables (SimpleQuoteVariables | None): As in the
+                constructor.
+            iterative_options (IterativeBootstrapOptions | None): Controls for
+                bootstrap="iterative" only.
 
         Returns:
             PiecewiseYieldCurve: The moving jumped curve.
