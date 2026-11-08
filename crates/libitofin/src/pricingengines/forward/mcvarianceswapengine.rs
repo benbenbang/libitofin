@@ -181,6 +181,7 @@ impl PricingEngine for MCVarianceSwapEngine {
         let calculation = simulation.calculate(
             path_generator,
             pricer.clone(),
+            None,
             self.config.tolerance,
             self.config.samples,
             self.config.max_samples,

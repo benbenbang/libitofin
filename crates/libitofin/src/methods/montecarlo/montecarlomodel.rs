@@ -27,11 +27,19 @@
 //! the FORWARD sample's weight (`montecarlomodel.hpp:120,127`), over either the
 //! single- or the multi-factor generator.
 //!
-//! Deferred, rejected visibly rather than silently ignored:
-//! - **control variate** (`montecarlomodel.hpp:67-69,98-106`): the four CV
-//!   constructor parameters are dropped entirely.
+//! The control variate (`montecarlomodel.hpp:67-69,98-117`) is ported:
+//! [`with_control_variate`](MonteCarloModel::with_control_variate) attaches a
+//! [`ControlVariate`], and every priced path then contributes
+//! `price + (cv_value - cv_pricer(path))`, the antithetic partner too, before
+//! the pair is averaged. The CV pricer is a trait object because it is a
+//! different concrete type than the main pricer (a European pricer under a
+//! Longstaff-Schwartz one).
 //!
-//! [`new`]: MonteCarloModel::new
+//! Deferred, omitted visibly rather than accepted and ignored:
+//! - **the control-variate path generator** (`montecarlomodel.hpp:70-71,99-105`):
+//!   [`ControlVariate`] has no generator field, so the CV pricer always prices
+//!   the main path. Only `mchestonhullwhiteengine.hpp` overrides
+//!   `controlPathGenerator`, and it is not ported.
 
 use crate::errors::QlResult;
 use crate::math::statistics::{GeneralStatistics, Statistics};
@@ -73,16 +81,26 @@ impl<P, T: PathPricer<P>> PathPricer<P> for Shared<T> {
     }
 }
 
+/// A control variate: a path pricer whose expectation is known exactly
+/// (the C++ `cvPathPricer` and `cvOptionValue`, `montecarlomodel.hpp:67-68`).
+pub struct ControlVariate<T> {
+    /// The exact value of the control instrument.
+    pub value: Real,
+    /// Prices the control instrument along the same path as the main pricer.
+    pub path_pricer: Box<dyn PathPricer<T>>,
+}
+
 /// Draws paths, prices them, and accumulates the sample statistics.
 ///
 /// Generic over the path generator `PG` (single- or multi-factor,
 /// `mctraits.hpp:44,55`). `S` defaults to [`GeneralStatistics`], QuantLib's
 /// default `Statistics` tool.
-pub struct MonteCarloModel<PG, P, S = GeneralStatistics> {
+pub struct MonteCarloModel<PG: PathGen, P, S = GeneralStatistics> {
     path_generator: PG,
     path_pricer: P,
     sample_accumulator: S,
     antithetic_variate: bool,
+    control_variate: Option<ControlVariate<PG::PathType>>,
 }
 
 impl<PG, P, S> MonteCarloModel<PG, P, S>
@@ -98,8 +116,7 @@ where
     ///
     /// # Errors
     ///
-    /// Infallible today; the `QlResult` return preserves the C++ constructor's
-    /// fallibility for the deferred control-variate branch.
+    /// Infallible today; the `QlResult` return keeps the signature stable.
     pub fn new(
         path_generator: PG,
         path_pricer: P,
@@ -111,7 +128,16 @@ where
             path_pricer,
             sample_accumulator,
             antithetic_variate,
+            control_variate: None,
         })
+    }
+
+    /// Attaches a control variate (`montecarlomodel.hpp:67-75`): each sample
+    /// then adds `cv.value - cv.path_pricer(path)` to the price of its path.
+    #[must_use]
+    pub fn with_control_variate(mut self, control_variate: ControlVariate<PG::PathType>) -> Self {
+        self.control_variate = Some(control_variate);
+        self
     }
 
     /// Draws, prices, and accumulates `samples` paths (`montecarlomodel.hpp:92`).
@@ -120,7 +146,9 @@ where
     /// its antithetic partner (the order is not commutative: `antithetic` reads
     /// the last sequence, `montecarlomodel.hpp:95,109`), prices both, and
     /// accumulates `(price + price2) / 2` under the FORWARD weight
-    /// (`montecarlomodel.hpp:120,127`).
+    /// (`montecarlomodel.hpp:120,127`). With a control variate, each of the two
+    /// prices is first adjusted by `cv.value - cv.path_pricer(path)` on its own
+    /// path (`montecarlomodel.hpp:98-117`).
     ///
     /// # Errors
     ///
@@ -130,10 +158,16 @@ where
     pub fn add_samples(&mut self, samples: Size) -> QlResult<()> {
         for _ in 0..samples {
             let sample = self.path_generator.next()?;
-            let price = self.path_pricer.price(&sample.value);
+            let mut price = self.path_pricer.price(&sample.value);
+            if let Some(cv) = &self.control_variate {
+                price += cv.value - cv.path_pricer.price(&sample.value);
+            }
             if self.antithetic_variate {
                 let antithetic = self.path_generator.antithetic()?;
-                let price2 = self.path_pricer.price(&antithetic.value);
+                let mut price2 = self.path_pricer.price(&antithetic.value);
+                if let Some(cv) = &self.control_variate {
+                    price2 += cv.value - cv.path_pricer.price(&antithetic.value);
+                }
                 self.sample_accumulator
                     .add_weighted((price + price2) / 2.0, sample.weight)?;
             } else {
@@ -336,6 +370,61 @@ mod tests {
             N as Real * W1,
             "must accumulate the forward weight, not the antithetic weight"
         );
+    }
+
+    /// The control-variate sample formula on distinct forward and antithetic
+    /// draws (`montecarlomodel.hpp:98-117`). With the identity as main pricer,
+    /// `2x` as CV pricer, and `V = 5`, the forward sample is
+    /// `4 + (5 - 8) = 1` and the antithetic one `10 + (5 - 20) = -5`.
+    ///
+    /// Every wrong wiring lands elsewhere: skipping the adjustment gives `4`
+    /// (or the pair mean `7`), adjusting only the forward path gives `5.5`,
+    /// and pricing the CV on the forward path for the partner gives `4`.
+    #[test]
+    fn control_variate_adjusts_each_path_of_the_pair() {
+        const N: Size = 8;
+        const V: Real = 5.0;
+        const W1: Real = 2.0;
+        let stub = || WeightStub {
+            forward: Sample::new(4.0, W1),
+            anti: Sample::new(10.0, 3.0),
+        };
+        let cv = || ControlVariate {
+            value: V,
+            path_pricer: Box::new(|x: &Real| 2.0 * *x),
+        };
+
+        let mut plain =
+            MonteCarloModel::new(stub(), |x: &Real| *x, GeneralStatistics::new(), false)
+                .unwrap()
+                .with_control_variate(cv());
+        plain.add_samples(N).unwrap();
+        assert_eq!(plain.sample_accumulator().mean().unwrap(), 1.0);
+
+        let mut anti = MonteCarloModel::new(stub(), |x: &Real| *x, GeneralStatistics::new(), true)
+            .unwrap()
+            .with_control_variate(cv());
+        anti.add_samples(N).unwrap();
+        let acc = anti.sample_accumulator();
+        assert_eq!(acc.mean().unwrap(), (1.0 + -5.0) / 2.0);
+        assert_eq!(acc.samples(), N);
+        assert_eq!(acc.weight_sum(), N as Real * W1);
+    }
+
+    /// A control pricer identical to the main pricer cancels every path:
+    /// each sample is `p + (V - p)`, so the mean is `V` and the variance
+    /// collapses, over a real GBM generator.
+    #[test]
+    fn a_perfect_control_variate_collapses_the_variance() {
+        const V: Real = 100.0;
+        let mut m = model(|path: &Path| path.back(), 4, 42).with_control_variate(ControlVariate {
+            value: V,
+            path_pricer: Box::new(|path: &Path| path.back()),
+        });
+        m.add_samples(2_000).unwrap();
+        let acc = m.sample_accumulator();
+        assert!((acc.mean().unwrap() - V).abs() < 1e-12);
+        assert!(acc.error_estimate().unwrap() < 1e-12);
     }
 
     /// Oracle 2: the generalized model driven end-to-end over [`MultiPath`]. A
