@@ -29,12 +29,12 @@ class SensitivityAnalysis:
     __hash__: typing.ClassVar[None]  # type: ignore[assignment]
 
 @typing.overload
-def bucket_analysis(quotes: typing.Mapping[builtins.str, quotes.SimpleQuote], instruments: typing.Sequence[instruments.Bond | instruments.VanillaSwap | instruments.OvernightIndexedSwap | instruments.VanillaOption | instruments.CreditDefaultSwap], quantities: typing.Sequence[builtins.float] = [], shift: builtins.float = 0.0001, kind: SensitivityAnalysis = SensitivityAnalysis.Centered) -> builtins.dict[builtins.str, tuple[builtins.float, builtins.float | None]]: ...
+def bucket_analysis(quotes: typing.Mapping[builtins.str, quotes.SimpleQuote], instruments: typing.Sequence[instruments.Bond | instruments.VanillaSwap | instruments.OvernightIndexedSwap | instruments.VanillaOption | instruments.Swaption | instruments.CapFloor | instruments.CreditDefaultSwap], quantities: typing.Sequence[builtins.float] = [], shift: builtins.float = 0.0001, kind: SensitivityAnalysis = SensitivityAnalysis.Centered) -> builtins.dict[builtins.str, tuple[builtins.float, builtins.float | None]]: ...
 
 @typing.overload
-def bucket_analysis(quotes: typing.Sequence[quotes.SimpleQuote], instruments: typing.Sequence[instruments.Bond | instruments.VanillaSwap | instruments.OvernightIndexedSwap | instruments.VanillaOption | instruments.CreditDefaultSwap], quantities: typing.Sequence[builtins.float] = [], shift: builtins.float = 0.0001, kind: SensitivityAnalysis = SensitivityAnalysis.Centered) -> builtins.list[tuple[builtins.float, builtins.float | None]]: ...
+def bucket_analysis(quotes: typing.Sequence[quotes.SimpleQuote], instruments: typing.Sequence[instruments.Bond | instruments.VanillaSwap | instruments.OvernightIndexedSwap | instruments.VanillaOption | instruments.Swaption | instruments.CapFloor | instruments.CreditDefaultSwap], quantities: typing.Sequence[builtins.float] = [], shift: builtins.float = 0.0001, kind: SensitivityAnalysis = SensitivityAnalysis.Centered) -> builtins.list[tuple[builtins.float, builtins.float | None]]: ...
 
-def parallel_analysis(quotes: typing.Sequence[quotes.SimpleQuote], instruments: typing.Sequence[instruments.Bond | instruments.VanillaSwap | instruments.OvernightIndexedSwap | instruments.VanillaOption | instruments.CreditDefaultSwap], quantities: typing.Sequence[builtins.float] = [], shift: builtins.float = 0.0001, kind: SensitivityAnalysis = SensitivityAnalysis.Centered, reference_npv: typing.Optional[builtins.float] = None) -> tuple[builtins.float, typing.Optional[builtins.float]]:
+def parallel_analysis(quotes: typing.Sequence[quotes.SimpleQuote], instruments: typing.Sequence[instruments.Bond | instruments.VanillaSwap | instruments.OvernightIndexedSwap | instruments.VanillaOption | instruments.Swaption | instruments.CapFloor | instruments.CreditDefaultSwap], quantities: typing.Sequence[builtins.float] = [], shift: builtins.float = 0.0001, kind: SensitivityAnalysis = SensitivityAnalysis.Centered, reference_npv: typing.Optional[builtins.float] = None) -> tuple[builtins.float, typing.Optional[builtins.float]]:
     r"""
     Parallel PV01: every quote bumped together by `shift`.
 

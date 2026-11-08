@@ -123,7 +123,7 @@ impl PySettlementMethod {
 #[gen_stub_pyclass]
 #[pyclass(name = "Swaption", unsendable, module = "itofin.instruments")]
 pub struct PySwaption {
-    inner: Swaption,
+    inner: SharedMut<Swaption>,
 }
 
 #[gen_stub_pymethods]
@@ -151,13 +151,13 @@ impl PySwaption {
         settings: &PySettings,
     ) -> Self {
         PySwaption {
-            inner: Swaption::new(
+            inner: shared_mut(Swaption::new(
                 swap.inner(),
                 exercise.inner(),
                 settlement_type.inner(),
                 settlement_method.inner(),
                 settings.inner(),
-            ),
+            )),
         }
     }
 
@@ -189,30 +189,31 @@ impl PySwaption {
         settings: &PySettings,
     ) -> Self {
         Self {
-            inner: Swaption::new(
+            inner: shared_mut(Swaption::new(
                 swap.inner(),
                 exercise.inner(),
                 settlement_type.inner(),
                 settlement_method.inner(),
                 settings.inner(),
-            ),
+            )),
         }
     }
 
     /// Return the first exercise date (the sole date for a European option).
     fn exercise_date(&self) -> PyDate {
-        PyDate::from_inner(self.inner.exercise().dates()[0])
+        PyDate::from_inner(self.inner.borrow().exercise().dates()[0])
     }
 
     /// Return the underlying swap's fixed rate.
     fn underlying_fixed_rate(&self) -> f64 {
-        self.inner.underlying().borrow().fixed_rate()
+        self.inner.borrow().underlying().borrow().fixed_rate()
     }
 
     /// Return the underlying swap's nominal.
     fn underlying_nominal(&self) -> PyResult<f64> {
         Ok(self
             .inner
+            .borrow()
             .underlying()
             .borrow()
             .nominal()
@@ -229,7 +230,10 @@ impl PySwaption {
     fn set_jamshidian_engine(&mut self, model: &PyHullWhite) {
         let engine = shared_mut(JamshidianSwaptionEngine::new(model.inner()))
             as SharedMut<dyn PricingEngine>;
-        self.inner.base_mut().set_pricing_engine(engine);
+        self.inner
+            .borrow_mut()
+            .base_mut()
+            .set_pricing_engine(engine);
     }
 
     /// Attach a Black engine, pricing off a swaption volatility surface.
@@ -243,12 +247,18 @@ impl PySwaption {
     ///     engine (BlackSwaptionEngine): The engine and its volatility
     ///         surface.
     fn set_black_engine(&mut self, engine: &PyBlackSwaptionEngine) {
-        self.inner.base_mut().set_pricing_engine(engine.engine());
+        self.inner
+            .borrow_mut()
+            .base_mut()
+            .set_pricing_engine(engine.engine());
     }
 
     /// Attach a Hull-White tree engine. OIS underlyings are unsupported.
     fn set_tree_engine(&mut self, engine: &PyTreeSwaptionEngine) {
-        self.inner.base_mut().set_pricing_engine(engine.engine());
+        self.inner
+            .borrow_mut()
+            .base_mut()
+            .set_pricing_engine(engine.engine());
     }
 
     /// Attach a Bachelier engine, pricing off a normal-volatility surface.
@@ -259,7 +269,10 @@ impl PySwaption {
     ///     engine (BachelierSwaptionEngine): The engine and its
     ///         normal-volatility surface.
     fn set_bachelier_engine(&mut self, engine: &PyBachelierSwaptionEngine) {
-        self.inner.base_mut().set_pricing_engine(engine.engine());
+        self.inner
+            .borrow_mut()
+            .base_mut()
+            .set_pricing_engine(engine.engine());
     }
 
     /// Force the valuation. Idempotent.
@@ -269,7 +282,11 @@ impl PySwaption {
     ///         or the (settlement type, method) pair is inconsistent, which
     ///         the core checks here rather than at construction.
     fn calculate(&mut self) -> PyResult<()> {
-        Ok(self.inner.calculate().map_err(PyQlError::from)?)
+        Ok(self
+            .inner
+            .borrow_mut()
+            .calculate()
+            .map_err(PyQlError::from)?)
     }
 
     /// Return whether the cached results are currently valid.
@@ -277,7 +294,7 @@ impl PySwaption {
     /// Returns:
     ///     bool: True when the next accessor reads the cache.
     fn is_calculated(&self) -> bool {
-        self.inner.base().is_calculated()
+        self.inner.borrow().base().is_calculated()
     }
 
     /// Attach the Black engine and return the NPV.
@@ -309,7 +326,7 @@ impl PySwaption {
     ///     ItofinError: On anything that makes the valuation fail.
     fn results(&mut self) -> PyResult<Results> {
         self.calculate()?;
-        Ok(Results::snapshot(self.inner.base()))
+        Ok(Results::snapshot(self.inner.borrow().base()))
     }
 
     /// Return the swaption NPV under the attached engine.
@@ -321,12 +338,19 @@ impl PySwaption {
     ///     ItofinError: If no engine is attached or the (settlement type,
     ///         method) pair is inconsistent.
     fn npv(&mut self) -> PyResult<f64> {
-        Ok(self.inner.npv().map_err(PyQlError::from)?)
+        Ok(self.inner.borrow_mut().npv().map_err(PyQlError::from)?)
     }
 }
 
 impl PySwaption {
     pub(crate) fn from_inner(inner: Swaption) -> Self {
-        Self { inner }
+        Self {
+            inner: shared_mut(inner),
+        }
+    }
+
+    /// A clone of the inner swaption for sensitivity analysis.
+    pub(crate) fn inner(&self) -> SharedMut<Swaption> {
+        SharedMut::clone(&self.inner)
     }
 }
