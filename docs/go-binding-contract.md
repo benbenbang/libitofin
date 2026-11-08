@@ -151,3 +151,15 @@ Bounds are initial solver brackets, widened on retries; they are not constraints
 `DontThrow`/`dont_throw` deliberately permits approximate curves that need not
 reprice helpers. Evaluation errors still propagate. These configuration facades
 cover iterative yield curves; credit/inflation constructors keep their defaults.
+
+## Monte Carlo variance reduction
+
+C layout change (#1364): `McConfig` appends two trailing `int32_t` fields,
+`brownian_bridge` (presence bit 512) and `control_variate` (bit 1024). Existing
+fields and bits keep their offsets and meaning, but the struct is larger, so C
+callers must rebuild against the regenerated `itofin.h`. Both values require 0/1.
+
+Go sets `MCConfig.BrownianBridge` and `MCConfig.ControlVariate`; nil keeps the
+previous behavior (both false). The bridge applies to the pseudo-random and Sobol
+European engines; Heston and American engines reject it, since the core builders
+have no bridge. The control variate applies to American engines only.
