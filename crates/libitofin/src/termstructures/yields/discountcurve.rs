@@ -15,7 +15,7 @@
 //!   taking both an explicit interpolator and jumps. The zero, forward and
 //!   simple-zero curves take jumps through their own `with_jumps`. #1320
 //!   bound jumps for the piecewise curves only; binding them on these node
-//!   curves is a tracked follow-up.
+//!   curves is a tracked follow-up (#1388).
 //! - The protected detached/moving constructors exist only for bootstrapped
 //!   curves and follow with the bootstrap; the public data constructors are
 //!   ported, with the empty calendar an `Option` per the base convention.

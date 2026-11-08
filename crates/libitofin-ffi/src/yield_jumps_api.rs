@@ -1,6 +1,6 @@
 //! Yield-curve discount jumps on the piecewise and global bootstrap constructors.
 //!
-//! Jumps on the node curves of `itofin_node_curve_new` are a tracked follow-up.
+//! Jumps on the node curves of `itofin_node_curve_new` are a tracked follow-up (#1388).
 use crate::bootstrap_api::global_curve;
 use crate::bootstrap_callbacks::ItofinBootstrapCallbacks;
 use crate::boundary::*;

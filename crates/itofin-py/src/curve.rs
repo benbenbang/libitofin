@@ -3,7 +3,7 @@
 //!
 //! Discount jumps are taken by PiecewiseYieldCurve.with_jumps and
 //! moving_with_jumps; jumps on the node curves (ZeroCurve, DiscountCurve,
-//! ForwardCurve) and the named Piecewise* classes are a tracked follow-up.
+//! ForwardCurve) and the named Piecewise* classes are a tracked follow-up (#1388).
 
 use crate::bootstrap::{BootstrapCallbacks, PySimpleQuoteVariables, global_bootstrap};
 use crate::helpers::PyRateHelper;
