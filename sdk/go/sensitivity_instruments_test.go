@@ -1,6 +1,9 @@
 package itofin
 
-import "testing"
+import (
+	"math"
+	"testing"
+)
 
 func (p sensitivityPortfolio) checkKind(t *testing.T, s *Session) {
 	t.Helper()
@@ -13,14 +16,14 @@ func (p sensitivityPortfolio) checkKind(t *testing.T, s *Session) {
 }
 
 type optionMarket struct {
-	option     *VanillaOption
-	rate, vol  *SimpleQuote
-	settings   *Settings
-	today      Date
-	dc         *DayCounter
-	riskFree   *YieldTermStructure
-	dividend   *YieldTermStructure
-	volatility *BlackVolTermStructure
+	option          *VanillaOption
+	spot, rate, vol *SimpleQuote
+	settings        *Settings
+	today           Date
+	dc              *DayCounter
+	riskFree        *YieldTermStructure
+	dividend        *YieldTermStructure
+	volatility      *BlackVolTermStructure
 }
 
 func optionFixture(t *testing.T, s *Session) optionMarket {
@@ -32,6 +35,8 @@ func optionFixture(t *testing.T, s *Session) optionMarket {
 	m.settings, e = s.NewSettings()
 	bondCheck(t, e)
 	bondCheck(t, m.settings.SetEvaluationDate(m.today))
+	m.spot, e = s.NewSimpleQuote(100)
+	bondCheck(t, e)
 	m.rate, e = s.NewSimpleQuote(.05)
 	bondCheck(t, e)
 	m.vol, e = s.NewSimpleQuote(.2)
@@ -44,7 +49,7 @@ func optionFixture(t *testing.T, s *Session) optionMarket {
 	bondCheck(t, e)
 	m.volatility, e = s.NewBlackConstantVolFromQuote(m.today, m.vol, m.dc, calendar)
 	bondCheck(t, e)
-	process, e := s.NewBlackScholesProcessFromCurves(100, m.riskFree, m.dividend, m.volatility)
+	process, e := s.NewBlackScholesProcessFromQuote(m.spot, m.riskFree, m.dividend, m.volatility)
 	bondCheck(t, e)
 	expiry, e := m.today.AddDays(360)
 	bondCheck(t, e)
@@ -59,8 +64,46 @@ func TestSensitivityOptionMatchesManualBump(t *testing.T) {
 	bondCheck(t, e)
 	defer s.Close()
 	m := optionFixture(t, s)
-	for _, q := range []*SimpleQuote{m.vol, m.rate} {
+	for _, q := range []*SimpleQuote{m.spot, m.vol, m.rate} {
 		sensitivityPortfolio{[]*SimpleQuote{q}, []Instrument{m.option}, []func() (float64, error){m.option.NPV}}.checkKind(t, s)
+	}
+}
+
+func TestBlackScholesProcessFromQuoteLinksTheSpot(t *testing.T) {
+	s, e := NewSession()
+	bondCheck(t, e)
+	defer s.Close()
+	m := optionFixture(t, s)
+	bondCheck(t, m.spot.SetValue(110))
+	linked, e := m.option.NPV()
+	bondCheck(t, e)
+	fixed, e := s.NewBlackScholesProcessFromCurves(110, m.riskFree, m.dividend, m.volatility)
+	bondCheck(t, e)
+	want, e := m.option.Price(fixed)
+	bondCheck(t, e)
+	if linked != want {
+		t.Fatalf("linked spot %.15g vs fixed 110 %.15g", linked, want)
+	}
+	if _, e := s.NewBlackScholesProcessFromQuote(nil, m.riskFree, m.dividend, m.volatility); e == nil {
+		t.Fatal("nil spot accepted")
+	}
+}
+
+func TestSensitivityOptionSpotBumpMatchesDeltaAtSecondOrder(t *testing.T) {
+	s, e := NewSession()
+	bondCheck(t, e)
+	defer s.Close()
+	m := optionFixture(t, s)
+	delta, e := m.option.Delta()
+	bondCheck(t, e)
+	errorAt := func(h float64) float64 {
+		got, e := s.ParallelAnalysis([]*SimpleQuote{m.spot}, []Instrument{m.option}, nil, h, Centered, nil)
+		bondCheck(t, e)
+		return math.Abs(got.First - delta)
+	}
+	coarse, fine := errorAt(1), errorAt(.5)
+	if coarse > 1e-3 || math.Abs(coarse/fine-4) > .1 {
+		t.Fatalf("delta %g: error %g at h=1, %g at h=0.5", delta, coarse, fine)
 	}
 }
 

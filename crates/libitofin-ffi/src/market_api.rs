@@ -145,6 +145,36 @@ pub unsafe extern "C" fn itofin_black_scholes_from_curves(
     }
 }
 #[unsafe(no_mangle)]
+/// Build a process over the session quote `spot` and three term structures.
+/// The process links the quote, so setting it reprices dependent instruments.
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
+pub unsafe extern "C" fn itofin_black_scholes_from_quote(
+    ctx: *mut Context,
+    spot: u64,
+    risk_free: u64,
+    dividend: u64,
+    volatility: u64,
+    out: *mut u64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(out)?;
+            let process = shared(GeneralizedBlackScholesProcess::new(
+                Handle::new(c.get::<Shared<SimpleQuote>>(spot)? as Shared<dyn Quote>),
+                c.get::<Handle<dyn YieldTermStructure>>(dividend)?,
+                c.get::<Handle<dyn YieldTermStructure>>(risk_free)?,
+                c.get::<Handle<dyn BlackVolTermStructure>>(volatility)?,
+            ));
+            output(out, c.insert(process)?)
+        })
+    }
+}
+#[unsafe(no_mangle)]
 /// # Safety
 /// Pointers must be aligned, live and valid for their stated lengths. Outputs
 /// must not overlap inputs or other outputs. Any context and its handles must

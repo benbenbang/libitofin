@@ -990,6 +990,16 @@
       ]
     },
     {
+      "c": "itofin_black_scholes_from_quote",
+      "go": "Session.NewBlackScholesProcessFromQuote",
+      "python": "itofin.processes.BlackScholesProcess.from_quote",
+      "status": "implemented",
+      "tests": [
+        "TestBlackScholesProcessFromQuoteLinksTheSpot",
+        "TestSensitivityOptionSpotBumpMatchesDeltaAtSecondOrder"
+      ]
+    },
+    {
       "c": "itofin_black_scholes_rate",
       "go": "BlackScholesProcess.RiskFreeRate",
       "python": "itofin.processes.BlackScholesProcess.risk_free_rate",

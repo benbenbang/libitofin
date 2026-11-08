@@ -120,6 +120,20 @@ class BlackScholesProcess:
         Returns:
             BlackScholesProcess: A process over the three supplied term structures.
         """
+    @staticmethod
+    def from_quote(spot: quotes.SimpleQuote, risk_free: termstructures.YieldTermStructure, dividend: termstructures.YieldTermStructure, vol: termstructures.BlackVolTermStructure) -> BlackScholesProcess:
+        r"""
+        Build a process linking a spot quote, so setting it reprices dependents.
+
+        Args:
+            spot (SimpleQuote): The spot quote the process observes.
+            risk_free (YieldTermStructure): The risk-free discount curve.
+            dividend (YieldTermStructure): The dividend curve.
+            vol (BlackVolTermStructure): The Black volatility surface.
+
+        Returns:
+            BlackScholesProcess: A process over the quote and the three term structures.
+        """
     def risk_free_rate(self) -> builtins.float:
         r"""
         Return the risk-free rate carried by the process.
