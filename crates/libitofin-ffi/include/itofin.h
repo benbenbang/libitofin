@@ -7415,6 +7415,24 @@ int32_t itofin_local_vol_surface_new(struct ItofinContext *ctx,
                                      struct ItofinError *error);
 
 /**
+ * Local volatility of a linear Black variance curve built from the same
+ * arguments as `itofin_black_variance_curve_new` (extrapolation: 0 flat
+ * volatility, 1 use interpolator, 2 linear variance).
+ * # Safety
+ * Follow the crate C caller contract; arrays must have their stated lengths.
+ */
+int32_t itofin_local_vol_curve_new(struct ItofinContext *ctx,
+                                   int32_t reference_date,
+                                   const int32_t *dates,
+                                   const double *vols,
+                                   size_t count,
+                                   uint64_t dc,
+                                   int32_t monotone,
+                                   int32_t extrapolation,
+                                   uint64_t *out,
+                                   struct ItofinError *error);
+
+/**
  * Local volatility at time `t` (a year fraction) and underlying level `strike`.
  * # Safety
  * Follow the crate C caller contract; outputs must be live and non-overlapping.

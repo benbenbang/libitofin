@@ -106,35 +106,60 @@ pub unsafe extern "C" fn itofin_black_variance_curve_new(
     unsafe {
         with_context(ctx, error, |c| {
             check_ptr(out)?;
-            let dates = input_slice(dates, count)?
-                .iter()
-                .copied()
-                .map(date)
-                .collect::<BindingResult<Vec<_>>>()?;
-            let vols = input_slice(vols, count)?;
-            if vols.iter().any(|v| !v.is_finite() || *v < 0.0) {
-                return Err(BindingError::invalid(
-                    "volatilities must be finite and nonnegative",
-                ));
-            }
-            let extrapolation = match extrapolation {
-                0 => BlackVolTimeExtrapolation::FlatVolatility,
-                1 => BlackVolTimeExtrapolation::UseInterpolator,
-                2 => BlackVolTimeExtrapolation::LinearVariance,
-                _ => return Err(BindingError::invalid("unknown time extrapolation")),
-            };
-            let v = shared(BlackVarianceCurve::with_interpolator(
-                date(reference_date)?,
-                &dates,
+            let v = variance_curve(
+                c,
+                reference_date,
+                dates,
                 vols,
-                day_counter(c, dc)?,
-                flag(monotone)?,
+                count,
+                dc,
+                monotone,
                 extrapolation,
-                Linear,
-            )?) as Shared<dyn BlackVolTermStructure>;
+            )? as Shared<dyn BlackVolTermStructure>;
             output(out, c.insert(Handle::new(v))?)
         })
     }
+}
+/// The concrete linear variance curve shared by the Black and local-vol exports.
+/// # Safety
+/// `dates` and `vols` must be valid for `count` elements.
+#[allow(clippy::too_many_arguments)]
+pub(crate) unsafe fn variance_curve(
+    c: &Context,
+    reference_date: i32,
+    dates: *const i32,
+    vols: *const f64,
+    count: usize,
+    dc: u64,
+    monotone: i32,
+    extrapolation: i32,
+) -> BindingResult<Shared<BlackVarianceCurve<Linear>>> {
+    let dates = unsafe { input_slice(dates, count) }?
+        .iter()
+        .copied()
+        .map(date)
+        .collect::<BindingResult<Vec<_>>>()?;
+    let vols = unsafe { input_slice(vols, count) }?;
+    if vols.iter().any(|v| !v.is_finite() || *v < 0.0) {
+        return Err(BindingError::invalid(
+            "volatilities must be finite and nonnegative",
+        ));
+    }
+    let extrapolation = match extrapolation {
+        0 => BlackVolTimeExtrapolation::FlatVolatility,
+        1 => BlackVolTimeExtrapolation::UseInterpolator,
+        2 => BlackVolTimeExtrapolation::LinearVariance,
+        _ => return Err(BindingError::invalid("unknown time extrapolation")),
+    };
+    Ok(shared(BlackVarianceCurve::with_interpolator(
+        date(reference_date)?,
+        &dates,
+        vols,
+        day_counter(c, dc)?,
+        flag(monotone)?,
+        extrapolation,
+        Linear,
+    )?))
 }
 /// # Safety
 /// Follow the crate C caller contract; arrays must have their stated lengths.
