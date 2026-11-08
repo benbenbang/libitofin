@@ -9,11 +9,11 @@ import pytest
 # itofin library
 from itofin import ItofinError, Settings
 from itofin.indexes import Currency, Estr, Euribor, IborIndex
-from itofin.instruments import FixedRateBond, FloatingRateBond, MakeOis, MakeVanillaSwap
-from itofin.pricingengines import DiscountingBondEngine
+from itofin.instruments import CreditDefaultSwap, FixedRateBond, FloatingRateBond, MakeOis, MakeVanillaSwap, ProtectionSide
+from itofin.pricingengines import DiscountingBondEngine, MidPointCdsEngine
 from itofin.quotes import SimpleQuote
 from itofin.risk import SensitivityAnalysis, bucket_analysis, parallel_analysis
-from itofin.termstructures import FlatForward
+from itofin.termstructures import FlatForward, FlatHazardRate
 from itofin.time import BusinessDayConvention as BDC, Calendar, Date, DayCounter, Frequency, Period, Schedule
 
 TODAY = Date(15, 1, 2026)
@@ -114,3 +114,27 @@ def test_errors_leave_the_quotes_untouched():
     with pytest.raises(TypeError, match="#1322"):
         bucket_analysis(quotes, cast(Any, [quotes[0]]))
     assert quotes[0].value() == 0.03
+
+
+def _assert_kind(quote, instrument):
+    reference, first, second, one_side = _manual([quote], [instrument], [1.0])
+    assert first != 0.0
+    assert parallel_analysis([quote], [instrument]) == (first, second)
+    assert parallel_analysis([quote], [instrument], kind=SensitivityAnalysis.OneSide, reference_npv=reference) == (one_side, None)
+
+
+def test_cds_is_bit_identical_to_a_manual_discount_and_hazard_bump():
+    """A CDS reprices through the discount curve built from_quote and the hazard quote."""
+    settings = Settings()
+    today = Date(9, 6, 2006)
+    settings.set_evaluation_date(today)
+    calendar, day_counter, convention = Calendar.target(), DayCounter.actual360(), BDC.ModifiedFollowing
+    rate, hazard = SimpleQuote(0.06), SimpleQuote(0.01234)
+    discount = FlatForward.from_quote(today, rate, day_counter)
+    probability = FlatHazardRate.moving(0, calendar, hazard, day_counter, settings)
+    schedule = Schedule(Date(9, 6, 2005), Date(9, 6, 2015), Frequency.Semiannual, calendar, convention)
+    cds = CreditDefaultSwap(ProtectionSide.Seller, 10000.0, 0.012, schedule, convention, day_counter, True, True, settings)
+    cds.set_engine(MidPointCdsEngine(probability, 0.4, discount, settings))
+    for quote in (rate, hazard):
+        _assert_kind(quote, cds)
+    assert (rate.value(), hazard.value()) == (0.06, 0.01234)

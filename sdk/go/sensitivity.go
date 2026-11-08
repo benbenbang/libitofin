@@ -20,8 +20,11 @@ const (
 )
 
 // Instrument is a session-owned instrument accepted by sensitivity analysis:
-// any bond, a vanilla swap or an overnight indexed swap. Options, swaptions,
-// cap/floors and CDS are deferred (#1322).
+// any bond, a vanilla swap, an overnight indexed swap, a vanilla option, a
+// swaption, a cap/floor or a credit default swap. Under a Monte Carlo engine
+// each reprice carries sampling error that does not shrink with the shift, so
+// the finite differences are noisy; prefer an analytic, tree or
+// finite-difference engine.
 type Instrument interface {
 	instrumentObject() object
 }
@@ -51,6 +54,34 @@ func (v *OvernightIndexedSwap) instrumentObject() object {
 		return object{}
 	}
 	return v.object
+}
+
+func (o *VanillaOption) instrumentObject() object {
+	if o == nil {
+		return object{}
+	}
+	return o.object
+}
+
+func (o *Swaption) instrumentObject() object {
+	if o == nil {
+		return object{}
+	}
+	return o.object
+}
+
+func (o *CapFloor) instrumentObject() object {
+	if o == nil {
+		return object{}
+	}
+	return o.object
+}
+
+func (c *CreditDefaultSwap) instrumentObject() object {
+	if c == nil {
+		return object{}
+	}
+	return c.object
 }
 
 func sensitivityIDs(s *Session, quotes []*SimpleQuote, instruments []Instrument) ([]C.uint64_t, []C.uint64_t, error) {

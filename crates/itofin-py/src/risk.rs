@@ -2,10 +2,16 @@
 //!
 //! Supported instruments: every bond (each runs the same refresh and
 //! floating-coupon preflight as `Bond.npv` once, before the first reprice),
-//! `VanillaSwap` and `OvernightIndexedSwap`. Deferred and rejected with
-//! `TypeError`: options, swaptions, cap/floors and CDS (#1322).
+//! `VanillaSwap`, `OvernightIndexedSwap` and `CreditDefaultSwap`, which
+//! reprices through plain `npv()`. Deferred and rejected with `TypeError`:
+//! options, swaptions and cap/floors (#1322).
+//!
+//! Under a Monte Carlo engine each reprice carries sampling error that does not
+//! shrink with the shift, so the finite differences are noisy; prefer an
+//! analytic, tree or finite-difference engine for sensitivities.
 use crate::PyQlError;
 use crate::bonds::PyBond;
+use crate::credit::PyCreditDefaultSwap;
 use crate::market::PySimpleQuote;
 use crate::ois::PyOvernightIndexedSwap;
 use crate::swap::PyVanillaSwap;
@@ -53,10 +59,12 @@ fn instruments(items: &[Bound<'_, PyAny>]) -> PyResult<Vec<SharedMut<dyn Instrum
                 Ok(swap.inner() as SharedMut<dyn Instrument>)
             } else if let Ok(ois) = item.extract::<PyRef<'_, PyOvernightIndexedSwap>>() {
                 Ok(ois.inner() as SharedMut<dyn Instrument>)
+            } else if let Ok(cds) = item.extract::<PyRef<'_, PyCreditDefaultSwap>>() {
+                Ok(cds.inner() as SharedMut<dyn Instrument>)
             } else {
                 Err(PyTypeError::new_err(
-                    "expected Bond, VanillaSwap or OvernightIndexedSwap; options, swaptions, \
-                     cap/floors and CDS are deferred (#1322)",
+                    "expected Bond, VanillaSwap, OvernightIndexedSwap or CreditDefaultSwap; \
+                     options, swaptions and cap/floors are deferred (#1322)",
                 ))
             }
         })
@@ -76,7 +84,7 @@ fn shared(quotes: &[PyRef<'_, PySimpleQuote>]) -> Vec<Shared<SimpleQuote>> {
 #[pyo3(signature = (quotes, instruments, quantities = Vec::new(), shift = DEFAULT_SHIFT, kind = PySensitivityAnalysis::Centered, reference_npv = None))]
 pub(crate) fn parallel_analysis(
     quotes: Vec<PyRef<'_, PySimpleQuote>>,
-    #[gen_stub(override_type(type_repr = "typing.Sequence[instruments.Bond | instruments.VanillaSwap | instruments.OvernightIndexedSwap]", imports = ("typing", "itofin.instruments")))]
+    #[gen_stub(override_type(type_repr = "typing.Sequence[instruments.Bond | instruments.VanillaSwap | instruments.OvernightIndexedSwap | instruments.CreditDefaultSwap]", imports = ("typing", "itofin.instruments")))]
     instruments: Vec<Bound<'_, PyAny>>,
     quantities: Vec<f64>,
     shift: f64,
@@ -105,9 +113,9 @@ pub(crate) fn parallel_analysis(
     module = "itofin.risk",
     python_overload = r#"
     @typing.overload
-    def bucket_analysis(quotes: typing.Mapping[builtins.str, quotes.SimpleQuote], instruments: typing.Sequence[instruments.Bond | instruments.VanillaSwap | instruments.OvernightIndexedSwap], quantities: typing.Sequence[builtins.float] = [], shift: builtins.float = 0.0001, kind: SensitivityAnalysis = SensitivityAnalysis.Centered) -> builtins.dict[builtins.str, tuple[builtins.float, builtins.float | None]]: ...
+    def bucket_analysis(quotes: typing.Mapping[builtins.str, quotes.SimpleQuote], instruments: typing.Sequence[instruments.Bond | instruments.VanillaSwap | instruments.OvernightIndexedSwap | instruments.CreditDefaultSwap], quantities: typing.Sequence[builtins.float] = [], shift: builtins.float = 0.0001, kind: SensitivityAnalysis = SensitivityAnalysis.Centered) -> builtins.dict[builtins.str, tuple[builtins.float, builtins.float | None]]: ...
     @typing.overload
-    def bucket_analysis(quotes: typing.Sequence[quotes.SimpleQuote], instruments: typing.Sequence[instruments.Bond | instruments.VanillaSwap | instruments.OvernightIndexedSwap], quantities: typing.Sequence[builtins.float] = [], shift: builtins.float = 0.0001, kind: SensitivityAnalysis = SensitivityAnalysis.Centered) -> builtins.list[tuple[builtins.float, builtins.float | None]]: ...
+    def bucket_analysis(quotes: typing.Sequence[quotes.SimpleQuote], instruments: typing.Sequence[instruments.Bond | instruments.VanillaSwap | instruments.OvernightIndexedSwap | instruments.CreditDefaultSwap], quantities: typing.Sequence[builtins.float] = [], shift: builtins.float = 0.0001, kind: SensitivityAnalysis = SensitivityAnalysis.Centered) -> builtins.list[tuple[builtins.float, builtins.float | None]]: ...
     "#,
     no_default_overload = true
 )]

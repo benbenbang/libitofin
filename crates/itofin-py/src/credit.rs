@@ -1366,6 +1366,11 @@ impl PyCreditDefaultSwap {
     pub(crate) fn from_inner(inner: SharedMut<CreditDefaultSwap>) -> Self {
         PyCreditDefaultSwap { inner }
     }
+
+    /// A clone of the inner contract for sensitivity analysis.
+    pub(crate) fn inner(&self) -> SharedMut<CreditDefaultSwap> {
+        SharedMut::clone(&self.inner)
+    }
 }
 
 /// Market-convention builder for a CreditDefaultSwap: derives the premium

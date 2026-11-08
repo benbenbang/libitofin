@@ -1,21 +1,25 @@
 //! Bump-and-reprice sensitivities over session quotes and instruments.
 //!
 //! Supported instruments: every bond handle (fixed, zero, floating, amortizing
-//! and callable), vanilla swaps and overnight indexed swaps. A bond runs the
+//! and callable), vanilla swaps, overnight indexed swaps, vanilla options,
+//! swaptions, cap/floors and credit default swaps. A bond runs the
 //! same refresh and floating-coupon preflight as `itofin_bond_real` once,
 //! before the first reprice; the bump loop then reprices through the core
 //! `npv()`. The settings flags that refresh synchronizes cannot change inside
 //! the loop, and the preflight guards depend on dates and fixings, not on quote
-//! values.
+//! values. Options, swaptions, cap/floors and CDS reprice through plain `npv()`.
 //!
-//! Deferred and rejected with an explicit error: options, swaptions,
-//! cap/floors and CDS (#1322).
+//! Under a Monte Carlo engine each reprice carries sampling error that does not
+//! shrink with the shift, so the finite differences are noisy; prefer an
+//! analytic, tree or finite-difference engine for sensitivities.
 use crate::bond_api::NativeBond;
 use crate::bond_backing::BondBacking;
 use crate::boundary::*;
 use crate::rates_api::{NativeOis, finite};
 use libitofin::instrument::Instrument;
-use libitofin::instruments::FixedVsFloatingSwap;
+use libitofin::instruments::{
+    CapFloor, CreditDefaultSwap, FixedVsFloatingSwap, Swaption, VanillaOption,
+};
 use libitofin::quotes::SimpleQuote;
 use libitofin::risk::{self, SensitivityAnalysis};
 use libitofin::shared::{Shared, SharedMut};
@@ -57,9 +61,21 @@ pub(crate) fn instrument(c: &Context, id: u64) -> BindingResult<SharedMut<dyn In
     if let Ok(ois) = c.get::<NativeOis>(id) {
         return Ok(ois.0);
     }
+    if let Ok(option) = c.get::<SharedMut<VanillaOption>>(id) {
+        return Ok(option);
+    }
+    if let Ok(swaption) = c.get::<SharedMut<Swaption>>(id) {
+        return Ok(swaption);
+    }
+    if let Ok(cap) = c.get::<SharedMut<CapFloor>>(id) {
+        return Ok(cap);
+    }
+    if let Ok(cds) = c.get::<SharedMut<CreditDefaultSwap>>(id) {
+        return Ok(cds);
+    }
     Err(BindingError::invalid(
-        "sensitivity analysis supports bonds, vanilla swaps and overnight indexed swaps; \
-         options, swaptions, cap/floors and CDS are deferred (#1322)",
+        "sensitivity analysis supports bonds, vanilla swaps, overnight indexed swaps, \
+         vanilla options, swaptions, cap/floors and credit default swaps",
     ))
 }
 fn kind(value: i32) -> BindingResult<SensitivityAnalysis> {
