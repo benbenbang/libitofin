@@ -1282,6 +1282,8 @@ mod test_greeks {
 }
 
 #[cfg(test)]
+mod mc_local_vol_oracle;
+#[cfg(test)]
 mod qmc_oracle;
 #[cfg(test)]
 mod seed_replay;
