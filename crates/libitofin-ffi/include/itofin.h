@@ -2105,6 +2105,21 @@ typedef struct ItofinXccyBasisSwapConfig {
   int32_t spot_settlement_date;
 } ItofinXccyBasisSwapConfig;
 
+/**
+ * A zero settings handle selects the fixed reference date; a nonzero one
+ * selects a reference date settlement_days business days on calendar past
+ * the evaluation date of settings. settings must be the SAME instance the
+ * helpers' index carries: a different instance moves the curve's reference
+ * date while the helpers stay put.
+ */
+typedef struct ItofinPiecewiseYieldConfig {
+  int32_t reference_date;
+  uint32_t settlement_days;
+  uint64_t calendar;
+  uint64_t day_counter;
+  uint64_t settings;
+} ItofinPiecewiseYieldConfig;
+
 #define ITOFIN_OPTIMIZE_CONVERGED_XTOL 0
 
 #define ITOFIN_OPTIMIZE_CONVERGED_FTOL 1
@@ -9977,6 +9992,60 @@ int32_t itofin_xccy_basis_swap_currency(struct ItofinContext *ctx,
                                         int32_t side,
                                         uint64_t *out,
                                         struct ItofinError *error);
+
+/**
+ * The itofin_piecewise_curve_new twin taking a fixed or moving reference
+ * date, optional iterative options (null for the defaults, iterative
+ * algorithm only) and multiplicative discount jumps on SimpleQuote handles.
+ * Empty dates generate December 31 jump dates from the reference year,
+ * which on a moving curve needs the evaluation date already set: an unset
+ * one is an error, never a clock fallback.
+ * # Safety
+ * Pointers must be aligned, live and valid for their stated lengths. Outputs
+ * must not overlap inputs or other outputs. Any context and its handles must
+ * belong to the calling thread; serialize calls including destruction.
+ * See the crate-level C caller contract for lifetime requirements.
+ */
+int32_t itofin_piecewise_curve_with_jumps_new(struct ItofinContext *ctx,
+                                              const struct ItofinPiecewiseYieldConfig *config,
+                                              const uint64_t *helpers,
+                                              size_t len,
+                                              int32_t kind,
+                                              int32_t algorithm,
+                                              const uint64_t *additional,
+                                              size_t additional_len,
+                                              const struct ItofinIterativeBootstrapOptions *options,
+                                              const uint64_t *jumps,
+                                              size_t jump_count,
+                                              const int32_t *dates,
+                                              size_t date_count,
+                                              uint64_t *out,
+                                              struct ItofinError *error);
+
+/**
+ * The itofin_global_curve_new twin taking a fixed or moving reference date
+ * and multiplicative discount jumps, dated as in
+ * itofin_piecewise_curve_with_jumps_new. Callback ownership follows
+ * itofin_global_curve_new, including on a jump argument error.
+ * # Safety
+ * As itofin_global_curve_new.
+ */
+int32_t itofin_global_curve_with_jumps_new(struct ItofinContext *ctx,
+                                           const struct ItofinPiecewiseYieldConfig *config,
+                                           const uint64_t *helpers,
+                                           size_t len,
+                                           int32_t kind,
+                                           const uint64_t *additional,
+                                           size_t additional_len,
+                                           uint64_t variables,
+                                           const struct ItofinBootstrapCallbacks *callbacks,
+                                           bool *adopted,
+                                           const uint64_t *jumps,
+                                           size_t jump_count,
+                                           const int32_t *dates,
+                                           size_t date_count,
+                                           uint64_t *out,
+                                           struct ItofinError *error);
 
 #ifdef __cplusplus
 }  // extern "C"

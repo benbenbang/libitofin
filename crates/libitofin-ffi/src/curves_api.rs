@@ -1,6 +1,6 @@
 //! Yield curve construction and queries. All curves retain the same erased handle type.
 use crate::boundary::*;
-use crate::iterative_bootstrap_api::{CurveAnchor, anchored, iterative_curve};
+use crate::iterative_bootstrap_api::{CurveAnchor, CurveJumps, anchored, iterative_curve};
 use crate::time_api::{calendar, date, day_counter};
 use libitofin::handle::Handle;
 use libitofin::interestrate::Compounding;
@@ -10,6 +10,7 @@ use libitofin::math::interpolations::{
 };
 use libitofin::settings::Settings;
 use libitofin::shared::{Shared, shared};
+use libitofin::termstructures::iterativebootstrap::IterativeBootstrapOptions;
 use libitofin::termstructures::yields::{
     DiscountCurve, FlatForward, ForwardCurve, InterpolatedDiscountCurve, InterpolatedZeroCurve,
     PiecewiseYieldCurve, ZeroCurve,
@@ -237,7 +238,18 @@ pub unsafe extern "C" fn itofin_piecewise_curve_new(
                 input_slice(helpers, len)?,
                 input_slice(additional, additional_len)?,
             );
-            piecewise_curve(c, anchor, h, dc, kind, algorithm, x, out)
+            piecewise_curve(
+                c,
+                anchor,
+                h,
+                dc,
+                kind,
+                algorithm,
+                x,
+                Default::default(),
+                CurveJumps::default(),
+                out,
+            )
         })
     }
 }
@@ -279,12 +291,23 @@ pub unsafe extern "C" fn itofin_piecewise_curve_new_moving(
                 input_slice(helpers, len)?,
                 input_slice(additional, additional_len)?,
             );
-            piecewise_curve(c, anchor, h, dc, kind, algorithm, x, out)
+            piecewise_curve(
+                c,
+                anchor,
+                h,
+                dc,
+                kind,
+                algorithm,
+                x,
+                Default::default(),
+                CurveJumps::default(),
+                out,
+            )
         })
     }
 }
 #[allow(clippy::too_many_arguments)]
-unsafe fn piecewise_curve(
+pub(crate) unsafe fn piecewise_curve(
     c: &mut Context,
     anchor: CurveAnchor,
     helpers: &[u64],
@@ -292,6 +315,8 @@ unsafe fn piecewise_curve(
     kind: i32,
     algorithm: i32,
     additional: &[u64],
+    options: IterativeBootstrapOptions,
+    jumps: CurveJumps,
     out: *mut u64,
 ) -> BindingResult<()> {
     unsafe {
@@ -316,16 +341,17 @@ unsafe fn piecewise_curve(
         };
         let (a, h) = (anchor, helpers);
         let v = match (kind, algorithm) {
-            (0..=7, 0) => iterative_curve(a, h, dc, kind, Default::default())?,
+            (0..=7, 0) => iterative_curve(a, h, dc, kind, options, jumps)?,
             (6, 2) => anchored::<ForwardRate, _, _>(
                 a,
                 h,
                 dc,
                 ConvexMonotone::default(),
                 LocalBootstrap::default(),
+                jumps,
             )?,
-            (0, 1) => anchored::<Discount, _, _>(a, h, dc, LogLinear, global())?,
-            (1, 1) => anchored::<Discount, _, _>(a, h, dc, Linear, global())?,
+            (0, 1) => anchored::<Discount, _, _>(a, h, dc, LogLinear, global(), jumps)?,
+            (1, 1) => anchored::<Discount, _, _>(a, h, dc, Linear, global(), jumps)?,
             _ => {
                 return Err(BindingError::invalid(
                     "unsupported curve/bootstrap combination",

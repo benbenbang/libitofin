@@ -6,6 +6,7 @@ use libitofin::math::interpolations::{
     convexmonotone::ConvexMonotone, cubic::Cubic, flat::BackwardFlat, linear::Linear,
     loglinear::LogLinear,
 };
+use libitofin::quotes::{Quote, SimpleQuote};
 use libitofin::settings::Settings;
 use libitofin::shared::Shared;
 use libitofin::termstructures::RateHelper;
@@ -39,7 +40,7 @@ pub struct ItofinIterativeBootstrapOptions {
     pub max_evaluations: usize,
 }
 impl ItofinIterativeBootstrapOptions {
-    fn parse(&self) -> BindingResult<IterativeBootstrapOptions> {
+    pub(crate) fn parse(&self) -> BindingResult<IterativeBootstrapOptions> {
         let flag = |x| match x {
             0 => Ok(false),
             1 => Ok(true),
@@ -100,28 +101,60 @@ pub(crate) enum CurveAnchor {
     Moving(Natural, Calendar, Shared<Settings<Date>>),
 }
 
+/// Multiplicative discount jump quotes and their dates; both empty is no jumps.
+#[derive(Default)]
+pub(crate) struct CurveJumps(Vec<Handle<dyn Quote>>, Vec<Date>);
+
+/// Reads jump SimpleQuote handles and date serials from C arrays.
+pub(crate) unsafe fn curve_jumps(
+    c: &Context,
+    jumps: *const u64,
+    jump_count: usize,
+    dates: *const i32,
+    date_count: usize,
+) -> BindingResult<CurveJumps> {
+    unsafe {
+        let quotes = input_slice(jumps, jump_count)?
+            .iter()
+            .map(|id| {
+                c.get::<Shared<SimpleQuote>>(*id)
+                    .map(|q| Handle::new(q as Shared<dyn Quote>))
+            })
+            .collect::<BindingResult<Vec<_>>>()?;
+        let dates = input_slice(dates, date_count)?
+            .iter()
+            .map(|d| date(*d))
+            .collect::<BindingResult<Vec<_>>>()?;
+        Ok(CurveJumps(quotes, dates))
+    }
+}
+
 pub(crate) fn anchored<T, I, B>(
     anchor: CurveAnchor,
     helpers: Vec<Shared<dyn RateHelper>>,
     dc: DayCounter,
     interpolator: I,
     bootstrap: B,
+    jumps: CurveJumps,
 ) -> BindingResult<Shared<dyn YieldTermStructure>>
 where
     T: YieldBootstrapTraits + 'static,
     I: Interpolator + 'static,
     B: Bootstrap<PiecewiseYieldCurve<T, I, B>> + 'static,
 {
+    let CurveJumps(quotes, dates) = jumps;
     Ok(match anchor {
-        CurveAnchor::Fixed(reference) => PiecewiseYieldCurve::<T, I, B>::with_bootstrap(
+        CurveAnchor::Fixed(reference) => PiecewiseYieldCurve::<T, I, B>::with_bootstrap_and_jumps(
             reference,
             helpers,
             dc,
             interpolator,
             bootstrap,
+            quotes,
+            dates,
         )?,
         CurveAnchor::Moving(days, calendar, settings) => {
-            PiecewiseYieldCurve::<T, I, B>::moving_with_bootstrap(
+            PiecewiseYieldCurve::<T, I, B>::moving_with_bootstrap_and_jumps(
                 days,
                 calendar,
                 helpers,
@@ -129,6 +162,8 @@ where
                 interpolator,
                 settings,
                 bootstrap,
+                quotes,
+                dates,
             )?
         }
     })
@@ -140,18 +175,19 @@ pub(crate) fn iterative_curve(
     dc: DayCounter,
     kind: i32,
     options: IterativeBootstrapOptions,
+    j: CurveJumps,
 ) -> BindingResult<Shared<dyn YieldTermStructure>> {
     let strategy = IterativeBootstrap::with_options(options)?;
     let (h, a) = (helpers, anchor);
     match kind {
-        0 => anchored::<Discount, _, _>(a, h, dc, LogLinear, strategy),
-        1 => anchored::<Discount, _, _>(a, h, dc, Linear, strategy),
-        2 => anchored::<Discount, _, _>(a, h, dc, Cubic, strategy),
-        3 => anchored::<ZeroYield, _, _>(a, h, dc, Linear, strategy),
-        4 => anchored::<ZeroYield, _, _>(a, h, dc, Cubic, strategy),
-        5 => anchored::<ForwardRate, _, _>(a, h, dc, Linear, strategy),
-        6 => anchored::<ForwardRate, _, _>(a, h, dc, ConvexMonotone::default(), strategy),
-        7 => anchored::<ForwardRate, _, _>(a, h, dc, BackwardFlat, strategy),
+        0 => anchored::<Discount, _, _>(a, h, dc, LogLinear, strategy, j),
+        1 => anchored::<Discount, _, _>(a, h, dc, Linear, strategy, j),
+        2 => anchored::<Discount, _, _>(a, h, dc, Cubic, strategy, j),
+        3 => anchored::<ZeroYield, _, _>(a, h, dc, Linear, strategy, j),
+        4 => anchored::<ZeroYield, _, _>(a, h, dc, Cubic, strategy, j),
+        5 => anchored::<ForwardRate, _, _>(a, h, dc, Linear, strategy, j),
+        6 => anchored::<ForwardRate, _, _>(a, h, dc, ConvexMonotone::default(), strategy, j),
+        7 => anchored::<ForwardRate, _, _>(a, h, dc, BackwardFlat, strategy, j),
         _ => Err(BindingError::invalid("unsupported iterative curve kind")),
     }
 }
@@ -240,7 +276,7 @@ unsafe fn options_curve(
             .iter()
             .map(|id| crate::helpers_api::helper(c, *id))
             .collect::<BindingResult<Vec<_>>>()?;
-        let curve = iterative_curve(anchor, helpers, dc, kind, options)?;
+        let curve = iterative_curve(anchor, helpers, dc, kind, options, CurveJumps::default())?;
         output(out, c.insert(Handle::new(curve))?)
     }
 }

@@ -142,3 +142,5 @@ mod cap_calibration_tests;
 pub mod variance_swap_api;
 
 pub mod xccy_basis_api;
+
+pub mod yield_jumps_api;
