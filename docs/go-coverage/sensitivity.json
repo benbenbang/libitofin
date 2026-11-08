@@ -9,7 +9,11 @@
       "tests": [
         "TestSensitivityParallelMatchesManualBump",
         "TestSensitivityParallelZeroBondAnalyticDuration",
-        "TestSensitivityFloatingBondRunsThePreflight"
+        "TestSensitivityFloatingBondRunsThePreflight",
+        "TestSensitivityOptionMatchesManualBump",
+        "TestSensitivitySwaptionMatchesManualBump",
+        "TestSensitivityCapFloorMatchesManualBump",
+        "TestSensitivityCdsMatchesManualBump"
       ]
     },
     {

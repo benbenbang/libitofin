@@ -37,7 +37,7 @@ fn unsupported_instruments_and_kinds_are_errors_that_leave_the_quote() {
     let quote = c.insert(value.clone()).unwrap();
     let (code, message) = parallel(&mut c, quote, quote, 1);
     assert_eq!(code, INVALID_ARGUMENT);
-    assert!(message.contains("deferred (#1322)"), "{message}");
+    assert!(message.contains("credit default swaps"), "{message}");
     let (code, message) = parallel(&mut c, quote, u64::MAX, 1);
     assert_eq!(code, INVALID_ARGUMENT);
     assert!(message.contains("supports bonds"), "{message}");
