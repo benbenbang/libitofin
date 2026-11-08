@@ -9,8 +9,8 @@ import pytest
 # itofin library
 from itofin import ItofinError, Settings
 from itofin.indexes import Currency, Estr, Euribor, IborIndex
-from itofin.instruments import CreditDefaultSwap, FixedRateBond, FloatingRateBond, MakeOis, MakeVanillaSwap, OptionType, ProtectionSide, VanillaOption
-from itofin.pricingengines import DiscountingBondEngine, MidPointCdsEngine
+from itofin.instruments import CapFloor, CapFloorType, CreditDefaultSwap, EuropeanExercise, FixedRateBond, FloatingRateBond, MakeOis, MakeVanillaSwap, OptionType, ProtectionSide, SettlementMethod, SettlementType, Swaption, VanillaOption
+from itofin.pricingengines import BlackCapFloorEngine, BlackSwaptionEngine, DiscountingBondEngine, MidPointCdsEngine
 from itofin.processes import BlackScholesProcess
 from itofin.quotes import SimpleQuote
 from itofin.risk import SensitivityAnalysis, bucket_analysis, parallel_analysis
@@ -106,13 +106,13 @@ def test_labelled_buckets_sum_to_the_parallel_shift():
 
 
 def test_errors_leave_the_quotes_untouched():
-    """Zero shift and empty inputs are core errors; other instruments are deferred."""
+    """Zero shift and empty inputs are core errors; a non-instrument is a TypeError."""
     _, quotes, instruments = _portfolio()
     with pytest.raises(ItofinError, match="zero shift"):
         parallel_analysis(quotes, instruments, shift=0.0)
     with pytest.raises(ItofinError, match="empty instrument"):
         bucket_analysis(quotes, [])
-    with pytest.raises(TypeError, match="#1322"):
+    with pytest.raises(TypeError, match="CapFloor or CreditDefaultSwap"):
         bucket_analysis(quotes, cast(Any, [quotes[0]]))
     assert quotes[0].value() == 0.03
 
@@ -169,3 +169,19 @@ def test_centred_spot_bump_matches_the_analytic_delta_at_second_order():
     coarse, fine = (abs(parallel_analysis([spot], [option], shift=h)[0] - delta) for h in (1.0, 0.5))
     assert coarse < 1e-3
     assert coarse / fine == pytest.approx(4.0, abs=0.1)
+
+
+def test_swaption_and_cap_floor_are_bit_identical_to_a_manual_curve_bump():
+    """A Black swaption and a Black cap reprice through the curve built from_quote."""
+    settings, _, discount, _, discount_curve = _market()
+    day_counter = DayCounter.actual365_fixed()
+    index = Euribor.six_months(discount_curve, settings)
+    exercise = Date(15, 1, 2031)
+    swap = MakeVanillaSwap(Period(5, "Years"), index, settings, fixed_rate=0.03, effective_date=Date(17, 1, 2031)).build()
+    swaption = Swaption(swap, EuropeanExercise(exercise), SettlementType.Physical, SettlementMethod.PhysicalOTC, settings)
+    swaption.set_black_engine(BlackSwaptionEngine.with_flat_vol(discount_curve, SimpleQuote(0.2), day_counter, 0.0, settings))
+    cap = CapFloor(CapFloorType.Cap, Period(3, "Years"), index, 0.03, Period(1, "Years"), settings)
+    cap.set_black_engine(BlackCapFloorEngine.with_flat_vol(discount_curve, SimpleQuote(0.2), day_counter, 0.0, settings))
+    for instrument in (swaption, cap):
+        _assert_kind(discount, instrument)
+    assert discount.value() == 0.03

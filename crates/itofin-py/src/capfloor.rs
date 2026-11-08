@@ -30,6 +30,7 @@ use crate::settings::PySettings;
 use crate::time::{PyBusinessDayConvention, PyPeriod, PySchedule};
 use libitofin::instrument::Instrument;
 use libitofin::instruments::{CapFloor, CapFloorType, MakeCapFloor};
+use libitofin::shared::{SharedMut, shared_mut};
 use pyo3::prelude::*;
 #[allow(unused_imports)]
 use pyo3_stub_gen::derive::{
@@ -85,7 +86,7 @@ impl PyCapFloorType {
 #[gen_stub_pyclass]
 #[pyclass(name = "CapFloor", unsendable, module = "itofin.instruments")]
 pub struct PyCapFloor {
-    inner: CapFloor,
+    inner: SharedMut<CapFloor>,
 }
 
 #[gen_stub_pymethods]
@@ -118,16 +119,18 @@ impl PyCapFloor {
         settings: &PySettings,
     ) -> PyResult<Self> {
         Ok(PyCapFloor {
-            inner: MakeCapFloor::new(
-                cap_floor_type.inner(),
-                tenor.inner(),
-                ibor_index.inner(),
-                strike,
-                forward_start.inner(),
-                settings.inner(),
-            )
-            .build()
-            .map_err(PyQlError::from)?,
+            inner: shared_mut(
+                MakeCapFloor::new(
+                    cap_floor_type.inner(),
+                    tenor.inner(),
+                    ibor_index.inner(),
+                    strike,
+                    forward_start.inner(),
+                    settings.inner(),
+                )
+                .build()
+                .map_err(PyQlError::from)?,
+            ),
         })
     }
 
@@ -153,8 +156,10 @@ impl PyCapFloor {
     #[staticmethod]
     fn cap(leg: &PyIborLeg, cap_rates: Vec<f64>, settings: &PySettings) -> PyResult<Self> {
         Ok(PyCapFloor {
-            inner: CapFloor::cap(leg.coupons()?, cap_rates, settings.inner())
-                .map_err(PyQlError::from)?,
+            inner: shared_mut(
+                CapFloor::cap(leg.coupons()?, cap_rates, settings.inner())
+                    .map_err(PyQlError::from)?,
+            ),
         })
     }
 
@@ -175,8 +180,10 @@ impl PyCapFloor {
     #[staticmethod]
     fn floor(leg: &PyIborLeg, floor_rates: Vec<f64>, settings: &PySettings) -> PyResult<Self> {
         Ok(PyCapFloor {
-            inner: CapFloor::floor(leg.coupons()?, floor_rates, settings.inner())
-                .map_err(PyQlError::from)?,
+            inner: shared_mut(
+                CapFloor::floor(leg.coupons()?, floor_rates, settings.inner())
+                    .map_err(PyQlError::from)?,
+            ),
         })
     }
 
@@ -206,8 +213,10 @@ impl PyCapFloor {
         settings: &PySettings,
     ) -> PyResult<Self> {
         Ok(PyCapFloor {
-            inner: CapFloor::collar(leg.coupons()?, cap_rates, floor_rates, settings.inner())
-                .map_err(PyQlError::from)?,
+            inner: shared_mut(
+                CapFloor::collar(leg.coupons()?, cap_rates, floor_rates, settings.inner())
+                    .map_err(PyQlError::from)?,
+            ),
         })
     }
 
@@ -239,14 +248,16 @@ impl PyCapFloor {
             .coupons()
             .map_err(PyQlError::from)?;
         Ok(Self {
-            inner: CapFloor::from_overnight(
-                kind.inner(),
-                coupons,
-                cap_rates,
-                floor_rates,
-                settings.inner(),
-            )
-            .map_err(PyQlError::from)?,
+            inner: shared_mut(
+                CapFloor::from_overnight(
+                    kind.inner(),
+                    coupons,
+                    cap_rates,
+                    floor_rates,
+                    settings.inner(),
+                )
+                .map_err(PyQlError::from)?,
+            ),
         })
     }
 
@@ -255,7 +266,7 @@ impl PyCapFloor {
     /// Returns:
     ///     list[float]: The cap strikes; empty for a floor.
     fn cap_rates(&self) -> Vec<f64> {
-        self.inner.cap_rates().to_vec()
+        self.inner.borrow().cap_rates().to_vec()
     }
 
     /// Return the floor strikes, one per coupon.
@@ -263,7 +274,7 @@ impl PyCapFloor {
     /// Returns:
     ///     list[float]: The floor strikes; empty for a cap.
     fn floor_rates(&self) -> Vec<f64> {
-        self.inner.floor_rates().to_vec()
+        self.inner.borrow().floor_rates().to_vec()
     }
 
     /// Return the number of optionlets.
@@ -271,7 +282,7 @@ impl PyCapFloor {
     /// Returns:
     ///     int: One per floating coupon on the leg.
     fn coupon_count(&self) -> usize {
-        self.inner.coupon_count()
+        self.inner.borrow().coupon_count()
     }
 
     /// Attach a Black engine, pricing each optionlet off a volatility surface.
@@ -285,14 +296,23 @@ impl PyCapFloor {
     ///     engine (BlackCapFloorEngine): The engine and its optionlet
     ///         volatility surface.
     fn set_black_engine(&mut self, engine: &PyBlackCapFloorEngine) {
-        self.inner.base_mut().set_pricing_engine(engine.engine());
+        self.inner
+            .borrow_mut()
+            .base_mut()
+            .set_pricing_engine(engine.engine());
     }
 
     fn set_bachelier_engine(&mut self, engine: &PyBachelierCapFloorEngine) {
-        self.inner.base_mut().set_pricing_engine(engine.engine());
+        self.inner
+            .borrow_mut()
+            .base_mut()
+            .set_pricing_engine(engine.engine());
     }
     fn set_tree_engine(&mut self, engine: &crate::caphelper::PyTreeCapFloorEngine) {
-        self.inner.base_mut().set_pricing_engine(engine.engine());
+        self.inner
+            .borrow_mut()
+            .base_mut()
+            .set_pricing_engine(engine.engine());
     }
 
     /// Force the valuation. Idempotent.
@@ -301,7 +321,11 @@ impl PyCapFloor {
     ///     ItofinError: If no engine is attached, no evaluation date is set,
     ///         or the engine refuses the instrument.
     fn calculate(&mut self) -> PyResult<()> {
-        Ok(self.inner.calculate().map_err(PyQlError::from)?)
+        Ok(self
+            .inner
+            .borrow_mut()
+            .calculate()
+            .map_err(PyQlError::from)?)
     }
 
     /// Return whether the cached results are currently valid.
@@ -312,7 +336,7 @@ impl PyCapFloor {
     /// Returns:
     ///     bool: True when the next accessor reads the cache.
     fn is_calculated(&self) -> bool {
-        self.inner.base().is_calculated()
+        self.inner.borrow().base().is_calculated()
     }
 
     /// Attach engine and return the NPV.
@@ -340,7 +364,7 @@ impl PyCapFloor {
     ///     ItofinError: On anything that makes the valuation fail.
     fn results(&mut self) -> PyResult<Results> {
         self.calculate()?;
-        Ok(Results::snapshot(self.inner.base()))
+        Ok(Results::snapshot(self.inner.borrow().base()))
     }
 
     /// Return the cap/floor NPV under the attached engine.
@@ -352,6 +376,13 @@ impl PyCapFloor {
     ///     ItofinError: If no engine is attached, which the core reports as
     ///         "null pricing engine".
     fn npv(&mut self) -> PyResult<f64> {
-        Ok(self.inner.npv().map_err(PyQlError::from)?)
+        Ok(self.inner.borrow_mut().npv().map_err(PyQlError::from)?)
+    }
+}
+
+impl PyCapFloor {
+    /// A clone of the inner cap/floor for sensitivity analysis.
+    pub(crate) fn inner(&self) -> SharedMut<CapFloor> {
+        SharedMut::clone(&self.inner)
     }
 }
