@@ -9,11 +9,12 @@ import pytest
 # itofin library
 from itofin import ItofinError, Settings
 from itofin.indexes import Currency, Estr, Euribor, IborIndex
-from itofin.instruments import CreditDefaultSwap, FixedRateBond, FloatingRateBond, MakeOis, MakeVanillaSwap, ProtectionSide
+from itofin.instruments import CreditDefaultSwap, FixedRateBond, FloatingRateBond, MakeOis, MakeVanillaSwap, OptionType, ProtectionSide, VanillaOption
 from itofin.pricingengines import DiscountingBondEngine, MidPointCdsEngine
+from itofin.processes import BlackScholesProcess
 from itofin.quotes import SimpleQuote
 from itofin.risk import SensitivityAnalysis, bucket_analysis, parallel_analysis
-from itofin.termstructures import FlatForward, FlatHazardRate
+from itofin.termstructures import BlackConstantVol, FlatForward, FlatHazardRate
 from itofin.time import BusinessDayConvention as BDC, Calendar, Date, DayCounter, Frequency, Period, Schedule
 
 TODAY = Date(15, 1, 2026)
@@ -138,3 +139,33 @@ def test_cds_is_bit_identical_to_a_manual_discount_and_hazard_bump():
     for quote in (rate, hazard):
         _assert_kind(quote, cds)
     assert (rate.value(), hazard.value()) == (0.06, 0.01234)
+
+
+def _option():
+    settings = Settings()
+    settings.set_evaluation_date(TODAY)
+    day_counter = DayCounter.actual365_fixed()
+    spot, rate, vol = SimpleQuote(100.0), SimpleQuote(0.05), SimpleQuote(0.2)
+    risk_free = FlatForward.from_quote(TODAY, rate, day_counter)
+    volatility = BlackConstantVol.from_quote(TODAY, vol, day_counter)
+    process = BlackScholesProcess.from_quote(spot, risk_free, FlatForward(TODAY, 0.02, day_counter), volatility)
+    option = VanillaOption(OptionType.Call, 105.0, TODAY + 360, settings)
+    option.set_engine(process)
+    return option, spot, rate, vol
+
+
+def test_option_is_bit_identical_to_a_manual_spot_vol_and_rate_bump():
+    """An analytic European option reprices through its spot, vol and curve quotes."""
+    option, spot, rate, vol = _option()
+    for quote in (spot, vol, rate):
+        _assert_kind(quote, option)
+    assert (spot.value(), rate.value(), vol.value()) == (100.0, 0.05, 0.2)
+
+
+def test_centred_spot_bump_matches_the_analytic_delta_at_second_order():
+    """The centred difference error against option.delta() quarters when h halves."""
+    option, spot, _, _ = _option()
+    delta = option.delta()
+    coarse, fine = (abs(parallel_analysis([spot], [option], shift=h)[0] - delta) for h in (1.0, 0.5))
+    assert coarse < 1e-3
+    assert coarse / fine == pytest.approx(4.0, abs=0.1)
