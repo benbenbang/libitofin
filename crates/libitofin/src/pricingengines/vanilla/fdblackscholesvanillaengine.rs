@@ -1057,3 +1057,235 @@ mod test_fd_engine_with_non_constant_parameters {
         );
     }
 }
+
+#[cfg(test)]
+mod test_fd_spot_cash_dividends {
+    //! The `Spot` cash-dividend model: the Spot arms of
+    //! `test-suite/dividendoption.cpp` and cached QuantLib numbers.
+    //!
+    //! The C++ fixtures dated `Date::todaysDate()` run on a fixed date on an
+    //! explicit [`Settings`] (D5).
+    //!
+    //! REFERENCE SUBSTITUTION, stated plainly. The `dividendoption.cpp` Spot
+    //! arms are self-consistency, no-op or `t = 0` checks; the C++ mid-life
+    //! Spot checks (`dividendoption.cpp:1023/1123/1214`) need engines this
+    //! crate does not have yet (#1371). The mid-life reference is therefore the
+    //! value QuantLib itself produces on the Spot arm of
+    //! `testEscrowedVsSpotAmericanOption` (`americanoption.cpp:731-761`),
+    //! measured on a locally built QuantLib at commit `9863b578a` (reports
+    //! 1.43.0; CMake Release, Apple clang, `-O2 -std=c++17`, Boost 1.92):
+    //! Actual360, today 2021-02-27, spot 100, `q = 0.08`, `r = 0.04`,
+    //! `vol = 0.3` on flat curves, strike 100, maturity today + 12M, one cash
+    //! dividend of 10 at today + 10M, `FdBlackScholesVanillaEngine(process,
+    //! dividends, 100, 400)` with the default damping and Douglas scheme.
+
+    use crate::cashflows::dividend_vector;
+    use crate::exercise::{AmericanExercise, EuropeanExercise, Exercise};
+    use crate::handle::Handle;
+    use crate::instrument::Instrument;
+    use crate::instruments::{OneAssetOption, PlainVanillaPayoff};
+    use crate::interestrate::Compounding;
+    use crate::methods::finitedifferences::solvers::FdmSchemeDesc;
+    use crate::option::OptionType::{self, Call, Put};
+    use crate::pricingengine::PricingEngine;
+    use crate::pricingengines::vanilla::test_market::quote_handle;
+    use crate::processes::{BlackScholesMertonProcess, GeneralizedBlackScholesProcess};
+    use crate::quotes::SimpleQuote;
+    use crate::settings::Settings;
+    use crate::shared::{Shared, SharedMut, shared, shared_mut};
+    use crate::termstructures::volatility::{BlackConstantVol, BlackVolTermStructure};
+    use crate::termstructures::yields::FlatForward;
+    use crate::termstructures::yieldtermstructure::YieldTermStructure;
+    use crate::time::date::{Date, Month};
+    use crate::time::daycounter::DayCounter;
+    use crate::time::daycounters::actual360::Actual360;
+    use crate::time::frequency::Frequency;
+    use crate::time::period::Period;
+    use crate::time::timeunit::TimeUnit;
+    use crate::types::{Real, Size};
+
+    use super::FdBlackScholesVanillaEngine;
+
+    /// Quote-backed flat curves on `day_counter`, as `flatRate` and `flatVol`
+    /// of `test-suite/utilities.hpp` build them for a fixed evaluation date.
+    struct Market {
+        settings: Shared<Settings<Date>>,
+        spot: Shared<SimpleQuote>,
+        q_rate: Shared<SimpleQuote>,
+        r_rate: Shared<SimpleQuote>,
+        vol: Shared<SimpleQuote>,
+        process: Shared<GeneralizedBlackScholesProcess>,
+    }
+
+    impl Market {
+        fn new(today: Date, day_counter: DayCounter) -> Market {
+            let settings = shared(Settings::new());
+            settings.set_evaluation_date(today);
+            let quote = || shared(SimpleQuote::new(0.0));
+            let (spot, q_rate, r_rate, vol) = (quote(), quote(), quote(), quote());
+            let flat = |q: &Shared<SimpleQuote>| {
+                Handle::new(shared(FlatForward::new(
+                    today,
+                    quote_handle(q),
+                    day_counter.clone(),
+                    Compounding::Continuous,
+                    Frequency::Annual,
+                )) as Shared<dyn YieldTermStructure>)
+            };
+            let vol_ts = shared(BlackConstantVol::with_quote(
+                today,
+                None,
+                quote_handle(&vol),
+                day_counter.clone(),
+            )) as Shared<dyn BlackVolTermStructure>;
+            let process = shared(BlackScholesMertonProcess::new(
+                quote_handle(&spot),
+                flat(&q_rate),
+                flat(&r_rate),
+                Handle::new(vol_ts),
+            ));
+            Market {
+                settings,
+                spot,
+                q_rate,
+                r_rate,
+                vol,
+                process,
+            }
+        }
+
+        fn set(&self, spot: Real, q: Real, r: Real, vol: Real) {
+            self.spot.set_value(spot);
+            self.q_rate.set_value(q);
+            self.r_rate.set_value(r);
+            self.vol.set_value(vol);
+        }
+
+        /// The option priced by [`FdBlackScholesVanillaEngine::new`] when
+        /// `dividends` is `None`, and by
+        /// [`FdBlackScholesVanillaEngine::with_cash_dividends`] otherwise.
+        fn option(
+            &self,
+            option_type: OptionType,
+            strike: Real,
+            exercise: &Shared<dyn Exercise>,
+            dividends: Option<(&[Date], &[Real])>,
+            (t_grid, x_grid): (Size, Size),
+        ) -> OneAssetOption {
+            let process = Shared::clone(&self.process);
+            let engine = match dividends {
+                None => FdBlackScholesVanillaEngine::new(
+                    process,
+                    t_grid,
+                    x_grid,
+                    0,
+                    FdmSchemeDesc::douglas(),
+                ),
+                Some((dates, amounts)) => FdBlackScholesVanillaEngine::with_cash_dividends(
+                    process,
+                    dividend_vector(dates, amounts).unwrap(),
+                    t_grid,
+                    x_grid,
+                    0,
+                    FdmSchemeDesc::douglas(),
+                ),
+            };
+            let mut option = OneAssetOption::new(
+                shared(PlainVanillaPayoff::new(option_type, strike)),
+                Shared::clone(exercise),
+                Shared::clone(&self.settings),
+            );
+            option
+                .base_mut()
+                .set_pricing_engine(shared_mut(engine) as SharedMut<dyn PricingEngine>);
+            option
+        }
+    }
+
+    fn european(date: Date) -> Shared<dyn Exercise> {
+        shared(EuropeanExercise::new(date))
+    }
+
+    fn american(earliest: Date, latest: Date) -> Shared<dyn Exercise> {
+        shared(AmericanExercise::over(earliest, latest).unwrap())
+    }
+
+    /// `(type, american, npv, delta, gamma, theta)` as printed by the C++
+    /// program; theta is not required by the ticket but matches as well.
+    #[allow(
+        clippy::excessive_precision,
+        reason = "Preserve the exact digits QuantLib printed"
+    )]
+    const CACHED: [(OptionType, bool, Real, Real, Real, Real); 4] = [
+        (
+            Call,
+            false,
+            6.1960282059877851,
+            0.35044346362393469,
+            0.011801864944369449,
+            -3.6653085886903991,
+        ),
+        (
+            Call,
+            true,
+            9.3876035416433616,
+            0.50439288657051151,
+            0.014825610960493722,
+            -4.4369085588700861,
+        ),
+        (
+            Put,
+            false,
+            19.549295792091659,
+            -0.57167700814074907,
+            0.011801370341950067,
+            -6.8200224270321117,
+        ),
+        (
+            Put,
+            true,
+            19.554593543297607,
+            -0.57210536069765239,
+            0.011835102196332071,
+            -6.8366745831229414,
+        ),
+    ];
+
+    #[test]
+    fn mid_life_cash_dividend_reproduces_the_cached_quantlib_values() {
+        let today = Date::new(27, Month::February, 2021);
+        let market = Market::new(today, Actual360::new());
+        market.set(100.0, 0.08, 0.04, 0.3);
+        let maturity = today + Period::new(12, TimeUnit::Months);
+        let dividend_date = today + Period::new(10, TimeUnit::Months);
+        assert_eq!(maturity, Date::new(27, Month::February, 2022));
+        assert_eq!(dividend_date, Date::new(27, Month::December, 2021));
+
+        for (option_type, is_american, npv, delta, gamma, theta) in CACHED {
+            let exercise = if is_american {
+                american(today, maturity)
+            } else {
+                european(maturity)
+            };
+            let mut option = market.option(
+                option_type,
+                100.0,
+                &exercise,
+                Some((&[dividend_date], &[10.0])),
+                (100, 400),
+            );
+            for (name, value, expected) in [
+                ("npv", option.npv().unwrap(), npv),
+                ("delta", option.delta().unwrap(), delta),
+                ("gamma", option.gamma().unwrap(), gamma),
+                ("theta", option.theta().unwrap(), theta),
+            ] {
+                assert!(
+                    (value - expected).abs() < 1.0e-8,
+                    "{option_type:?} american {is_american} {name}: \
+                     calculated {value} expected {expected}"
+                );
+            }
+        }
+    }
+}
