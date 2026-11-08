@@ -92,7 +92,7 @@ is approximately `0.04`, with approximately zero NPV at strike `0.04`.
     )?;
     ```
 
-    [Complete Rust market, attachment and result example](https://github.com/benbenbang/libitofin/blob/main/crates/libitofin/examples/mc_variance_swap.rs).
+    [Complete Rust market, attachment and result example](https://github.com/bitbrew-dev/libitofin/blob/main/crates/libitofin/examples/mc_variance_swap.rs).
 
 === "Python"
 
@@ -105,7 +105,7 @@ is approximately `0.04`, with approximately zero NPV at strike `0.04`.
     ```
 
     Tolerance mode replaces `samples=1023` with `tolerance=1e-5, max_samples=50000`.
-    [Complete Python example](https://github.com/benbenbang/libitofin/blob/main/example/python/mc_variance_swap.py).
+    [Complete Python example](https://github.com/bitbrew-dev/libitofin/blob/main/example/python/mc_variance_swap.py).
 
 === "Go"
 
@@ -121,7 +121,7 @@ is approximately `0.04`, with approximately zero NPV at strike `0.04`.
     Go/C zero-valued option selectors mean unset; Python uses `None` and rejects
     explicit zero grid/sample selectors or tolerance. Tolerance mode uses
     `AbsoluteTolerance: 1e-5, MaxSamples: 50000` instead of `Samples`.
-    [Complete Go example with all results and cleanup](https://github.com/benbenbang/libitofin/blob/main/sdk/go/examples/mc-variance-swap/main.go).
+    [Complete Go example with all results and cleanup](https://github.com/bitbrew-dev/libitofin/blob/main/sdk/go/examples/mc-variance-swap/main.go).
 
 ## Ownership and recalculation
 
@@ -137,5 +137,5 @@ variance error and weights are unavailable. Included maturity-day events still
 require positive pricing time. Changing the reference-date-event flag after an
 expired cache requires explicit recalculation because that setter does not notify.
 
-[Pinned source-built native fixtures](https://github.com/benbenbang/libitofin/tree/main/sdk/go/testdata/mc-variance-swap)
+[Pinned source-built native fixtures](https://github.com/bitbrew-dev/libitofin/tree/main/sdk/go/testdata/mc-variance-swap)
 include the original time-dependent 90-day native case, not only flat volatility.

@@ -27,7 +27,7 @@ concurrency:
 
 jobs:
   resolve:
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     outputs:
       version: ${{ steps.release.outputs.version }}
       revision: ${{ steps.release.outputs.revision }}
@@ -58,7 +58,7 @@ jobs:
 
   publish:
     needs: [resolve, package]
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     permissions:
       contents: write
     steps:
@@ -83,13 +83,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-24.04
+          - os: blacksmith-4vcpu-ubuntu-2404
             platform: linux-amd64
-          - os: ubuntu-24.04-arm
+          - os: blacksmith-4vcpu-ubuntu-2404-arm
             platform: linux-arm64
           - os: macos-15-intel
             platform: darwin-amd64
-          - os: macos-15
+          - os: blacksmith-6vcpu-macos-15
             platform: darwin-arm64
     runs-on: ${{ matrix.os }}
     steps:
@@ -120,7 +120,7 @@ jobs:
 
   verify-published-windows:
     needs: [resolve, publish]
-    runs-on: windows-2025
+    runs-on: blacksmith-4vcpu-windows-2025
     timeout-minutes: 30
     continue-on-error: true
     defaults:

@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 license = "BSD-3-Clause"
 description = "C ABI for libitofin"
-repository = "https://github.com/benbenbang/libitofin"
+repository = "https://github.com/bitbrew-dev/libitofin"
 
 [lib]
 name = "itofin_ffi"

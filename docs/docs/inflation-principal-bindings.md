@@ -84,5 +84,5 @@ python scripts/generate_inflation_principal_oracle.py sdk/go/testdata
 
 Runnable examples:
 
-- [Python](https://github.com/benbenbang/libitofin/blob/main/example/python/inflation_principal.py)
-- [Go](https://github.com/benbenbang/libitofin/blob/main/sdk/go/examples/inflation_principal/main.go)
+- [Python](https://github.com/bitbrew-dev/libitofin/blob/main/example/python/inflation_principal.py)
+- [Go](https://github.com/bitbrew-dev/libitofin/blob/main/sdk/go/examples/inflation_principal/main.go)

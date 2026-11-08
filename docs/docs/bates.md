@@ -91,7 +91,7 @@ it does not infer physical return forecasts.
 
 ## Numerical evidence
 
-The [independent oracle](https://github.com/benbenbang/libitofin/blob/main/sdk/go/testdata/bates-oracle.md)
+The [independent oracle](https://github.com/bitbrew-dev/libitofin/blob/main/sdk/go/testdata/bates-oracle.md)
 records QuantLib price and calibration provenance, quadrature orders and
 fixed tolerances. Exact zero-intensity cases use independent Heston reference
 prices because upstream Bates model constraints exclude zero intensity.

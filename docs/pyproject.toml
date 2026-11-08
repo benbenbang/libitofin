@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Docs site of the codebase"
 readme = "README.md"
 authors = [
-    { name = "benbenbang", email = "bn@bitbrew.dev" }
+    { name = "bitbrew-dev", email = "bn@bitbrew.dev" }
 ]
 requires-python = ">=3.13.14,<3.15"
 dependencies = [

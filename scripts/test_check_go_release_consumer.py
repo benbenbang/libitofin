@@ -8,7 +8,7 @@ import unittest
 
 SCRIPT = Path(__file__).with_name("check_go_release_consumer.sh")
 REVISION = "a" * 40
-MODULE = "github.com/benbenbang/libitofin/sdk/go"
+MODULE = "github.com/bitbrew-dev/libitofin/sdk/go"
 FAKE_GO = r'''#!/usr/bin/env python3
 import json
 import os
@@ -24,21 +24,21 @@ if args[:2] == ["mod", "download"]:
     if mode == "unavailable":
         print(json.dumps({"Error": "not yet published"}))
         sys.exit(1)
-    record = {"Path": "github.com/benbenbang/libitofin/sdk/go", "Version": "v0.23.0",
+    record = {"Path": "github.com/bitbrew-dev/libitofin/sdk/go", "Version": "v0.23.0",
               "Sum": "h1:source", "GoModSum": "h1:manifest"}
     if mode == "origin":
         record["Origin"] = {"Hash": "b" * 40}
     if mode == "version":
         record["Version"] = "v0.21.0"
     if mode == "legacy-path":
-        record["Path"] = "github.com/benbenbang/libitofin/bindings/go"
+        record["Path"] = "github.com/bitbrew-dev/libitofin/bindings/go"
     if mode == "checksum" and query == "a" * 40:
         record["Sum"] = "h1:different"
     print(json.dumps(record))
 elif args == ["mod", "edit", "-json"]:
     print(json.dumps({"Replace": [{"Old": {"Path": "bad"}}]} if mode == "replace" else {}))
 elif args[:3] == ["list", "-m", "-json"]:
-    print(json.dumps({"Path": "github.com/benbenbang/libitofin/sdk/go",
+    print(json.dumps({"Path": "github.com/bitbrew-dev/libitofin/sdk/go",
                       "Version": "v0.23.0"}))
 elif args and args[0] == "list":
     print("[] []")

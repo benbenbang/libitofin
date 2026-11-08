@@ -42,7 +42,7 @@ Recovered Z-spread: 0.007000000000
 ```
 
 The equivalent checked Go example is
-[`sdk/go/examples/bond-analytics/main.go`](https://github.com/benbenbang/libitofin/blob/main/sdk/go/examples/bond-analytics/main.go).
+[`sdk/go/examples/bond-analytics/main.go`](https://github.com/bitbrew-dev/libitofin/blob/main/sdk/go/examples/bond-analytics/main.go).
 Go methods return `(float64, error)`; all related handles must belong to one
 Session. Python returns `float` or raises the existing typed binding errors.
 

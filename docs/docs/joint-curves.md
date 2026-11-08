@@ -47,8 +47,8 @@ this assembly. Solver failures remain ordinary errors on curve queries.
 curve. `IborIndex.add_fixing` / `AddFixing` notifies retained and cloned indices;
 conflicting stored fixings are rejected.
 
-The complete [Python fixture](https://github.com/benbenbang/libitofin/blob/main/crates/itofin-py/tests/test_joint_yield_curves.py)
-and [Go fixture](https://github.com/benbenbang/libitofin/blob/main/sdk/go/joint_curves_test.go)
+The complete [Python fixture](https://github.com/bitbrew-dev/libitofin/blob/main/crates/itofin-py/tests/test_joint_yield_curves.py)
+and [Go fixture](https://github.com/bitbrew-dev/libitofin/blob/main/sdk/go/joint_curves_test.go)
 reproduce QuantLib's `testMultiCurveTwoPiecewiseYieldCurves`: independent FRAs
 use `1e-12` relative tolerance and independent swap NPVs use `1e-10` absolute
 tolerance. Fixing-update cases retain future coupons; a fully fixed short basis

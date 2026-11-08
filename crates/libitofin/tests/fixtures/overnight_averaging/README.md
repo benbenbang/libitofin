@@ -35,7 +35,7 @@ Updated cases specify reproducible target values; consumers should also mutate
 retained objects to verify invalidation, rather than only reconstructing them.
 
 The Rust fixture test checks all 18 Simple and 18 Compound rows, including the
-[#1045](https://github.com/benbenbang/libitofin/issues/1045) regressions. Additional
+[#1045](https://github.com/bitbrew-dev/libitofin/issues/1045) regressions. Additional
 cases cover weekend boundaries, forecast/historical daily spread, and enforced
 missing-today errors on partial spans. Effective spread and index fixing are
 independent QuantLib outputs; Simple has no effective index fixing.

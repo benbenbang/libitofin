@@ -22,7 +22,7 @@ concurrency:
 
 jobs:
   docs:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5

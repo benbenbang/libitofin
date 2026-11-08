@@ -1,3 +1,3 @@
-module github.com/benbenbang/libitofin/sdk/go
+module github.com/bitbrew-dev/libitofin/sdk/go
 
 go 1.27.1

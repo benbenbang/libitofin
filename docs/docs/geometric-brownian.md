@@ -64,7 +64,7 @@ process's log-price diffusion, not this arithmetic `volatility × x` diffusion.
     assert_eq!(process.evolve(0.0, 100.0, 1.0, -6.0)?, -15.0);
     ```
 
-    [Complete Rust accessor and transition example](https://github.com/benbenbang/libitofin/blob/main/crates/libitofin/examples/geometric_brownian.rs).
+    [Complete Rust accessor and transition example](https://github.com/bitbrew-dev/libitofin/blob/main/crates/libitofin/examples/geometric_brownian.rs).
 
 === "Python"
 
@@ -77,7 +77,7 @@ process's log-price diffusion, not this arithmetic `volatility × x` diffusion.
     assert process.evolve(0.0, 100.0, 1.0, -6.0) == -15.0
     ```
 
-    [Complete Python example](https://github.com/benbenbang/libitofin/blob/main/example/python/geometric_brownian.py).
+    [Complete Python example](https://github.com/bitbrew-dev/libitofin/blob/main/example/python/geometric_brownian.py).
 
 === "Go"
 
@@ -90,11 +90,11 @@ process's log-price diffusion, not this arithmetic `volatility × x` diffusion.
     fmt.Println(deviation)
     ```
 
-    [Complete Go example with cleanup](https://github.com/benbenbang/libitofin/blob/main/sdk/go/examples/geometric-brownian/main.go).
+    [Complete Go example with cleanup](https://github.com/bitbrew-dev/libitofin/blob/main/sdk/go/examples/geometric-brownian/main.go).
 
 C objects belong to their context, Go objects to one Session. Close Go objects
 before closing their session. Python objects are thread-confined and own their
 immutable scalar process; no external market owners are required.
 
-[Pinned independent native fixtures](https://github.com/benbenbang/libitofin/tree/main/sdk/go/testdata/geometric-brownian)
+[Pinned independent native fixtures](https://github.com/bitbrew-dev/libitofin/tree/main/sdk/go/testdata/geometric-brownian)
 cover signed states, zero steps and zero-crossing transitions.

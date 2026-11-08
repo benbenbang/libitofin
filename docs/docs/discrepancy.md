@@ -76,7 +76,7 @@ Four interior unit-square points below have exact squared discrepancy
 === "Go"
 
     ```go
-    import itofin "github.com/benbenbang/libitofin/sdk/go"
+    import itofin "github.com/bitbrew-dev/libitofin/sdk/go"
 
     points := [][]float64{{0.25, 0.25}, {0.75, 0.75}, {0.25, 0.75}, {0.75, 0.25}}
     discrepancy, err := itofin.StatisticsDiscrepancy(points, nil)
@@ -92,10 +92,10 @@ shape/work gate; passing a huge Python sequence still has conversion cost.
 
 Executable examples:
 
-- [Rust](https://github.com/benbenbang/libitofin/blob/main/crates/libitofin/examples/discrepancy_statistics.rs)
-- [Python](https://github.com/benbenbang/libitofin/blob/main/example/python/discrepancy_statistics.py)
-- [Go](https://github.com/benbenbang/libitofin/blob/main/sdk/go/examples/discrepancy-statistics/main.go)
-- [Pinned oracle and regeneration](https://github.com/benbenbang/libitofin/tree/main/sdk/go/testdata/discrepancy-statistics)
+- [Rust](https://github.com/bitbrew-dev/libitofin/blob/main/crates/libitofin/examples/discrepancy_statistics.rs)
+- [Python](https://github.com/bitbrew-dev/libitofin/blob/main/example/python/discrepancy_statistics.py)
+- [Go](https://github.com/bitbrew-dev/libitofin/blob/main/sdk/go/examples/discrepancy-statistics/main.go)
+- [Pinned oracle and regeneration](https://github.com/bitbrew-dev/libitofin/tree/main/sdk/go/testdata/discrepancy-statistics)
 
 For mean trajectories use [mean-convergence diagnostics](convergence.md).
 For weighted vector covariance and correlation use [weighted statistics](statistics.md#weighted-vector-statistics).

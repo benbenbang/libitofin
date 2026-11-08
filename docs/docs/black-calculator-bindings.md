@@ -73,7 +73,7 @@ Theta is per year; `theta_per_day` divides it by 365. Probabilities are the nati
 C contexts/handles remain confined to the creating thread. Go serializes calls on
 its session worker and rejects closed or missing receivers. Python owns the
 copied scalar core object and permits concurrent immutable reads. This feature
-retains no external dependencies. See the [binding contract](https://github.com/benbenbang/libitofin/blob/main/docs/go-binding-contract.md)
+retains no external dependencies. See the [binding contract](https://github.com/bitbrew-dev/libitofin/blob/main/docs/go-binding-contract.md)
 for C/Go lifecycle rules.
 
 This is bounded plain-vanilla scalar coverage, not complete QuantLib payoff or

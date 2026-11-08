@@ -288,7 +288,7 @@ not total peak memory. Terminal mode or smaller batches reduce output size.
 C accepts caller-owned capacity through `itofin_merton_paths` and preserves
 its output buffer on every error, including failures after earlier steps.
 
-The [independent fixture notes](https://github.com/benbenbang/libitofin/blob/main/sdk/go/testdata/merton-paths-oracle.md)
+The [independent fixture notes](https://github.com/bitbrew-dev/libitofin/blob/main/sdk/go/testdata/merton-paths-oracle.md)
 include a dependency-free generator, seed/draw records, twelve numerical
 cases and analytical moment checks. Rust, C, Go and Python share these gates.
 

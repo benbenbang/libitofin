@@ -5,27 +5,27 @@
 The Go SDK calls the Rust core through cgo. Use an explicit package name:
 
 ```go
-import itofin "github.com/benbenbang/libitofin/sdk/go"
+import itofin "github.com/bitbrew-dev/libitofin/sdk/go"
 ```
 
 Start with [installation](../README.md#install). An external application
 needs the native headers and library from the same release as its Go module;
 `go get` alone does not install them. Follow the
-[Go SDK setup guide](https://benbenbang.github.io/libitofin/go/#install-in-an-application)
+[Go SDK setup guide](https://bitbrew-dev.github.io/libitofin/go/#install-in-an-application)
 for native packages, linker settings, and the `itofin_external` build tag.
 
 ## Examples and sessions
 
-The [source-checkout setup](https://benbenbang.github.io/libitofin/go/#run-examples-from-a-source-checkout)
+The [source-checkout setup](https://bitbrew-dev.github.io/libitofin/go/#run-examples-from-a-source-checkout)
 shows how to build the native library and run these examples:
 
-- [European option](../sdk/go/examples/european_option/main.go): price a call and read its greeks, with a [walkthrough](https://benbenbang.github.io/libitofin/getting-started/).
+- [European option](../sdk/go/examples/european_option/main.go): price a call and read its greeks, with a [walkthrough](https://bitbrew-dev.github.io/libitofin/getting-started/).
 - [Swaption example](../sdk/go/examples/swaption/main.go) (requires current `main`): price vanilla payer and Eonia OIS swaptions with checked errors, retained dependencies and live volatility repricing.
-- [Portfolio simulation](../sdk/go/examples/portfolio/main.go): simulate correlated assets with a [worked explanation](https://benbenbang.github.io/libitofin/go/#portfolio-simulation).
+- [Portfolio simulation](../sdk/go/examples/portfolio/main.go): simulate correlated assets with a [worked explanation](https://bitbrew-dev.github.io/libitofin/go/#portfolio-simulation).
 
 A session owns its native object graph. Close sessions explicitly, check returned
 errors, and keep objects from different sessions separate. See
-[sessions and errors](https://benbenbang.github.io/libitofin/go/#sessions-and-errors)
+[sessions and errors](https://bitbrew-dev.github.io/libitofin/go/#sessions-and-errors)
 for concurrency and callback restrictions.
 
 ## Optimization
@@ -56,7 +56,7 @@ result, err := itofin.Minimize(ctx, func(x []float64) (float64, error) {
 
 ## Reference
 
-- [Go API reference](https://pkg.go.dev/github.com/benbenbang/libitofin/sdk/go).
+- [Go API reference](https://pkg.go.dev/github.com/bitbrew-dev/libitofin/sdk/go).
 - [SDK ownership and validation guide](../sdk/go/README.md).
 - [Native distribution and migration](../docs/go-distribution.md).
 - [C ABI contract](../docs/go-binding-contract.md) and [header](../crates/libitofin-ffi/include/itofin.h).
@@ -66,4 +66,4 @@ result, err := itofin.Minimize(ctx, func(x []float64) (float64, error) {
 ## Global optimization examples
 
 - [Particle swarm](../sdk/go/examples/particle_swarm/main.go): seeded signed-scalar minimization, with checked analytic value `-3`.
-- [Shared global-search contract](https://benbenbang.github.io/libitofin/global-optimization/): DE/PSO controls, feasible calibration boxes, budgets and numerical limits.
+- [Shared global-search contract](https://bitbrew-dev.github.io/libitofin/global-optimization/): DE/PSO controls, feasible calibration boxes, budgets and numerical limits.

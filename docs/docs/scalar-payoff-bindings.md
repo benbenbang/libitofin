@@ -76,5 +76,5 @@ agreement does not establish full QuantLib or engine parity.
 
 Examples:
 
-- [`example/python/scalar_payoffs.py`](https://github.com/benbenbang/libitofin/blob/main/example/python/scalar_payoffs.py)
-- [`sdk/go/examples/scalar_payoffs/main.go`](https://github.com/benbenbang/libitofin/blob/main/sdk/go/examples/scalar_payoffs/main.go)
+- [`example/python/scalar_payoffs.py`](https://github.com/bitbrew-dev/libitofin/blob/main/example/python/scalar_payoffs.py)
+- [`sdk/go/examples/scalar_payoffs/main.go`](https://github.com/bitbrew-dev/libitofin/blob/main/sdk/go/examples/scalar_payoffs/main.go)

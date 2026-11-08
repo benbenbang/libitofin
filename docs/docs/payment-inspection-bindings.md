@@ -71,5 +71,5 @@ aggregation and missing payments. It was produced by
 The recorded pinned source revision is a separate reference, not evidence that
 it built that wheel. These cases do not establish complete BondFunctions parity.
 
-Examples: [`example/python/payment_inspection.py`](https://github.com/benbenbang/libitofin/blob/main/example/python/payment_inspection.py)
-and [`sdk/go/examples/payment_inspection/main.go`](https://github.com/benbenbang/libitofin/blob/main/sdk/go/examples/payment_inspection/main.go).
+Examples: [`example/python/payment_inspection.py`](https://github.com/bitbrew-dev/libitofin/blob/main/example/python/payment_inspection.py)
+and [`sdk/go/examples/payment_inspection/main.go`](https://github.com/bitbrew-dev/libitofin/blob/main/sdk/go/examples/payment_inspection/main.go).

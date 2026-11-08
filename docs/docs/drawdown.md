@@ -62,7 +62,7 @@ that a supplied positive NAV reached zero. No weights or annualization apply.
 
 ## Independent fixtures
 
-The [hand-calculated fixture](https://github.com/benbenbang/libitofin/blob/main/sdk/go/testdata/drawdown.json)
+The [hand-calculated fixture](https://github.com/bitbrew-dev/libitofin/blob/main/sdk/go/testdata/drawdown.json)
 covers increase/decrease, recovery, repeated peaks/troughs, equal maximum
 losses and multiple drawdowns. Python independently enumerates every ordered
 peak/trough pair with exact rational arithmetic; Rust, C/C++ and Go validate

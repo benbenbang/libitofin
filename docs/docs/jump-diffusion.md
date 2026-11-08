@@ -98,7 +98,7 @@ The series checks both the latest contribution and a bound on the remaining
 payoff tail. This avoids stopping at zero early terms when later jumps can
 produce a payoff. Zero diffusion volatility is handled without NaNs.
 These behaviors intentionally correct upstream edge cases. Independent
-[QuantLib fixture notes](https://github.com/benbenbang/libitofin/blob/main/sdk/go/testdata/merton76-oracle.md)
+[QuantLib fixture notes](https://github.com/bitbrew-dev/libitofin/blob/main/sdk/go/testdata/merton76-oracle.md)
 record the source, curve clocks and tolerances.
 
 This process provides pricing inputs and date conversion. Like QuantLib's

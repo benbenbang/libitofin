@@ -3,8 +3,8 @@
 The original `feat/go-bindings-followups` stack started at `4c48647e`, with
 reviewed commits integrated sequentially from isolated feature branches. GitHub
 rebase-merges rewrite commit IDs; that starting point records assembly history.
-Tracker: [#1000](https://github.com/benbenbang/libitofin/issues/1000); binding
-strategy: [#46](https://github.com/benbenbang/libitofin/issues/46).
+Tracker: [#1000](https://github.com/bitbrew-dev/libitofin/issues/1000); binding
+strategy: [#46](https://github.com/bitbrew-dev/libitofin/issues/46).
 
 ## Scope
 
@@ -35,7 +35,7 @@ The [original review](go-bindings-review.md) retains the previous Linux counts.
 
 ## Integrated validation
 
-Validated API revision: `b169fabe15d86623b24f3dd76489533d59a3a4da`. The [Linux/macOS CI run](https://github.com/benbenbang/libitofin/actions/runs/35302175566) passed Rust, Python, native/C/C++ checks, Go vet and
+Validated API revision: `b169fabe15d86623b24f3dd76489533d59a3a4da`. The [Linux/macOS CI run](https://github.com/bitbrew-dev/libitofin/actions/runs/35302175566) passed Rust, Python, native/C/C++ checks, Go vet and
 race/cgocheck2 tests, header generation, native-package consumer validation,
 and the aggregate `workflow-success` gate.
 
@@ -89,10 +89,10 @@ Rust 1.96.0:
 The coordinated release workflow validates Linux amd64/arm64 and macOS amd64/arm64 packages,
 attaches them to the main `vVERSION` release, and publishes the matching
 `sdk/go/vVERSION` tag. SDK-path publication and platform acceptance are tracked
-in [#1037](https://github.com/benbenbang/libitofin/issues/1037). Fresh external
+in [#1037](https://github.com/bitbrew-dev/libitofin/issues/1037). Fresh external
 consumers verify the published module and assets without local replacements. Legacy `bindings/go/v0.22.0` remains unchanged; its acceptance
 evidence is recorded in
-[#1025](https://github.com/benbenbang/libitofin/issues/1025); private application
+[#1025](https://github.com/bitbrew-dev/libitofin/issues/1025); private application
 migration and production budgets remain separate acceptance work.
 The Go/C ABI matrix checks both clean and incremental Python/stub/C ABI build
 orders on Linux and macOS with `scripts/check_go_mixed_builds.sh`. It uses fresh

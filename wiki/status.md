@@ -4,7 +4,7 @@
 
 ## Process discretization
 
-Unreleased [#411](https://github.com/benbenbang/libitofin/issues/411) adds Rust-only
+Unreleased [#411](https://github.com/bitbrew-dev/libitofin/issues/411) adds Rust-only
 scalar and multifactor strategy adapters with default Euler discretization. Explicit
 wrapping replaces transition methods while retaining source coefficients,
 state composition, ownership and notifications. Existing concrete process
@@ -22,12 +22,12 @@ QMC grid and stored Gaussian/Poisson seed oracles retain their original toleranc
 
 Rust, Python, and Go are published together. The Go module uses a matching
 native C ABI package; Node remains a placeholder. See the
-[release history](https://github.com/benbenbang/libitofin/releases),
+[release history](https://github.com/bitbrew-dev/libitofin/releases),
 [Go installation](go.md), and [Python guide](python.md).
 
-Go delivery [#1000](https://github.com/benbenbang/libitofin/issues/1000),
-parity [#1030](https://github.com/benbenbang/libitofin/issues/1030), and behavioral
-follow-ups [#1036](https://github.com/benbenbang/libitofin/issues/1036) are closed.
+Go delivery [#1000](https://github.com/bitbrew-dev/libitofin/issues/1000),
+parity [#1030](https://github.com/bitbrew-dev/libitofin/issues/1030), and behavioral
+follow-ups [#1036](https://github.com/bitbrew-dev/libitofin/issues/1036) are closed.
 API accounting, numerical tests, and statement coverage measure different things;
 see the [Go validation record](../docs/go-binding-test-gaps.md).
 
@@ -53,7 +53,7 @@ those unrelated engines were added. Table provenance and reproduction are in
 
 ## Bates analytic pricing
 
-Unreleased [#1163](https://github.com/benbenbang/libitofin/issues/1163) adds
+Unreleased [#1163](https://github.com/bitbrew-dev/libitofin/issues/1163) adds
 constant-intensity lognormal jumps to Heston with a live eight-parameter Bates
 model in Rust, Python, C and Go. The retained engine supports European
 plain-vanilla NPV and existing Heston calibration helpers; zero intensity
@@ -63,7 +63,7 @@ See [parameters, limits and runnable examples](../docs/docs/bates.md).
 
 ## GJR-GARCH process and paths
 
-Unreleased [#1164](https://github.com/benbenbang/libitofin/issues/1164) adds a
+Unreleased [#1164](https://github.com/bitbrew-dev/libitofin/issues/1164) adds a
 live two-factor GJR-GARCH process and seeded full/terminal spot/variance paths
 in Rust, Python, C and Go. Daily inputs are explicitly annualized; Partial
 Truncation, Full Truncation and Reflection preserve QuantLib's raw variance
@@ -77,7 +77,7 @@ covered. See [units, schemes and examples](../docs/docs/gjrgarch.md).
 
 ## GJR-GARCH model and European pricing
 
-Unreleased [#1165](https://github.com/benbenbang/libitofin/issues/1165) pairs a
+Unreleased [#1165](https://github.com/bitbrew-dev/libitofin/issues/1165) pairs a
 six-parameter daily-unit model, calibration and analytic/Monte Carlo European
 engines in Rust, Python, C and Go. Analytic pricing observes model updates;
 MC retains the supplied process snapshot and reports sampling standard error.
@@ -92,7 +92,7 @@ are exposed by these engines. See [contracts and examples](../docs/docs/gjrgarch
 
 ## Cap/floor normal and lattice engines
 
-[#440](https://github.com/benbenbang/libitofin/issues/440) adds Bachelier cap/floor
+[#440](https://github.com/bitbrew-dev/libitofin/issues/440) adds Bachelier cap/floor
 pricing, Hull-White tree engines, and normal-volatility CapHelper calibration in
 Rust, Python and Go since v0.27.0. Fixed grids preserve supplied nodes;
 missing coupon times are errors. The tree engine requires a nonnegative first
@@ -102,7 +102,7 @@ See the [independent oracles](../crates/libitofin/tests/fixtures/tree_capfloor/R
 
 ## Optionlet stripping
 
-Unreleased [#577](https://github.com/benbenbang/libitofin/issues/577) adds normal
+Unreleased [#577](https://github.com/bitbrew-dev/libitofin/issues/577) adds normal
 and non-flat stripping, fixed/floating switch strikes, ATM correction through
 `OptionletStripper2`, and optionlet smile snapshots in Rust, Python, C and Go.
 ATM curves retain live quotes with fixed or moving reference dates. Surface
@@ -120,23 +120,23 @@ See [binding evidence](../docs/go-binding-test-gaps.md) for lifecycle tests and 
 
 ## Credit extensions
 
-- [#1023](https://github.com/benbenbang/libitofin/issues/1023): spread and upfront
+- [#1023](https://github.com/bitbrew-dev/libitofin/issues/1023): spread and upfront
   helpers support ISDA pricing, extended pillars and quote recalibration in Rust,
   Python and Go. [QuantLib fixtures](../crates/libitofin/tests/fixtures/isda_helpers/generator.py)
   independently pin prices and settings-sensitive settlement cases.
-- [#1021](https://github.com/benbenbang/libitofin/issues/1021): fixed and moving
+- [#1021](https://github.com/bitbrew-dev/libitofin/issues/1021): fixed and moving
   FlatHazardRate curves accept observable survival jumps in Rust, Python and Go.
   Other Rust curves can opt into the shared jump hook. Strict boundaries,
   generated year-end dates and date updates match the
   [QuantLib oracle](../sdk/go/testdata/credit_jumps_oracle.md).
-- [#1020](https://github.com/benbenbang/libitofin/issues/1020): default-density
+- [#1020](https://github.com/bitbrew-dev/libitofin/issues/1020): default-density
   interpolation and CDS bootstrapping support BackwardFlat and Linear in Rust,
   Python and Go. [Analytic and binding tests](../crates/itofin-py/tests/test_credit_density.py)
   cover survival, density, quote recalibration and retained dependencies.
-- [#1024](https://github.com/benbenbang/libitofin/issues/1024): Rust, Python and Go
+- [#1024](https://github.com/bitbrew-dev/libitofin/issues/1024): Rust, Python and Go
   expose the CDS protection end as the final coupon's accrual end, independent of
   payment-date adjustment. [Cross-language regression](../crates/itofin-py/tests/test_credit_protection_end.py).
-- [#1022](https://github.com/benbenbang/libitofin/issues/1022): custom Rust hazard
+- [#1022](https://github.com/bitbrew-dev/libitofin/issues/1022): custom Rust hazard
   curves can derive survival using QuantLib's 48-point Gauss-Chebyshev fallback.
   Existing concrete curves retain their closed-form calculations. The
   [independent oracle generator](../crates/libitofin/tests/fixtures/credit_hazard_quadrature.py)
@@ -144,14 +144,14 @@ See [binding evidence](../docs/go-binding-test-gaps.md) for lifecycle tests and 
 
 ## Inflation extensions
 
-[#1018](https://github.com/benbenbang/libitofin/issues/1018) adds monthly Kerkhof
+[#1018](https://github.com/bitbrew-dev/libitofin/issues/1018) adds monthly Kerkhof
 seasonality in Rust, Python and Go. The cumulative correction matches 72
 [independent QuantLib rows](../crates/libitofin/tests/fixtures/kerkhof_seasonality.md);
 installing or clearing it recalibrates zero-inflation curves. Exactly twelve
 factors are supported; YoY corrections are rejected. This addition shipped in
 v0.26.0.
 
-[#1017](https://github.com/benbenbang/libitofin/issues/1017) adds lazy zero-inflation
+[#1017](https://github.com/bitbrew-dev/libitofin/issues/1017) adds lazy zero-inflation
 base dates. Python/C/Go expose a last-fixing constructor with linear interpolation;
 its unlinked index copy shares settings/history without retaining its forecast
 curve. Generic callbacks remain Rust-only. `try_base_date()` and binding inspectors
@@ -162,7 +162,7 @@ difference. Existing fixed-base constructors remain available.
 
 ## Iterative bootstrap recovery
 
-[#941](https://github.com/benbenbang/libitofin/issues/941) shipped in v0.27.0.
+[#941](https://github.com/bitbrew-dev/libitofin/issues/941) shipped in v0.27.0.
 The generic Rust driver retries a failed cached curve from fresh state before
 applying optional sign-aware bound widening. Explicit `dont_throw`
 permits an inclusive fallback scan or the final unconverged outer pass; it does
@@ -176,7 +176,7 @@ checks widening, fallback values, cached recovery, and the outer iteration limit
 
 ## Municipal BMA swaps
 
-[#565](https://github.com/benbenbang/libitofin/issues/565) adds Rust/Python/C/Go
+[#565](https://github.com/bitbrew-dev/libitofin/issues/565) adds Rust/Python/C/Go
 BMA indexes, averaged coupons, municipal swaps and rate helpers. Original ten
 1Y-30Y quotes reprice at `1e-9` across iterative curve configurations; local
 bootstrap retains `1e-6`. Independent QuantLib prices, holiday fixing dates,
@@ -186,18 +186,18 @@ live quotes/history, retained ownership and recovery are tested. See the
 ## Joint curve bootstrapping
 
 Rust exposes `IborIborBasisSwapRateHelper` and the genuinely coupled 3M/6M
-`MultiCurve` oracle ([#995](https://github.com/benbenbang/libitofin/issues/995)).
+`MultiCurve` oracle ([#995](https://github.com/bitbrew-dev/libitofin/issues/995)).
 Both helper sets read the opposite curve; QuantLib's FRA and swap repricing
 tolerances are preserved. Fixing-history updates on either index invalidate
 and recalibrate the live curve without observing its own forecast handle.
 The Ibor-Ibor core shipped in v0.26.0. Version 0.27.0 adds the concrete
 Python/C/Go `JointYieldCurves` assembly and basis-helper facade
-([#1066](https://github.com/benbenbang/libitofin/issues/1066)), with retained joint
+([#1066](https://github.com/bitbrew-dev/libitofin/issues/1066)), with retained joint
 ownership and live quote, discount, date and fixing updates. See the
 [joint-curve guide](../docs/docs/joint-curves.md).
 
 Rust also exposes `OvernightIborBasisSwapRateHelper`
-([#1060](https://github.com/benbenbang/libitofin/issues/1060)): it fits the Ibor
+([#1060](https://github.com/bitbrew-dev/libitofin/issues/1060)): it fits the Ibor
 forecast curve, with basis paid on the compounded overnight leg. An omitted
 discount curve uses fitted Ibor, matching QuantLib executable behavior despite
 the upstream header prose. The [independent oracle](../crates/libitofin/tests/fixtures/overnight_basis/README.md)
@@ -207,7 +207,7 @@ exposure of this overnight helper remains outside the supported binding scope.
 
 ## Custom pillars and overnight futures
 
-[#808](https://github.com/benbenbang/libitofin/issues/808) adds custom pillar dates
+[#808](https://github.com/bitbrew-dev/libitofin/issues/808) adds custom pillar dates
 for FRA, swap, OIS and inflation helpers across Rust/Python/C/Go. Dates must lie
 within the helper's relevant window; flat inflation helpers retain QuantLib's
 single-node behavior. Relative helpers retain their last valid dates after a
@@ -223,7 +223,7 @@ in v0.27.0.
 
 ## Hull-White calibration
 
-[#400](https://github.com/benbenbang/libitofin/issues/400) covers fixed-reversion
+[#400](https://github.com/bitbrew-dev/libitofin/issues/400) covers fixed-reversion
 and zero-start-delay calibration. Rust tests both coupon modes; Python and Go
 check the exposed PAR cases against the original QuantLib caches at `1e-5`,
 including calibration after input wrappers are released.
@@ -231,7 +231,7 @@ including calibration after input wrappers are released.
 
 ## Swaption foundation
 
-Version 0.27.0 completes [#467](https://github.com/benbenbang/libitofin/issues/467):
+Version 0.27.0 completes [#467](https://github.com/bitbrew-dev/libitofin/issues/467):
 Hull-White tree swaptions rebuild vanilla coupon schedules after inclusive
 seven-day exercise-date snapping. Rust, Python and C/Go support Bermudan exercise;
 all six indexed/par QuantLib cached values pass at `1e-4` absolute tolerance with
@@ -240,7 +240,7 @@ shared fixing history are preserved. The tree engine requires a vanilla Ibor
 underlying; OIS remains supported by the existing Black/Bachelier engines.
 
 
-[EPIC-10 #358](https://github.com/benbenbang/libitofin/issues/358) covers the
+[EPIC-10 #358](https://github.com/bitbrew-dev/libitofin/issues/358) covers the
 constant volatility surface, swaption instrument, Black engine, Eonia, SwapIndex
 and vanilla MakeSwaption builder. Its five core issues (#359-#363) are complete.
 Physical and cash settlement, both cash annuity models, and payer/receiver pricing
@@ -253,7 +253,7 @@ are supported; the later convention and delta gates (#364/#365) are also complet
 | [Go settlement oracle](../sdk/go/rates_completion_settlement_test.go) | Same 12 independent settlement cases; both cash annuity models and payer/receiver sides |
 
 Python/C/Go expose Eonia, OIS-underlying swaptions and the vanilla MakeSwaption
-convenience ([#1049](https://github.com/benbenbang/libitofin/issues/1049)).
+convenience ([#1049](https://github.com/bitbrew-dev/libitofin/issues/1049)).
 [Python](../crates/itofin-py/tests/test_swaption_facades.py) and
 [C/Go](../sdk/go/swaption_facades_test.go) tests preserve the Eonia OIS cached NPV
 `0.014101075767` at `1e-12`, independent forecast pins, exercise-calendar overrides,
@@ -261,7 +261,7 @@ retained dependencies and live repricing. These facades shipped in v0.26.0.
 MakeSwaption is payer-only and has no overnight-index builder; SwapIndex clone
 variants and swaption implied volatility remain deferred.
 
-[#570](https://github.com/benbenbang/libitofin/issues/570) completes all five
+[#570](https://github.com/bitbrew-dev/libitofin/issues/570) completes all five
 swaption volatility matrix constructors in Rust, Python and Go, including fixed
 live quotes, moving numeric values and explicit option dates. The
 [independent oracle](../crates/libitofin/tests/fixtures/swaption_matrix/README.md)
@@ -269,8 +269,8 @@ pins 120 volatility nodes at `1e-16`; Rust also checks Black prices, volatility
 recovery through a test-only flat engine, and quote-handle relinks.
 
 Rust, Python and C/Go support backward-flat SABR parameter cubes
-([#606](https://github.com/benbenbang/libitofin/issues/606),
-[#1065](https://github.com/benbenbang/libitofin/issues/1065)). Python's trailing
+([#606](https://github.com/bitbrew-dev/libitofin/issues/606),
+[#1065](https://github.com/bitbrew-dev/libitofin/issues/1065)). Python's trailing
 `backward_flat=False` and Go's `BackwardFlat` preserve bilinear defaults. The new
 C `itofin_sabr_swaption_vol_cube_new` accepts the unchanged config plus a 0/1 flag;
 the existing constructor retains its old behavior. Go rejects `BackwardFlat=true`
@@ -279,16 +279,16 @@ layers 0-4 are backward-flat in option time and linear in swap length; market
 volatility and local-spread grids remain bilinear. All 72 independent QuantLib
 1.43 sparse/dense fixture rows are checked for both flags at `1e-6`, with live
 quote/date recalculation and retained-input tests in Python and Go.
-Normal SABR [#586](https://github.com/benbenbang/libitofin/issues/586), ZABR/generic
-XABR [#597](https://github.com/benbenbang/libitofin/issues/597), public section
+Normal SABR [#586](https://github.com/bitbrew-dev/libitofin/issues/586), ZABR/generic
+XABR [#597](https://github.com/bitbrew-dev/libitofin/issues/597), public section
 recalibration and standalone interpolation bindings retain separate scope.
 
 ## Dependency layers
 
 The port proceeds **bottom-up** through dependency layers L0→L11; each layer
 depends only on lower-numbered layers. The live backlog is the
-[GitHub Project board](https://github.com/users/benbenbang/projects/5) and
-[open issues](https://github.com/benbenbang/libitofin/issues). Use those
+[GitHub Project board](https://github.com/users/bitbrew-dev/projects/5) and
+[open issues](https://github.com/bitbrew-dev/libitofin/issues). Use those
 for current acceptance criteria; the layer map below describes scope, not full
 QuantLib parity.
 
@@ -354,7 +354,7 @@ Verified end-to-end since then, each against the matching `test-suite/` oracle:
 
 ### MC American and Bermudan depth
 
-Unreleased [#763](https://github.com/benbenbang/libitofin/issues/763):
+Unreleased [#763](https://github.com/bitbrew-dev/libitofin/issues/763):
 Rust/Python/C/Go support latest-only American windows and Bermudan vanilla options
 with selectable LSM bases: Monomial, Laguerre, Hermite, Hyperbolic and Chebyshev2nd.
 The default remains Monomial; Legendre and Chebyshev are rejected by this engine,

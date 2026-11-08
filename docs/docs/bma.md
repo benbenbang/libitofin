@@ -46,7 +46,7 @@ bracketing fixing-schedule queries, plus historical-fixing reads, writes and
 clearing. Python and Go retain native dependencies when the originating wrapper
 is released; Go handles still follow the owning session's lifetime.
 
-The [independent oracle](https://github.com/benbenbang/libitofin/tree/main/crates/libitofin/tests/fixtures/bma)
+The [independent oracle](https://github.com/bitbrew-dev/libitofin/tree/main/crates/libitofin/tests/fixtures/bma)
 contains QuantLib 1.43 prices for ten maturities from 1Y through 30Y. Iterative
 bootstrap reprices the original fractions within `1e-9`; Rust's local-bootstrap
 acceptance retains QuantLib's `1e-6` tolerance. These APIs cover plain municipal

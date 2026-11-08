@@ -107,7 +107,7 @@ class TypingGateTests(unittest.TestCase):
                 self.removal()
                 | {
                     "classification": "accepted-precision-loss",
-                    "follow_up": "https://github.com/benbenbang/libitofin/issues/" + suffix,
+                    "follow_up": "https://github.com/bitbrew-dev/libitofin/issues/" + suffix,
                 }
             ]
             with self.assertRaises(ValueError):
@@ -118,7 +118,7 @@ class TypingGateTests(unittest.TestCase):
             self.removal()
             | {
                 "classification": "accepted-precision-loss",
-                "follow_up": "https://github.com/benbenbang/libitofin/issues/993",
+                "follow_up": "https://github.com/bitbrew-dev/libitofin/issues/993",
             }
         ]
         self.assertFalse(gate.expected_diagnostics(self.baseline))

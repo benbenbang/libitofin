@@ -20,7 +20,7 @@ concurrency:
 jobs:
   pre-commit:
     name: pre-commit checks
-    uses: benbenbang/reusable-workflows/.github/workflows/prek.yml@1.0.2
+    uses: bitbrew-dev/reusable-workflows/.github/workflows/prek.yml@main
     permissions:
       contents: read
       packages: read
@@ -35,7 +35,7 @@ jobs:
       rust: ${{ steps.check-changes.outputs.rust_any_modified }}
       go: ${{ steps.check-changes.outputs.go_any_modified }}
       docs: ${{ steps.check-changes.outputs.docs_any_modified }}
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     permissions:
       contents: read
     steps:
@@ -83,7 +83,7 @@ jobs:
 
   rust-ci:
     name: rust ci
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     needs: check-change-files
     if: needs.check-change-files.outputs.rust == 'true'
     permissions:
@@ -113,7 +113,7 @@ jobs:
   python-bindings:
     name: python bindings
     needs: check-change-files
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     strategy:
       fail-fast: false
       matrix:
@@ -194,7 +194,7 @@ jobs:
 
   pr-labeler:
     name: pr labeler
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     if: ${{ github.event.pull_request.head.repo.fork == false }}
     permissions:
       contents: read
@@ -223,7 +223,7 @@ jobs:
   docs:
     needs: check-change-files
     if: needs.check-change-files.outputs.docs == 'true'
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
@@ -237,7 +237,7 @@ jobs:
     name: workflow-success
     needs: [check-change-files, pre-commit, rust-ci, python-bindings, go-bindings, go-package, docs]
     if: ${{ always() }}
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     steps:
       - name: Require successful validation
         env:

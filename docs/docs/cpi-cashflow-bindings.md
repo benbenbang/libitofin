@@ -64,7 +64,7 @@ Independent fixtures in `sdk/go/testdata/cpi-oracle-*.json` are produced by
 source is a separate reference, not a claim that it built the Python wheel.
 Fixture agreement covers the listed scenarios, not full QuantLib parity.
 
-Runnable examples: [`example/python/cpi_cashflows.py`](https://github.com/benbenbang/libitofin/blob/main/example/python/cpi_cashflows.py)
-and [`sdk/go/examples/cpi_cashflows/main.go`](https://github.com/benbenbang/libitofin/blob/main/sdk/go/examples/cpi_cashflows/main.go).
+Runnable examples: [`example/python/cpi_cashflows.py`](https://github.com/bitbrew-dev/libitofin/blob/main/example/python/cpi_cashflows.py)
+and [`sdk/go/examples/cpi_cashflows/main.go`](https://github.com/bitbrew-dev/libitofin/blob/main/sdk/go/examples/cpi_cashflows/main.go).
 Both use published historical CPI and a nominal discount curve, so no inflation
 forecast curve is needed for their short maturity.

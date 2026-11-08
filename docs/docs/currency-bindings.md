@@ -63,4 +63,4 @@ or fractions per unit as fields 0/1. New accessor outputs remain unchanged on
 failure. Existing `itofin_currency_code` still returns the three-letter code plus
 NUL with capacity at least four and checks that the actual code fits.
 
-All calls follow the [binding ownership contract](https://github.com/benbenbang/libitofin/blob/main/docs/go-binding-contract.md).
+All calls follow the [binding ownership contract](https://github.com/bitbrew-dev/libitofin/blob/main/docs/go-binding-contract.md).

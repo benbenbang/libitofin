@@ -57,7 +57,7 @@ package main
 import (
 	"errors"
 	"fmt"
-	itofin "github.com/benbenbang/libitofin/sdk/go"
+	itofin "github.com/bitbrew-dev/libitofin/sdk/go"
 	"log"
 )
 

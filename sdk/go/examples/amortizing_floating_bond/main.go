@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"math"
 
-	itofin "github.com/benbenbang/libitofin/sdk/go"
+	itofin "github.com/bitbrew-dev/libitofin/sdk/go"
 )
 
 func must(err error) {

@@ -46,14 +46,14 @@ separate binding work.
     Then add the module to your application:
 
     ```sh
-    go get github.com/benbenbang/libitofin/sdk/go@v0.24.0
+    go get github.com/bitbrew-dev/libitofin/sdk/go@v0.24.0
     ```
 
     Go requires cgo, a C compiler, and the `itofin_external` build tag for
     applications outside this repository.
 
 The [Getting started](getting-started.md) page has runnable pricing examples
-in Python, Rust, and Go. The [project index](https://github.com/benbenbang/libitofin#readme)
+in Python, Rust, and Go. The [project index](https://github.com/bitbrew-dev/libitofin#readme)
 links to the language guides and project documentation.
 
 ## Where the docs live
@@ -62,8 +62,8 @@ links to the language guides and project documentation.
 |---------|-------|
 | Python API reference | This site (see the **Python API** section) |
 | Rust API reference | [docs.rs/libitofin](https://docs.rs/libitofin) - see [Rust API](rust.md) |
-| Go SDK | [Installation, sessions, and examples](go.md), plus [API reference](https://pkg.go.dev/github.com/benbenbang/libitofin/sdk/go) |
-| Worked examples | [`example/python`](https://github.com/benbenbang/libitofin/tree/main/example/python), [`sdk/go/examples`](https://github.com/benbenbang/libitofin/tree/main/sdk/go/examples), and [`crates/libitofin/examples`](https://github.com/benbenbang/libitofin/tree/main/crates/libitofin/examples) |
+| Go SDK | [Installation, sessions, and examples](go.md), plus [API reference](https://pkg.go.dev/github.com/bitbrew-dev/libitofin/sdk/go) |
+| Worked examples | [`example/python`](https://github.com/bitbrew-dev/libitofin/tree/main/example/python), [`sdk/go/examples`](https://github.com/bitbrew-dev/libitofin/tree/main/sdk/go/examples), and [`crates/libitofin/examples`](https://github.com/bitbrew-dev/libitofin/tree/main/crates/libitofin/examples) |
 
 ## Reviewed Rust additions
 
@@ -73,13 +73,13 @@ links to the language guides and project documentation.
 
 ## Project guides
 
-- Language guides: [Rust](https://github.com/benbenbang/libitofin/blob/main/wiki/rust.md),
-  [Python](https://github.com/benbenbang/libitofin/blob/main/wiki/python.md),
-  [Go](https://github.com/benbenbang/libitofin/blob/main/wiki/go.md).
-- [Status and scope](https://github.com/benbenbang/libitofin/blob/main/wiki/status.md)
-- [Development](https://github.com/benbenbang/libitofin/blob/main/wiki/development.md)
-- [Design](https://github.com/benbenbang/libitofin/blob/main/wiki/design.md)
-- [QuantLib compatibility](https://github.com/benbenbang/libitofin/blob/main/wiki/compatibility.md)
+- Language guides: [Rust](https://github.com/bitbrew-dev/libitofin/blob/main/wiki/rust.md),
+  [Python](https://github.com/bitbrew-dev/libitofin/blob/main/wiki/python.md),
+  [Go](https://github.com/bitbrew-dev/libitofin/blob/main/wiki/go.md).
+- [Status and scope](https://github.com/bitbrew-dev/libitofin/blob/main/wiki/status.md)
+- [Development](https://github.com/bitbrew-dev/libitofin/blob/main/wiki/development.md)
+- [Design](https://github.com/bitbrew-dev/libitofin/blob/main/wiki/design.md)
+- [QuantLib compatibility](https://github.com/bitbrew-dev/libitofin/blob/main/wiki/compatibility.md)
 
 - [Small LOW Rust additions](low-small-additions.md): additive helpers, immutable
   legacy components, independent references and deferred scope.

@@ -87,7 +87,7 @@ They inspect a bounded strip, not an asserted exact fair variance of `0.04`.
         today, today + 365, settings)?;
     ```
 
-    [Complete market, engine attachment and results](https://github.com/benbenbang/libitofin/blob/main/crates/libitofin/examples/variance_swap.rs).
+    [Complete market, engine attachment and results](https://github.com/bitbrew-dev/libitofin/blob/main/crates/libitofin/examples/variance_swap.rs).
 
 === "Python"
 
@@ -103,7 +103,7 @@ They inspect a bounded strip, not an asserted exact fair variance of `0.04`.
     print(swap.variance(), swap.npv(), len(swap.option_weights()))
     ```
 
-    [Complete Python example](https://github.com/benbenbang/libitofin/blob/main/example/python/variance_swap.py).
+    [Complete Python example](https://github.com/bitbrew-dev/libitofin/blob/main/example/python/variance_swap.py).
 
 === "Go"
 
@@ -122,7 +122,7 @@ They inspect a bounded strip, not an asserted exact fair variance of `0.04`.
     if err := swap.SetEngine(engine); err != nil { panic(err) }
     ```
 
-    [Complete Go example with results and explicit cleanup](https://github.com/benbenbang/libitofin/blob/main/sdk/go/examples/variance-swap/main.go).
+    [Complete Go example with results and explicit cleanup](https://github.com/bitbrew-dev/libitofin/blob/main/sdk/go/examples/variance-swap/main.go).
 
 ## Live markets and ownership
 
@@ -143,5 +143,5 @@ They inspect a bounded strip, not an asserted exact fair variance of `0.04`.
   serialized, including count-and-copy weight reads. Close objects before their
   session. Python classes are thread-confined.
 
-[Pinned native fixtures and regeneration](https://github.com/benbenbang/libitofin/tree/main/sdk/go/testdata/variance-swap)
+[Pinned native fixtures and regeneration](https://github.com/bitbrew-dev/libitofin/tree/main/sdk/go/testdata/variance-swap)
 record numerical provenance separately from these API boundaries.

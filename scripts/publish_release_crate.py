@@ -17,7 +17,7 @@ import urllib.request
 from check_release_version import check_version
 
 
-AGENT = "libitofin-release (https://github.com/benbenbang/libitofin)"
+AGENT = "libitofin-release (https://github.com/bitbrew-dev/libitofin)"
 PACKAGES = ("itofin-optimize", "libitofin")
 DELAYS = (2, 4, 8, 16, 30)
 

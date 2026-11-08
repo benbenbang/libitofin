@@ -54,7 +54,7 @@ def expected_diagnostics(baseline):
         if not removal.get("reason", "").strip() or not removal.get("evidence", "").strip():
             raise ValueError(f"Removal requires a reason and evidence: {identifier}")
         if classification == "accepted-precision-loss" and not re.fullmatch(
-            r"https://github\.com/benbenbang/libitofin/issues/[1-9][0-9]*", removal.get("follow_up", "")
+            r"https://github\.com/bitbrew-dev/libitofin/issues/[1-9][0-9]*", removal.get("follow_up", "")
         ):
             raise ValueError(f"Precision loss requires a filed follow-up: {identifier}")
         key = identifiers[identifier]

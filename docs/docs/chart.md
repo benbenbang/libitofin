@@ -21,7 +21,7 @@ close inside the low-to-high range; negative prices are valid.
 === "Go"
 
     ```go
-    import itofin "github.com/benbenbang/libitofin/sdk/go"
+    import itofin "github.com/bitbrew-dev/libitofin/sdk/go"
 
     // dates is a []itofin.Date in input order.
     bars, err := itofin.IntervalPrices(dates,
@@ -63,7 +63,7 @@ deviation. The output retains the input's alignment and warmup slots.
 === "Go"
 
     ```go
-    import itofin "github.com/benbenbang/libitofin/sdk/go"
+    import itofin "github.com/bitbrew-dev/libitofin/sdk/go"
 
     close := []float64{100, 110, 99}
     local, err := itofin.SimpleLocalVolatilityConstantFraction(close, 1.0/252)
@@ -105,7 +105,7 @@ point variances are `c²`, `(u-d)²/(4 ln 2)`,
 === "Go"
 
     ```go
-    import itofin "github.com/benbenbang/libitofin/sdk/go"
+    import itofin "github.com/bitbrew-dev/libitofin/sdk/go"
 
     estimates, err := itofin.OHLCPointVolatilityConstantFraction(
         []float64{100}, []float64{110}, []float64{90}, []float64{105}, 1.0/252,
@@ -149,7 +149,7 @@ low-to-high range.
 === "Go"
 
     ```go
-    import itofin "github.com/benbenbang/libitofin/sdk/go"
+    import itofin "github.com/bitbrew-dev/libitofin/sdk/go"
 
     estimates, err := itofin.OHLCOvernightVolatilityConstantFraction(
         []float64{100, 110}, []float64{100, 120},
@@ -190,7 +190,7 @@ the recurrence separately. Parameters must be finite and nonnegative, with
 === "Go"
 
     ```go
-    import itofin "github.com/benbenbang/libitofin/sdk/go"
+    import itofin "github.com/bitbrew-dev/libitofin/sdk/go"
 
     returns := []float64{0.1, 0.1, 0.1}
     result, err := itofin.Garch11Filter(returns, 0.2, 0.3, 0.4)
@@ -231,7 +231,7 @@ autocovariance calculation bounded.
 === "Go"
 
     ```go
-    import itofin "github.com/benbenbang/libitofin/sdk/go"
+    import itofin "github.com/bitbrew-dev/libitofin/sdk/go"
 
     returns := []float64{0.2, -0.3, 0.1, 0.5, -0.4, 0.25, -0.1, 0.3}
     fitted, err := itofin.Garch11Fit(returns)
@@ -269,7 +269,7 @@ earlier zeroes are warmup placeholders. Use Python's `to_list()` or Go's
 === "Go"
 
     ```go
-    import itofin "github.com/benbenbang/libitofin/sdk/go"
+    import itofin "github.com/bitbrew-dev/libitofin/sdk/go"
 
     average, err := itofin.SMA([]float64{1, 2, 3, 4}, 3)
     if err != nil { panic(err) }
@@ -324,7 +324,7 @@ falls subtract it, and equal closes preserve the previous OBV.
 === "Go"
 
     ```go
-    import itofin "github.com/benbenbang/libitofin/sdk/go"
+    import itofin "github.com/bitbrew-dev/libitofin/sdk/go"
 
     price := []float64{10, 12, 11, 11, 9}
     volume := []float64{0, 2, 1, 0, 3}
@@ -384,7 +384,7 @@ entirely missing. Period one returns the exact true-range series.
 === "Go"
 
     ```go
-    import itofin "github.com/benbenbang/libitofin/sdk/go"
+    import itofin "github.com/bitbrew-dev/libitofin/sdk/go"
 
     high := []float64{12, 16, 11}
     low := []float64{10, 14, 9}
@@ -458,7 +458,7 @@ Use **each channel's** `to_list()`/`NullableValues()` to mask its warmup zeroes.
 === "Go"
 
     ```go
-    import itofin "github.com/benbenbang/libitofin/sdk/go"
+    import itofin "github.com/bitbrew-dev/libitofin/sdk/go"
 
     result, err := itofin.ADX(
         []float64{10, 12, 11, 14}, []float64{8, 9, 7, 10},
@@ -487,7 +487,7 @@ positive. Ratios are divided before multiplying by 100 to avoid artificial
 multiply overflow. Incremental means avoid overflowing representable seeds.
 Floating-point rounding, including underflow of very small means, still applies.
 
-The [independent step fixture](https://github.com/benbenbang/libitofin/blob/main/crates/libitofin/tests/fixtures/chart_adx.csv)
+The [independent step fixture](https://github.com/bitbrew-dev/libitofin/blob/main/crates/libitofin/tests/fixtures/chart_adx.csv)
 records raw TR/DM, smoothed means, DI/DX/ADX as exact fractions. Regenerate it
 with `python3 scripts/chart_adx_fixture.py`; it imports no production code.
 The period-two fixture covers rising/falling movements, gaps, a positive tie
@@ -558,7 +558,7 @@ render as missing through `to_list()` or `NullableValues()`.
 === "Go"
 
     ```go
-    import itofin "github.com/benbenbang/libitofin/sdk/go"
+    import itofin "github.com/bitbrew-dev/libitofin/sdk/go"
 
     channels, err := itofin.ChartKeltnerChannels(
         []float64{12, 16, 11}, []float64{10, 14, 9},
@@ -658,7 +658,7 @@ Returns and intermediates are not silently rescaled or clipped.
     import (
         "fmt"
         "math"
-        itofin "github.com/benbenbang/libitofin/sdk/go"
+        itofin "github.com/bitbrew-dev/libitofin/sdk/go"
     )
 
     func main() {
@@ -679,6 +679,6 @@ period and writes caller-owned values and first-valid only on success. No
 context or result handle needs closing. Go's `DefaultWilliamsR` and Python's
 omitted period use 14. Python value properties return independent NumPy copies.
 
-[Independent fixture](https://github.com/benbenbang/libitofin/blob/main/crates/libitofin/tests/data/chart/williams_r.md):
+[Independent fixture](https://github.com/bitbrew-dev/libitofin/blob/main/crates/libitofin/tests/data/chart/williams_r.md):
 exact standard-library Fraction calculations, shared across Rust, Go and Python;
 standalone C and C++ clients separately pin the same rational values.

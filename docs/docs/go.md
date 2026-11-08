@@ -3,11 +3,11 @@
 The Go package calls the Rust core through cgo. Import it with an explicit name:
 
 ```go
-import itofin "github.com/benbenbang/libitofin/sdk/go"
+import itofin "github.com/bitbrew-dev/libitofin/sdk/go"
 ```
 
 `itofin` is the package name; `go` is only the final directory in the module path.
-The [Go API reference](https://pkg.go.dev/github.com/benbenbang/libitofin/sdk/go)
+The [Go API reference](https://pkg.go.dev/github.com/bitbrew-dev/libitofin/sdk/go)
 provides the exported types and methods.
 
 ## Install in an application
@@ -55,7 +55,7 @@ first run `go mod init example.com/pricing`.
 Download, verify, and extract the native package:
 
 ```sh
-gh release download "v$version" --repo benbenbang/libitofin \
+gh release download "v$version" --repo bitbrew-dev/libitofin \
   --pattern "itofin-native-$version-$platform.tar.gz*"
 shasum -a 256 -c "itofin-native-$version-$platform.tar.gz.sha256"
 tar -xzf "itofin-native-$version-$platform.tar.gz"
@@ -64,7 +64,7 @@ export ITOFIN_NATIVE="$PWD/itofin-native-$version-$platform"
 export CGO_ENABLED=1
 export CGO_CFLAGS="\"-I$ITOFIN_NATIVE/include\""
 export CGO_LDFLAGS="\"-L$ITOFIN_NATIVE/lib\" -litofin_ffi \"-Wl,-rpath,$ITOFIN_NATIVE/lib\""
-go get "github.com/benbenbang/libitofin/sdk/go@v$version"
+go get "github.com/bitbrew-dev/libitofin/sdk/go@v$version"
 ```
 
 Save this as `main.go`:
@@ -76,7 +76,7 @@ import (
     "fmt"
     "log"
 
-    itofin "github.com/benbenbang/libitofin/sdk/go"
+    itofin "github.com/bitbrew-dev/libitofin/sdk/go"
 )
 
 func main() {
@@ -101,7 +101,7 @@ go build -tags itofin_external .
 The linker configuration embeds the absolute native-library directory. If you
 move that directory, rebuild with its new path. Keep the header and library
 together. For relocatable bundles and source-built native packages, see the
-[native distribution guide](https://github.com/benbenbang/libitofin/blob/main/docs/go-distribution.md).
+[native distribution guide](https://github.com/bitbrew-dev/libitofin/blob/main/docs/go-distribution.md).
 
 ## Run examples from a source checkout
 
@@ -197,5 +197,5 @@ session after the callback returns.
 
 Check returned errors before using results. Native errors expose a code and
 message through `*itofin.Error`, accessible with `errors.As`. See the
-[SDK guide](https://github.com/benbenbang/libitofin/blob/main/sdk/go/README.md)
+[SDK guide](https://github.com/bitbrew-dev/libitofin/blob/main/sdk/go/README.md)
 for ownership, simulation layout, and validation details.

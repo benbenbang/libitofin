@@ -1,6 +1,6 @@
 # Go behavioral test evidence
 
-[#1036](https://github.com/benbenbang/libitofin/issues/1036) completes the bounded
+[#1036](https://github.com/bitbrew-dev/libitofin/issues/1036) completes the bounded
 cases deferred by the original #1005 triage. Tests below use independent
 QuantLib or analytical expectations; API mappings alone do not prove behavior.
 This inventory does not claim exhaustive QuantLib product coverage.
@@ -56,7 +56,7 @@ constructor does not expose that convention. Each is checked against its own
 matching QuantLib contract, and the one-day premium difference is reconstructed
 analytically. Their NPVs are intentionally different.
 
-[#1038](https://github.com/benbenbang/libitofin/issues/1038) adds the default
+[#1038](https://github.com/bitbrew-dev/libitofin/issues/1038) adds the default
 arithmetic-averaging overnight coupon path in Rust and successful Simple OIS
 pricing through Python and C/Go. The default uses the full daily schedule and
 zero convexity adjustment. Custom arithmetic-pricer volatility and telescopic
@@ -65,14 +65,14 @@ tolerances are unchanged. The richer
 [overnight oracle](../crates/libitofin/tests/fixtures/overnight_averaging/README.md)
 covers all three language surfaces.
 
-[#1045](https://github.com/benbenbang/libitofin/issues/1045) aligns Compound
+[#1045](https://github.com/bitbrew-dev/libitofin/issues/1045) aligns Compound
 forecast discount-ratio compounding, today's fixing enforcement and daily-spread
 treatment with QuantLib, including partial forecast intervals. Both previously
 excluded coupon cases now run. Exact enforcement and daily-spread switches remain
 Rust-only; #808 additionally exposes overnight fixing-history writes in Python/Go.
 The OIS tests cover exposed pricing and recovery from missing-history errors;
 they do not claim coverage of unexposed switches.
-[#1047](https://github.com/benbenbang/libitofin/issues/1047) registers the helper's
+[#1047](https://github.com/bitbrew-dev/libitofin/issues/1047) registers the helper's
 additive-spread handle with its existing observer, so a live spread change
 invalidates and rebootstraps the same fitted curve in Rust, Python and Go.
 

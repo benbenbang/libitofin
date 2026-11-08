@@ -1,6 +1,6 @@
 # GJR-GARCH model, calibration and pricing oracle
 
-Issue [#1165](https://github.com/benbenbang/libitofin/issues/1165) extends the
+Issue [#1165](https://github.com/bitbrew-dev/libitofin/issues/1165) extends the
 [process oracle](gjrgarch-oracle.md) with independent models and engines.
 
 ## Provenance and regeneration

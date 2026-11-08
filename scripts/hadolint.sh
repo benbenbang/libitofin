@@ -17,7 +17,7 @@
 # under the License.
 
 # Script has been modified by
-# - @benbenbang
+# - @bitbrew-dev
 #
 
 set -u  # Ensure the script fails on undefined variables
