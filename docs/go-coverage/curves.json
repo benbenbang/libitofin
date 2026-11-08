@@ -5,7 +5,8 @@
     "Go explicit config defaults: use DefaultFraRateHelperConfig and DefaultOISRateHelperConfig for Python coupon/pillar/averaging defaults. Optional pointers represent None.",
     "Futures helpers retain Shared<FuturesRateHelper> for convexity introspection; helpers_api::helper upcasts them for bootstrap. Other helpers retain Shared<dyn RateHelper>.",
     "Tests include independent QuantLib/Python deposit, futures-price and one-period bond oracles; OIS and swap helper tests also verify bootstrap residuals, which alone are not independent price oracles. Niche optional-argument combinations are not exhaustively tested.",
-    "Enum mappings preserve Python ordinals; enum member rows deliberately have no test reference where only consumers, not every variant, are exercised."
+    "Enum mappings preserve Python ordinals; enum member rows deliberately have no test reference where only consumers, not every variant, are exercised.",
+    "PiecewiseYieldCurve jumped constructors select their C entry points through PiecewiseCurveConfig.JumpQuotes/JumpDates; node-curve jumps are a tracked follow-up."
   ],
   "scope": "curve.rs, helpers.rs, currency.rs, market.rs and Ibor index classes from hullwhite.rs; committed Python stubs; inherited methods counted at defining class",
   "symbols": [
@@ -147,6 +148,52 @@
       "tests": [
         "moving_piecewise_curve_follows_a_shared_settings_roll",
         "TestMovingPiecewiseCurveFollowsSharedSettingsRoll"
+      ]
+    },
+    {
+      "c": [
+        "itofin_piecewise_curve_with_jumps_new",
+        "itofin_global_curve_with_jumps_new"
+      ],
+      "go": "Session.NewPiecewiseYieldCurve",
+      "python": "itofin.termstructures.PiecewiseYieldCurve.with_jumps",
+      "status": "implemented",
+      "tests": [
+        "jumped_piecewise_nodes_carry_the_jump_on_every_algorithm",
+        "TestPiecewiseYieldJumpsNodeOracle",
+        "TestPiecewiseYieldJumpsInvalidArguments"
+      ]
+    },
+    {
+      "c": [
+        "itofin_piecewise_curve_with_jumps_new",
+        "itofin_global_curve_with_jumps_new"
+      ],
+      "go": "Session.NewPiecewiseYieldCurve",
+      "python": "itofin.termstructures.PiecewiseYieldCurve.moving_with_jumps",
+      "status": "implemented",
+      "tests": [
+        "TestPiecewiseYieldJumpsNodeOracle",
+        "TestPiecewiseYieldJumpsMovingRollAndGeneratedDates"
+      ]
+    },
+    {
+      "c": "itofin_curve_jumps",
+      "go": "YieldTermStructure.JumpDates",
+      "python": "itofin.termstructures.YieldTermStructure.jump_dates",
+      "status": "implemented",
+      "tests": [
+        "TestPiecewiseYieldJumpsNodeOracle",
+        "TestPiecewiseYieldJumpsInvalidArguments"
+      ]
+    },
+    {
+      "c": "itofin_curve_jumps",
+      "go": "YieldTermStructure.JumpTimes",
+      "python": "itofin.termstructures.YieldTermStructure.jump_times",
+      "status": "implemented",
+      "tests": [
+        "TestPiecewiseYieldJumpsMovingRollAndGeneratedDates"
       ]
     },
     {
