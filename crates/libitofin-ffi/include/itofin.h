@@ -3845,6 +3845,33 @@ int32_t itofin_sensitivity_bucket(struct ItofinContext *ctx,
                                   struct ItofinError *error);
 
 /**
+ * Bucket PV01 over a ragged matrix of quotes, each bumped alone, with one
+ * shared reference NPV. `quotes` holds the rows back to back (row-major) and
+ * `row_lengths` the `row_count` row sizes, which must sum to `quote_count`;
+ * empty rows are allowed, zero rows is an error. Writes `quote_count` results
+ * to `out` in the same row-major layout. Same `kind`, `quantities` and restore
+ * conventions as `itofin_sensitivity_parallel`.
+ * Under a Monte Carlo engine each reprice carries sampling error that does not
+ * shrink with the shift, so the result is noisy; prefer an analytic, tree or
+ * finite-difference engine.
+ * # Safety
+ * Pointers and thread ownership must satisfy the crate-level C caller contract.
+ */
+int32_t itofin_sensitivity_bucket_matrix(struct ItofinContext *ctx,
+                                         const uint64_t *quotes,
+                                         size_t quote_count,
+                                         const size_t *row_lengths,
+                                         size_t row_count,
+                                         const uint64_t *instruments,
+                                         size_t instrument_count,
+                                         const double *quantities,
+                                         size_t quantity_count,
+                                         double shift,
+                                         int32_t kind,
+                                         struct ItofinSensitivity *out,
+                                         struct ItofinError *error);
+
+/**
  * Generate `count` standard normal values with a deterministic nonzero seed.
  * # Safety
  * Follow the crate-level pointer contract. Output contains `count` doubles.
