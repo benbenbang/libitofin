@@ -28,6 +28,7 @@ jobs:
     with:
       go_version_file: sdk/go/go.mod
       prek_skip: fmt,check,clippy,test
+      runner: blacksmith-4vcpu-ubuntu-2404
 
   check-change-files:
     name: check-changed-files
