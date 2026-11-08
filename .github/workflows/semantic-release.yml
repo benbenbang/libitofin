@@ -57,7 +57,7 @@ jobs:
   resolve-release:
     needs: semantic-release
     if: ${{ !cancelled() && (inputs.prompt == 'true' || (github.event_name == 'schedule' && vars.ENABLE_SCHEDULED_RELEASES == 'true')) && (needs.semantic-release.result == 'success' || needs.semantic-release.result == 'skipped') }}
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     permissions:
       contents: read
       actions: read
@@ -84,7 +84,7 @@ jobs:
     name: publish itofin-optimize to crates.io
     needs: resolve-release
     if: ${{ !cancelled() && needs.resolve-release.result == 'success' && needs.resolve-release.outputs.publish == 'true' && (github.event_name == 'schedule' || inputs.publish_targets == 'all' || inputs.publish_targets == 'rust') }}
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 20
     permissions:
       contents: read
@@ -126,7 +126,7 @@ jobs:
     name: publish libitofin to crates.io
     needs: [resolve-release, publish-optimizer]
     if: ${{ !cancelled() && needs.resolve-release.result == 'success' && needs.publish-optimizer.result == 'success' && needs.resolve-release.outputs.publish == 'true' && (github.event_name == 'schedule' || inputs.publish_targets == 'all' || inputs.publish_targets == 'rust') }}
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 20
     permissions:
       contents: read
@@ -179,7 +179,7 @@ jobs:
     name: publish itofin to PyPI
     needs: [resolve-release, build-python-wheels]
     if: ${{ !cancelled() && needs.resolve-release.result == 'success' && needs.resolve-release.outputs.publish == 'true' && (github.event_name == 'schedule' || inputs.publish_targets == 'all' || inputs.publish_targets == 'python') && (needs.build-python-wheels.result == 'success' || (inputs.python_artifact_run_id != '' && needs.build-python-wheels.result == 'skipped')) }}
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     permissions:
       contents: read
       actions: read

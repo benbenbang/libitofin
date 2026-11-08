@@ -36,19 +36,19 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-24.04
+          - os: blacksmith-4vcpu-ubuntu-2404
             name: linux-x86_64
             target: x86_64
             python_arch: ''
             sdist: true
             optional: false
-          - os: ubuntu-24.04-arm
+          - os: blacksmith-4vcpu-ubuntu-2404-arm
             name: linux-aarch64
             target: aarch64
             python_arch: ''
             sdist: false
             optional: false
-          - os: macos-15
+          - os: blacksmith-6vcpu-macos-15
             name: macos-arm64
             target: aarch64
             python_arch: ''
