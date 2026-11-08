@@ -107,6 +107,12 @@ jobs:
         run: |
           version=$(cargo metadata --locked --no-deps --format-version 1 | python -c 'import json,sys; print(next(p["version"] for p in json.load(sys.stdin)["packages"] if p["name"] == "itofin-py"))')
           echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: build sdist
+        if: matrix.sdist
+        uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: --out dist -m crates/itofin-py/Cargo.toml
       - name: build wheel
         id: build
         continue-on-error: ${{ matrix.optional }}
@@ -116,12 +122,6 @@ jobs:
           target: ${{ matrix.target }}
           args: --release --out dist -m crates/itofin-py/Cargo.toml
           manylinux: auto
-      - name: build sdist
-        if: matrix.sdist
-        uses: PyO3/maturin-action@v1
-        with:
-          command: sdist
-          args: --out dist -m crates/itofin-py/Cargo.toml
       - name: Verify bundled third-party attribution
         id: attribution
         if: steps.build.outcome == 'success'
