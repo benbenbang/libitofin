@@ -57,7 +57,7 @@ type bootstrapCallbacks struct {
 	dates     func() ([]Date, error)
 }
 
-func (s *Session) globalCurve(cfg PiecewiseCurveConfig, kind int, ids, extra []C.uint64_t, out *C.uint64_t) error {
+func (s *Session) globalCurve(cfg PiecewiseCurveConfig, kind int, ids, extra []C.uint64_t, jumps *yieldJumps, out *C.uint64_t) error {
 	var variables C.uint64_t
 	if cfg.AdditionalVariables != nil {
 		if err := sameSession(s, cfg.AdditionalVariables.object); err != nil {
@@ -80,6 +80,10 @@ func (s *Session) globalCurve(cfg PiecewiseCurveConfig, kind int, ids, extra []C
 		callbacks.dates = (C.goBootstrapFn)(C.goBootstrapDates)
 	}
 	var e C.ItofinError
+	if jumps != nil {
+		config := yieldConfig(cfg)
+		return ffiError(C.itofin_global_curve_with_jumps_new(s.ctx, &config, unsafe.SliceData(ids), C.size_t(len(ids)), C.int32_t(kind), unsafe.SliceData(extra), C.size_t(len(extra)), variables, &callbacks, &adopted, unsafe.SliceData(jumps.quotes), C.size_t(len(jumps.quotes)), unsafe.SliceData(jumps.dates), C.size_t(len(jumps.dates)), out, &e), &e)
+	}
 	if cfg.Settings != nil {
 		return ffiError(C.itofin_global_curve_new_moving(s.ctx, C.uint32_t(cfg.SettlementDays), C.uint64_t(cfg.Calendar.id), C.uint64_t(cfg.Settings.id), unsafe.SliceData(ids), C.size_t(len(ids)), C.uint64_t(cfg.DayCounter.id), C.int32_t(kind), unsafe.SliceData(extra), C.size_t(len(extra)), variables, &callbacks, &adopted, out, &e), &e)
 	}

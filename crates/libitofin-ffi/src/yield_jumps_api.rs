@@ -4,7 +4,7 @@
 use crate::bootstrap_api::global_curve;
 use crate::bootstrap_callbacks::ItofinBootstrapCallbacks;
 use crate::boundary::*;
-use crate::curves_api::piecewise_curve;
+use crate::curves_api::{curve, piecewise_curve};
 use crate::iterative_bootstrap_api::{
     CurveAnchor, ItofinIterativeBootstrapOptions, curve_jumps, moving_anchor,
 };
@@ -151,6 +151,52 @@ pub unsafe extern "C" fn itofin_global_curve_with_jumps_new(
             out,
             error,
         )
+    }
+}
+
+/// Jump dates in constructor order and their times against the current
+/// reference date, for any yield curve (a jump-free curve has none).
+/// Capacity zero queries the required length. A null `times` pointer
+/// requests dates only, without resolving the reference date.
+#[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
+pub unsafe extern "C" fn itofin_curve_jumps(
+    ctx: *mut Context,
+    id: u64,
+    dates: *mut i32,
+    times: *mut f64,
+    capacity: usize,
+    count: *mut usize,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(count)?;
+            let curve = curve(c, id)?.current_link()?;
+            let jump_dates = curve.jump_dates();
+            output(count, jump_dates.len())?;
+            if capacity == 0 {
+                return Ok(());
+            }
+            check_ptr(dates)?;
+            if capacity < jump_dates.len() {
+                return Err(BindingError::invalid("jump buffer too small"));
+            }
+            if !times.is_null() {
+                check_ptr(times)?;
+                for (i, t) in curve.jump_times()?.into_iter().enumerate() {
+                    output(times.add(i), t)?;
+                }
+            }
+            for (i, d) in jump_dates.iter().enumerate() {
+                output(dates.add(i), d.serial_number())?;
+            }
+            Ok(())
+        })
     }
 }
 

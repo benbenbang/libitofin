@@ -167,6 +167,11 @@ type PiecewiseCurveConfig struct {
 	// Settings selects a moving reference date, SettlementDays on Calendar past its evaluation date.
 	// It must be the Settings the helpers' index carries, or the curve moves while the helpers stay put.
 	Settings *Settings
+	// JumpQuotes multiply the discount factor past each JumpDates entry and enter the bootstrap.
+	// Empty JumpDates generate consecutive December 31 dates from the reference year; a moving
+	// curve then needs the evaluation date at construction and errors without one.
+	JumpQuotes []*SimpleQuote
+	JumpDates  []Date
 }
 
 func (s *Session) piecewise(cfg PiecewiseCurveConfig, kind int) (*YieldTermStructure, error) {
@@ -218,10 +223,17 @@ func (s *Session) piecewise(cfg PiecewiseCurveConfig, kind int) (*YieldTermStruc
 			return nil, err
 		}
 	}
+	jumps, err := s.yieldJumps(cfg)
+	if err != nil {
+		return nil, err
+	}
 	var id C.uint64_t
-	err := s.invoke(func() error {
+	err = s.invoke(func() error {
 		if globalOptions {
-			return s.globalCurve(cfg, kind, ids, extra, &id)
+			return s.globalCurve(cfg, kind, ids, extra, jumps, &id)
+		}
+		if jumps != nil {
+			return s.jumpedCurve(cfg, kind, algo, ids, extra, jumps, &id)
 		}
 		if cfg.IterativeOptions != nil {
 			if len(extra) != 0 {

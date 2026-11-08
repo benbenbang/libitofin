@@ -10047,6 +10047,25 @@ int32_t itofin_global_curve_with_jumps_new(struct ItofinContext *ctx,
                                            uint64_t *out,
                                            struct ItofinError *error);
 
+/**
+ * Jump dates in constructor order and their times against the current
+ * reference date, for any yield curve (a jump-free curve has none).
+ * Capacity zero queries the required length. A null `times` pointer
+ * requests dates only, without resolving the reference date.
+ * # Safety
+ * Pointers must be aligned, live and valid for their stated lengths. Outputs
+ * must not overlap inputs or other outputs. Any context and its handles must
+ * belong to the calling thread; serialize calls including destruction.
+ * See the crate-level C caller contract for lifetime requirements.
+ */
+int32_t itofin_curve_jumps(struct ItofinContext *ctx,
+                           uint64_t id,
+                           int32_t *dates,
+                           double *times,
+                           size_t capacity,
+                           size_t *count,
+                           struct ItofinError *error);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

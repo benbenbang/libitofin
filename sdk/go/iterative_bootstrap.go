@@ -22,7 +22,15 @@ func DefaultIterativeBootstrapOptions() IterativeBootstrapOptions {
 }
 
 func (s *Session) iterativeCurve(cfg PiecewiseCurveConfig, kind int, ids []C.uint64_t, out *C.uint64_t) error {
-	x := cfg.IterativeOptions
+	opts := iterativeOptions(cfg.IterativeOptions)
+	var e C.ItofinError
+	if cfg.Settings != nil {
+		return ffiError(C.itofin_piecewise_curve_new_with_options_moving(s.ctx, C.uint32_t(cfg.SettlementDays), C.uint64_t(cfg.Calendar.id), C.uint64_t(cfg.Settings.id), unsafe.SliceData(ids), C.size_t(len(ids)), C.uint64_t(cfg.DayCounter.id), C.int32_t(kind), &opts, out, &e), &e)
+	}
+	return ffiError(C.itofin_piecewise_curve_new_with_options(s.ctx, C.int32_t(cfg.ReferenceDate.Serial()), unsafe.SliceData(ids), C.size_t(len(ids)), C.uint64_t(cfg.DayCounter.id), C.int32_t(kind), &opts, out, &e), &e)
+}
+
+func iterativeOptions(x *IterativeBootstrapOptions) C.ItofinIterativeBootstrapOptions {
 	opts := C.ItofinIterativeBootstrapOptions{max_attempts: C.size_t(x.MaxAttempts), max_factor: C.double(x.MaxFactor), min_factor: C.double(x.MinFactor), dont_throw_steps: C.size_t(x.DontThrowSteps), max_evaluations: C.size_t(x.MaxEvaluations)}
 	if x.Accuracy != nil {
 		opts.accuracy, opts.has_accuracy = C.double(*x.Accuracy), 1
@@ -36,9 +44,5 @@ func (s *Session) iterativeCurve(cfg PiecewiseCurveConfig, kind int, ids []C.uin
 	if x.DontThrow {
 		opts.dont_throw = 1
 	}
-	var e C.ItofinError
-	if cfg.Settings != nil {
-		return ffiError(C.itofin_piecewise_curve_new_with_options_moving(s.ctx, C.uint32_t(cfg.SettlementDays), C.uint64_t(cfg.Calendar.id), C.uint64_t(cfg.Settings.id), unsafe.SliceData(ids), C.size_t(len(ids)), C.uint64_t(cfg.DayCounter.id), C.int32_t(kind), &opts, out, &e), &e)
-	}
-	return ffiError(C.itofin_piecewise_curve_new_with_options(s.ctx, C.int32_t(cfg.ReferenceDate.Serial()), unsafe.SliceData(ids), C.size_t(len(ids)), C.uint64_t(cfg.DayCounter.id), C.int32_t(kind), &opts, out, &e), &e)
+	return opts
 }
