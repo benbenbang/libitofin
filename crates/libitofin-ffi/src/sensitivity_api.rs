@@ -107,6 +107,9 @@ unsafe fn inputs(
 /// Parallel PV01: every quote bumped together. `kind`: 0 one-sided, 1 centered.
 /// A null `reference_npv` computes the reference from the instruments; empty
 /// `quantities` mean unit weights. Quotes are restored on success and error.
+/// Under a Monte Carlo engine each reprice carries sampling error that does not
+/// shrink with the shift, so the result is noisy; prefer an analytic, tree or
+/// finite-difference engine.
 /// # Safety
 /// Pointers and thread ownership must satisfy the crate-level C caller contract.
 #[allow(clippy::too_many_arguments)]
@@ -152,6 +155,9 @@ pub unsafe extern "C" fn itofin_sensitivity_parallel(
 /// Bucket PV01: each quote bumped alone, with one shared reference NPV. Writes
 /// `quote_count` results to `out`, index-aligned with `quotes`. Same `kind`,
 /// `quantities` and restore conventions as `itofin_sensitivity_parallel`.
+/// Under a Monte Carlo engine each reprice carries sampling error that does not
+/// shrink with the shift, so the result is noisy; prefer an analytic, tree or
+/// finite-difference engine.
 /// # Safety
 /// Pointers and thread ownership must satisfy the crate-level C caller contract.
 #[allow(clippy::too_many_arguments)]

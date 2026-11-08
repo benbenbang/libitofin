@@ -41,4 +41,8 @@ def parallel_analysis(quotes: typing.Sequence[quotes.SimpleQuote], instruments: 
     Returns `(first, second)`; `second` is None for `OneSide`. Empty
     `quantities` mean unit weights; a None `reference_npv` is computed from the
     instruments. A zero shift is an error. Quotes are restored on return.
+
+    Under a Monte Carlo engine each reprice carries sampling error that does not
+    shrink with the shift, so the result is noisy; prefer an analytic, tree or
+    finite-difference engine.
     """
