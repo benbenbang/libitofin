@@ -1,12 +1,13 @@
 //! Local volatility term structures; handles retain the common trait representation.
 //!
-//! Deferred: FD local-vol pricing is #828.
+//! Deferred: only `LocalVolCurve<Linear>` is bound, the one variance curve
+//! interpolation the C ABI builds (#624); FD local-vol pricing is #828.
 use crate::boundary::*;
 use libitofin::handle::Handle;
 use libitofin::quotes::{Quote, SimpleQuote};
 use libitofin::shared::{Shared, shared};
 use libitofin::termstructures::volatility::{
-    BlackVolTermStructure, LocalVolSurface, LocalVolTermStructure,
+    BlackVolTermStructure, LocalVolCurve, LocalVolSurface, LocalVolTermStructure,
 };
 use libitofin::termstructures::yieldtermstructure::YieldTermStructure;
 
@@ -35,6 +36,44 @@ pub unsafe extern "C" fn itofin_local_vol_surface_new(
                 c.get::<Handle<dyn YieldTermStructure>>(dividend)?,
                 Handle::new(c.get::<Shared<SimpleQuote>>(spot)? as Shared<dyn Quote>),
             )) as Shared<dyn LocalVolTermStructure>;
+            output(out, c.insert(Handle::new(v))?)
+        })
+    }
+}
+
+/// Local volatility of a linear Black variance curve built from the same
+/// arguments as `itofin_black_variance_curve_new` (extrapolation: 0 flat
+/// volatility, 1 use interpolator, 2 linear variance).
+/// # Safety
+/// Follow the crate C caller contract; arrays must have their stated lengths.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn itofin_local_vol_curve_new(
+    ctx: *mut Context,
+    reference_date: i32,
+    dates: *const i32,
+    vols: *const f64,
+    count: usize,
+    dc: u64,
+    monotone: i32,
+    extrapolation: i32,
+    out: *mut u64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            check_ptr(out)?;
+            let curve = crate::vol_api::variance_curve(
+                c,
+                reference_date,
+                dates,
+                vols,
+                count,
+                dc,
+                monotone,
+                extrapolation,
+            )?;
+            let v =
+                shared(LocalVolCurve::new(Handle::new(curve))) as Shared<dyn LocalVolTermStructure>;
             output(out, c.insert(Handle::new(v))?)
         })
     }

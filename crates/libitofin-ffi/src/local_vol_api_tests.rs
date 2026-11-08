@@ -276,3 +276,47 @@ fn local_vol_core_errors() {
     let err = m.price(plain, 0, 100.0, 180, 20_000).unwrap_err();
     assert!(err.contains("only constant Black volatilities"), "{err}");
 }
+
+#[test]
+fn linear_local_vol_curve_prices_and_queries() {
+    let mut m = market();
+    let black = m.term_curve(&[0.15, 0.20, 0.25], &[119, 269, 360], 1);
+    let dates: Vec<i32> = [119, 269, 360].iter().map(|d| m.today + d).collect();
+    let (today, dc, d, v) = (m.today, m.dc, dates.as_ptr(), [0.15, 0.20, 0.25].as_ptr());
+    let (spot, r, q, mut curve, mut process) = (m.spot, m.risk_free, m.dividend, 0, 0);
+    m.ok(|c, e| unsafe { itofin_local_vol_curve_new(c, today, d, v, 3, dc, 1, 0, &mut curve, e) });
+    assert!((m.local_vol(curve, 0.1, 0).unwrap() - 0.15).abs() < 1e-12);
+    let past = m.local_vol(curve, 1.5, 0).unwrap_err();
+    assert!(past.contains("past max curve time"), "{past}");
+    assert!(m.local_vol(curve, 1.5, 1).is_ok());
+    let err = m
+        .call(|c, e| unsafe { itofin_local_vol_curve_new(c, today, d, v, 3, dc, 1, 3, &mut 0, e) });
+    assert!(err.unwrap_err().contains("unknown time extrapolation"));
+
+    m.ok(|c, e| unsafe {
+        itofin_black_scholes_with_local_vol(c, spot, r, q, black, curve, &mut process, e)
+    });
+    let v_euler: f64 = (0..12)
+        .map(|i| m.local_vol(curve, f64::from(i) / 12.0, 1).unwrap().powi(2) / 12.0)
+        .sum();
+    for id in [black, curve] {
+        m.ok(|c, e| unsafe { itofin_handle_release(c, id, e) });
+    }
+    let (analytic, _) = m.price(process, 0, 100.0, 360, 0).unwrap();
+    let (mc, se) = m.price(process, 0, 100.0, 360, 20_000).unwrap();
+    let euler = black_formula(
+        OptionType::Call,
+        100.0,
+        SPOT * (R - Q).exp(),
+        v_euler.sqrt(),
+        (-R).exp(),
+        0.0,
+    )
+    .unwrap();
+    let budget = (euler - analytic).abs();
+    assert!(
+        (mc - euler).abs() < 3.0 * se,
+        "mc {mc} euler {euler} se {se}"
+    );
+    assert!(budget < 0.03 && (mc - analytic).abs() < 3.0 * se + budget);
+}
