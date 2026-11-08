@@ -37,10 +37,15 @@
 //!   re-solves warm from the previous nodes when their count is unchanged.
 //! - Jump quotes (`jumps`/`jumpDates`) are taken by
 //!   [`with_jumps`](PiecewiseYieldCurve::with_jumps) and
-//!   [`moving_with_jumps`](PiecewiseYieldCurve::moving_with_jumps), which use a
-//!   default-configured bootstrap. The quotes register with the curve's own
-//!   updater, so a jump change re-bootstraps: helpers price off the
-//!   jump-adjusted discount, as in C++.
+//!   [`moving_with_jumps`](PiecewiseYieldCurve::moving_with_jumps) with a
+//!   default-configured bootstrap, or by
+//!   [`with_bootstrap_and_jumps`](PiecewiseYieldCurve::with_bootstrap_and_jumps)
+//!   and
+//!   [`moving_with_bootstrap_and_jumps`](PiecewiseYieldCurve::moving_with_bootstrap_and_jumps)
+//!   with an explicit one, so jumps combine with any bootstrap configuration
+//!   as in C++ (`piecewiseyieldcurve.hpp:74-84,101-112`). The quotes register
+//!   with the curve's own updater, so a jump change re-bootstraps: helpers
+//!   price off the jump-adjusted discount, as in C++.
 //! - Jump times are calculated on demand against the current reference date.
 //!   C++ `update()` (`piecewiseyieldcurve.hpp:220-229`) skips
 //!   `YieldTermStructure::update`, the only re-caller of `setJumps`
@@ -178,11 +183,37 @@ where
     where
         B: Default,
     {
+        Self::with_bootstrap_and_jumps(
+            reference_date,
+            instruments,
+            day_counter,
+            interpolator,
+            B::default(),
+            jumps,
+            jump_dates,
+        )
+    }
+
+    /// The fixed-reference-date curve with multiplicative discount jumps and
+    /// an explicitly configured bootstrap (`piecewiseyieldcurve.hpp:74-84`).
+    ///
+    /// # Errors
+    /// As [`with_jumps`](Self::with_jumps).
+    #[allow(clippy::too_many_arguments)]
+    pub fn with_bootstrap_and_jumps(
+        reference_date: Date,
+        instruments: Vec<Shared<dyn RateHelper>>,
+        day_counter: DayCounter,
+        interpolator: I,
+        bootstrap: B,
+        jumps: Vec<Handle<dyn Quote>>,
+        jump_dates: Vec<Date>,
+    ) -> QlResult<Shared<PiecewiseYieldCurve<T, I, B>>> {
         Self::build(
             TermStructureBase::with_reference_date(reference_date, None, Some(day_counter)),
             instruments,
             interpolator,
-            B::default(),
+            bootstrap,
             jumps,
             jump_dates,
         )
@@ -271,7 +302,7 @@ where
     where
         B: Default,
     {
-        Self::build_moving(
+        Self::moving_with_bootstrap_and_jumps(
             settlement_days,
             calendar,
             instruments,
@@ -279,6 +310,36 @@ where
             interpolator,
             settings,
             B::default(),
+            jumps,
+            jump_dates,
+        )
+    }
+
+    /// The moving constructor with multiplicative discount jumps and an
+    /// explicitly configured bootstrap (`piecewiseyieldcurve.hpp:101-112`).
+    ///
+    /// # Errors
+    /// As [`moving_with_jumps`](Self::moving_with_jumps).
+    #[allow(clippy::too_many_arguments)]
+    pub fn moving_with_bootstrap_and_jumps(
+        settlement_days: Natural,
+        calendar: Calendar,
+        instruments: Vec<Shared<dyn RateHelper>>,
+        day_counter: DayCounter,
+        interpolator: I,
+        settings: Shared<Settings<Date>>,
+        bootstrap: B,
+        jumps: Vec<Handle<dyn Quote>>,
+        jump_dates: Vec<Date>,
+    ) -> QlResult<Shared<PiecewiseYieldCurve<T, I, B>>> {
+        Self::build_moving(
+            settlement_days,
+            calendar,
+            instruments,
+            day_counter,
+            interpolator,
+            settings,
+            bootstrap,
             jumps,
             jump_dates,
         )
@@ -2339,6 +2400,112 @@ mod tests {
         .unwrap();
         let probe = 0.5 * (times[0] + new_times[0]);
         for t in [probe, 0.1, 1.0, 1.5, 2.0, 5.0, 10.0] {
+            let (a, b) = (
+                curve.discount(t, false).unwrap(),
+                fresh.discount(t, false).unwrap(),
+            );
+            assert!((a - b).abs() <= 1.0e-10, "t = {t}: {a} vs {b}");
+        }
+    }
+
+    /// The jump ratio `discount / discount_impl` at each probe time: the
+    /// product of the jumps strictly between the reference date and `t`.
+    fn assert_jump_ratios(curve: &dyn YieldTermStructure, values: &[Real]) {
+        let times = curve.jump_times().unwrap();
+        for t in [0.1, 0.5, 1.0, 1.5, 2.0, 5.0, 10.0] {
+            let expected: Real = times
+                .iter()
+                .zip(values)
+                .filter(|(time, _)| 0.0 < **time && **time < t)
+                .map(|(_, jump)| jump)
+                .product();
+            let ratio = curve.discount(t, false).unwrap() / curve.discount_impl(t).unwrap();
+            assert!(
+                (ratio - expected).abs() <= 1.0e-14 * expected,
+                "t = {t}: {ratio} vs {expected}"
+            );
+        }
+    }
+
+    /// Jumps combine with an explicit bootstrap (`piecewiseyieldcurve.hpp:74-84`):
+    /// a global-bootstrap curve keeps its jumps, prices its helpers off the
+    /// jump-adjusted discount, and re-solves when a jump quote changes.
+    #[test]
+    fn jumps_combine_with_an_explicit_global_bootstrap() {
+        use crate::termstructures::globalbootstrap::GlobalBootstrap;
+
+        let vars = common_vars();
+        let (quotes, handles) = jump_quotes(&JUMPS);
+        let curve =
+            PiecewiseYieldCurve::<Discount, LogLinear, GlobalBootstrap>::with_bootstrap_and_jumps(
+                vars.settlement,
+                vars.instruments.clone(),
+                Actual360::new(),
+                LogLinear,
+                GlobalBootstrap::default(),
+                handles,
+                jump_dates(),
+            )
+            .unwrap();
+        assert_eq!(curve.jump_dates(), jump_dates());
+        assert_jump_ratios(&*curve, &JUMPS);
+        reprice_helpers(&vars, curve.clone(), 1.0e-9);
+        let nodes = curve.data().unwrap();
+        quotes[0].set_value(0.98);
+        assert!(!curve.lazy.borrow().is_calculated());
+        assert!(
+            nodes
+                .iter()
+                .zip(&curve.data().unwrap())
+                .any(|(a, b)| (a - b).abs() > 1.0e-6),
+            "nodes did not move"
+        );
+    }
+
+    /// The moving twin (`piecewiseyieldcurve.hpp:101-112`) with configured
+    /// iterative options: generated year-end dates, jumps applied, and after
+    /// a roll it matches a fresh fixed curve built the same way.
+    #[test]
+    fn jumps_combine_with_explicit_iterative_options_on_a_moving_curve() {
+        use crate::termstructures::iterativebootstrap::IterativeBootstrapOptions;
+
+        let options = IterativeBootstrapOptions {
+            accuracy: Some(1.0e-13),
+            max_attempts: 3,
+            ..Default::default()
+        };
+        let strategy = || IterativeBootstrap::with_options(options).unwrap();
+        let vars = common_vars();
+        let curve = PiecewiseYieldCurve::<Discount, LogLinear>::moving_with_bootstrap_and_jumps(
+            2,
+            Target::new(),
+            vars.instruments.clone(),
+            Actual360::new(),
+            LogLinear,
+            vars.settings.clone(),
+            strategy(),
+            jump_quotes(&JUMPS).1,
+            Vec::new(),
+        )
+        .unwrap();
+        assert_eq!(curve.jump_dates(), jump_dates());
+        assert_jump_ratios(&*curve, &JUMPS);
+        reprice_helpers(&vars, curve.clone(), TOLERANCE);
+
+        vars.settings.set_evaluation_date(rolled(vars.today));
+        let reference = TermStructure::reference_date(&*curve).unwrap();
+        let (_, instruments) = instruments_on(&vars.settings);
+        let fresh = PiecewiseYieldCurve::<Discount, LogLinear>::with_bootstrap_and_jumps(
+            reference,
+            instruments,
+            Actual360::new(),
+            LogLinear,
+            strategy(),
+            jump_quotes(&JUMPS).1,
+            jump_dates(),
+        )
+        .unwrap();
+        for t in [0.1, 1.0, 1.5, 2.0, 5.0, 10.0] {
             let (a, b) = (
                 curve.discount(t, false).unwrap(),
                 fresh.discount(t, false).unwrap(),
