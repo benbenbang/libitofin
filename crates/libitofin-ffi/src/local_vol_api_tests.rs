@@ -1,7 +1,14 @@
 //! Local volatility through the C ABI (#1366), against the core #1365 MC
-//! European local-vol oracle on the same market, grid and seed. The smile
-//! case uses a convex skew: the binding surface is bilinear, under which
-//! #1365's bicubic tanh grid has a negative local vol^2.
+//! European local-vol oracle on the same market, grid and seed.
+//!
+//! The smile case is adapted: the bindings' `BlackVarianceSurface` is
+//! bilinear only, and #1365's tanh grid `vol = 0.20 - 0.1 tanh(2 m)` under
+//! bilinear fails in the core with "negative local vol^2 at strike 67.03...
+//! and time 0.333...; the black vol surface is not smooth enough" (asserted
+//! below). The convex skew `vol = 0.20 - 0.1 m + 0.05 m^2`, with
+//! `m = ln(strike / spot)`, keeps the bilinear kinks positive and keeps
+//! #1365's criterion `sign * (mc - flat) > 5 * se`. The core Bicubic oracle
+//! stays in #1365 (`mc_local_vol_oracle.rs`).
 use crate::boundary::*;
 use crate::curves_api::itofin_flat_forward_new;
 use crate::local_vol_api::*;
@@ -96,13 +103,17 @@ impl Market {
     }
 
     fn smile_surface(&mut self) -> u64 {
+        self.surface(|m| 0.2 - 0.1 * m + 0.05 * m * m)
+    }
+
+    fn surface(&mut self, smile: impl Fn(f64) -> f64) -> u64 {
         let dates: Vec<i32> = [60, 120, 240].iter().map(|d| self.today + d).collect();
         let strikes: Vec<f64> = (-7..=7)
             .map(|k| SPOT * (0.2 * f64::from(k)).exp())
             .collect();
         let vols: Vec<f64> = strikes
             .iter()
-            .flat_map(|k| [0.2 - 0.1 * (k / SPOT).ln() + 0.05 * (k / SPOT).ln().powi(2); 3])
+            .flat_map(|k| [smile((k / SPOT).ln()); 3])
             .collect();
         let (today, dc, mut id) = (self.today, self.dc, 0);
         let (d, k, v) = (dates.as_ptr(), strikes.as_ptr(), vols.as_ptr());
@@ -319,4 +330,40 @@ fn linear_local_vol_curve_prices_and_queries() {
         "mc {mc} euler {euler} se {se}"
     );
     assert!(budget < 0.03 && (mc - analytic).abs() < 3.0 * se + budget);
+}
+
+#[test]
+fn tanh_smile_grid_under_bilinear_returns_the_core_error() {
+    let mut m = market();
+    let black = m.surface(|m| 0.2 - 0.1 * (2.0 * m).tanh());
+    let (local, _) = m.local_process(black);
+    let mut e = ItofinError {
+        code: 0,
+        message: [0 as c_char; 1024],
+    };
+    let mut v = 0.0;
+    let status = unsafe {
+        itofin_local_vol_query(
+            &mut m.c,
+            local,
+            1.0 / 3.0,
+            67.03185451850742,
+            0,
+            &mut v,
+            &mut e,
+        )
+    };
+    let bytes: Vec<u8> = e
+        .message
+        .iter()
+        .take_while(|b| **b != 0)
+        .map(|b| *b as u8)
+        .collect();
+    let message = String::from_utf8_lossy(&bytes);
+    assert_ne!(status, 0);
+    assert_eq!(e.code, CORE_ERROR, "{message}");
+    assert!(
+        message.contains("negative local vol^2") && message.contains("not smooth enough"),
+        "{message}"
+    );
 }
