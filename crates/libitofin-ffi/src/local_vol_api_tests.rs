@@ -1,21 +1,25 @@
 //! Local volatility through the C ABI (#1366), against the core #1365 MC
 //! European local-vol oracle on the same market, grid and seed.
 //!
-//! The smile case is adapted: the bindings' `BlackVarianceSurface` is
-//! bilinear only, and #1365's tanh grid `vol = 0.20 - 0.1 tanh(2 m)` under
+//! The smile case is adapted: the bindings' `BlackVarianceSurface` defaults
+//! to bilinear, and #1365's tanh grid `vol = 0.20 - 0.1 tanh(2 m)` under
 //! bilinear fails in the core with "negative local vol^2 at strike 67.03...
 //! and time 0.333...; the black vol surface is not smooth enough" (asserted
 //! below). The convex skew `vol = 0.20 - 0.1 m + 0.05 m^2`, with
 //! `m = ln(strike / spot)`, keeps the bilinear kinks positive and keeps
-//! #1365's criterion `sign * (mc - flat) > 5 * se`. The core Bicubic oracle
-//! stays in #1365 (`mc_local_vol_oracle.rs`).
+//! #1365's criterion `sign * (mc - flat) > 5 * se`. #1399 adds the Bicubic
+//! choice, and the original tanh grid under it matches the core oracle
+//! (`mc_local_vol_oracle.rs`) bit for bit.
 use crate::boundary::*;
 use crate::curves_api::itofin_flat_forward_new;
 use crate::local_vol_api::*;
 use crate::market_api::*;
 use crate::mc_api::{McConfig, itofin_mc_engine_new};
 use crate::options_api::*;
-use crate::vol_api::{itofin_black_variance_curve_new, itofin_black_variance_surface_new};
+use crate::vol_api::{
+    itofin_black_variance_curve_new, itofin_black_variance_surface_new,
+    itofin_black_variance_surface_new_with_interpolation, itofin_black_vol_query,
+};
 use libitofin::option::OptionType;
 use libitofin::pricingengines::blackformula::black_formula;
 use libitofin::settings::Settings;
@@ -423,4 +427,115 @@ fn surface_query_matches_the_core_argument_order() {
             "K={strike}: {v} vs {expected}"
         );
     }
+}
+
+fn tanh(m: f64) -> f64 {
+    0.2 - 0.1 * (2.0 * m).tanh()
+}
+
+impl Market {
+    fn interpolated(&mut self, strikes: &[f64], interpolation: i32) -> (u64, i32, String) {
+        let dates: Vec<i32> = [60, 120, 240].iter().map(|d| self.today + d).collect();
+        let vols: Vec<f64> = strikes
+            .iter()
+            .flat_map(|k| [tanh((k / SPOT).ln()); 3])
+            .collect();
+        let (today, dc, n, mut id) = (self.today, self.dc, strikes.len(), 0);
+        let (d, k, v) = (dates.as_ptr(), strikes.as_ptr(), vols.as_ptr());
+        let mut e = ItofinError {
+            code: 0,
+            message: [0 as c_char; 1024],
+        };
+        unsafe {
+            itofin_black_variance_surface_new_with_interpolation(
+                &mut self.c,
+                today,
+                d,
+                3,
+                k,
+                n,
+                v,
+                3 * n,
+                dc,
+                0,
+                interpolation,
+                &mut id,
+                &mut e,
+            )
+        };
+        let bytes: Vec<u8> = e
+            .message
+            .iter()
+            .take_while(|b| **b != 0)
+            .map(|b| *b as u8)
+            .collect();
+        (id, e.code, String::from_utf8_lossy(&bytes).into_owned())
+    }
+
+    fn vol(&mut self, id: u64, t: f64, strike: f64) -> f64 {
+        let mut v = 0.0;
+        self.ok(|c, e| unsafe { itofin_black_vol_query(c, id, 0, t, 0.0, strike, 0, &mut v, e) });
+        v
+    }
+}
+
+fn smile_strikes() -> Vec<f64> {
+    (-7..=7)
+        .map(|k| SPOT * (0.2 * f64::from(k)).exp())
+        .collect()
+}
+
+#[test]
+fn tanh_smile_under_bicubic_matches_the_core_oracle() {
+    let mut m = market();
+    let (surface, code, message) = m.interpolated(&smile_strikes(), 1);
+    assert_eq!(code, 0, "{message}");
+    let (_, process) = m.local_process(surface);
+    let (today, dc, mut flat) = (m.today, m.dc, 0);
+    m.ok(|c, e| unsafe { itofin_black_scholes_new(c, SPOT, R, Q, 0.20, today, dc, &mut flat, e) });
+    for (kind, strike, sign, npv, error) in [
+        (0, 115.0, -1.0, 1.0751944785024798, 0.05164019195806817),
+        (1, 85.0, 1.0, 1.0122245200291142, 0.05721888187042385),
+    ] {
+        let (flat, _) = m.price(flat, kind, strike, 180, 0).unwrap();
+        let (mc, se) = m.price(process, kind, strike, 180, 4_000).unwrap();
+        assert_eq!(mc.to_bits(), f64::to_bits(npv), "K={strike}: {mc} vs {npv}");
+        assert_eq!(
+            se.to_bits(),
+            f64::to_bits(error),
+            "K={strike}: {se} vs {error}"
+        );
+        assert!(
+            sign * (mc - flat) > 5.0 * se,
+            "K={strike}: mc {mc} flat {flat} se {se}"
+        );
+    }
+}
+
+#[test]
+fn default_surface_is_bilinear_and_bicubic_differs_off_node() {
+    let mut m = market();
+    let default = m.surface(tanh);
+    let (bilinear, _, _) = m.interpolated(&smile_strikes(), 0);
+    let (bicubic, _, _) = m.interpolated(&smile_strikes(), 1);
+    for (t, strike) in [(0.25, 95.0), (0.5, 130.0), (1.0 / 6.0, 100.0)] {
+        let (a, b) = (m.vol(default, t, strike), m.vol(bilinear, t, strike));
+        assert_eq!(a.to_bits(), b.to_bits(), "t={t} K={strike}: {a} vs {b}");
+    }
+    let (b, c) = (m.vol(bilinear, 0.25, 95.0), m.vol(bicubic, 0.25, 95.0));
+    assert!((b - c).abs() > 1e-6, "bilinear {b} bicubic {c}");
+}
+
+#[test]
+fn interpolation_choice_errors() {
+    let mut m = market();
+    let (_, code, message) = m.interpolated(&smile_strikes(), 2);
+    assert_eq!(code, INVALID_ARGUMENT, "{message}");
+    assert!(message.contains("unknown interpolation"), "{message}");
+    let (_, code, message) = m.interpolated(&[100.0], 1);
+    assert_eq!(code, CORE_ERROR, "{message}");
+    assert!(
+        message.contains("bilinear interpolation needs at least 2"),
+        "{message}"
+    );
 }

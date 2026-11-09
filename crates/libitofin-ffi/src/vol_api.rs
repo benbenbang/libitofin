@@ -2,7 +2,10 @@
 use crate::boundary::*;
 use crate::time_api::{date, day_counter};
 use libitofin::handle::Handle;
-use libitofin::math::{interpolations::linear::Linear, matrix::Matrix};
+use libitofin::math::{
+    interpolations::{bicubic::Bicubic, linear::Linear},
+    matrix::Matrix,
+};
 use libitofin::shared::{Shared, shared};
 use libitofin::termstructures::volatility::{
     BlackConstantVol, BlackVarianceCurve, BlackVarianceSurface, BlackVolTermStructure,
@@ -161,6 +164,7 @@ pub(crate) unsafe fn variance_curve(
         Linear,
     )?))
 }
+/// Bilinear surface; same as the `_with_interpolation` export with 0.
 /// # Safety
 /// Follow the crate C caller contract; arrays must have their stated lengths.
 #[unsafe(no_mangle)]
@@ -179,8 +183,53 @@ pub unsafe extern "C" fn itofin_black_variance_surface_new(
     error: *mut ItofinError,
 ) -> i32 {
     unsafe {
+        itofin_black_variance_surface_new_with_interpolation(
+            ctx,
+            reference_date,
+            dates,
+            date_count,
+            strikes,
+            strike_count,
+            vols,
+            vol_count,
+            dc,
+            cal,
+            0,
+            out,
+            error,
+        )
+    }
+}
+/// Interpolation: 0 Bilinear (the construction default), 1 Bicubic. The
+/// choice is made at construction because the handle is type-erased.
+/// Deferred: strike extrapolation and non-Linear `BlackVarianceCurve`
+/// interpolators (#624).
+/// # Safety
+/// Follow the crate C caller contract; arrays must have their stated lengths.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn itofin_black_variance_surface_new_with_interpolation(
+    ctx: *mut Context,
+    reference_date: i32,
+    dates: *const i32,
+    date_count: usize,
+    strikes: *const f64,
+    strike_count: usize,
+    vols: *const f64,
+    vol_count: usize,
+    dc: u64,
+    cal: u64,
+    interpolation: i32,
+    out: *mut u64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
         with_context(ctx, error, |c| {
             check_ptr(out)?;
+            let bicubic = match interpolation {
+                0 => false,
+                1 => true,
+                _ => return Err(BindingError::invalid("unknown interpolation")),
+            };
             if date_count == 0
                 || strike_count == 0
                 || date_count.checked_mul(strike_count) != Some(vol_count)
@@ -209,14 +258,18 @@ pub unsafe extern "C" fn itofin_black_variance_surface_new(
                     matrix[(i, j)] = vols[i * date_count + j];
                 }
             }
-            let v = shared(BlackVarianceSurface::new(
+            let mut surface = BlackVarianceSurface::new(
                 date(reference_date)?,
                 calendar(c, cal)?,
                 &dates,
                 strikes,
                 &matrix,
                 day_counter(c, dc)?,
-            )?) as Shared<dyn BlackVolTermStructure>;
+            )?;
+            if bicubic {
+                surface.set_interpolation(&Bicubic)?;
+            }
+            let v = shared(surface) as Shared<dyn BlackVolTermStructure>;
             output(out, c.insert(Handle::new(v))?)
         })
     }

@@ -9700,6 +9700,7 @@ int32_t itofin_black_variance_curve_new(struct ItofinContext *ctx,
                                         struct ItofinError *error);
 
 /**
+ * Bilinear surface; same as the `_with_interpolation` export with 0.
  * # Safety
  * Follow the crate C caller contract; arrays must have their stated lengths.
  */
@@ -9715,6 +9716,28 @@ int32_t itofin_black_variance_surface_new(struct ItofinContext *ctx,
                                           uint64_t cal,
                                           uint64_t *out,
                                           struct ItofinError *error);
+
+/**
+ * Interpolation: 0 Bilinear (the construction default), 1 Bicubic. The
+ * choice is made at construction because the handle is type-erased.
+ * Deferred: strike extrapolation and non-Linear `BlackVarianceCurve`
+ * interpolators (#624).
+ * # Safety
+ * Follow the crate C caller contract; arrays must have their stated lengths.
+ */
+int32_t itofin_black_variance_surface_new_with_interpolation(struct ItofinContext *ctx,
+                                                             int32_t reference_date,
+                                                             const int32_t *dates,
+                                                             size_t date_count,
+                                                             const double *strikes,
+                                                             size_t strike_count,
+                                                             const double *vols,
+                                                             size_t vol_count,
+                                                             uint64_t dc,
+                                                             uint64_t cal,
+                                                             int32_t interpolation,
+                                                             uint64_t *out,
+                                                             struct ItofinError *error);
 
 /**
  * Query kind: 0 vol, 1 variance, 2 forward vol, 3 forward variance,
