@@ -85,6 +85,10 @@ impl CalendarImpl for BejImpl {
             || (dd == em - 3)
             // Ascension Thursday
             || (dd == em + 38)
+            // Labour Day (national holiday since 2014)
+            || (d == 1 && m == Month::May && y >= 2014)
+            // Pancasila Day (national holiday since 2017)
+            || (d == 1 && m == Month::June && y >= 2017)
             // Independence Day
             || (d == 17 && m == Month::August)
             // Christmas
@@ -311,8 +315,6 @@ impl CalendarImpl for BejImpl {
                 || (d == 31 && m == Month::January)
                 // Saka New Year
                 || (d == 31 && m == Month::March)
-                // Labour Day
-                || (d == 1 && m == Month::May)
                 // Birth of Buddha
                 || (d == 15 && m == Month::May)
                 // Isra' Mi'raj of the prophet Muhammad SAW
@@ -324,6 +326,157 @@ impl CalendarImpl for BejImpl {
                 // Public Holiday
                 || (d == 26 && m == Month::December)
                 // Trading Holiday
+                || (d == 31 && m == Month::December)
+            {
+                return false;
+            }
+        }
+
+        if y == 2015 {
+            if
+            // Chinese New Year
+            (d == 19 && m == Month::February)
+                // Birth of Buddha
+                || (d == 2 && m == Month::June)
+                // Ied ul-Fitr
+                || ((d == 16 || d == 17) && m == Month::July)
+                || ((d == 20 || d == 21) && m == Month::July)
+                // Eid ul-Adha
+                || (d == 24 && m == Month::September)
+                // Islamic New Year
+                || (d == 14 && m == Month::October)
+                // Regional elections
+                || (d == 9 && m == Month::December)
+                // Birthday of the prophet Muhammad SAW
+                || (d == 24 && m == Month::December)
+                // Trading Holiday
+                || (d == 31 && m == Month::December)
+            {
+                return false;
+            }
+        }
+
+        if y == 2016 {
+            if
+            // Chinese New Year
+            (d == 8 && m == Month::February)
+                // Saka New Year
+                || (d == 9 && m == Month::March)
+                // Isra' Mi'raj of the prophet Muhammad SAW
+                || (d == 6 && m == Month::May)
+                // Ied ul-Fitr
+                || (d >= 4 && d <= 8 && m == Month::July)
+                // Eid ul-Adha
+                || (d == 12 && m == Month::September)
+                // Birthday of the prophet Muhammad SAW
+                || (d == 12 && m == Month::December)
+                // National leave
+                || (d == 26 && m == Month::December)
+            {
+                return false;
+            }
+        }
+
+        if y == 2017 {
+            if
+            // National leave
+            (d == 2 && m == Month::January)
+                // Regional elections
+                || (d == 15 && m == Month::February)
+                // Saka New Year
+                || (d == 28 && m == Month::March)
+                // Regional elections (Jakarta runoff)
+                || (d == 19 && m == Month::April)
+                // Isra' Mi'raj of the prophet Muhammad SAW
+                || (d == 24 && m == Month::April)
+                // Birth of Buddha
+                || (d == 11 && m == Month::May)
+                // Ied ul-Fitr
+                || (d == 23 && m == Month::June)
+                || (d >= 26 && d <= 30 && m == Month::June)
+                // Eid ul-Adha
+                || (d == 1 && m == Month::September)
+                // Islamic New Year
+                || (d == 21 && m == Month::September)
+                // Birthday of the prophet Muhammad SAW
+                || (d == 1 && m == Month::December)
+                // National leave
+                || (d == 26 && m == Month::December)
+            {
+                return false;
+            }
+        }
+
+        if y == 2018 {
+            if
+            // Chinese New Year
+            (d == 16 && m == Month::February)
+                // Birth of Buddha
+                || (d == 29 && m == Month::May)
+                // Ied ul-Fitr
+                || (d >= 11 && d <= 15 && m == Month::June)
+                || ((d == 18 || d == 19) && m == Month::June)
+                // Eid ul-Adha
+                || (d == 22 && m == Month::August)
+                // Islamic New Year
+                || (d == 11 && m == Month::September)
+                // Birthday of the prophet Muhammad SAW
+                || (d == 20 && m == Month::November)
+                // National leave
+                || (d == 24 && m == Month::December)
+                // Trading Holiday
+                || (d == 31 && m == Month::December)
+            {
+                return false;
+            }
+        }
+
+        if y == 2019 {
+            if
+            // Chinese New Year
+            (d == 5 && m == Month::February)
+                // Saka New Year
+                || (d == 7 && m == Month::March)
+                // Isra' Mi'raj of the prophet Muhammad SAW
+                || (d == 3 && m == Month::April)
+                // General elections
+                || (d == 17 && m == Month::April)
+                // Ied ul-Fitr
+                || (d >= 3 && d <= 7 && m == Month::June)
+                // National leave
+                || (d == 24 && m == Month::December)
+                // Trading Holiday
+                || (d == 31 && m == Month::December)
+            {
+                return false;
+            }
+        }
+
+        if y == 2020 {
+            if
+            // Saka New Year
+            (d == 25 && m == Month::March)
+                // Birth of Buddha
+                || (d == 7 && m == Month::May)
+                // Ied ul-Fitr
+                || (d == 22 && m == Month::May)
+                || (d == 25 && m == Month::May)
+                // Eid ul-Adha
+                || (d == 31 && m == Month::July)
+                // Islamic New Year
+                || (d == 20 && m == Month::August)
+                // National leave
+                || (d == 21 && m == Month::August)
+                || (d == 28 && m == Month::October)
+                // Birthday of the prophet Muhammad SAW
+                || (d == 29 && m == Month::October)
+                // National leave
+                || (d == 30 && m == Month::October)
+                // Regional elections
+                || (d == 9 && m == Month::December)
+                // National leave
+                || (d == 24 && m == Month::December)
+                // Ied ul-Fitr
                 || (d == 31 && m == Month::December)
             {
                 return false;
@@ -369,6 +522,35 @@ mod tests {
     fn in_horizon_query_works() {
         let c = Indonesia::new(Market::Idx);
         assert!(c.is_holiday(Date::new(1, Month::January, HOLIDAY_HORIZON)));
+    }
+
+    #[test]
+    fn labour_and_pancasila_days_are_rule_based() {
+        // indonesia.cpp (v1.44): Labour Day from 2014, Pancasila Day from 2017.
+        let c = Indonesia::new(Market::Idx);
+        assert!(c.is_business_day(Date::new(1, Month::May, 2013)));
+        assert!(c.is_holiday(Date::new(1, Month::May, 2014)));
+        assert!(c.is_holiday(Date::new(1, Month::May, 2015)));
+        assert!(c.is_business_day(Date::new(1, Month::June, 2016)));
+        assert!(c.is_holiday(Date::new(1, Month::June, 2017)));
+    }
+
+    #[test]
+    fn tables_2015_to_2020_follow_quantlib_v1_44() {
+        let c = Indonesia::new(Market::Idx);
+        for (d, m, y) in [
+            (19, Month::February, 2015),
+            (21, Month::July, 2015),
+            (8, Month::February, 2016),
+            (2, Month::January, 2017),
+            (16, Month::February, 2018),
+            (5, Month::February, 2019),
+            (25, Month::March, 2020),
+            (31, Month::December, 2020),
+        ] {
+            assert!(c.is_holiday(Date::new(d, m, y)), "{d} {m:?} {y}");
+        }
+        assert!(c.is_business_day(Date::new(18, Month::February, 2015)));
     }
 
     #[test]
