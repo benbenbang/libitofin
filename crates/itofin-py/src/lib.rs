@@ -487,6 +487,7 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     pricingengines.add_class::<PyInterpolatingCpiCapFloorEngine>()?;
     pricingengines.add_class::<fdengine::PyFdScheme>()?;
     pricingengines.add_class::<fdengine::PyFdBlackScholesVanillaEngine>()?;
+    pricingengines.add_class::<fdengine::PyAnalyticDividendEuropeanEngine>()?;
     pricingengines.add_class::<PyMCEuropeanEngine>()?;
     pricingengines.add_class::<merton::PyJumpDiffusionEngine>()?;
     pricingengines.add_class::<bates::PyBatesEngine>()?;

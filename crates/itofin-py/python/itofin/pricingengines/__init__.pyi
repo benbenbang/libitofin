@@ -13,6 +13,7 @@ from itofin import time
 import typing
 __all__ = [
     "AccrualBias",
+    "AnalyticDividendEuropeanEngine",
     "AnalyticGJRGARCHEngine",
     "BachelierCapFloorEngine",
     "BachelierSwaptionEngine",
@@ -48,6 +49,27 @@ __all__ = [
     "TreeSwaptionEngine",
     "YoYInflationCapFloorEngine",
 ]
+
+@typing.final
+class AnalyticDividendEuropeanEngine:
+    r"""
+    Analytic engine for European vanilla options paying fixed cash dividends.
+    """
+    def __init__(self, process: processes.BlackScholesProcess, dividend_dates: typing.Sequence[time.Date], dividend_amounts: typing.Sequence[builtins.float]) -> None:
+        r"""
+        Build the engine retaining the Black-Scholes process.
+
+        The spot is reduced by the present value of the dividends paid up to
+        the exercise date. Pricing a non-European exercise raises ItofinError.
+
+        Args:
+            process (BlackScholesProcess): The market process to price under.
+            dividend_dates (list[Date]): Payment dates of the cash dividends.
+            dividend_amounts (list[float]): The cash amount paid on each date.
+
+        Raises:
+            ItofinError: If the dividend lists differ in length.
+        """
 
 @typing.final
 class AnalyticGJRGARCHEngine:
@@ -453,7 +475,7 @@ class FdBlackScholesVanillaEngine:
     r"""
     Finite-difference engine for European, American and Bermudan vanilla options.
     """
-    def __init__(self, process: processes.BlackScholesProcess, t_grid: builtins.int = 100, x_grid: builtins.int = 100, damping_steps: builtins.int = 0, scheme: FdScheme = FdScheme.Douglas) -> None:
+    def __init__(self, process: processes.BlackScholesProcess, t_grid: builtins.int = 100, x_grid: builtins.int = 100, damping_steps: builtins.int = 0, scheme: FdScheme = FdScheme.Douglas, dividend_dates: typing.Optional[typing.Sequence[time.Date]] = None, dividend_amounts: typing.Optional[typing.Sequence[builtins.float]] = None) -> None:
         r"""
         Build a grid engine retaining the Black-Scholes process.
 
@@ -463,10 +485,19 @@ class FdBlackScholesVanillaEngine:
             x_grid (int): Spatial grid size, at least 3; defaults to 100.
             damping_steps (int): Initial implicit-Euler steps; defaults to 0.
             scheme (FdScheme): Douglas by default; ImplicitEuler is also supported.
+            dividend_dates (list[Date] | None): Payment dates of fixed cash
+                dividends, paid under the Spot model; dividends outside the
+                option life are dropped. The Escrowed model is not offered
+                (deferred to #828). A dividend on the evaluation date leaves
+                theta unavailable.
+            dividend_amounts (list[float] | None): The cash amount paid on each
+                of dividend_dates; given together with them or not at all.
 
         Raises:
-            ValueError: If the grid dimensions are invalid.
+            ValueError: If the grid dimensions are invalid or only one of the
+                dividend lists is given.
             OverflowError: If a grid integer is outside the accepted range.
+            ItofinError: If the dividend lists differ in length.
         """
 
 @typing.final

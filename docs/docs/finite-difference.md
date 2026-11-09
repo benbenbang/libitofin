@@ -30,6 +30,34 @@ calls. The option retains its engine, and the engine retains the process.
 The default grid is 100 time steps by 100 spatial nodes, with zero damping
 steps and `FdScheme.Douglas`. `FdScheme.ImplicitEuler` is the other supported
 rollback scheme. Time steps must be positive and spatial nodes at least three.
-Cash dividends, quanto and local-volatility settings are outside this API.
+Quanto and local-volatility settings are outside this API.
+
+## Cash dividends
+
+Pass `dividend_dates` and `dividend_amounts` together to pay fixed cash
+dividends under the Spot model. Dividends outside the option life are dropped,
+and a dividend on the evaluation date leaves `option.theta()` unavailable. The
+Escrowed cash-dividend model is not offered; it is tracked on #828.
+
+```python
+dividends = FdBlackScholesVanillaEngine(
+    process, 100, 400,
+    dividend_dates=[Date(15, 7, 2025)], dividend_amounts=[2.0],
+)
+american_value = option.price_fd(dividends)
+
+from itofin.pricingengines import AnalyticDividendEuropeanEngine
+
+analytic = AnalyticDividendEuropeanEngine(process, [Date(15, 7, 2025)], [2.0])
+european = VanillaOption(OptionType.Put, 100.0, expiry, settings)
+european_value = european.price_analytic_dividend(analytic)
+```
+
+`AnalyticDividendEuropeanEngine` reduces the spot by the present value of the
+dividends and raises `ItofinError` for a non-European exercise. Go exposes
+`Session.NewFdBlackScholesVanillaEngineWithCashDividends` and
+`Session.NewAnalyticDividendEuropeanEngine`; C exposes
+`itofin_fd_black_scholes_engine_with_cash_dividends` and
+`itofin_analytic_dividend_european_engine_new`, both taking serial dates.
 
 For the equivalent Go constructor and configuration, see the [Go SDK FD example](go.md#finite-difference-vanilla-options).

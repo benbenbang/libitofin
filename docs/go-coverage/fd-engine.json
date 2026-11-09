@@ -11,6 +11,53 @@
       ]
     },
     {
+      "c": "itofin_fd_black_scholes_engine_with_cash_dividends",
+      "go": "Session.NewFdBlackScholesVanillaEngineWithCashDividends",
+      "python": "itofin.pricingengines.FdBlackScholesVanillaEngine.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestFdCashDividendsReproduceCachedQuantLib",
+        "TestFdCashDividendTodayMatchesAnalyticAndHasNoTheta"
+      ]
+    },
+    {
+      "c": "itofin_analytic_dividend_european_engine_new",
+      "go": "AnalyticDividendEuropeanEngine",
+      "python": "itofin.pricingengines.AnalyticDividendEuropeanEngine",
+      "status": "implemented",
+      "tests": [
+        "TestAnalyticDividendEuropeanKnownValue"
+      ]
+    },
+    {
+      "c": "itofin_analytic_dividend_european_engine_new",
+      "go": "Session.NewAnalyticDividendEuropeanEngine",
+      "python": "itofin.pricingengines.AnalyticDividendEuropeanEngine.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestAnalyticDividendEuropeanKnownValue",
+        "TestCashDividendEnginesErrorsAndLifetime"
+      ]
+    },
+    {
+      "c": "itofin_option_set_engine",
+      "go": "VanillaOption.SetAnalyticDividendEngine",
+      "python": "itofin.instruments.VanillaOption.set_analytic_dividend_engine",
+      "status": "implemented",
+      "tests": [
+        "TestCashDividendEnginesErrorsAndLifetime"
+      ]
+    },
+    {
+      "c": "itofin_option_value",
+      "go": "VanillaOption.PriceAnalyticDividend",
+      "python": "itofin.instruments.VanillaOption.price_analytic_dividend",
+      "status": "implemented",
+      "tests": [
+        "TestAnalyticDividendEuropeanKnownValue"
+      ]
+    },
+    {
       "go": "FdScheme",
       "python": "itofin.pricingengines.FdScheme",
       "status": "implemented",

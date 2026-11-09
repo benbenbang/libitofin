@@ -2,7 +2,7 @@
 
 use crate::PyQlError;
 use crate::bates::PyBatesEngine;
-use crate::fdengine::PyFdBlackScholesVanillaEngine;
+use crate::fdengine::{PyAnalyticDividendEuropeanEngine, PyFdBlackScholesVanillaEngine};
 use crate::gjr_model::{PyAnalyticGjrGarchEngine, PyMcEuropeanGjrGarchEngine};
 use crate::heston::PyHestonModel;
 use crate::heston_engines::{PyCosHestonEngine, PyExponentialFittingHestonEngine};
@@ -436,6 +436,32 @@ impl PyVanillaOption {
     /// Attach an FD engine and return the option value.
     fn price_fd(&mut self, engine: &PyFdBlackScholesVanillaEngine) -> PyResult<f64> {
         self.set_fd_engine(engine);
+        self.npv()
+    }
+
+    /// Attach the analytic dividend European engine, retaining its process.
+    ///
+    /// Args:
+    ///     engine (AnalyticDividendEuropeanEngine): The engine to attach.
+    fn set_analytic_dividend_engine(&mut self, engine: &PyAnalyticDividendEuropeanEngine) {
+        self.inner
+            .borrow_mut()
+            .base_mut()
+            .set_pricing_engine(engine.engine());
+    }
+
+    /// Attach the analytic dividend European engine and return the NPV.
+    ///
+    /// Args:
+    ///     engine (AnalyticDividendEuropeanEngine): The engine to attach.
+    ///
+    /// Raises:
+    ///     ItofinError: If the exercise is not European.
+    fn price_analytic_dividend(
+        &mut self,
+        engine: &PyAnalyticDividendEuropeanEngine,
+    ) -> PyResult<f64> {
+        self.set_analytic_dividend_engine(engine);
         self.npv()
     }
 
