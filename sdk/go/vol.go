@@ -96,12 +96,14 @@ func (s *Session) BlackVarianceCurve(cfg BlackVarianceCurveConfig) (*BlackVolTer
 }
 
 // SurfaceInterpolation selects the variance interpolator of a
-// BlackVarianceSurface; the zero value is the construction-default Bilinear.
+// BlackVarianceSurface; the zero value is the construction-default
+// SurfaceBilinear. Deferred (#624): strike extrapolation and non-Linear
+// BlackVarianceCurve interpolators.
 type SurfaceInterpolation int32
 
 const (
-	Bilinear SurfaceInterpolation = iota
-	Bicubic
+	SurfaceBilinear SurfaceInterpolation = iota
+	SurfaceBicubic
 )
 
 type BlackVarianceSurfaceConfig struct {
