@@ -7,6 +7,7 @@ use crate::quotes::SimpleQuote;
 use crate::termstructures::bootstraptraits::Discount;
 use crate::termstructures::yields::{FlatForward, PiecewiseYieldCurve};
 use crate::test_support::implied_quote_on_dirty_curve;
+use crate::time::calendars::jointcalendar::{JointCalendar, JointCalendarRule};
 use crate::time::date::Month;
 use crate::time::daycounters::{
     actual360::Actual360,
@@ -366,4 +367,64 @@ fn implied_quote_on_a_dirty_curve_reprices_the_new_quote() {
     });
     assert!((dirty - fresh).abs() < 1e-12, "{dirty} vs {fresh}");
     assert!((dirty - 0.70).abs() < 1e-10, "{dirty}");
+}
+
+/// `testBmaHelperSwap` (v1.44 `piecewiseyieldcurve.cpp:2473`): the helper's
+/// swap starts on its earliest date (Wednesday 17 January 2024, two joint
+/// business days from Martin Luther King Day) with 20 quarterly BMA coupons,
+/// and moving the evaluation date one month rebuilds it (start Tuesday
+/// 20 February 2024, past Presidents' Day). C++ also checks the rebuilt
+/// `shared_ptr` differs; the swap lives in the helper's `RefCell`, so the port
+/// checks the rebuilt start date instead.
+#[test]
+fn bma_helper_swap_follows_the_evaluation_date() {
+    let today = Date::new(15, Month::January, 2024);
+    let settings = shared(Settings::new());
+    settings.set_evaluation_date(today);
+    let bma = shared(BMAIndex::new(Handle::empty(), settings.clone()));
+    let ibor = shared(
+        UsdLibor::new(
+            Period::new(3, TimeUnit::Months),
+            Handle::empty(),
+            settings.clone(),
+        )
+        .unwrap(),
+    );
+    let calendar = JointCalendar::of_two(
+        bma.fixing_calendar(),
+        ibor.fixing_calendar(),
+        JointCalendarRule::JoinHolidays,
+    );
+    let helper = BMASwapRateHelper::new(
+        Handle::new(shared(SimpleQuote::new(0.75)) as Shared<dyn Quote>),
+        Period::new(5, TimeUnit::Years),
+        2,
+        calendar.clone(),
+        Period::new(3, TimeUnit::Months),
+        Bdc::Following,
+        Actual360::new(),
+        &bma,
+        &ibor,
+    )
+    .unwrap();
+
+    let first_start = {
+        let swap = helper.swap().unwrap();
+        assert_eq!(swap.swap().leg(1).unwrap().len(), 20);
+        swap.swap().start_date().unwrap()
+    };
+    assert_eq!(first_start, helper.base().earliest_date());
+    assert_eq!(first_start, Date::new(17, Month::January, 2024));
+
+    settings.set_evaluation_date(calendar.advance(
+        today,
+        1,
+        TimeUnit::Months,
+        Bdc::Following,
+        false,
+    ));
+    let second_start = helper.swap().unwrap().swap().start_date().unwrap();
+    assert_ne!(second_start, first_start);
+    assert_eq!(second_start, helper.base().earliest_date());
+    assert_eq!(second_start, Date::new(20, Month::February, 2024));
 }

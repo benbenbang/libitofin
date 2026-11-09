@@ -14,13 +14,12 @@ use crate::termstructures::bootstraphelper::{
     BootstrapHelperBase, RateHelper, RelativeDateRateHelper,
 };
 use crate::termstructures::yieldtermstructure::YieldTermStructure;
-use crate::time::calendars::jointcalendar::{JointCalendar, JointCalendarRule};
 use crate::time::{
     businessdayconvention::BusinessDayConvention as Bdc, calendar::Calendar, date::Date,
     daycounter::DayCounter, period::Period, schedule::MakeSchedule, timeunit::TimeUnit,
 };
 use std::{
-    cell::RefCell,
+    cell::{Ref, RefCell},
     panic::{AssertUnwindSafe, catch_unwind},
     rc::Weak,
 };
@@ -112,6 +111,12 @@ impl BMASwapRateHelper {
         helper.try_initialize_dates()?;
         Ok(helper)
     }
+    /// The BMA swap underlying the helper (v1.44 `ratehelpers.hpp:315`), rebuilt
+    /// whenever the evaluation date moves. The borrow must be released before
+    /// the evaluation date changes, since the rebuild replaces the swap.
+    pub fn swap(&self) -> Option<Ref<'_, BMASwap>> {
+        Ref::filter_map(self.swap.borrow(), Option::as_ref).ok()
+    }
     /// Atomically rebuilds dates and stores errors until a subsequent successful update.
     pub fn try_initialize_dates(&self) -> QlResult<()> {
         let result = catch_unwind(AssertUnwindSafe(|| self.rebuild_dates())).unwrap_or_else(|_| {
@@ -138,6 +143,8 @@ impl BMASwapRateHelper {
             }
         }
     }
+    /// The earliest date counts the settlement days on the helper calendar
+    /// from the unadjusted evaluation date (v1.44 `ratehelpers.cpp:674-678`).
     fn rebuild_dates(&self) -> QlResult<(BMASwap, Date, Date, Date)> {
         let today = self
             .base
@@ -147,12 +154,8 @@ impl BMASwapRateHelper {
             today >= Date::min_date() + 14 && today <= Date::max_date() - 14,
             "BMA evaluation date outside supported range"
         );
-        let jc = JointCalendar::new(
-            vec![self.calendar.clone(), self.ibor_index.fixing_calendar()],
-            JointCalendarRule::JoinHolidays,
-        );
         let earliest = self.calendar.advance(
-            jc.adjust(today, Bdc::Following),
+            today,
             self.settlement_days as i32,
             TimeUnit::Days,
             Bdc::Following,

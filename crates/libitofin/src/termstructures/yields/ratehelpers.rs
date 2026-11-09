@@ -156,16 +156,20 @@ impl RateHelper for DepositRateHelper {
 
 impl RelativeDateRateHelper for DepositRateHelper {
     /// Rebuilds the schedule off the current evaluation date
-    /// (`initializeDates`, `ratehelpers.cpp:228`): the reference date is the
-    /// evaluation date rolled to a business day, the earliest (value) date is
-    /// spot from there, the fixing date the value date rolled back, and the
-    /// maturity the value date advanced by the tenor. Pillar, latest and
-    /// latest-relevant dates all equal the maturity.
+    /// (`initializeDates`, v1.44 `ratehelpers.cpp:228-237`): the earliest date
+    /// is the index fixing days advanced on the fixing calendar from the
+    /// unadjusted evaluation date (a Saturday plus two days is a Tuesday), the
+    /// fixing date that date rolled back, and the maturity the earliest date
+    /// advanced by the tenor. Pillar, latest and latest-relevant dates all
+    /// equal the maturity.
+    ///
+    /// The earliest date no longer goes through the index value date, so for
+    /// Libor-family indexes the joint-calendar adjust of `Libor::valueDate`
+    /// (`libor.cpp:86-99`) no longer applies: the result changes on business
+    /// days too when the spot lands on a value-calendar holiday.
     ///
     /// An unset evaluation date is stored as the error and returned by the
-    /// next [`implied_quote`](RateHelper::implied_quote) (D10). The value- and
-    /// maturity-date arithmetic is calendar rolling on an already-adjusted
-    /// business day and so cannot fail; the `expect`s document that invariant.
+    /// next [`implied_quote`](RateHelper::implied_quote) (D10).
     fn initialize_dates(&self) {
         *self.date_error.borrow_mut() = self.try_initialize_dates().err();
     }
@@ -177,19 +181,15 @@ impl DepositRateHelper {
             .base
             .evaluation_date()
             .ok_or_else(|| QlError::new("evaluation date is not set", file!(), line!()))?;
-        let reference_date = self
-            .index
-            .fixing_calendar()
-            .adjust(evaluation_date, BusinessDayConvention::Following);
-        let earliest = self
-            .index
-            .value_date(reference_date)
-            .expect("value date of an adjusted business day is valid");
+        let earliest = self.index.fixing_calendar().advance(
+            evaluation_date,
+            self.index.fixing_days() as Integer,
+            TimeUnit::Days,
+            BusinessDayConvention::Following,
+            false,
+        );
         self.fixing_date.set(self.index.fixing_date(earliest));
-        let maturity = self
-            .index
-            .maturity_date(earliest)
-            .expect("maturity date of a value date is valid");
+        let maturity = self.index.maturity_date(earliest)?;
 
         self.base.set_earliest_date(earliest);
         self.base.set_maturity_date(maturity);
@@ -744,10 +744,13 @@ impl RateHelper for FraRateHelper {
 
 impl RelativeDateRateHelper for FraRateHelper {
     /// Rebuilds the schedule off the current evaluation date (`initializeDates`,
-    /// `ratehelpers.cpp:393`).
+    /// v1.44 `ratehelpers.cpp:392-397`).
     ///
     /// When the helper tracks the evaluation date (the relative constructors),
-    /// the earliest date is `period_to_start` past spot and the maturity is the
+    /// spot is the index fixing days advanced on the fixing calendar from the
+    /// unadjusted evaluation date (not the index value date, so no Libor
+    /// joint-calendar adjust), the earliest date is `period_to_start` past spot
+    /// and the maturity is the
     /// combined `period_to_start + tenor` past spot - both advanced from spot,
     /// not chained, so a business-day roll on the intermediate date cannot leak
     /// into the maturity. The explicit-date constructor sets those two dates at
@@ -769,12 +772,13 @@ impl FraRateHelper {
                         QlError::new("evaluation date is not set", file!(), line!())
                     })?;
                     let calendar = self.index.fixing_calendar();
-                    let reference =
-                        calendar.adjust(evaluation_date, BusinessDayConvention::Following);
-                    let spot = self
-                        .index
-                        .value_date(reference)
-                        .expect("spot date of an adjusted business day is valid");
+                    let spot = calendar.advance(
+                        evaluation_date,
+                        self.index.fixing_days() as Integer,
+                        TimeUnit::Days,
+                        BusinessDayConvention::Following,
+                        false,
+                    );
                     let period_to_start = self
                         .period_to_start
                         .expect("a relative-date FRA helper carries a period to start");
@@ -2962,5 +2966,68 @@ mod tests {
         assert!(helper.validate_dates().is_ok());
         assert!(helper.earliest_date() > today());
         helper.quote_error().unwrap();
+    }
+
+    /// `testHelperDatesFromNonBusinessEvaluationDate` (v1.44
+    /// `piecewiseyieldcurve.cpp:2422`): on Saturday 20 June 2026 the deposit,
+    /// FRA and BMA helpers count their fixing / settlement days from the
+    /// Saturday itself (`ratehelpers.cpp:232-233/396-397/676-678`). The C++
+    /// deposit is built from explicit Euribor6M parameters; the port's
+    /// index-based [`DepositRateHelper::from_rate`] builds the same schedule.
+    #[test]
+    fn helper_dates_from_a_saturday_evaluation_date() {
+        use crate::indexes::ibor::Euribor;
+        use crate::indexes::{BMAIndex, UsdLibor};
+        use crate::termstructures::yields::BMASwapRateHelper;
+        use crate::time::calendars::{JointCalendar, JointCalendarRule};
+
+        let settings = settings_on(Date::new(20, Month::June, 2026));
+        let euribor6m = Euribor::six_months(Handle::empty(), Shared::clone(&settings));
+
+        let depo = DepositRateHelper::from_rate(0.03, &euribor6m);
+        assert_eq!(
+            depo.base().earliest_date(),
+            Date::new(23, Month::June, 2026)
+        );
+
+        let fra = FraRateHelper::from_months(
+            Handle::new(shared(SimpleQuote::new(0.03)) as Shared<dyn Quote>),
+            3,
+            &euribor6m,
+            true,
+            Pillar::LastRelevantDate,
+        );
+        assert_eq!(
+            fra.base().earliest_date(),
+            Date::new(23, Month::September, 2026)
+        );
+
+        let bma_index = shared(BMAIndex::new(Handle::empty(), Shared::clone(&settings)));
+        let libor = shared(
+            UsdLibor::new(
+                Period::new(3, TimeUnit::Months),
+                Handle::empty(),
+                Shared::clone(&settings),
+            )
+            .unwrap(),
+        );
+        let bma_calendar = JointCalendar::of_two(
+            bma_index.fixing_calendar(),
+            libor.fixing_calendar(),
+            JointCalendarRule::JoinHolidays,
+        );
+        let bma = BMASwapRateHelper::new(
+            Handle::new(shared(SimpleQuote::new(0.75)) as Shared<dyn Quote>),
+            Period::new(5, TimeUnit::Years),
+            3,
+            bma_calendar,
+            Period::new(3, TimeUnit::Months),
+            BusinessDayConvention::Following,
+            Actual360::new(),
+            &bma_index,
+            &libor,
+        )
+        .unwrap();
+        assert_eq!(bma.base().earliest_date(), Date::new(24, Month::June, 2026));
     }
 }
