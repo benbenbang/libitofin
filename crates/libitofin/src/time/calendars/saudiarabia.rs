@@ -281,4 +281,43 @@ mod tests {
         bus(21, Month::May, 2026);
         bus(31, Month::May, 2026);
     }
+
+    /// Every non-weekend holiday per year, generated from the v1.44 C++ source
+    /// (`ql/time/calendars/saudiarabia.cpp:54-171`: Eid windows and Founding Day), not from this port.
+    #[rustfmt::skip]
+    const SOURCE_HOLIDAYS: &[(Year, &[(i32, i32)])] = &[
+        (2022, &[(22, 2), (1, 5), (2, 5), (3, 5), (4, 5), (5, 5), (10, 7), (11, 7), (12, 7),
+            (13, 7), (14, 7)]),
+        (2023, &[(22, 2), (17, 4), (18, 4), (19, 4), (20, 4), (23, 4), (24, 4), (25, 4),
+            (25, 6), (26, 6), (27, 6), (28, 6), (29, 6)]),
+        (2024, &[(22, 2), (4, 4), (7, 4), (8, 4), (9, 4), (10, 4), (11, 4), (14, 4), (16, 6),
+            (17, 6), (18, 6), (19, 6), (20, 6), (23, 9)]),
+        (2025, &[(23, 2), (27, 3), (30, 3), (31, 3), (1, 4), (2, 4), (5, 6), (8, 6), (9, 6),
+            (10, 6), (23, 9)]),
+        (2026, &[(22, 2), (17, 3), (18, 3), (19, 3), (22, 3), (23, 3), (24, 5), (25, 5),
+            (26, 5), (27, 5), (28, 5), (23, 9)]),
+        (2027, &[(22, 2), (7, 3), (8, 3), (9, 3), (10, 3), (11, 3), (16, 5), (17, 5), (18, 5),
+            (19, 5), (20, 5), (23, 9)]),
+        (2028, &[(22, 2), (27, 2), (28, 2), (29, 2), (1, 3), (2, 3), (3, 5), (4, 5), (7, 5),
+            (8, 5), (9, 5)]),
+        (2029, &[(12, 2), (13, 2), (14, 2), (15, 2), (18, 2), (22, 2), (22, 4), (23, 4),
+            (24, 4), (25, 4), (26, 4), (23, 9)]),
+    ];
+
+    #[test]
+    fn holiday_lists_match_quantlib_v1_44_source() {
+        let c = SaudiArabia::new(Market::Tadawul);
+        for &(y, expected) in SOURCE_HOLIDAYS {
+            let expected: Vec<Date> = expected
+                .iter()
+                .map(|&(d, m)| Date::new(d, Month::from_ordinal(m), y))
+                .collect();
+            let got = c.holiday_list(
+                Date::new(1, Month::January, y),
+                Date::new(31, Month::December, y),
+                false,
+            );
+            assert_eq!(got, expected, "{y}");
+        }
+    }
 }
