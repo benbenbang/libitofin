@@ -1,6 +1,8 @@
 //! The QuantLib 1.44 `bonds.cpp` oracles for the stepwise yield analytics:
-//! `testBasisPointValue` (:1759), `testYieldInFinalCouponPeriod` (:1952)
-//! and `testYieldInFinalCouponPeriodWithLateRedemption` (:1980).
+//! `testBasisPointValue` (:1759), `testYieldInFinalCouponPeriod` (:1952),
+//! `testYieldInFinalCouponPeriodWithLateRedemption` (:1980),
+//! `testYieldWithLongFirstCoupon` (:2104) and
+//! `testYieldWithLongFirstCouponAndQuasiPeriods` (:2149).
 
 use super::*;
 use crate::cashflows::FixedRateLeg;
@@ -322,4 +324,119 @@ fn a_late_redemption_splits_the_composite_yields() {
         None,
     );
     assert_close("late CTS yield", late_cts, late_stc, 1e-12);
+}
+
+/// `longFirstCouponDates` (`bonds.cpp:2054-2057`).
+fn long_first_coupon_dates() -> Vec<Date> {
+    vec![
+        Date::new(1, Month::January, 2026),
+        Date::new(1, Month::January, 2027),
+        Date::new(1, Month::July, 2027),
+        Date::new(1, Month::January, 2028),
+        Date::new(1, Month::July, 2028),
+        Date::new(1, Month::January, 2029),
+    ]
+}
+
+/// `checkLongFirstCouponBond` (`bonds.cpp:2063-2100`).
+fn check_long_first_coupon_bond(
+    bond: &Bond,
+    day_counter: &DayCounter,
+    settlement: Date,
+    expected_accrued: Real,
+    expected_stc: Real,
+    expected_cts: Real,
+) {
+    let accrued = BondFunctions::accrued_amount(bond, Some(settlement)).unwrap();
+    assert_close("accrued", accrued, expected_accrued, 1e-8);
+
+    for (compounding, expected) in [(STC, expected_stc), (CTS, expected_cts)] {
+        let rate = InterestRate::new(
+            0.05,
+            day_counter.clone(),
+            compounding,
+            Frequency::Semiannual,
+        )
+        .unwrap();
+        let price = BondFunctions::clean_price_at_yield(bond, &rate, Some(settlement)).unwrap();
+        assert_close(&format!("{compounding} price"), price, expected, 1e-8);
+
+        let irr = solve(
+            bond,
+            BondPrice::Clean(expected),
+            day_counter,
+            compounding,
+            settlement,
+            Some(0.02),
+        );
+        assert_close(&format!("{compounding} yield"), irr, 0.05, 1e-9);
+
+        check_sensitivities(bond, day_counter, settlement, 0.05, compounding);
+    }
+}
+
+/// `testYieldWithLongFirstCoupon` (:2104): the schedule is bare dates, so
+/// `ActualActual (ISMA)` has no quasi-coupon periods for the long coupon.
+#[test]
+fn a_long_first_coupon_is_simple_or_compounded_over_the_stub() {
+    let issue = Date::new(1, Month::January, 2026);
+    let day_counter = ActualActual::with_convention(Convention::ISMA);
+    let schedule = Schedule::from_dates(long_first_coupon_dates());
+    let bond = fixed_rate_bond(
+        0,
+        100.0,
+        schedule,
+        0.05,
+        day_counter.clone(),
+        Some(issue),
+        settings_at(issue),
+    );
+
+    check_long_first_coupon_bond(&bond, &day_counter, issue, 0.0, 100.0, 99.9405116002);
+    check_long_first_coupon_bond(
+        &bond,
+        &day_counter,
+        Date::new(1, Month::April, 2026),
+        1.2328767123,
+        99.9552420996,
+        99.9320683103,
+    );
+}
+
+/// `testYieldWithLongFirstCouponAndQuasiPeriods` (:2149): the same bond on
+/// a schedule tagged with its tenor and an irregular first period, so
+/// `ActualActual (ISMA)` uses the ICMA quasi-coupon fractions.
+#[test]
+fn a_long_first_coupon_uses_its_quasi_coupon_periods() {
+    let issue = Date::new(1, Month::January, 2026);
+    let settlement = Date::new(1, Month::April, 2026);
+    let schedule = Schedule::with_metadata(
+        long_first_coupon_dates(),
+        NullCalendar::new(),
+        UNADJUSTED,
+        Some(UNADJUSTED),
+        Some(Period::new(6, TimeUnit::Months)),
+        Some(DateGeneration::Backward),
+        Some(false),
+        vec![false, true, true, true, true],
+    );
+    let day_counter = ActualActual::with_schedule(Convention::ISMA, schedule.clone());
+    let bond = fixed_rate_bond(
+        0,
+        100.0,
+        schedule,
+        0.05,
+        day_counter.clone(),
+        Some(issue),
+        settings_at(settlement),
+    );
+
+    check_long_first_coupon_bond(
+        &bond,
+        &day_counter,
+        settlement,
+        1.2430939227,
+        99.9549891444,
+        99.9320607612,
+    );
 }

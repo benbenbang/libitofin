@@ -1967,6 +1967,27 @@ mod analytics_tests {
         assert!((at_yield - 1.0e-4 * expected).abs() < 1e-15);
     }
 
+    /// `cashflows.cpp:950-952`: a flow that is not a coupon is skipped before
+    /// the step date moves, so the coupon after it is still discounted from
+    /// the one before.
+    #[test]
+    fn the_bps_at_yield_steps_over_flows_that_are_not_coupons() {
+        let settings = settings();
+        let yield_rate = simple_365(FORWARD);
+        let plain = fixed_leg(RATE);
+        let mut with_flow = plain.clone();
+        with_flow.insert(
+            1,
+            shared(SimpleCashFlow::new(NOMINAL, day(Month::October, 2026)).unwrap())
+                as Shared<dyn CashFlow>,
+        );
+
+        let bps = |leg: &Leg| {
+            CashFlows::bps_at_yield(leg, &yield_rate, &settings, None, None, None).unwrap()
+        };
+        assert_eq!(bps(&with_flow), bps(&plain));
+    }
+
     /// Both yield analytics short-circuit an empty leg before resolving the
     /// settlement date, so they stand with no evaluation date set.
     #[test]
@@ -2464,6 +2485,30 @@ mod analytics_tests {
                 assert_eq!(conv(&leg, &rate(composite)), conv(&leg, &simple));
             }
         }
+    }
+
+    /// `cashflows.cpp:611-627`: on two flows `SimpleThenCompounded` discounts
+    /// the first step simply and the second compounded, and
+    /// `CompoundedThenSimple` the other way round, whatever the step lengths.
+    #[test]
+    fn a_composite_yield_is_simple_on_its_own_end_of_the_leg() {
+        let settings = settings();
+        let leg: Leg = vec![
+            shared(SimpleCashFlow::new(NOMINAL, today() + 210).unwrap()) as Shared<dyn CashFlow>,
+            shared(SimpleCashFlow::new(NOMINAL, today() + 300).unwrap()),
+        ];
+        let (r, t1, t2) = (0.04, 210.0 / 360.0, 90.0 / 360.0);
+        let simple = |t: Real| 1.0 / (1.0 + r * t);
+        let compounded = |t: Real| (1.0 + r / 2.0).powf(-2.0 * t);
+        let npv = |compounding| {
+            let rate = semiannual_360(r, compounding);
+            CashFlows::npv_at_yield(&leg, &rate, &settings, None, None, None).unwrap()
+        };
+
+        let stc = NOMINAL * simple(t1) * (1.0 + compounded(t2));
+        let cts = NOMINAL * compounded(t1) * (1.0 + simple(t2));
+        assert!((npv(Compounding::SimpleThenCompounded) - stc).abs() < 1e-12);
+        assert!((npv(Compounding::CompoundedThenSimple) - cts).abs() < 1e-12);
     }
 
     /// **Self-consistency.** The `bonds.cpp` oracle legs are all-coupon, so
