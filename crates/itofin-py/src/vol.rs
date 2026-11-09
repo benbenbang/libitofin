@@ -4,6 +4,7 @@ use crate::PyQlError;
 use crate::market::PySimpleQuote;
 use crate::time::{PyCalendar, PyDate, PyDayCounter};
 use libitofin::handle::Handle;
+use libitofin::math::interpolations::bicubic::Bicubic;
 use libitofin::math::interpolations::linear::Linear;
 use libitofin::math::matrix::Matrix;
 use libitofin::shared::{Shared, shared};
@@ -11,6 +12,7 @@ use libitofin::termstructures::volatility::{
     BlackConstantVol, BlackVarianceCurve, BlackVarianceSurface, BlackVolTermStructure,
     BlackVolTimeExtrapolation,
 };
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 #[allow(unused_imports)]
 use pyo3_stub_gen::derive::{
@@ -453,7 +455,8 @@ impl PyBlackVarianceCurve {
     }
 }
 
-/// A Black volatility surface in strike and expiry, interpolating bilinearly.
+/// A Black volatility surface in strike and expiry, interpolating bilinearly
+/// unless bicubic is chosen at construction.
 ///
 /// Finite in both time and strike, so out-of-grid queries require
 /// enable_extrapolation().
@@ -474,13 +477,16 @@ impl PyBlackVarianceSurface {
     ///         strike and one column per date.
     ///     day_counter (DayCounter): The day count turning dates into times.
     ///     calendar (Calendar | None): The surface's calendar, if any.
+    ///     interpolation (str): The variance interpolator, "bilinear" (the
+    ///         default) or "bicubic". Strike extrapolation is deferred (#624).
     ///
     /// Raises:
     ///     ItofinError: On an empty or ragged matrix, and on whatever the core
     ///         rejects about the grid dimensions.
+    ///     ValueError: On an unknown interpolation.
     #[gen_stub(override_return_type(type_repr = "BlackVarianceSurface"))]
     #[new]
-    #[pyo3(signature = (reference_date, dates, strikes, black_vol_matrix, day_counter, calendar = None))]
+    #[pyo3(signature = (reference_date, dates, strikes, black_vol_matrix, day_counter, calendar = None, interpolation = "bilinear"))]
     fn new(
         reference_date: &PyDate,
         dates: Vec<PyRef<PyDate>>,
@@ -488,20 +494,34 @@ impl PyBlackVarianceSurface {
         black_vol_matrix: Vec<Vec<f64>>,
         day_counter: &PyDayCounter,
         calendar: Option<&PyCalendar>,
+        interpolation: &str,
     ) -> PyResult<PyClassInitializer<Self>> {
+        let bicubic = match interpolation {
+            "bilinear" => false,
+            "bicubic" => true,
+            _ => {
+                return Err(PyValueError::new_err(format!(
+                    "unknown interpolation {interpolation:?}: expected \"bilinear\" or \"bicubic\""
+                )));
+            }
+        };
         let dates: Vec<_> = dates.iter().map(|d| d.inner()).collect();
         let matrix = matrix_from_rows(&black_vol_matrix)?;
-        let surface = shared(
-            BlackVarianceSurface::new(
-                reference_date.inner(),
-                calendar.map(PyCalendar::inner),
-                &dates,
-                strikes,
-                &matrix,
-                day_counter.inner(),
-            )
-            .map_err(PyQlError::from)?,
-        ) as Shared<dyn BlackVolTermStructure>;
+        let mut surface = BlackVarianceSurface::new(
+            reference_date.inner(),
+            calendar.map(PyCalendar::inner),
+            &dates,
+            strikes,
+            &matrix,
+            day_counter.inner(),
+        )
+        .map_err(PyQlError::from)?;
+        if bicubic {
+            surface
+                .set_interpolation(&Bicubic)
+                .map_err(PyQlError::from)?;
+        }
+        let surface = shared(surface) as Shared<dyn BlackVolTermStructure>;
         Ok(PyClassInitializer::from(PyBlackVolTermStructure {
             inner: Handle::new(surface),
         })

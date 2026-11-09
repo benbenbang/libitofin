@@ -1,8 +1,10 @@
 """Local volatility through the Python facade (#1366).
 
 Mirrors the core #1365 MC European local-vol oracle on the same market, grid
-and seed. The smile case uses a convex skew: the binding surface is bilinear,
-under which #1365's bicubic tanh grid has a negative local vol^2.
+and seed. The smile case uses a convex skew: the binding surface defaults to
+bilinear, under which #1365's bicubic tanh grid has a negative local vol^2.
+#1399 adds interpolation="bicubic", under which the tanh grid matches the core
+oracle bit for bit.
 """
 
 import math
@@ -50,9 +52,15 @@ class Market:
         )
         return local, process
 
-    def mc(self, process, option_type, strike, days):
+    def tanh_smile(self, interpolation, ks=range(-7, 8)):
+        strikes = [100.0 * math.exp(0.2 * k) for k in ks]
+        vols = [[0.2 - 0.1 * math.tanh(2 * math.log(k / 100))] * 3 for k in strikes]
+        dates = [TODAY + 60, TODAY + 120, TODAY + 240]
+        return BlackVarianceSurface(TODAY, dates, strikes, vols, DC, interpolation=interpolation)
+
+    def mc(self, process, option_type, strike, days, samples=20000):
         option = VanillaOption(option_type, strike, TODAY + days, self.settings)
-        npv = option.price_mc(MCEuropeanEngine(process, steps_per_year=12, samples=20000, seed=42))
+        npv = option.price_mc(MCEuropeanEngine(process, steps_per_year=12, samples=samples, seed=42))
         return option, npv, option.error_estimate()
 
     def analytic(self, process, option_type, strike, days):
@@ -136,3 +144,32 @@ def test_core_errors():
     plain = BlackScholesProcess.from_quote(m.spot, m.risk_free, m.dividend, m.smile())
     with pytest.raises(ItofinError, match="only constant Black volatilities"):
         m.mc(plain, OptionType.Call, 100.0, 180)
+
+
+def test_tanh_smile_under_bicubic_matches_the_core_oracle():
+    m = Market()
+    _, process = m.process(m.tanh_smile("bicubic"))
+    flat = BlackScholesProcess(100.0, 0.05, 0.02, 0.20, TODAY, DC)
+    for option_type, strike, sign, npv, error in (
+        (OptionType.Call, 115.0, -1, 1.0751944785024798, 0.05164019195806817),
+        (OptionType.Put, 85.0, 1, 1.0122245200291142, 0.05721888187042385),
+    ):
+        base = m.analytic(flat, option_type, strike, 180)
+        _, mc, se = m.mc(process, option_type, strike, 180, samples=4000)
+        assert (mc, se) == (npv, error), (strike, mc, se)
+        assert sign * (mc - base) > 5 * se, (strike, mc, base, se)
+
+
+def test_interpolation_choice():
+    m = Market()
+    strikes, dates = [90.0, 100.0, 110.0], [TODAY + 60, TODAY + 120, TODAY + 240]
+    vols = [[0.22, 0.21, 0.2], [0.2, 0.2, 0.2], [0.18, 0.19, 0.2]]
+    default = BlackVarianceSurface(TODAY, dates, strikes, vols, DC)
+    bilinear = BlackVarianceSurface(TODAY, dates, strikes, vols, DC, interpolation="bilinear")
+    assert default.black_vol(0.25, 95.0) == bilinear.black_vol(0.25, 95.0)
+    lin, cub = m.tanh_smile("bilinear"), m.tanh_smile("bicubic")
+    assert abs(lin.black_vol(0.25, 95.0) - cub.black_vol(0.25, 95.0)) > 1e-6
+    with pytest.raises(ValueError, match="unknown interpolation"):
+        m.tanh_smile("cubic")
+    with pytest.raises(ItofinError, match="bilinear interpolation needs at least 2"):
+        m.tanh_smile("bicubic", ks=range(1))
