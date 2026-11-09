@@ -5,12 +5,80 @@ import builtins
 import typing
 __all__ = [
     "AtmType",
+    "CompositeOp",
+    "CompositeQuote",
     "DeltaType",
+    "DerivedQuote",
+    "Quote",
     "SimpleQuote",
 ]
 
 @typing.final
-class SimpleQuote:
+class CompositeQuote(Quote):
+    r"""
+    A read-only quote combining two quotes that follows both.
+    """
+    def __init__(self, q1: Quote, q2: Quote, op: CompositeOp) -> None:
+        r"""
+        Build the composite quote.
+
+        Args:
+            q1 (Quote): The first source; may itself be dependent.
+            q2 (Quote): The second source; may be q1 itself.
+            op (CompositeOp): The function applied; Subtract is q1 - q2.
+        """
+    def value(self) -> builtins.float:
+        r"""
+        Return `op(q1, q2)` for the sources' current values.
+
+        Returns:
+            float: The combined value.
+        """
+
+@typing.final
+class DerivedQuote(Quote):
+    r"""
+    A read-only quote worth `a * source + b` that follows its source.
+
+    Covers QuantLib DerivedQuote for affine functions; other functions are not
+    bound because a Python callable cannot cross into the core.
+    """
+    def __init__(self, source: Quote, a: builtins.float = 1.0, b: builtins.float = 0.0) -> None:
+        r"""
+        Build the derived quote.
+
+        Args:
+            source (Quote): The quote followed; may itself be dependent.
+            a (float): The slope applied to the source value.
+            b (float): The offset added after scaling.
+        """
+    def value(self) -> builtins.float:
+        r"""
+        Return `a * source + b` for the source's current value.
+
+        Returns:
+            float: The derived value.
+        """
+
+class Quote:
+    r"""
+    A read-only market quote: the base of SimpleQuote, DerivedQuote and
+    CompositeQuote.
+
+    Inputs that only read a quote, such as FlatForward.from_quote, accept any
+    subclass and observe it, so changing a source SimpleQuote reprices them.
+    Not constructible directly.
+    """
+    def value(self) -> builtins.float:
+        r"""
+        Return the current value.
+
+        Returns:
+            float: The quote's current market value.
+        """
+
+@typing.final
+class SimpleQuote(Quote):
     r"""
     A mutable, observable market element (D1).
 
@@ -55,6 +123,21 @@ class AtmType:
     GammaMax: typing.ClassVar[AtmType]
     PutCall50: typing.ClassVar[AtmType]
     def __new__(cls, _unconstructible: typing.NoReturn) -> AtmType: ...
+    def __int__(self) -> builtins.int: ...
+    __hash__: typing.ClassVar[None]  # type: ignore[assignment]
+
+@typing.final
+class CompositeOp:
+    r"""
+    The function a CompositeQuote applies to its two sources.
+
+    Divide and power are not bound; a square is Multiply with the same quote
+    twice.
+    """
+    Add: typing.ClassVar[CompositeOp]
+    Subtract: typing.ClassVar[CompositeOp]
+    Multiply: typing.ClassVar[CompositeOp]
+    def __new__(cls, _unconstructible: typing.NoReturn) -> CompositeOp: ...
     def __int__(self) -> builtins.int: ...
     __hash__: typing.ClassVar[None]  # type: ignore[assignment]
 

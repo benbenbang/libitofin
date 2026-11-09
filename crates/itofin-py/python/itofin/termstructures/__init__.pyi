@@ -1237,9 +1237,12 @@ class FlatForward(YieldTermStructure):
             day_counter (DayCounter): The day count times are measured in.
         """
     @staticmethod
-    def from_quote(reference_date: time.Date, quote: quotes.SimpleQuote, day_counter: time.DayCounter) -> FlatForward:
+    def from_quote(reference_date: time.Date, quote: quotes.Quote, day_counter: time.DayCounter) -> FlatForward:
         r"""
         Build a flat curve backed by a retained, observable quote.
+
+        The quote may be a SimpleQuote or a dependent DerivedQuote or
+        CompositeQuote; changing a source quote reprices the curve.
         """
 
 @typing.final

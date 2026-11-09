@@ -9,7 +9,7 @@
 use crate::bootstrap::{BootstrapCallbacks, PySimpleQuoteVariables, global_bootstrap};
 use crate::helpers::PyRateHelper;
 use crate::iterativebootstrap::{PyIterativeBootstrapOptions, strategy};
-use crate::market::PySimpleQuote;
+use crate::market::{PyQuote, PySimpleQuote};
 use crate::settings::PySettings;
 use crate::time::{PyCalendar, PyDate, PyDayCounter};
 use crate::{ItofinError, PyQlError};
@@ -324,11 +324,14 @@ impl PyFlatForward {
     }
 
     /// Build a flat curve backed by a retained, observable quote.
+    ///
+    /// The quote may be a SimpleQuote or a dependent DerivedQuote or
+    /// CompositeQuote; changing a source quote reprices the curve.
     #[staticmethod]
     fn from_quote(
         py: Python<'_>,
         reference_date: &PyDate,
-        quote: &PySimpleQuote,
+        quote: &PyQuote,
         day_counter: &PyDayCounter,
     ) -> PyResult<Py<Self>> {
         let curve = shared(FlatForward::new(

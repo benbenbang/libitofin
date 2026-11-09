@@ -267,7 +267,11 @@ fn itofin(m: &Bound<'_, PyModule>) -> PyResult<()> {
     crate::time::add_functions(&time)?;
 
     let quotes = PyModule::new(py, "quotes")?;
+    quotes.add_class::<market::PyQuote>()?;
     quotes.add_class::<PySimpleQuote>()?;
+    quotes.add_class::<market::PyDerivedQuote>()?;
+    quotes.add_class::<market::PyCompositeQuote>()?;
+    quotes.add_class::<market::PyCompositeOp>()?;
     quotes.add_class::<black_delta::PyDeltaType>()?;
     quotes.add_class::<black_delta::PyAtmType>()?;
 

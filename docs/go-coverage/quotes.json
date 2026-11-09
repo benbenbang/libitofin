@@ -1,0 +1,95 @@
+{
+  "domain": "dependent-quotes",
+  "entries": [
+    {
+      "c": "itofin_quote_value",
+      "go": "Quote.Value",
+      "python": "itofin.quotes.Quote.value",
+      "status": "implemented",
+      "tests": [
+        "TestDependentQuotesChainAndRepriceFlatForward",
+        "chained_dependents_and_square_track_the_source"
+      ]
+    },
+    {
+      "c": "itofin_derived_quote_new",
+      "go": "Session.NewDerivedQuote",
+      "python": "itofin.quotes.DerivedQuote.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestDependentQuotesQuantLibOracle",
+        "TestDependentQuotesInvalidInputs",
+        "derived_quote_matches_quantlib_functions"
+      ]
+    },
+    {
+      "c": "itofin_quote_value",
+      "go": "DerivedQuote.Value",
+      "python": "itofin.quotes.DerivedQuote.value",
+      "status": "implemented",
+      "tests": [
+        "TestDependentQuotesQuantLibOracle"
+      ]
+    },
+    {
+      "c": "itofin_composite_quote_new",
+      "go": "Session.NewCompositeQuote",
+      "python": "itofin.quotes.CompositeQuote.__init__",
+      "status": "implemented",
+      "tests": [
+        "TestDependentQuotesQuantLibOracle",
+        "TestDependentQuotesInvalidInputs",
+        "composite_quote_matches_quantlib_functions"
+      ]
+    },
+    {
+      "c": "itofin_quote_value",
+      "go": "CompositeQuote.Value",
+      "python": "itofin.quotes.CompositeQuote.value",
+      "status": "implemented",
+      "tests": [
+        "TestDependentQuotesQuantLibOracle"
+      ]
+    },
+    {
+      "go": "CompositeOp",
+      "python": "itofin.quotes.CompositeOp",
+      "status": "implemented",
+      "tests": "TestDependentQuotesQuantLibOracle"
+    },
+    {
+      "go": "CompositeOp: explicit integer conversion",
+      "python": "itofin.quotes.CompositeOp.__int__",
+      "status": "implemented",
+      "tests": "TestDependentQuotesQuantLibOracle"
+    },
+    {
+      "c": "ITOFIN_COMPOSITE_ADD",
+      "go": "CompositeAdd",
+      "python": "itofin.quotes.CompositeOp.Add",
+      "status": "implemented",
+      "tests": "TestDependentQuotesQuantLibOracle"
+    },
+    {
+      "c": "ITOFIN_COMPOSITE_SUBTRACT",
+      "go": "CompositeSubtract",
+      "python": "itofin.quotes.CompositeOp.Subtract",
+      "status": "implemented",
+      "tests": "TestDependentQuotesQuantLibOracle"
+    },
+    {
+      "c": "ITOFIN_COMPOSITE_MULTIPLY",
+      "go": "CompositeMultiply",
+      "python": "itofin.quotes.CompositeOp.Multiply",
+      "status": "implemented",
+      "tests": "TestDependentQuotesQuantLibOracle"
+    },
+    {
+      "classification": "nonconstructible-enum",
+      "go": "CompositeOp",
+      "python": "itofin.quotes.CompositeOp.__new__",
+      "reason": "Python CompositeOp forbids construction; Go uses typed integer constants and casts. itofin_composite_quote_new rejects an unknown discriminant.",
+      "status": "language-specific"
+    }
+  ]
+}
