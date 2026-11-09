@@ -39,12 +39,22 @@ def sample(kind, lag=2, settings=None, evaluate=True):
 @pytest.mark.parametrize("row", ORACLE["cases"], ids=[f"{r['kind']}-{r['lag']}-{r['compounding']}" for r in ORACLE["cases"]])
 def test_thirty_independent_native_quotes_and_roots(row):
     """Preserve native absolute quote and spread tolerance without relative slack."""
-    assert ORACLE["quantlib_version"] == "1.43"
+    assert ORACLE["quantlib_version"] == "1.44"
     assert len(ORACLE["cases"]) == 30
     bond, tree, _, _ = sample(row["kind"], row["lag"])
     dc = DayCounter.actual365_fixed() if row["day_counter"] == 365 else DayCounter.actual360()
     comp = getattr(Compounding, row["compounding"])
     assert not bond.is_calculated()
+    if row["compounding"] in {"SimpleThenCompounded", "CompoundedThenSimple"}:
+        message = "is not supported for direct calculations: use the CashFlow methods"
+        with pytest.raises(ItofinError, match=message):
+            bond.clean_price_oas(row["spread"], tree, dc, comp, Frequency.Semiannual)
+        with pytest.raises(ItofinError, match=message):
+            bond.oas(100.0, tree, dc, comp, Frequency.Semiannual)
+        with pytest.raises(ItofinError) as error:
+            bond.effective_duration(row["spread"], tree, dc, comp, Frequency.Semiannual)
+        assert str(error.value).partition(": ")[2] == f"{row['compounding']} {message}"
+        return
     price = bond.clean_price_oas(row["spread"], tree, dc, comp, Frequency.Semiannual)
     assert price == pytest.approx(row["normalized_clean"], abs=2e-10, rel=0.0)
     assert bond.oas(price, tree, dc, comp, Frequency.Semiannual) == pytest.approx(row["spread"], abs=2e-10, rel=0.0)

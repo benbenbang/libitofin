@@ -209,8 +209,6 @@ fn defaults_honor_bond_settlement_and_cashflow_settings() {
         Compounding::Simple,
         Compounding::Compounded,
         Compounding::Continuous,
-        Compounding::SimpleThenCompounded,
-        Compounding::CompoundedThenSimple,
     ] {
         let default = BondFunctions::dirty_price_at_z_spread(
             &bond,
@@ -240,6 +238,34 @@ fn defaults_honor_bond_settlement_and_cashflow_settings() {
             )
             .unwrap(),
         );
+    }
+    for comp in [
+        Compounding::SimpleThenCompounded,
+        Compounding::CompoundedThenSimple,
+    ] {
+        let message =
+            format!("{comp} is not supported for direct calculations: use the CashFlow methods");
+        let price = BondFunctions::dirty_price_at_z_spread(
+            &bond,
+            discount.clone(),
+            0.0,
+            comp,
+            Frequency::Semiannual,
+            None,
+        );
+        assert_eq!(price.unwrap_err().message(), message);
+        let root = BondFunctions::z_spread(
+            &bond,
+            BondPrice::Dirty(100.0),
+            discount.clone(),
+            comp,
+            Frequency::Semiannual,
+            None,
+            None,
+            None,
+            None,
+        );
+        assert_eq!(root.unwrap_err().message(), message);
     }
     settings.set_evaluation_date(date(10, 2027));
     assert_close(

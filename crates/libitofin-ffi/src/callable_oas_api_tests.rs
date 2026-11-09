@@ -73,6 +73,52 @@ fn thirty_independent_native_quotes_and_roots() {
         let mut a = config(dc);
         a.compounding = [2, 1, 0, 3, 4][row[2].parse::<usize>().unwrap()];
         let spread = row[4].parse().unwrap();
+        if a.compounding >= 3 {
+            let mut error = ItofinError {
+                code: 0,
+                message: [0; 1024],
+            };
+            let mut value = -991.0;
+            let label =
+                ["SimpleThenCompounded", "CompoundedThenSimple"][a.compounding as usize - 3];
+            let expected = format!(
+                "{label} is not supported for direct calculations: use the CashFlow methods"
+            );
+            let check = |status: i32, error: &ItofinError| {
+                assert_eq!(status, CORE_ERROR);
+                let message = unsafe { std::ffi::CStr::from_ptr(error.message.as_ptr()) };
+                assert_eq!(
+                    message.to_str().unwrap().split_once(": ").unwrap().1,
+                    expected
+                );
+            };
+            let status = unsafe {
+                itofin_callable_bond_clean_price_oas(
+                    &mut c, b, spread, e, a, &mut value, &mut error,
+                )
+            };
+            check(status, &error);
+            let status = unsafe {
+                itofin_callable_bond_oas(&mut c, b, 100.0, e, a, defaults(), &mut value, &mut error)
+            };
+            check(status, &error);
+            let risk = crate::callable_risk_api::ItofinCallableBondRiskConfig {
+                tree_engine: e,
+                day_counter: a.day_counter,
+                compounding: a.compounding,
+                frequency: a.frequency,
+                flags: 0,
+                bump: f64::NAN,
+            };
+            let status = unsafe {
+                crate::callable_risk_api::itofin_callable_bond_effective_duration(
+                    &mut c, b, spread, risk, &mut value, &mut error,
+                )
+            };
+            check(status, &error);
+            assert_eq!(value, -991.0);
+            continue;
+        }
         let expected = row[6].parse().unwrap();
         unsafe {
             let mut price = -991.0;

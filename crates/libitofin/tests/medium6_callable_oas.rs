@@ -1,4 +1,4 @@
-//! QuantLib 1.43 native spreads and independently normalized settlement quotes.
+//! QuantLib 1.44 native spreads and independently normalized settlement quotes.
 
 #[path = "fixtures/medium6_callable_oas/support.rs"]
 mod support;
@@ -38,14 +38,22 @@ fn thirty_native_compounding_daycounter_and_settlement_cases() {
             Actual360::new()
         };
         let spread = c[4].parse().unwrap();
-        let expected = c[6].parse().unwrap();
+        let composite = matches!(
+            comp,
+            Compounding::SimpleThenCompounded | Compounding::CompoundedThenSimple
+        );
+        let expected = if composite {
+            100.0
+        } else {
+            c[6].parse().unwrap()
+        };
         let s = settings();
         let e = engine(s.clone());
-        let (price, recovered) = if c[0] == "fixed" {
+        let (price, duration, recovered) = if c[0] == "fixed" {
             let b = fixed(lag, s, calls());
             (
-                b.clean_price_oas(spread, &e, dc.clone(), comp, Frequency::Semiannual, None)
-                    .unwrap(),
+                b.clean_price_oas(spread, &e, dc.clone(), comp, Frequency::Semiannual, None),
+                b.effective_duration(spread, &e, dc.clone(), comp, Frequency::Semiannual, None),
                 b.oas(
                     expected,
                     &e,
@@ -56,14 +64,13 @@ fn thirty_native_compounding_daycounter_and_settlement_cases() {
                     1e-10,
                     100,
                     0.0,
-                )
-                .unwrap(),
+                ),
             )
         } else {
             let b = zero(lag, s, calls());
             (
-                b.clean_price_oas(spread, &e, dc.clone(), comp, Frequency::Semiannual, None)
-                    .unwrap(),
+                b.clean_price_oas(spread, &e, dc.clone(), comp, Frequency::Semiannual, None),
+                b.effective_duration(spread, &e, dc.clone(), comp, Frequency::Semiannual, None),
                 b.oas(
                     expected,
                     &e,
@@ -74,10 +81,19 @@ fn thirty_native_compounding_daycounter_and_settlement_cases() {
                     1e-10,
                     100,
                     0.0,
-                )
-                .unwrap(),
+                ),
             )
         };
+        if composite {
+            let message = format!(
+                "{comp} is not supported for direct calculations: use the CashFlow methods"
+            );
+            assert_eq!(price.unwrap_err().message(), message);
+            assert_eq!(duration.unwrap_err().message(), message);
+            assert_eq!(recovered.unwrap_err().message(), message);
+            continue;
+        }
+        let (price, recovered) = (price.unwrap(), recovered.unwrap());
         close(price, expected, 2e-10);
         close(recovered, spread, 2e-10);
         if lag == 0 {
