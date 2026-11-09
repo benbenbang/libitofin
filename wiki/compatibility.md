@@ -18,6 +18,7 @@ oversight) and is documented at the point of divergence in the source.
 - [Credit](#credit-epic-credit-676)
 - [Processes](#processes-l5)
 - [Non-finite inputs](#non-finite-inputs-cross-cutting)
+- [Bindings](#bindings-c-go-python)
 
 ## Time / calendars (EPIC-2)
 
@@ -305,3 +306,12 @@ oversight) and is documented at the point of divergence in the source.
   port asserts rather than returning `Err`. If a Rust panic occurs within a C
   entry point, the boundary returns `PANIC` (5); a context involved in the call
   is invalidated, later calls return `POISONED` (6), and it can still be destroyed.
+
+## Bindings (C, Go, Python)
+
+- **Dependent quotes take a fixed function set, not arbitrary functions (#1359).**
+  QuantLib (and QuantLib-Python) build `DerivedQuote` and `CompositeQuote` from
+  any function; the bindings expose only affine `a * x + b` for `DerivedQuote`
+  and Add, Subtract or Multiply for `CompositeQuote`, with no Divide, no Power
+  and no user callables, because a closure cannot cross the C ABI. The Rust
+  core keeps the closure-generic types.
