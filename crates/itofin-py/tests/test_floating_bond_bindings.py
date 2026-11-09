@@ -350,12 +350,12 @@ def test_mixed_calendar_natural_roll_does_not_invent_fixing_calendar_adjustment(
 
 @pytest.mark.parametrize("factory,market,horizon", [
     ("china", "SSE", 2026), ("china", "IB", 2026),
-    ("hong_kong", "HKEX", 2025), ("india", "NSE", 2026),
+    ("hong_kong", "HKEX", 2026), ("india", "NSE", 2026),
     ("indonesia", "BEJ", 2026), ("israel", "Tase", 2050),
     ("israel", "Telbor", 2050), ("israel", "Shir", 2050),
     ("new_zealand", "Wellington", 2052), ("new_zealand", "Auckland", 2052),
     ("north_macedonia", "MSE", 2040), ("saudi_arabia", "Tadawul", 2029),
-    ("singapore", "SGX", 2026), ("south_korea", "Settlement", 2050),
+    ("singapore", "SGX", 2027), ("south_korea", "Settlement", 2050),
     ("south_korea", "KRX", 2050), ("taiwan", "TSEC", 2026),
     ("thailand", None, 2025), ("turkey", None, 2034),
     ("uzbekistan", "UZSE", 2040),

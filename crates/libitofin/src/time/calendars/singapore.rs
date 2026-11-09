@@ -11,7 +11,7 @@ use crate::time::weekday::Weekday;
 /// (matching QuantLib's data). Past this year the calendar falls through to its
 /// weekend and recurring rules, exactly like QuantLib (which never checks the
 /// year).
-pub const HOLIDAY_HORIZON: Year = 2026;
+pub const HOLIDAY_HORIZON: Year = 2027;
 
 /// Singapore markets.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -25,7 +25,7 @@ pub enum Market {
 /// # Accuracy
 ///
 /// Singapore's public/lunar holidays are tabulated (from QuantLib) only through
-/// 2026. After 2026 the tabulated holidays are not observed and the calendar
+/// 2027. After 2027 the tabulated holidays are not observed and the calendar
 /// falls through to its weekend and recurring rules, exactly like QuantLib
 /// (which never checks the year).
 pub struct Singapore;
@@ -290,6 +290,24 @@ impl CalendarImpl for SgxImpl {
         {
             return false;
         }
+
+        // https://data.gov.sg/datasets/d_0ba69fc6d56717ff0bf8083c6af3bb84/view
+        if y == 2027
+            && (
+                // Chinese New Year (Sat/Sun 6-7 Feb, observed Monday 8 Feb)
+                (d == 8 && m == Month::February)
+                // Hari Raya Puasa
+                || (d == 10 && m == Month::March)
+                // Hari Raya Haji
+                || (d == 17 && m == Month::May)
+                // Vesak Day
+                || (d == 20 && m == Month::May)
+                // Deepavali
+                || (d == 28 && m == Month::October)
+            )
+        {
+            return false;
+        }
         true
     }
 }
@@ -298,8 +316,34 @@ impl CalendarImpl for SgxImpl {
 mod tests {
     use super::*;
 
-    // Spot-checks against known Singapore holidays; not a full transcription of
-    // test-suite/calendars.cpp.
+    /// `testSingaporeCalendar`, `test-suite/calendars.cpp:3077` (v1.44).
+    #[test]
+    fn quantlib_test_singapore_calendar() {
+        let c = Singapore::new(Market::Sgx);
+        assert!(c.is_holiday(Date::new(1, Month::January, 2024)));
+        assert!(c.is_holiday(Date::new(29, Month::March, 2024)));
+        assert!(c.is_holiday(Date::new(1, Month::May, 2024)));
+        assert!(c.is_holiday(Date::new(9, Month::August, 2024)));
+        assert!(c.is_holiday(Date::new(25, Month::December, 2024)));
+        assert!(c.is_business_day(Date::new(2, Month::January, 2024)));
+    }
+
+    /// The 2027 table of `ql/time/calendars/singapore.cpp:252-266` (v1.44).
+    #[test]
+    fn holidays_2027() {
+        let c = Singapore::new(Market::Sgx);
+        for date in [
+            Date::new(8, Month::February, 2027),
+            Date::new(10, Month::March, 2027),
+            Date::new(17, Month::May, 2027),
+            Date::new(20, Month::May, 2027),
+            Date::new(28, Month::October, 2027),
+        ] {
+            assert!(c.is_holiday(date), "{date:?}");
+        }
+        assert!(c.is_business_day(Date::new(9, Month::February, 2027)));
+    }
+
     #[test]
     fn name_matches_quantlib() {
         assert_eq!(Singapore::new(Market::Sgx).name(), "Singapore exchange");
@@ -335,9 +379,9 @@ mod tests {
         // QuantLib never checks the year: past the tables only weekends and
         // recurring rules apply, and tabulated dates do not recur.
         let c = Singapore::new(Market::Sgx);
-        assert!(c.is_holiday(Date::new(9, Month::August, 2027)));
-        assert!(c.is_holiday(Date::new(26, Month::March, 2027)));
-        assert!(c.is_business_day(Date::new(8, Month::February, 2027)));
-        assert!(c.is_business_day(Date::new(10, Month::August, 2027)));
+        assert!(c.is_holiday(Date::new(9, Month::August, 2028)));
+        assert!(c.is_holiday(Date::new(14, Month::April, 2028)));
+        assert!(c.is_business_day(Date::new(26, Month::January, 2028)));
+        assert!(c.is_business_day(Date::new(10, Month::August, 2028)));
     }
 }

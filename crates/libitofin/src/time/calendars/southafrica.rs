@@ -74,7 +74,9 @@ impl CalendarImpl for Impl {
             // one-shot: Special holiday to celebrate winning of Rugby World Cup 2023
             || (d == 15 && m == Month::December && y == 2023)
             // one-shot: Election day 2024
-            || (d == 29 && m == Month::May && y == 2024))
+            || (d == 29 && m == Month::May && y == 2024)
+            // one-shot: Election day 2026
+            || (d == 4 && m == Month::November && y == 2026))
     }
 }
 
@@ -82,7 +84,31 @@ impl CalendarImpl for Impl {
 mod tests {
     use super::*;
 
-    // Spot-checks, not a full transcription of test-suite/calendars.cpp.
+    /// `testSouthAfricaCalendar`, `test-suite/calendars.cpp:3059` (v1.44).
+    #[test]
+    fn quantlib_test_south_africa_calendar() {
+        let c = SouthAfrica::new();
+        assert!(c.is_holiday(Date::new(16, Month::December, 2024)));
+        assert!(c.is_business_day(Date::new(17, Month::December, 2024)));
+    }
+
+    /// The election days of `ql/time/calendars/southafrica.cpp:71-77` (v1.44).
+    #[test]
+    fn election_days() {
+        let c = SouthAfrica::new();
+        for date in [
+            Date::new(14, Month::April, 2004),
+            Date::new(22, Month::April, 2009),
+            Date::new(3, Month::August, 2016),
+            Date::new(1, Month::November, 2021),
+            Date::new(29, Month::May, 2024),
+            Date::new(4, Month::November, 2026),
+        ] {
+            assert!(c.is_holiday(date), "{date:?}");
+        }
+        assert!(c.is_business_day(Date::new(4, Month::November, 2025)));
+    }
+
     #[test]
     fn name_matches_quantlib() {
         assert_eq!(SouthAfrica::new().name(), "South Africa");
