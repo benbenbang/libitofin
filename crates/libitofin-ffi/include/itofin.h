@@ -93,6 +93,15 @@ typedef double ItofinReal;
 #define ITOFIN_CONSTRAINT_INEQ 1
 
 /**
+ * Composite operation codes for `itofin_composite_quote_new`.
+ */
+#define ITOFIN_COMPOSITE_ADD 0
+
+#define ITOFIN_COMPOSITE_SUBTRACT 1
+
+#define ITOFIN_COMPOSITE_MULTIPLY 2
+
+/**
  * Opaque thread-confined owner of live native objects. Never copy this value.
  */
 typedef struct ItofinContext ItofinContext;
@@ -8512,6 +8521,39 @@ int32_t itofin_interval_prices_normalize(const struct ItofinDatedIntervalPrice *
                                          size_t capacity,
                                          size_t *out_len,
                                          struct ItofinError *error);
+
+/**
+ * Build a quote worth `a * source + b`, recomputed when `source` changes.
+ * `source` may be a SimpleQuote or another dependent quote.
+ * # Safety
+ * Pointers must be aligned, live and valid for their stated lengths. Outputs
+ * must not overlap inputs or other outputs. Any context and its handles must
+ * belong to the calling thread; serialize calls including destruction.
+ * See the crate-level C caller contract for lifetime requirements.
+ */
+int32_t itofin_derived_quote_new(struct ItofinContext *ctx,
+                                 uint64_t source,
+                                 double a,
+                                 double b,
+                                 uint64_t *out,
+                                 struct ItofinError *error);
+
+/**
+ * Build a quote combining `q1` and `q2` with `op`: 0 add, 1 subtract
+ * (`q1 - q2`), 2 multiply; any other code is an error. Pass the same quote
+ * twice for a square. Either source may be a dependent quote.
+ * # Safety
+ * Pointers must be aligned, live and valid for their stated lengths. Outputs
+ * must not overlap inputs or other outputs. Any context and its handles must
+ * belong to the calling thread; serialize calls including destruction.
+ * See the crate-level C caller contract for lifetime requirements.
+ */
+int32_t itofin_composite_quote_new(struct ItofinContext *ctx,
+                                   uint64_t q1,
+                                   uint64_t q2,
+                                   int32_t op,
+                                   uint64_t *out,
+                                   struct ItofinError *error);
 
 /**
  * # Safety

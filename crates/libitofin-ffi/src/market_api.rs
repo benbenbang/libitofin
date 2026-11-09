@@ -11,10 +11,14 @@ use libitofin::termstructures::yields::FlatForward;
 use libitofin::termstructures::yieldtermstructure::YieldTermStructure;
 use libitofin::time::frequency::Frequency;
 
+/// Any session quote, simple or dependent, read-only.
+pub(crate) fn any_quote(c: &Context, id: u64) -> BindingResult<Shared<dyn Quote>> {
+    c.get::<Shared<SimpleQuote>>(id)
+        .map(|q| q as Shared<dyn Quote>)
+        .or_else(|_| c.get::<Shared<dyn Quote>>(id))
+}
 pub(crate) fn quote(c: &Context, id: u64) -> BindingResult<Handle<dyn Quote>> {
-    Ok(Handle::new(
-        c.get::<Shared<SimpleQuote>>(id)? as Shared<dyn Quote>
-    ))
+    Ok(Handle::new(any_quote(c, id)?))
 }
 #[unsafe(no_mangle)]
 /// # Safety
@@ -47,11 +51,7 @@ pub unsafe extern "C" fn itofin_quote_value(
     out: *mut f64,
     error: *mut ItofinError,
 ) -> i32 {
-    unsafe {
-        with_context(ctx, error, |c| {
-            output(out, c.get::<Shared<SimpleQuote>>(id)?.value()?)
-        })
-    }
+    unsafe { with_context(ctx, error, |c| output(out, any_quote(c, id)?.value()?)) }
 }
 #[unsafe(no_mangle)]
 /// # Safety
