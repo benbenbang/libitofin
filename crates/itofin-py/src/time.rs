@@ -1220,7 +1220,7 @@ impl PyCalendar {
 
     /// The Saudi Arabian calendar.
     ///
-    /// Its Eid holidays are tabulated through 2022 only, as in QuantLib;
+    /// Its Eid holidays are tabulated through 2029 only, as in QuantLib;
     /// every query on this calendar raises ItofinError for a later date
     /// rather than silently omitting holidays.
     ///

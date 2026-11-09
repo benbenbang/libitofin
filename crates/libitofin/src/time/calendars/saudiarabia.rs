@@ -12,14 +12,11 @@ use crate::time::calendar::{Calendar, CalendarImpl};
 use crate::time::date::{Date, Month, Year};
 use crate::time::weekday::Weekday;
 
-/// Last year for which *all* of Saudi Arabia's Islamic holiday tables are
-/// complete (matching QuantLib's data). This is the MINIMUM across the required
-/// moving-holiday tables, not the maximum: QuantLib's Eid al-Fitr table runs to
-/// 2029 but its Eid al-Adha table stops at 2022, so from 2023 onward Eid
-/// al-Adha is not observed while Eid al-Fitr still is. Past this year the
-/// calendar falls through to its weekend and recurring rules, exactly like
-/// QuantLib (which never checks the year).
-pub const HOLIDAY_HORIZON: Year = 2022;
+/// Last year for which Saudi Arabia's Eid al-Adha and Eid al-Fitr windows are
+/// tabulated (matching QuantLib's data: both tables end in 2029). Past this
+/// year the calendar falls through to its weekend and recurring rules, exactly
+/// like QuantLib (which never checks the year).
+pub const HOLIDAY_HORIZON: Year = 2029;
 
 /// Market handled by the Saudi Arabian calendar.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -32,11 +29,10 @@ pub enum Market {
 ///
 /// # Accuracy
 ///
-/// Saudi Arabia's Islamic (Eid) holidays are tabulated (from QuantLib) only
-/// through 2022 - the Eid al-Adha table ends there, even though Eid al-Fitr
-/// extends to 2029. After 2022 Eid al-Adha is not observed (Eid al-Fitr is,
-/// through 2029) and the calendar falls through to its weekend and recurring
-/// rules, exactly like QuantLib (which never checks the year).
+/// Saudi Arabia's Islamic (Eid) holiday windows are tabulated (from QuantLib)
+/// only through 2029. After 2029 they are not observed and the calendar falls
+/// through to its weekend and recurring rules (National Day, Founding Day),
+/// exactly like QuantLib (which never checks the year).
 pub struct SaudiArabia;
 
 impl SaudiArabia {
@@ -59,88 +55,92 @@ fn is_true_weekend(d: Date) -> bool {
     }
 }
 
-// In 2015 and 2014, the Eid holidays of the Tadawul Exchange
-// have been from Eid-1 to Eid+4.
-// Sometimes, slightly longer holidays are observed.
-// But conservatively, we take Eid-1 to Eid+4 as the holiday.
+// Tadawul Eid holiday windows: through 2022 they are Eid-1 to Eid+4 around the
+// published Gregorian dates, with exchange-documented ranges for 2012-2015;
+// from 2023 through 2029 they follow the Saudi Exchange holiday calendar.
 
-/// Whether `d` falls within a Tadawul Eid al-Adha holiday window (Eid-1 to Eid+4).
-fn is_eid_al_adha(d: Date) -> bool {
-    // Eid al Adha dates taken from:
-    // https://en.wikipedia.org/wiki/Eid_al-Adha#Eid_al-Adha_in_the_Gregorian_calendar
-    const EID_AL_ADHA: &[(i32, Month, i32)] = &[
-        (7, Month::April, 1998),
-        (27, Month::March, 1999),
-        (16, Month::March, 2000),
-        (5, Month::March, 2001),
-        (23, Month::February, 2002),
-        (12, Month::February, 2003),
-        (1, Month::February, 2004),
-        (21, Month::January, 2005),
-        (10, Month::January, 2006),
-        (31, Month::December, 2006),
-        (20, Month::December, 2007),
-        (8, Month::December, 2008),
-        (27, Month::November, 2009),
-        (16, Month::November, 2010),
-        (6, Month::November, 2011),
-        (26, Month::October, 2012),
-        (15, Month::October, 2013),
-        (4, Month::October, 2014),
-        (24, Month::September, 2015),
-        (11, Month::September, 2016),
-        (1, Month::September, 2017),
-        (23, Month::August, 2018),
-        (12, Month::August, 2019),
-        (31, Month::July, 2020),
-        (20, Month::July, 2021),
-        (10, Month::July, 2022),
-    ];
-    EID_AL_ADHA.iter().any(|&(day, m, y)| {
-        let p = Date::new(day, m, y);
-        d >= p - 1 && d <= p + 4
+type Window = ((i32, Month, i32), (i32, Month, i32));
+
+fn in_any_window(d: Date, windows: &[Window]) -> bool {
+    windows.iter().any(|&((d1, m1, y1), (d2, m2, y2))| {
+        d >= Date::new(d1, m1, y1) && d <= Date::new(d2, m2, y2)
     })
 }
 
-/// Whether `d` falls within a Tadawul Eid al-Fitr holiday window (Eid-1 to Eid+4).
-fn is_eid_al_fitr(d: Date) -> bool {
-    // Eid al Fitr dates taken from:
-    // https://en.wikipedia.org/wiki/Eid_al-Fitr#In_the_Gregorian_calendar
-    const EID_AL_FITR: &[(i32, Month, i32)] = &[
-        (16, Month::December, 2001),
-        (5, Month::December, 2002),
-        (25, Month::November, 2003),
-        (13, Month::November, 2004),
-        (3, Month::November, 2005),
-        (23, Month::October, 2006),
-        (12, Month::October, 2007),
-        (30, Month::September, 2008),
-        (20, Month::September, 2009),
-        (10, Month::September, 2010),
-        (30, Month::August, 2011),
-        (19, Month::August, 2012),
-        (8, Month::August, 2013),
-        (28, Month::July, 2014),
-        (17, Month::July, 2015),
-        (6, Month::July, 2016),
-        (25, Month::June, 2017),
-        (15, Month::June, 2018),
-        (4, Month::June, 2019),
-        (24, Month::May, 2020),
-        (13, Month::May, 2021),
-        (2, Month::May, 2022),
-        (21, Month::April, 2023),
-        (10, Month::April, 2024),
-        (30, Month::March, 2025),
-        (20, Month::March, 2026),
-        (9, Month::March, 2027),
-        (26, Month::February, 2028),
-        (14, Month::February, 2029),
+/// Whether `d` falls within a Tadawul Eid al-Adha holiday window.
+fn is_eid_al_adha(d: Date) -> bool {
+    const EID_AL_ADHA: &[Window] = &[
+        ((6, Month::April, 1998), (11, Month::April, 1998)),
+        ((26, Month::March, 1999), (31, Month::March, 1999)),
+        ((15, Month::March, 2000), (20, Month::March, 2000)),
+        ((4, Month::March, 2001), (9, Month::March, 2001)),
+        ((22, Month::February, 2002), (27, Month::February, 2002)),
+        ((11, Month::February, 2003), (16, Month::February, 2003)),
+        ((31, Month::January, 2004), (5, Month::February, 2004)),
+        ((20, Month::January, 2005), (25, Month::January, 2005)),
+        ((9, Month::January, 2006), (14, Month::January, 2006)),
+        ((30, Month::December, 2006), (4, Month::January, 2007)),
+        ((19, Month::December, 2007), (24, Month::December, 2007)),
+        ((7, Month::December, 2008), (12, Month::December, 2008)),
+        ((26, Month::November, 2009), (1, Month::December, 2009)),
+        ((15, Month::November, 2010), (20, Month::November, 2010)),
+        ((5, Month::November, 2011), (10, Month::November, 2011)),
+        ((25, Month::October, 2012), (3, Month::November, 2012)),
+        ((11, Month::October, 2013), (19, Month::October, 2013)),
+        ((3, Month::October, 2014), (11, Month::October, 2014)),
+        ((22, Month::September, 2015), (27, Month::September, 2015)),
+        ((10, Month::September, 2016), (15, Month::September, 2016)),
+        ((31, Month::August, 2017), (5, Month::September, 2017)),
+        ((22, Month::August, 2018), (27, Month::August, 2018)),
+        ((11, Month::August, 2019), (16, Month::August, 2019)),
+        ((30, Month::July, 2020), (4, Month::August, 2020)),
+        ((19, Month::July, 2021), (24, Month::July, 2021)),
+        ((9, Month::July, 2022), (14, Month::July, 2022)),
+        ((23, Month::June, 2023), (1, Month::July, 2023)),
+        ((14, Month::June, 2024), (22, Month::June, 2024)),
+        ((5, Month::June, 2025), (10, Month::June, 2025)),
+        ((22, Month::May, 2026), (30, Month::May, 2026)),
+        ((16, Month::May, 2027), (20, Month::May, 2027)),
+        ((3, Month::May, 2028), (9, Month::May, 2028)),
+        ((22, Month::April, 2029), (26, Month::April, 2029)),
     ];
-    EID_AL_FITR.iter().any(|&(day, m, y)| {
-        let p = Date::new(day, m, y);
-        d >= p - 1 && d <= p + 4
-    })
+    in_any_window(d, EID_AL_ADHA)
+}
+
+/// Whether `d` falls within a Tadawul Eid al-Fitr holiday window.
+fn is_eid_al_fitr(d: Date) -> bool {
+    const EID_AL_FITR: &[Window] = &[
+        ((15, Month::December, 2001), (20, Month::December, 2001)),
+        ((4, Month::December, 2002), (9, Month::December, 2002)),
+        ((24, Month::November, 2003), (29, Month::November, 2003)),
+        ((12, Month::November, 2004), (17, Month::November, 2004)),
+        ((2, Month::November, 2005), (7, Month::November, 2005)),
+        ((22, Month::October, 2006), (27, Month::October, 2006)),
+        ((11, Month::October, 2007), (16, Month::October, 2007)),
+        ((29, Month::September, 2008), (4, Month::October, 2008)),
+        ((19, Month::September, 2009), (24, Month::September, 2009)),
+        ((9, Month::September, 2010), (14, Month::September, 2010)),
+        ((29, Month::August, 2011), (3, Month::September, 2011)),
+        ((16, Month::August, 2012), (24, Month::August, 2012)),
+        ((6, Month::August, 2013), (12, Month::August, 2013)),
+        ((25, Month::July, 2014), (3, Month::August, 2014)),
+        ((18, Month::July, 2015), (21, Month::July, 2015)),
+        ((5, Month::July, 2016), (10, Month::July, 2016)),
+        ((24, Month::June, 2017), (29, Month::June, 2017)),
+        ((14, Month::June, 2018), (19, Month::June, 2018)),
+        ((3, Month::June, 2019), (8, Month::June, 2019)),
+        ((23, Month::May, 2020), (28, Month::May, 2020)),
+        ((12, Month::May, 2021), (17, Month::May, 2021)),
+        ((1, Month::May, 2022), (6, Month::May, 2022)),
+        ((17, Month::April, 2023), (25, Month::April, 2023)),
+        ((4, Month::April, 2024), (14, Month::April, 2024)),
+        ((27, Month::March, 2025), (2, Month::April, 2025)),
+        ((17, Month::March, 2026), (23, Month::March, 2026)),
+        ((7, Month::March, 2027), (11, Month::March, 2027)),
+        ((27, Month::February, 2028), (2, Month::March, 2028)),
+        ((12, Month::February, 2029), (18, Month::February, 2029)),
+    ];
+    in_any_window(d, EID_AL_FITR)
 }
 
 struct TadawulImpl;
@@ -168,12 +168,17 @@ impl CalendarImpl for TadawulImpl {
         let d = date.day_of_month();
         let m = date.month();
         let y = date.year();
+        let w = date.weekday();
 
         !(is_true_weekend(date)
             || is_eid_al_adha(date)
             || is_eid_al_fitr(date)
             // National Day
             || (d == 23 && m == Month::September)
+            // Founding Day (from 2022; rolls to the following Sunday when on Fri/Sat)
+            || ((d == 22 || ((d == 23 || d == 24) && w == Weekday::Sunday))
+                && m == Month::February
+                && y >= 2022)
             // other one-shot holidays
             || (d == 26 && m == Month::February && y == 2011)
             || (d == 19 && m == Month::March && y == 2011))
@@ -219,10 +224,61 @@ mod tests {
         // QuantLib never checks the year: past the tables only weekends and
         // recurring rules apply, and tabulated dates do not recur.
         let c = SaudiArabia::new(Market::Tadawul);
-        assert!(c.is_holiday(Date::new(23, Month::September, 2026)));
-        assert!(c.is_holiday(Date::new(24, Month::April, 2023)));
-        assert!(c.is_holiday(Date::new(9, Month::March, 2027)));
-        assert!(c.is_business_day(Date::new(28, Month::June, 2023)));
+        assert!(c.is_holiday(Date::new(23, Month::September, 2030)));
+        assert!(c.is_holiday(Date::new(24, Month::February, 2030)));
         assert!(c.is_business_day(Date::new(5, Month::February, 2030)));
+    }
+
+    #[test]
+    fn eid_windows_follow_quantlib_v1_44_tables() {
+        let c = SaudiArabia::new(Market::Tadawul);
+        // Eid al-Adha 2013 window 11-19 Oct (saudiarabia.cpp, EidAlAdha table).
+        assert!(c.is_holiday(Date::new(13, Month::October, 2013)));
+        // Eid al-Adha 2023 window 23 Jun-1 Jul.
+        assert!(c.is_holiday(Date::new(28, Month::June, 2023)));
+        assert!(c.is_business_day(Date::new(2, Month::July, 2023)));
+    }
+
+    #[test]
+    fn founding_day_starts_in_2022() {
+        let c = SaudiArabia::new(Market::Tadawul);
+        assert!(c.is_business_day(Date::new(22, Month::February, 2021)));
+        assert!(c.is_holiday(Date::new(22, Month::February, 2022)));
+        assert!(c.is_holiday(Date::new(22, Month::February, 2027)));
+    }
+
+    /// Port of `testSaudiArabiaFoundingDayAndEidHolidays`
+    /// (`test-suite/calendars.cpp:4304`, QuantLib v1.44).
+    #[test]
+    fn saudi_arabia_founding_day_and_eid_holidays() {
+        let saudi = SaudiArabia::new(Market::Tadawul);
+        let hol = |d, m, y| assert!(saudi.is_holiday(Date::new(d, m, y)), "{d} {m:?} {y}");
+        let bus = |d, m, y| assert!(saudi.is_business_day(Date::new(d, m, y)), "{d} {m:?} {y}");
+
+        hol(23, Month::February, 2025);
+
+        hol(22, Month::February, 2026);
+        bus(19, Month::February, 2026);
+
+        hol(21, Month::July, 2015);
+        bus(16, Month::July, 2015);
+        bus(22, Month::July, 2015);
+
+        hol(22, Month::September, 2015);
+        bus(21, Month::September, 2015);
+        bus(28, Month::September, 2015);
+
+        hol(5, Month::June, 2025);
+        hol(10, Month::June, 2025);
+        bus(4, Month::June, 2025);
+        bus(11, Month::June, 2025);
+
+        hol(20, Month::March, 2026);
+        bus(16, Month::March, 2026);
+        bus(24, Month::March, 2026);
+
+        hol(25, Month::May, 2026);
+        bus(21, Month::May, 2026);
+        bus(31, Month::May, 2026);
     }
 }

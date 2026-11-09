@@ -354,7 +354,7 @@ def test_mixed_calendar_natural_roll_does_not_invent_fixing_calendar_adjustment(
     ("indonesia", "BEJ", 2014), ("israel", "Tase", 2050),
     ("israel", "Telbor", 2050), ("israel", "Shir", 2050),
     ("new_zealand", "Wellington", 2052), ("new_zealand", "Auckland", 2052),
-    ("north_macedonia", "MSE", 2040), ("saudi_arabia", "Tadawul", 2022),
+    ("north_macedonia", "MSE", 2040), ("saudi_arabia", "Tadawul", 2029),
     ("singapore", "SGX", 2026), ("south_korea", "Settlement", 2050),
     ("south_korea", "KRX", 2050), ("taiwan", "TSEC", 2026),
     ("thailand", None, 2025), ("turkey", None, 2034),
