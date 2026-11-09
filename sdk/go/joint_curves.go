@@ -135,17 +135,17 @@ func (i *IborIndex) AddFixing(date Date, value float64) error {
 	})
 }
 
-func (s *Session) NewFlatForwardFromQuote(reference Date, quote *SimpleQuote, dc *DayCounter) (*YieldTermStructure, error) {
+func (s *Session) NewFlatForwardFromQuote(reference Date, quote Quote, dc *DayCounter) (*YieldTermStructure, error) {
 	if quote == nil || dc == nil {
 		return nil, errNilArgument("flat curve input")
 	}
-	if err := sameSession(s, quote.object, dc.object); err != nil {
+	if err := sameSession(s, quote.quoteObject(), dc.object); err != nil {
 		return nil, err
 	}
 	var id C.uint64_t
 	err := s.invoke(func() error {
 		var e C.ItofinError
-		return ffiError(C.itofin_flat_forward_from_quote(s.ctx, C.int32_t(reference.Serial()), C.uint64_t(quote.id), C.uint64_t(dc.id), &id, &e), &e)
+		return ffiError(C.itofin_flat_forward_from_quote(s.ctx, C.int32_t(reference.Serial()), C.uint64_t(quote.quoteObject().id), C.uint64_t(dc.id), &id, &e), &e)
 	})
 	if err != nil {
 		return nil, err
