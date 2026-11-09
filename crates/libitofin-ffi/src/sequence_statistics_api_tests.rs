@@ -100,6 +100,7 @@ fn invalid_shapes_and_buffers_are_rejected_before_reading_inputs() {
         (781_312, 6104, 128, 6, 16384),
         (781_312, 6104, 128, 7, 16384),
         (usize::MAX, usize::MAX, usize::MAX, 0, 1),
+        (usize::MAX, usize::MAX, 2, 0, 2),
         (4, 2, 2, 8, 2),
         (3, 2, 2, 0, 2),
         (4, 2, 2, 0, 1),
