@@ -117,6 +117,7 @@ impl OptionletStripper2 {
         let adapter = StrippedOptionletAdapter::new(self.source.clone(), settings.clone())?;
         adapter.enable_extrapolation();
         let times = self.source.optionlet_fixing_times()?;
+        let first_optionlet_date = self.source.optionlet_fixing_dates()?[0];
         let mut state = Correction::default();
         for i in 0..self.source.optionlet_maturities() {
             state.strikes.push(self.source.optionlet_strikes(i)?);
@@ -133,6 +134,10 @@ impl OptionletStripper2 {
                 settings.clone(),
             )
             .build()?;
+            crate::require!(
+                !cap.coupons().is_empty(),
+                "cap/floor length {tenor} does not contain any optionlets"
+            );
             let strike = cap.atm_rate(curve.as_ref())?;
             let engine = shared_mut(BlackCapFloorEngine::with_flat_vol(
                 curve_handle.clone(),
@@ -152,6 +157,14 @@ impl OptionletStripper2 {
             .with_pricing_engine(engine)
             .build()?;
             let price = cap.npv()?;
+            let mut count = cap.coupons().len().min(times.len());
+            if cap.coupons()[0].fixing_date() < first_optionlet_date {
+                crate::require!(
+                    times.len() >= 2,
+                    "cannot extrapolate an ATM cap/floor fixing before the first optionlet date from fewer than two optionlet nodes"
+                );
+                count = count.max(2);
+            }
             let inputs = cap
                 .coupons()
                 .iter()
@@ -184,13 +197,11 @@ impl OptionletStripper2 {
             let spread = Brent::new()
                 .with_max_evaluations(10000)
                 .solve_bracketed(objective, 1e-6, 0.0001, -0.1, 0.1)?;
-            for (i, &time) in times.iter().enumerate() {
-                if i <= cap.coupons().len() {
-                    let vol = adapter.volatility(time, strike, true)? + spread;
-                    let position = state.strikes[i].partition_point(|&value| value < strike);
-                    state.strikes[i].insert(position, strike);
-                    state.vols[i].insert(position, vol);
-                }
+            for (i, &time) in times.iter().enumerate().take(count) {
+                let vol = adapter.volatility(time, strike, true)? + spread;
+                let position = state.strikes[i].partition_point(|&value| value < strike);
+                state.strikes[i].insert(position, strike);
+                state.vols[i].insert(position, vol);
             }
             state.atm_strikes.push(strike);
             state.atm_prices.push(price);
