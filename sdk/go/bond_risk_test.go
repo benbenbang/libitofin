@@ -31,7 +31,7 @@ func TestBondRiskAnalyticalAndLifecycle(t *testing.T) {
 		{func() (float64, error) { return b.Duration(rate, MacaulayDuration, a) }, years},
 		{func() (float64, error) { return b.Duration(rate, ModifiedDuration, a) }, modified},
 		{func() (float64, error) { return b.Convexity(rate, a) }, convexity},
-		{func() (float64, error) { return b.BasisPointValue(rate, a) }, -modified*price*.0001 + convexity/100*price*.0001*.0001/2},
+		{func() (float64, error) { return b.BasisPointValue(rate, a) }, -modified*price*.0001 + convexity*price*.0001*.0001/2},
 		{func() (float64, error) { return b.YieldValueBasisPoint(rate, a) }, .01 / (-price * modified)},
 	}
 	for _, c := range calls {

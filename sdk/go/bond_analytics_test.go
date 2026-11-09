@@ -17,7 +17,36 @@ type analyticsCase struct {
 	Start, End, Reference, Settlement int32
 	NPVDate                           int32 `json:"npv_date"`
 	Yield, Spread                     float64
-	Expected                          map[string]float64
+	Expected                          map[string]*float64
+}
+
+func (a analyticsCase) want(t *testing.T, key string) float64 {
+	t.Helper()
+	if a.Expected[key] == nil {
+		t.Fatalf("%s: no expected %s", a.Name, key)
+	}
+	return *a.Expected[key]
+}
+
+var analyticsSpreadKeys = []string{"clean_spread", "dirty_spread", "leg_npv", "spread_clean", "spread_dirty", "leg_spread"}
+
+// analyticsCompositeSpreadRows is the number of composite-compounding cases whose curve-spread
+// columns QuantLib 1.44 no longer computes (null in the fixture); #1406 turns them into errors.
+const analyticsCompositeSpreadRows = 34
+
+func (a analyticsCase) unsupportedSpreads(t *testing.T) bool {
+	t.Helper()
+	missing := 0
+	for _, key := range analyticsSpreadKeys {
+		if a.Expected[key] == nil {
+			missing++
+		}
+	}
+	composite := a.Compounding == SimpleThenCompounded || a.Compounding == CompoundedThenSimple
+	if missing != 0 && (missing != len(analyticsSpreadKeys) || !composite) {
+		t.Fatalf("%s: unexpected null spread columns", a.Name)
+	}
+	return missing != 0
 }
 
 func analyticsOracles(t *testing.T) []analyticsCase {
@@ -29,7 +58,7 @@ func analyticsOracles(t *testing.T) []analyticsCase {
 		Cases   []analyticsCase
 	}
 	bondCheck(t, json.Unmarshal(data, &x))
-	if x.Version != "1.43" || len(x.Cases) != 55 {
+	if x.Version != "1.44" || len(x.Cases) != 55 {
 		t.Fatal("oracle contract")
 	}
 	return x.Cases
@@ -92,7 +121,12 @@ func analyticsFixture(t *testing.T, s *Session, a analyticsCase) (*Bond, *Settin
 	return b, settings, dc, curve
 }
 func TestBondAnalyticsQuantLibOracles(t *testing.T) {
+	skipped := 0
 	for _, a := range analyticsOracles(t) {
+		unsupported := a.unsupportedSpreads(t)
+		if unsupported {
+			skipped++
+		}
 		t.Run(a.Name, func(t *testing.T) {
 			s, e := NewSession()
 			bondCheck(t, e)
@@ -121,9 +155,12 @@ func TestBondAnalyticsQuantLibOracles(t *testing.T) {
 				{"leg_npv", func() (float64, error) { return leg.NPVAtZSpread(a.Spread, lc) }},
 			}
 			for _, check := range checks {
+				if unsupported && a.Expected[check.name] == nil {
+					continue
+				}
 				v, e := check.call()
 				bondCheck(t, e)
-				analyticsNear(t, v, a.Expected[check.name])
+				analyticsNear(t, v, a.want(t, check.name))
 			}
 			accuracy := 1e-12
 			evaluations := uint(1000)
@@ -133,16 +170,21 @@ func TestBondAnalyticsQuantLibOracles(t *testing.T) {
 				if priceType == Dirty {
 					kind = "dirty"
 				}
-				v, e := b.YieldRate(a.Expected[kind+"_yield"], BondYieldSolveConfig{BondYieldConfig: y, PriceType: priceType, AnalyticsSolverConfig: solver})
+				v, e := b.YieldRate(a.want(t, kind+"_yield"), BondYieldSolveConfig{BondYieldConfig: y, PriceType: priceType, AnalyticsSolverConfig: solver})
 				bondCheck(t, e)
-				analyticsSolveNear(t, v, a.Expected["yield_"+kind])
-				v, e = b.ZSpread(a.Expected[kind+"_spread"], BondZSpreadSolveConfig{BondZSpreadConfig: z, PriceType: priceType, AnalyticsSolverConfig: solver})
+				analyticsSolveNear(t, v, a.want(t, "yield_"+kind))
+				if unsupported {
+					continue
+				}
+				v, e = b.ZSpread(a.want(t, kind+"_spread"), BondZSpreadSolveConfig{BondZSpreadConfig: z, PriceType: priceType, AnalyticsSolverConfig: solver})
 				bondCheck(t, e)
-				analyticsSolveNear(t, v, a.Expected["spread_"+kind])
+				analyticsSolveNear(t, v, a.want(t, "spread_"+kind))
 			}
-			v, e := leg.ZSpread(a.Expected["leg_npv"], CashFlowsZSpreadSolveConfig{CashFlowsZSpreadConfig: lc, AnalyticsSolverConfig: solver})
-			bondCheck(t, e)
-			analyticsSolveNear(t, v, a.Expected["leg_spread"])
+			if !unsupported {
+				v, e := leg.ZSpread(a.want(t, "leg_npv"), CashFlowsZSpreadSolveConfig{CashFlowsZSpreadConfig: lc, AnalyticsSolverConfig: solver})
+				bondCheck(t, e)
+				analyticsSolveNear(t, v, a.want(t, "leg_spread"))
+			}
 			calculated, e := b.IsCalculated()
 			bondCheck(t, e)
 			if calculated {
@@ -155,6 +197,9 @@ func TestBondAnalyticsQuantLibOracles(t *testing.T) {
 				t.Fatal("default settlement succeeded without evaluation date")
 			}
 		})
+	}
+	if skipped != analyticsCompositeSpreadRows {
+		t.Fatalf("null composite spread rows: got %d want %d", skipped, analyticsCompositeSpreadRows)
 	}
 }
 
@@ -297,7 +342,7 @@ func TestBondAnalyticsOmittedSettlementAndExplicitDatePurity(t *testing.T) {
 	distinct := testDate(t, 26, 6, 2026)
 	direct, e := b.DirtyPriceFromCurve(curve, &distinct)
 	bondCheck(t, e)
-	analyticsNear(t, direct, a.Expected["dirty_curve"])
+	analyticsNear(t, direct, a.want(t, "dirty_curve"))
 	if _, e := b.YieldRate(100, BondYieldSolveConfig{BondYieldConfig: BondYieldConfig{DayCounter: dc, Compounding: Compounded, Frequency: Semiannual}}); e != nil {
 		bondCheck(t, e)
 	}

@@ -55,8 +55,8 @@ Go: `sdk/go/examples/bond-coupon-analytics/main.go`.
 
 The shared 55-row binary64 table exercises all five existing compounding modes
 and four frequencies plus zero-coupon and ex-coupon cases. It is generated
-by independent calls to the separately compiled QuantLib 1.43 distribution using
+by independent calls to the separately compiled QuantLib 1.44 distribution using
 `scripts/fixtures/bond_coupon_analytics/generate.py`.
 This distribution is not claimed to be built from the local QuantLib source
-checkout `9863b578`. Public regression tests additionally exercise analytical
+checkout. The yield BPS discounts coupons stepwise as QuantLib 1.44 does. Public regression tests additionally exercise analytical
 annuity laws, units, errors, live inputs, retained dependencies and missing fixings.

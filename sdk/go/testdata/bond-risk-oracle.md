@@ -1,12 +1,12 @@
 # Bond risk fixtures
 
 `bond_risk_oracle.tsv` and its identical Python fixture are fresh queries to a
-separately installed **QuantLib 1.43 wheel**, not values copied from product
+separately installed **QuantLib 1.44 wheel**, not values copied from product
 outputs or an upstream test. The 55 construction inputs come from the existing
 `bond_analytics_oracle.json`, SHA-256
-`b1a1480e27af119fd55502d31e74a933280a7370b0bf350dce2c80aa4285efff`.
+`ce5c9904d3f5a9e3f2dd10f68e52462a6b7ec0ec4acb0b174d89a998f2660dd3`.
 
-Reproduce from the repository root with an interpreter containing QuantLib 1.43:
+Reproduce from the repository root with an interpreter containing QuantLib 1.44:
 
 ```sh
 python sdk/go/testdata/generate_bond_risk_oracle.py
@@ -22,15 +22,15 @@ calendar days. Supplied settlement dates are actual dates, not evaluation dates.
 
 ## Separate binary and source provenance
 
-- Wheel version: 1.43, CPython 3.13.16, macOS arm64.
+- Wheel version: 1.44, CPython 3.13.15, macOS arm64 (1.43 before #1405).
 - Observed `_QuantLib.abi3.so` SHA-256:
-  `04a53b6f425e728083149241f77e9b9711db845614ce65d2544a09a0970597d8`.
+  `59239903c2bd3f831040ebdad4f8a6870c82ec482e370e18c2f48f7097c0dd3e`.
 - Source **review reference**, not a claim about the compiled wheel revision:
-  `9863b578af0caa4cecabf697196533e84a8308b6`, version 1.43-dev.
+  tag `v1.44` (`ab4cb476d35f7275834bc05b47d1324403d1823b`).
 - `ql/pricingengines/bond/bondfunctions.cpp` SHA-256:
   `55a3f5a9158e304460b4e4ed6acf9c07913751df3a1528589164a7eeecb83ae5`.
 - `ql/cashflows/cashflows.cpp` SHA-256:
-  `a0a1d9fb9d98a79c13e6441f1af8c11faf1b572409b2b113a8b04ba0687cb58c`.
+  `58677c9bfe192169c35b74d90696c711619c69b077b357725d6b2ed0137a6452`.
 - QuantLib `LICENSE.TXT` SHA-256:
   `58e98bc18648e99865665733f4ed87404a8f1fc757885d119486dec201dddf99`.
 

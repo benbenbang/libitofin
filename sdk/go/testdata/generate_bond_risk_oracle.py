@@ -1,4 +1,4 @@
-"""Regenerate bond risk fixtures with the separately installed QuantLib 1.43 wheel."""
+"""Regenerate bond risk fixtures with the separately installed QuantLib 1.44 wheel."""
 import csv
 import io
 import hashlib
@@ -7,8 +7,8 @@ from pathlib import Path
 import QuantLib as q
 
 R = Path(__file__).resolve().parents[3]
-if q.__version__ != '1.43':
-    raise RuntimeError('QuantLib 1.43 is required')
+if q.__version__ != '1.44':
+    raise RuntimeError('QuantLib 1.44 is required')
 source = R / 'sdk/go/testdata/bond_analytics_oracle.json'
 original = json.loads(source.read_text())
 cal, dc = q.NullCalendar(), q.Actual360()

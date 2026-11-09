@@ -1,8 +1,21 @@
-"""Independent QuantLib 1.43 bond and leg analytics fixtures."""
+"""Independent QuantLib 1.44 bond and leg analytics fixtures."""
 
 import json
 
 import QuantLib as q
+
+if q.__version__ != "1.44":
+    raise RuntimeError("QuantLib 1.44 is required")
+
+
+def unsupported(call):
+    """From QuantLib 1.44 a composite compounding has no curve-spread calculation: record null."""
+    try:
+        return call()
+    except RuntimeError as error:
+        if "not supported for direct calculations" not in str(error):
+            raise
+        return None
 
 
 def case(name, kind, mode, frequency, rate=0.052, spread=0.007, face=375.0, days=None):
@@ -36,15 +49,15 @@ def case(name, kind, mode, frequency, rate=0.052, spread=0.007, face=375.0, days
     dirty_curve = q.BondFunctions.dirtyPrice(bond, curve, settlement)
     clean_yield = q.BondFunctions.cleanPrice(bond, rate, dc, compounded, native_frequency, settlement)
     dirty_yield = clean_yield + bond.accruedAmount(settlement)
-    clean_spread = q.BondFunctions.cleanPrice(bond, curve, spread, compounded, native_frequency, settlement)
-    dirty_spread = q.BondFunctions.dirtyPrice(bond, curve, spread, compounded, native_frequency, settlement)
+    clean_spread = unsupported(lambda: q.BondFunctions.cleanPrice(bond, curve, spread, compounded, native_frequency, settlement))
+    dirty_spread = unsupported(lambda: q.BondFunctions.dirtyPrice(bond, curve, spread, compounded, native_frequency, settlement))
     npv_date = settlement - 9
-    leg_npv = q.CashFlows.npv(bond.cashflows(), curve, spread, compounded, native_frequency, False, settlement, npv_date)
+    leg_npv = unsupported(lambda: q.CashFlows.npv(bond.cashflows(), curve, spread, compounded, native_frequency, False, settlement, npv_date))
     yield_clean = q.BondFunctions.bondYield(bond, q.BondPrice(clean_yield, q.BondPrice.Clean), dc, compounded, native_frequency, settlement, 1e-12, 1000, 0.05)
     yield_dirty = q.BondFunctions.bondYield(bond, q.BondPrice(dirty_yield, q.BondPrice.Dirty), dc, compounded, native_frequency, settlement, 1e-12, 1000, 0.05)
-    spread_clean = q.BondFunctions.zSpread(bond, q.BondPrice(clean_spread, q.BondPrice.Clean), curve, compounded, native_frequency, settlement, 1e-12, 1000, 0.0)
-    spread_dirty = q.BondFunctions.zSpread(bond, q.BondPrice(dirty_spread, q.BondPrice.Dirty), curve, compounded, native_frequency, settlement, 1e-12, 1000, 0.0)
-    leg_spread = q.CashFlows.zSpread(bond.cashflows(), leg_npv, curve, compounded, native_frequency, False, settlement, npv_date, 1e-12, 1000, 0.0)
+    spread_clean = None if clean_spread is None else q.BondFunctions.zSpread(bond, q.BondPrice(clean_spread, q.BondPrice.Clean), curve, compounded, native_frequency, settlement, 1e-12, 1000, 0.0)
+    spread_dirty = None if dirty_spread is None else q.BondFunctions.zSpread(bond, q.BondPrice(dirty_spread, q.BondPrice.Dirty), curve, compounded, native_frequency, settlement, 1e-12, 1000, 0.0)
+    leg_spread = None if leg_npv is None else q.CashFlows.zSpread(bond.cashflows(), leg_npv, curve, compounded, native_frequency, False, settlement, npv_date, 1e-12, 1000, 0.0)
     return {"name": name, "kind": kind, "compounding": int(compounded), "frequency": (q.Annual, q.Semiannual, q.Quarterly, q.Monthly).index(native_frequency), "face": face, "start": start.serialNumber(), "end": end.serialNumber(), "reference": reference.serialNumber(), "settlement": settlement.serialNumber(), "npv_date": npv_date.serialNumber(), "yield": rate, "spread": spread, "expected": {"clean_curve": clean_curve, "dirty_curve": dirty_curve, "clean_yield": clean_yield, "dirty_yield": dirty_yield, "clean_spread": clean_spread, "dirty_spread": dirty_spread, "yield_clean": yield_clean, "yield_dirty": yield_dirty, "spread_clean": spread_clean, "spread_dirty": spread_dirty, "leg_npv": leg_npv, "leg_spread": leg_spread, "accrued": bond.accruedAmount(settlement)}}
 
 

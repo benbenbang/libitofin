@@ -1029,10 +1029,10 @@ mod yield_tests {
 
         let rate = InterestRate::new(irr, day_counter, comp, freq).unwrap();
         let cases = [
-            (settlement, -795.459834, -0.0012571287),
+            (settlement, -795.098043, -0.0012571287),
             (
                 Date::new(12, Month::February, 2024),
-                -793.149033,
+                -792.789400,
                 -0.0012607913,
             ),
         ];

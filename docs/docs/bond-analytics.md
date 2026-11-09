@@ -146,9 +146,17 @@ constructed native cases rather than a global-toggle assumption.
 
 ## Verification and scope
 
-Tracked QuantLib 1.43 fixtures cover all routes, both quote types, five
+Tracked QuantLib 1.44 fixtures cover all routes, both quote types, five
 compounding modes, four frequencies, hybrid thresholds, negative rates, stubs,
-ex-coupon accrual, two faces, inclusion policy and frozen live inputs. Independent
+ex-coupon accrual, two faces, inclusion policy and frozen live inputs. QuantLib
+1.44 no longer computes curve Z-spreads with a hybrid compounding, so those
+fixture columns are null and the tests count them; this port still computes
+them until #1406 turns them into errors.
+
+Yield routes discount stepwise with QuantLib 1.44 positional hybrids:
+`SimpleThenCompounded` is simple over the first remaining interval and
+`CompoundedThenSimple` over the interval to the last payment date; every other
+interval compounds. Independent
 closed-form zero-coupon checks supplement native prices. Generated stubs, enum
 integer/member accounting and unchanged static-typing diagnostics are required.
 
@@ -186,8 +194,10 @@ Errors leave the output untouched. The usual thread/context/handle contract appl
 
 BPV and YVBP are **not per-100 quotes**. They use actual currency cash flows:
 BPV scales with face amount and YVBP inversely with it. For a paying bond they
-are normally negative. The native BPV convention retains the convexity correction
-`0.5 * (convexity / 100) * value * 0.0001**2`; no rescaling or new math is added.
+are normally negative. BPV is the second-order expansion
+`-modified * value * 0.0001 + 0.5 * convexity * value * 0.0001**2` (QuantLib 1.44
+dropped the former `/ 100` on the convexity term). Duration and convexity are the
+exact derivatives of the stepwise yield price.
 Duration and convexity are independent of face scaling.
 
 Explicit settlement is passed unchanged; omission retains existing checked lag
@@ -210,9 +220,8 @@ bpv = bond.basis_point_value(
 )
 ```
 
-The shared 55-case test fixture was freshly generated from a QuantLib 1.43 wheel
-on the existing analytics construction inputs. Source review uses QuantLib
-`9863b578af0caa4cecabf697196533e84a8308b6` (1.43-dev), not a claim that this source
-pin produced the wheel. Matching distribution notices retain upstream attribution.
+The shared 55-case test fixture was freshly generated from a QuantLib 1.44 wheel
+on the existing analytics construction inputs. Source review uses the QuantLib
+`v1.44` tag, not a claim that this source pin produced the wheel. Matching distribution notices retain upstream attribution.
 Coupon-rate BPS and default own-NPV ATM are documented separately in
 [bond coupon analytics](bond-coupon-analytics.md).
