@@ -365,35 +365,55 @@ impl PyZeroCurve {
     ///     day_counter (DayCounter): The day count turning dates into times.
     ///     interpolation (str): "Linear", the shipped behaviour, or "Cubic",
     ///         the Kruger cubic factory, which is non-monotonic.
+    ///     jumps (list[SimpleQuote] | None): Multiplicative discount jumps;
+    ///         the curve retains them, and each applies strictly after its
+    ///         date, so a jump on the reference date never applies. None
+    ///         builds the jump-free curve.
+    ///     jump_dates (list[Date] | None): One date per jump. None or empty
+    ///         selects consecutive December 31 dates from the reference year.
     ///
     /// Raises:
-    ///     ItofinError: On an unknown interpolation name, and on whatever the
-    ///         core rejects about the nodes.
+    ///     ItofinError: On an unknown interpolation name, on whatever the
+    ///         core rejects about the nodes, and on a jumps and jump_dates
+    ///         mismatch.
     #[gen_stub(override_return_type(type_repr = "ZeroCurve"))]
     #[new]
-    #[pyo3(signature = (dates, yields, day_counter, interpolation = "Linear"))]
+    #[pyo3(signature = (dates, yields, day_counter, interpolation = "Linear", jumps = None, jump_dates = None))]
     fn new(
         dates: Vec<PyRef<PyDate>>,
         yields: Vec<f64>,
         day_counter: &PyDayCounter,
         interpolation: &str,
+        jumps: Option<Vec<PyRef<PySimpleQuote>>>,
+        jump_dates: Option<Vec<PyRef<PyDate>>>,
     ) -> PyResult<PyClassInitializer<Self>> {
         let dates: Vec<_> = dates.iter().map(|d| d.inner()).collect();
-        let curve: Shared<dyn YieldTermStructure> = match interpolation {
-            "Linear" => shared(
-                ZeroCurve::new(dates, yields, day_counter.inner(), Linear)
+        let dc = day_counter.inner();
+        let curve: Shared<dyn YieldTermStructure> =
+            match (interpolation, optional_jumps(jumps, jump_dates)) {
+                ("Linear", None) => {
+                    shared(ZeroCurve::new(dates, yields, dc, Linear).map_err(PyQlError::from)?)
+                }
+                ("Linear", Some((q, d))) => shared(
+                    ZeroCurve::with_jumps(dates, yields, dc, None, Linear, q, d)
+                        .map_err(PyQlError::from)?,
+                ),
+                ("Cubic", None) => shared(
+                    InterpolatedZeroCurve::<Cubic>::new(dates, yields, dc, Cubic)
+                        .map_err(PyQlError::from)?,
+                ),
+                ("Cubic", Some((q, d))) => shared(
+                    InterpolatedZeroCurve::<Cubic>::with_jumps(
+                        dates, yields, dc, None, Cubic, q, d,
+                    )
                     .map_err(PyQlError::from)?,
-            ),
-            "Cubic" => shared(
-                InterpolatedZeroCurve::<Cubic>::new(dates, yields, day_counter.inner(), Cubic)
-                    .map_err(PyQlError::from)?,
-            ),
-            other => {
-                return Err(ItofinError::new_err(format!(
-                    "unknown interpolation {other:?}, expected Linear or Cubic"
-                )));
-            }
-        };
+                ),
+                (other, _) => {
+                    return Err(ItofinError::new_err(format!(
+                        "unknown interpolation {other:?}, expected Linear or Cubic"
+                    )));
+                }
+            };
         Ok(
             PyClassInitializer::from(PyYieldTermStructure::from_local(curve))
                 .add_subclass(PyZeroCurve),
@@ -425,42 +445,57 @@ impl PyDiscountCurve {
     ///     interpolation (str): "LogLinear", the shipped behaviour, giving
     ///         piecewise-constant forwards, or "Cubic", which is
     ///         non-monotonic.
+    ///     jumps (list[SimpleQuote] | None): Multiplicative discount jumps;
+    ///         the curve retains them, and each applies strictly after its
+    ///         date, so a jump on the reference date never applies. None
+    ///         builds the jump-free curve.
+    ///     jump_dates (list[Date] | None): One date per jump. None or empty
+    ///         selects consecutive December 31 dates from the reference year.
     ///
     /// Raises:
-    ///     ItofinError: On an unknown interpolation name, and on whatever the
-    ///         core rejects about the nodes.
+    ///     ItofinError: On an unknown interpolation name, on whatever the
+    ///         core rejects about the nodes, and on a jumps and jump_dates
+    ///         mismatch.
     #[gen_stub(override_return_type(type_repr = "DiscountCurve"))]
     #[new]
-    #[pyo3(signature = (dates, discounts, day_counter, calendar = None, interpolation = "LogLinear"))]
+    #[pyo3(signature = (dates, discounts, day_counter, calendar = None, interpolation = "LogLinear", jumps = None, jump_dates = None))]
     fn new(
         dates: Vec<PyRef<PyDate>>,
         discounts: Vec<f64>,
         day_counter: &PyDayCounter,
         calendar: Option<&PyCalendar>,
         interpolation: &str,
+        jumps: Option<Vec<PyRef<PySimpleQuote>>>,
+        jump_dates: Option<Vec<PyRef<PyDate>>>,
     ) -> PyResult<PyClassInitializer<Self>> {
         let dates: Vec<_> = dates.iter().map(|d| d.inner()).collect();
         let calendar = calendar.map(PyCalendar::inner);
-        let curve: Shared<dyn YieldTermStructure> = match interpolation {
-            "LogLinear" => shared(
-                DiscountCurve::new(dates, discounts, day_counter.inner(), calendar)
+        let dc = day_counter.inner();
+        let curve: Shared<dyn YieldTermStructure> =
+            match (interpolation, optional_jumps(jumps, jump_dates)) {
+                ("LogLinear", None) => shared(
+                    DiscountCurve::new(dates, discounts, dc, calendar).map_err(PyQlError::from)?,
+                ),
+                ("LogLinear", Some((q, d))) => shared(
+                    DiscountCurve::with_jumps(dates, discounts, dc, calendar, q, d)
+                        .map_err(PyQlError::from)?,
+                ),
+                ("Cubic", None) => shared(
+                    InterpolatedDiscountCurve::<Cubic>::new(dates, discounts, dc, calendar)
+                        .map_err(PyQlError::from)?,
+                ),
+                ("Cubic", Some((q, d))) => shared(
+                    InterpolatedDiscountCurve::<Cubic>::with_jumps(
+                        dates, discounts, dc, calendar, q, d,
+                    )
                     .map_err(PyQlError::from)?,
-            ),
-            "Cubic" => shared(
-                InterpolatedDiscountCurve::<Cubic>::new(
-                    dates,
-                    discounts,
-                    day_counter.inner(),
-                    calendar,
-                )
-                .map_err(PyQlError::from)?,
-            ),
-            other => {
-                return Err(ItofinError::new_err(format!(
-                    "unknown interpolation {other:?}, expected LogLinear or Cubic"
-                )));
-            }
-        };
+                ),
+                (other, _) => {
+                    return Err(ItofinError::new_err(format!(
+                        "unknown interpolation {other:?}, expected LogLinear or Cubic"
+                    )));
+                }
+            };
         Ok(
             PyClassInitializer::from(PyYieldTermStructure::from_local(curve))
                 .add_subclass(PyDiscountCurve),
@@ -490,21 +525,37 @@ impl PyForwardCurve {
     ///     forwards (list[float]): The instantaneous forward rate at each
     ///         node.
     ///     day_counter (DayCounter): The day count turning dates into times.
+    ///     jumps (list[SimpleQuote] | None): Multiplicative discount jumps;
+    ///         the curve retains them, and each applies strictly after its
+    ///         date, so a jump on the reference date never applies. None
+    ///         builds the jump-free curve.
+    ///     jump_dates (list[Date] | None): One date per jump. None or empty
+    ///         selects consecutive December 31 dates from the reference year.
     ///
     /// Raises:
-    ///     ItofinError: On whatever the core rejects about the nodes.
+    ///     ItofinError: On whatever the core rejects about the nodes, and on a
+    ///         jumps and jump_dates mismatch.
     #[gen_stub(override_return_type(type_repr = "ForwardCurve"))]
     #[new]
+    #[pyo3(signature = (dates, forwards, day_counter, jumps = None, jump_dates = None))]
     fn new(
         dates: Vec<PyRef<PyDate>>,
         forwards: Vec<f64>,
         day_counter: &PyDayCounter,
+        jumps: Option<Vec<PyRef<PySimpleQuote>>>,
+        jump_dates: Option<Vec<PyRef<PyDate>>>,
     ) -> PyResult<PyClassInitializer<Self>> {
         let dates: Vec<_> = dates.iter().map(|d| d.inner()).collect();
-        let curve = shared(
-            ForwardCurve::new(dates, forwards, day_counter.inner(), BackwardFlat)
-                .map_err(PyQlError::from)?,
-        ) as Shared<dyn YieldTermStructure>;
+        let dc = day_counter.inner();
+        let curve: Shared<dyn YieldTermStructure> = match optional_jumps(jumps, jump_dates) {
+            None => shared(
+                ForwardCurve::new(dates, forwards, dc, BackwardFlat).map_err(PyQlError::from)?,
+            ),
+            Some((q, d)) => shared(
+                ForwardCurve::with_jumps(dates, forwards, dc, None, BackwardFlat, q, d)
+                    .map_err(PyQlError::from)?,
+            ),
+        };
         Ok(
             PyClassInitializer::from(PyYieldTermStructure::from_local(curve))
                 .add_subclass(PyForwardCurve),
@@ -950,6 +1001,15 @@ enum Anchor {
 
 /// Multiplicative discount jump quotes and their dates; both empty is no jumps.
 type Jumps = (Vec<Handle<dyn Quote>>, Vec<Date>);
+
+/// Node-curve jumps: None when neither jumps nor jump_dates is given.
+fn optional_jumps(
+    jumps: Option<Vec<PyRef<PySimpleQuote>>>,
+    jump_dates: Option<Vec<PyRef<PyDate>>>,
+) -> Option<Jumps> {
+    (jumps.is_some() || jump_dates.is_some())
+        .then(|| jumps_of(jumps.unwrap_or_default(), jump_dates))
+}
 
 fn jumps_of(jumps: Vec<PyRef<PySimpleQuote>>, jump_dates: Option<Vec<PyRef<PyDate>>>) -> Jumps {
     (

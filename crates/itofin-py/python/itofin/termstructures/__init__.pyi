@@ -1127,7 +1127,7 @@ class DiscountCurve(YieldTermStructure):
     The first date is the reference date and its discount must be 1.0. Finite
     in time: queries past the last node require extrapolation.
     """
-    def __init__(self, dates: typing.Sequence[time.Date], discounts: typing.Sequence[builtins.float], day_counter: time.DayCounter, calendar: typing.Optional[time.Calendar] = None, interpolation: builtins.str = 'LogLinear') -> None:
+    def __init__(self, dates: typing.Sequence[time.Date], discounts: typing.Sequence[builtins.float], day_counter: time.DayCounter, calendar: typing.Optional[time.Calendar] = None, interpolation: builtins.str = 'LogLinear', jumps: typing.Optional[typing.Sequence[quotes.SimpleQuote]] = None, jump_dates: typing.Optional[typing.Sequence[time.Date]] = None) -> None:
         r"""
         Build the curve over its (date, discount-factor) nodes.
 
@@ -1142,10 +1142,17 @@ class DiscountCurve(YieldTermStructure):
             interpolation (str): "LogLinear", the shipped behaviour, giving
                 piecewise-constant forwards, or "Cubic", which is
                 non-monotonic.
+            jumps (list[SimpleQuote] | None): Multiplicative discount jumps;
+                the curve retains them, and each applies strictly after its
+                date, so a jump on the reference date never applies. None
+                builds the jump-free curve.
+            jump_dates (list[Date] | None): One date per jump. None or empty
+                selects consecutive December 31 dates from the reference year.
 
         Raises:
-            ItofinError: On an unknown interpolation name, and on whatever the
-                core rejects about the nodes.
+            ItofinError: On an unknown interpolation name, on whatever the
+                core rejects about the nodes, and on a jumps and jump_dates
+                mismatch.
         """
 
 @typing.final
@@ -1336,7 +1343,7 @@ class ForwardCurve(YieldTermStructure):
 
     A query past the last node needs enable_extrapolation() or extrapolate=True.
     """
-    def __init__(self, dates: typing.Sequence[time.Date], forwards: typing.Sequence[builtins.float], day_counter: time.DayCounter) -> None:
+    def __init__(self, dates: typing.Sequence[time.Date], forwards: typing.Sequence[builtins.float], day_counter: time.DayCounter, jumps: typing.Optional[typing.Sequence[quotes.SimpleQuote]] = None, jump_dates: typing.Optional[typing.Sequence[time.Date]] = None) -> None:
         r"""
         Build the curve over its (date, forward-rate) nodes.
 
@@ -1346,9 +1353,16 @@ class ForwardCurve(YieldTermStructure):
             forwards (list[float]): The instantaneous forward rate at each
                 node.
             day_counter (DayCounter): The day count turning dates into times.
+            jumps (list[SimpleQuote] | None): Multiplicative discount jumps;
+                the curve retains them, and each applies strictly after its
+                date, so a jump on the reference date never applies. None
+                builds the jump-free curve.
+            jump_dates (list[Date] | None): One date per jump. None or empty
+                selects consecutive December 31 dates from the reference year.
 
         Raises:
-            ItofinError: On whatever the core rejects about the nodes.
+            ItofinError: On whatever the core rejects about the nodes, and on a
+                jumps and jump_dates mismatch.
         """
 
 @typing.final
@@ -4255,7 +4269,7 @@ class ZeroCurve(YieldTermStructure):
     The first date is the reference date. Finite in time: queries past the last
     node require enable_extrapolation() or extrapolate=True.
     """
-    def __init__(self, dates: typing.Sequence[time.Date], yields: typing.Sequence[builtins.float], day_counter: time.DayCounter, interpolation: builtins.str = 'Linear') -> None:
+    def __init__(self, dates: typing.Sequence[time.Date], yields: typing.Sequence[builtins.float], day_counter: time.DayCounter, interpolation: builtins.str = 'Linear', jumps: typing.Optional[typing.Sequence[quotes.SimpleQuote]] = None, jump_dates: typing.Optional[typing.Sequence[time.Date]] = None) -> None:
         r"""
         Build the curve over its (date, zero-rate) nodes.
 
@@ -4267,10 +4281,17 @@ class ZeroCurve(YieldTermStructure):
             day_counter (DayCounter): The day count turning dates into times.
             interpolation (str): "Linear", the shipped behaviour, or "Cubic",
                 the Kruger cubic factory, which is non-monotonic.
+            jumps (list[SimpleQuote] | None): Multiplicative discount jumps;
+                the curve retains them, and each applies strictly after its
+                date, so a jump on the reference date never applies. None
+                builds the jump-free curve.
+            jump_dates (list[Date] | None): One date per jump. None or empty
+                selects consecutive December 31 dates from the reference year.
 
         Raises:
-            ItofinError: On an unknown interpolation name, and on whatever the
-                core rejects about the nodes.
+            ItofinError: On an unknown interpolation name, on whatever the
+                core rejects about the nodes, and on a jumps and jump_dates
+                mismatch.
         """
 
 class ZeroInflationHelper:
