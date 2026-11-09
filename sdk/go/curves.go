@@ -45,8 +45,13 @@ type NodeCurveConfig struct {
 	Dates         []Date
 	Values        []float64
 	DayCounter    *DayCounter
-	Calendar      *Calendar // Optional; used by DiscountCurve.
+	Calendar      *Calendar // Optional; used by DiscountCurve only, with or without jumps.
 	Interpolation string    // Linear for ZeroCurve; LogLinear for DiscountCurve; Cubic accepted by both.
+	// JumpQuotes multiply the discount factor strictly after each JumpDates entry, so a jump on
+	// Dates[0] never applies. Empty JumpDates generate consecutive December 31 dates from the
+	// year of Dates[0]. Leaving both empty builds the jump-free curve.
+	JumpQuotes []*SimpleQuote
+	JumpDates  []Date
 }
 
 func (s *Session) nodeCurve(cfg NodeCurveConfig, kind int) (*YieldTermStructure, error) {
@@ -70,9 +75,16 @@ func (s *Session) nodeCurve(cfg NodeCurveConfig, kind int) (*YieldTermStructure,
 	for i, d := range cfg.Dates {
 		ds[i] = C.int32_t(d.Serial())
 	}
+	jumps, err := s.yieldJumps(cfg.JumpQuotes, cfg.JumpDates)
+	if err != nil {
+		return nil, err
+	}
 	var id C.uint64_t
-	err := s.invoke(func() error {
+	err = s.invoke(func() error {
 		var e C.ItofinError
+		if jumps != nil {
+			return ffiError(C.itofin_node_curve_with_jumps_new(s.ctx, C.int32_t(kind), (*C.int32_t)(unsafe.Pointer(unsafe.SliceData(ds))), (*C.double)(unsafe.Pointer(unsafe.SliceData(cfg.Values))), C.size_t(len(ds)), C.uint64_t(cfg.DayCounter.id), C.uint64_t(cal), unsafe.SliceData(jumps.quotes), C.size_t(len(jumps.quotes)), unsafe.SliceData(jumps.dates), C.size_t(len(jumps.dates)), &id, &e), &e)
+		}
 		return ffiError(C.itofin_node_curve_new(s.ctx, C.int32_t(kind), (*C.int32_t)(unsafe.Pointer(unsafe.SliceData(ds))), (*C.double)(unsafe.Pointer(unsafe.SliceData(cfg.Values))), C.size_t(len(ds)), C.uint64_t(cfg.DayCounter.id), C.uint64_t(cal), &id, &e), &e)
 	})
 	if err != nil {
@@ -223,7 +235,7 @@ func (s *Session) piecewise(cfg PiecewiseCurveConfig, kind int) (*YieldTermStruc
 			return nil, err
 		}
 	}
-	jumps, err := s.yieldJumps(cfg)
+	jumps, err := s.yieldJumps(cfg.JumpQuotes, cfg.JumpDates)
 	if err != nil {
 		return nil, err
 	}
