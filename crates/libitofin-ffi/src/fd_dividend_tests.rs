@@ -14,7 +14,7 @@ use crate::time_api::itofin_day_counter_new;
 use libitofin::settings::Settings;
 use libitofin::shared::{Shared, shared};
 use libitofin::time::date::{Date, Month};
-use std::ptr::null_mut;
+use std::ptr::{null, null_mut};
 
 const GRID: ItofinFdConfig = ItofinFdConfig {
     present: 3,
@@ -242,4 +242,161 @@ fn analytic_dividend_engine_reproduces_the_known_value() {
     assert!((calculated - 3.67).abs() <= 1e-2, "{calculated}");
     let american = m.option(0, 40.0, today + 180, true);
     assert_eq!(m.value(american, engine, 0), Err(CORE_ERROR));
+}
+
+/// `testFdDividendAtTZero` (`dividendoption.cpp:856-919`), Spot arm, and the
+/// theta the C++ refuses (`:889-892`) as a core error.
+#[test]
+fn dividend_today_matches_the_analytic_engine_and_has_no_theta() {
+    let today = Date::new(27, Month::February, 2005);
+    let expiry = Date::new(13, Month::April, 2005);
+    let mut m = Market::new(today, 54.625, 0.0, 0.0, 0.282922);
+    let cfg = ItofinFdConfig { t_grid: 50, ..GRID };
+    let fd = m.fd(cfg, &[today], &[1.0]);
+    let analytic = m.analytic(&[today], &[1.0]);
+    let european = m.option(0, 55.0, expiry, false);
+    let expected = m.value(european, analytic, 0).unwrap();
+    for american in [false, true] {
+        let option = m.option(0, 55.0, expiry, american);
+        let calculated = m.value(option, fd, 0).unwrap();
+        assert!(
+            (calculated - expected).abs() <= 1e-4,
+            "{calculated} {expected}"
+        );
+        assert_eq!(m.value(option, fd, 3), Err(CORE_ERROR));
+    }
+}
+
+#[test]
+fn invalid_dividend_inputs_preserve_the_output() {
+    let mut m = cached_market();
+    let dates = [maturity().serial_number()];
+    let amounts = [1.0];
+    let invalid = [0];
+    let process = m.process;
+    let c = &mut m.c;
+    let mut out = 77;
+    let cases: [(*const i32, *const f64, usize, u64, i32); 5] = [
+        (null(), amounts.as_ptr(), 1, process, INVALID_ARGUMENT),
+        (dates.as_ptr(), null(), 1, process, INVALID_ARGUMENT),
+        (
+            invalid.as_ptr(),
+            amounts.as_ptr(),
+            1,
+            process,
+            INVALID_ARGUMENT,
+        ),
+        (dates.as_ptr(), amounts.as_ptr(), 1, 0, INVALID_HANDLE),
+        (null(), null(), 0, 0, INVALID_HANDLE),
+    ];
+    for (d, a, n, p, code) in cases {
+        unsafe {
+            assert_eq!(
+                itofin_fd_black_scholes_engine_with_cash_dividends(
+                    c,
+                    p,
+                    GRID,
+                    d,
+                    a,
+                    n,
+                    &mut out,
+                    null_mut()
+                ),
+                code
+            );
+            assert_eq!(
+                itofin_analytic_dividend_european_engine_new(c, p, d, a, n, &mut out, null_mut()),
+                code
+            );
+        }
+    }
+    let bad = ItofinFdConfig {
+        present: 16,
+        ..GRID
+    };
+    unsafe {
+        assert_eq!(
+            itofin_fd_black_scholes_engine_with_cash_dividends(
+                c,
+                process,
+                bad,
+                dates.as_ptr(),
+                amounts.as_ptr(),
+                1,
+                &mut out,
+                null_mut()
+            ),
+            INVALID_ARGUMENT
+        );
+        assert_eq!(
+            itofin_analytic_dividend_european_engine_new(
+                c,
+                process,
+                dates.as_ptr(),
+                amounts.as_ptr(),
+                1,
+                null_mut(),
+                null_mut()
+            ),
+            INVALID_ARGUMENT
+        );
+    }
+    assert_eq!(out, 77);
+}
+
+#[test]
+fn engines_retain_the_process_and_an_empty_schedule_is_the_plain_engine() {
+    let mut m = cached_market();
+    let mut plain = 0;
+    let mut empty = 0;
+    let mut analytic = 0;
+    unsafe {
+        assert_eq!(
+            itofin_fd_black_scholes_engine_new(&mut m.c, m.process, GRID, &mut plain, null_mut()),
+            0
+        );
+        assert_eq!(
+            itofin_fd_black_scholes_engine_with_cash_dividends(
+                &mut m.c,
+                m.process,
+                GRID,
+                null(),
+                null(),
+                0,
+                &mut empty,
+                null_mut()
+            ),
+            0
+        );
+        assert_eq!(
+            itofin_analytic_dividend_european_engine_new(
+                &mut m.c,
+                m.process,
+                null(),
+                null(),
+                0,
+                &mut analytic,
+                null_mut()
+            ),
+            0
+        );
+    }
+    let dividend = m.fd(GRID, &[Date::new(27, Month::December, 2021)], &[10.0]);
+    unsafe {
+        assert_eq!(itofin_handle_release(&mut m.c, m.process, null_mut()), 0);
+    }
+    for american in [false, true] {
+        let option = m.option(1, 100.0, maturity(), american);
+        for field in 0..4 {
+            assert_eq!(
+                m.value(option, empty, field).unwrap().to_bits(),
+                m.value(option, plain, field).unwrap().to_bits()
+            );
+        }
+        let expected = SINGLE[1].2[0];
+        if !american {
+            assert!((m.value(option, dividend, 0).unwrap() - expected).abs() <= 1e-8);
+            assert!(m.value(option, analytic, 0).unwrap().is_finite());
+        }
+    }
 }
