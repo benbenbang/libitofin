@@ -1216,3 +1216,7 @@ mod yield_tests {
 #[cfg(test)]
 #[path = "bond_price_atm_tests.rs"]
 mod price_atm_tests;
+
+#[cfg(test)]
+#[path = "bond_yield_convention_tests.rs"]
+mod yield_convention_tests;
