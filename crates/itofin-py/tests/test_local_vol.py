@@ -6,9 +6,11 @@ bilinear, under which #1365's bicubic tanh grid has a negative local vol^2.
 #1399 adds interpolation="bicubic", under which the tanh grid reproduces the
 core oracle. CORE_TANH_VOLS pins the core fixture vols 0.20 - 0.1 tanh(2m) at
 m = 0.2k as Apple libm computes them: glibc tanh is one ulp away at k = -1 and
-k = 3, so the inputs are fed as literals. The MC path itself calls the platform
-exp and log, so the pinned macOS NPVs hold to 1e-8, not bit for bit; the C ABI
-test checks bit equality against the core built in-process.
+k = 3, so the inputs are fed as literals. The NPV/se literals were captured on
+macOS arm64 and are checked to abs 1e-8: Linux glibc differs by about 1e-9
+through libm exp/log in the MC path (Call K115 1.0751944774791173 vs
+1.0751944785024798). Bit equality with the core is asserted in-process by the
+C ABI test on every platform.
 """
 
 import math

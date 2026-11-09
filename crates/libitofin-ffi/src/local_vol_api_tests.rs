@@ -9,9 +9,11 @@
 //! `m = ln(strike / spot)`, keeps the bilinear kinks positive and keeps
 //! #1365's criterion `sign * (mc - flat) > 5 * se`. #1399 adds the Bicubic
 //! choice: the original tanh grid under it matches the same chain built
-//! through the core in-process bit for bit. The pinned macOS NPVs of the core
-//! oracle (`mc_local_vol_oracle.rs`) hold to 1e-8 only, since the MC path calls
-//! the platform `exp` and `log`.
+//! through the core in-process bit for bit, on every platform. The pinned
+//! NPV/se literals of the core oracle (`mc_local_vol_oracle.rs`) were captured
+//! on macOS arm64 and are checked to abs 1e-8: Linux glibc differs by about
+//! 1e-9 through libm `exp`/`log` in the MC path (Call K115 1.0751944774791173
+//! vs 1.0751944785024798).
 use crate::boundary::*;
 use crate::curves_api::itofin_flat_forward_new;
 use crate::local_vol_api::*;

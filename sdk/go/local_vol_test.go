@@ -207,6 +207,11 @@ var coreTanhVols = []float64{0.29926315202011283, 0.29836748576936806, 0.2964027
 
 var smileGrid = []int{-7, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7}
 
+// TestLocalVolTanhSmileBicubicMatchesCoreOracle checks the core oracle's
+// NPV/se literals, captured on macOS arm64, to abs 1e-8: Linux glibc differs by
+// about 1e-9 through libm exp/log in the MC path (Call K115 1.0751944774791173
+// vs 1.0751944785024798). Bit equality with the core is asserted in-process by
+// the C ABI test on every platform.
 func TestLocalVolTanhSmileBicubicMatchesCoreOracle(t *testing.T) {
 	m := newLocalVolMarket(t)
 	_, p := m.process(pricingMust(m.tanhSmile(SurfaceBicubic, smileGrid...)))
