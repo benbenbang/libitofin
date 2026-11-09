@@ -6,7 +6,7 @@
     "Futures helpers retain Shared<FuturesRateHelper> for convexity introspection; helpers_api::helper upcasts them for bootstrap. Other helpers retain Shared<dyn RateHelper>.",
     "Tests include independent QuantLib/Python deposit, futures-price and one-period bond oracles; OIS and swap helper tests also verify bootstrap residuals, which alone are not independent price oracles. Niche optional-argument combinations are not exhaustively tested.",
     "Enum mappings preserve Python ordinals; enum member rows deliberately have no test reference where only consumers, not every variant, are exercised.",
-    "PiecewiseYieldCurve jumped constructors select their C entry points through PiecewiseCurveConfig.JumpQuotes/JumpDates; node-curve jumps are a tracked follow-up."
+    "PiecewiseYieldCurve jumped constructors select their C entry points through PiecewiseCurveConfig.JumpQuotes/JumpDates; NodeCurveConfig.JumpQuotes/JumpDates select itofin_node_curve_with_jumps_new the same way."
   ],
   "scope": "curve.rs, helpers.rs, currency.rs, market.rs and Ibor index classes from hullwhite.rs; committed Python stubs; inherited methods counted at defining class",
   "symbols": [
@@ -20,30 +20,48 @@
       ]
     },
     {
-      "c": "itofin_node_curve_new",
+      "c": [
+        "itofin_node_curve_new",
+        "itofin_node_curve_with_jumps_new"
+      ],
       "go": "Session.NewZeroCurve",
       "python": "itofin.termstructures.ZeroCurve.__init__",
       "status": "implemented",
       "tests": [
-        "TestCurveNodeQueriesAndConcurrentCallers"
+        "TestCurveNodeQueriesAndConcurrentCallers",
+        "TestNodeCurveJumpsScalePlainDiscount",
+        "TestNodeCurveJumpsGenerateYearEnds",
+        "TestNodeCurveJumpsInvalidArguments"
       ]
     },
     {
-      "c": "itofin_node_curve_new",
+      "c": [
+        "itofin_node_curve_new",
+        "itofin_node_curve_with_jumps_new"
+      ],
       "go": "Session.NewDiscountCurve",
       "python": "itofin.termstructures.DiscountCurve.__init__",
       "status": "implemented",
       "tests": [
-        "TestCurveNodeQueriesAndConcurrentCallers"
+        "TestCurveNodeQueriesAndConcurrentCallers",
+        "TestNodeCurveJumpsScalePlainDiscount",
+        "TestNodeCurveJumpsGenerateYearEnds",
+        "TestNodeCurveJumpsInvalidArguments"
       ]
     },
     {
-      "c": "itofin_node_curve_new",
+      "c": [
+        "itofin_node_curve_new",
+        "itofin_node_curve_with_jumps_new"
+      ],
       "go": "Session.NewForwardCurve",
       "python": "itofin.termstructures.ForwardCurve.__init__",
       "status": "implemented",
       "tests": [
-        "TestCurveNodeQueriesAndConcurrentCallers"
+        "TestCurveNodeQueriesAndConcurrentCallers",
+        "TestNodeCurveJumpsScalePlainDiscount",
+        "TestNodeCurveJumpsGenerateYearEnds",
+        "TestNodeCurveJumpsInvalidArguments"
       ]
     },
     {

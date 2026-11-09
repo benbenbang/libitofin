@@ -11,12 +11,12 @@ type yieldJumps struct {
 	dates  []C.int32_t
 }
 
-func (s *Session) yieldJumps(cfg PiecewiseCurveConfig) (*yieldJumps, error) {
-	if len(cfg.JumpQuotes) == 0 && len(cfg.JumpDates) == 0 {
+func (s *Session) yieldJumps(quotes []*SimpleQuote, dates []Date) (*yieldJumps, error) {
+	if len(quotes) == 0 && len(dates) == 0 {
 		return nil, nil
 	}
-	j := &yieldJumps{make([]C.uint64_t, len(cfg.JumpQuotes)), make([]C.int32_t, len(cfg.JumpDates))}
-	for i, q := range cfg.JumpQuotes {
+	j := &yieldJumps{make([]C.uint64_t, len(quotes)), make([]C.int32_t, len(dates))}
+	for i, q := range quotes {
 		if q == nil {
 			return nil, errNilArgument("jump quote")
 		}
@@ -25,7 +25,7 @@ func (s *Session) yieldJumps(cfg PiecewiseCurveConfig) (*yieldJumps, error) {
 		}
 		j.quotes[i] = C.uint64_t(q.id)
 	}
-	for i, d := range cfg.JumpDates {
+	for i, d := range dates {
 		j.dates[i] = C.int32_t(d.Serial())
 	}
 	return j, nil
