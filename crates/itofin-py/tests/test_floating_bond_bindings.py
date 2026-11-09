@@ -351,7 +351,7 @@ def test_mixed_calendar_natural_roll_does_not_invent_fixing_calendar_adjustment(
 @pytest.mark.parametrize("factory,market,horizon", [
     ("china", "SSE", 2026), ("china", "IB", 2026),
     ("hong_kong", "HKEX", 2025), ("india", "NSE", 2026),
-    ("indonesia", "BEJ", 2014), ("israel", "Tase", 2050),
+    ("indonesia", "BEJ", 2026), ("israel", "Tase", 2050),
     ("israel", "Telbor", 2050), ("israel", "Shir", 2050),
     ("new_zealand", "Wellington", 2052), ("new_zealand", "Auckland", 2052),
     ("north_macedonia", "MSE", 2040), ("saudi_arabia", "Tadawul", 2029),
@@ -390,7 +390,7 @@ def test_floating_returned_index_keeps_calendar_bounds_after_parent_release():
     gc.collect()
     assert returned.is_business_day(Date(5, 1, 2014)) == expected
     with pytest.raises(ItofinError):
-        returned.is_business_day(Date(5, 1, 2015))
+        returned.is_business_day(Date(5, 1, 2027))
 
 
 @pytest.mark.parametrize("rule", ["JoinHolidays", "JoinBusinessDays"])
@@ -398,7 +398,7 @@ def test_joint_calendar_retains_child_horizon_and_first_year(rule):
     """Joint views preserve all known native child table bounds without changing valid dates."""
     calendar = Calendar.joint([Calendar.indonesia(), Calendar.russia("MOEX")], rule)
     assert isinstance(calendar.is_business_day(Date(5, 1, 2014)), bool)
-    for unsupported in [Date(5, 1, 2011), Date(5, 1, 2015)]:
+    for unsupported in [Date(5, 1, 2011), Date(5, 1, 2027)]:
         with pytest.raises(ItofinError):
             calendar.is_business_day(unsupported)
 

@@ -276,7 +276,7 @@ def test_instrument_invalid_lags_null_dates_and_calendar_horizon():
     with pytest.raises(ItofinError):
         option(m, engine, observation_lag=Period(30, "Days"))
     with pytest.raises(ItofinError):
-        surface(m, calendar=Calendar.indonesia())
+        surface(m, calendar=Calendar.indonesia(), convention=Bdc.Following)
     with pytest.raises(ItofinError):
         option(m, engine, payment_calendar=Calendar.indonesia(), payment_convention=Bdc.Following)
     with pytest.raises(ItofinError):

@@ -204,7 +204,7 @@ def test_every_constructor_builds_without_arguments(build):
     calendar = build()
     assert calendar.name
     # Indonesia and Saudi Arabia tabulate their lunar holidays only through
-    # 2014 and 2029, so the probe stays early. Every calendar but the null one
+    # 2026 and 2029, so the probe stays early. Every calendar but the null one
     # holds at least its weekends over a year, whatever days those fall on.
     holidays = calendar.holiday_list(Date(1, 1, 2010), Date(31, 12, 2010), include_weekends=True)
     assert (len(holidays) > 0) == (calendar != Calendar.null_calendar())
@@ -213,7 +213,7 @@ def test_every_constructor_builds_without_arguments(build):
 
 @pytest.mark.parametrize(
     ("build", "horizon"),
-    [(Calendar.indonesia, 2014), (Calendar.saudi_arabia, 2029)],
+    [(Calendar.indonesia, 2026), (Calendar.saudi_arabia, 2029)],
 )
 def test_calendars_with_a_holiday_horizon_raise_past_it(build, horizon):
     calendar = build()
