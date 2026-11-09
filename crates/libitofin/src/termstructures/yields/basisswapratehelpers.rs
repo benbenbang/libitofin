@@ -366,12 +366,12 @@ impl IborIborBasisSwapRateHelper {
     }
 
     /// Rebuilds the swap off the current evaluation date (`initializeDates`,
-    /// `.cpp:85-127`): spot is `settlement_days` business days after today
+    /// `.cpp:86-129`): spot is `settlement_days` business days after today
     /// (`Following`), the termination is the unadjusted `spot + tenor`, and
     /// each leg runs backward from it on its index's tenor. The maturity is the
     /// later schedule end; the latest relevant date, which is also the pillar,
     /// is the latest of the maturity, both legs' last payment dates and both
-    /// legs' last fixing end dates (`.cpp:117-122`).
+    /// legs' last fixing end dates (`.cpp:120-126`).
     ///
     /// Deferred (#1423): the v1.44 `rule`, `paymentLag`, `useIndexedCoupons`
     /// and stub-index arguments; the helper always uses their defaults.

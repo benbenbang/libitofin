@@ -1,11 +1,13 @@
 use libitofin::cashflows::{IborLeg, OvernightLeg, RateAveraging};
 use libitofin::handle::{Handle, RelinkableHandle};
 use libitofin::indexes::ibor::{estr::Estr, euribor::Euribor};
+use libitofin::indexes::ibor::{sofr::Sofr, usdlibor::UsdLibor};
 use libitofin::indexes::iborindex::{IborIndex, OvernightIndex};
 use libitofin::indexes::interestrateindex::InterestRateIndex;
 use libitofin::instrument::Instrument;
 use libitofin::instruments::Swap;
 use libitofin::interestrate::Compounding;
+use libitofin::math::interpolations::linear::Linear;
 use libitofin::math::interpolations::loglinear::LogLinear;
 use libitofin::pricingengine::PricingEngine;
 use libitofin::pricingengines::swap::DiscountingSwapEngine;
@@ -14,6 +16,7 @@ use libitofin::settings::Settings;
 use libitofin::shared::{Shared, SharedMut, shared, shared_mut};
 use libitofin::termstructures::bootstraphelper::RateHelper;
 use libitofin::termstructures::bootstraptraits::Discount;
+use libitofin::termstructures::bootstraptraits::ZeroYield;
 use libitofin::termstructures::globalbootstrap::GlobalBootstrap;
 use libitofin::termstructures::multicurve::MultiCurve;
 use libitofin::termstructures::yields::{
@@ -22,12 +25,15 @@ use libitofin::termstructures::yields::{
 use libitofin::termstructures::yieldtermstructure::YieldTermStructure;
 use libitofin::time::businessdayconvention::BusinessDayConvention::{Following, ModifiedFollowing};
 use libitofin::time::calendars::target::Target;
+use libitofin::time::calendars::unitedstates::{Market as UsMarket, UnitedStates};
 use libitofin::time::date::{Date, Month};
+use libitofin::time::dategenerationrule::DateGeneration;
 use libitofin::time::daycounters::actual360::Actual360;
+use libitofin::time::daycounters::actual365fixed::Actual365Fixed;
 use libitofin::time::frequency::Frequency;
 use libitofin::time::period::Period;
 use libitofin::time::schedule::MakeSchedule;
-use libitofin::time::timeunit::TimeUnit::{Days, Years};
+use libitofin::time::timeunit::TimeUnit::{Days, Months, Years};
 
 fn quote(value: f64) -> Handle<dyn Quote> {
     Handle::new(shared(SimpleQuote::new(value)) as Shared<dyn Quote>)
@@ -66,6 +72,7 @@ fn helper(
 
 fn swap_npv(
     h: &OvernightIborBasisSwapRateHelper,
+    years: i32,
     basis: f64,
     overnight: &Shared<OvernightIndex>,
     ibor: &Shared<IborIndex>,
@@ -74,11 +81,11 @@ fn swap_npv(
 ) -> f64 {
     let schedule = MakeSchedule::new()
         .from(h.earliest_date())
-        .to(h.maturity_date())
+        .to(h.earliest_date() + Period::new(years, Years))
         .with_tenor(ibor.tenor())
         .with_calendar(Target::new())
         .with_convention(ModifiedFollowing)
-        .forwards()
+        .backwards()
         .build();
     let overnight_leg = OvernightLeg::new(schedule.clone(), overnight.clone())
         .with_notional(1.0)
@@ -124,7 +131,7 @@ fn overnight_basis_flat_curves_zero_independent_swaps() {
         } else {
             ibor_curve.clone()
         };
-        assert!(swap_npv(&h, basis, &overnight, &ibor, pricing, &settings).abs() < 1e-10);
+        assert!(swap_npv(&h, 5, basis, &overnight, &ibor, pricing, &settings).abs() < 1e-10);
         assert_eq!(h.earliest_date(), Date::new(27, Month::October, 2025));
         assert_eq!(h.maturity_date(), Date::new(28, Month::October, 2030));
         assert_eq!(h.pillar_date(), h.latest_relevant_date());
@@ -208,6 +215,7 @@ fn overnight_basis_coupled_curves_reprice_and_recalculate() {
             assert!(
                 swap_npv(
                     h,
+                    i as i32 + 1,
                     basis_value,
                     &overnight,
                     &ibor,
@@ -296,7 +304,185 @@ fn overnight_basis_explicit_and_default_discount_match_quantlib() {
             } else {
                 forecast.handle()
             };
-            assert!(swap_npv(h, 0.002, &overnight, &ibor, pricing, &settings).abs() < 1e-10);
+            assert!(
+                swap_npv(
+                    h,
+                    i as i32 + 1,
+                    0.002,
+                    &overnight,
+                    &ibor,
+                    pricing,
+                    &settings
+                )
+                .abs()
+                    < 1e-10
+            );
         }
     }
+}
+
+/// `testOvernightIborBootstrap` (v1.44 `basisswapratehelpers.cpp:147-246`) on
+/// the default schedule rule, fitting the Libor curve with an empty discount
+/// handle (`testOvernightIborBootstrapWithoutDiscountCurve` `:560`) or an
+/// external one (`testOvernightIborBootstrapWithDiscountCurve` `:566`): every
+/// quoted swap rebuilt backward from the unadjusted `spot + tenor` is fair
+/// within `1e-8` on notional 100. The C++ fixture takes today from the clock;
+/// this pins 23 October 2025, where the 5Y termination is a Sunday. The
+/// `bootstrapBaseCurve` cases `:579` and `:585` are deferred (#1423).
+#[test]
+fn overnight_ibor_bootstrap_reprices_fair_swaps_on_backward_schedules() {
+    let quotes = [
+        (1, 0.0010),
+        (2, 0.0012),
+        (3, 0.0015),
+        (5, 0.0015),
+        (8, 0.0018),
+        (10, 0.0020),
+        (15, 0.0021),
+        (20, 0.0021),
+    ];
+    let calendar = UnitedStates::new(UsMarket::GovernmentBond);
+    for external in [false, true] {
+        let settings = shared(Settings::<Date>::new());
+        let today = Date::new(23, Month::October, 2025);
+        settings.set_evaluation_date(today);
+        let flat365 = |rate: f64| {
+            Handle::new(shared(FlatForward::with_rate(
+                today,
+                rate,
+                Actual365Fixed::new(),
+                Compounding::Continuous,
+                Frequency::Annual,
+            )) as Shared<dyn YieldTermStructure>)
+        };
+        let discount = if external {
+            flat365(0.005)
+        } else {
+            Handle::empty()
+        };
+        let sofr = shared(Sofr::new(flat365(0.01), settings.clone()));
+        let libor = |curve| shared(UsdLibor::six_months(curve, settings.clone()));
+        let helpers = quotes
+            .iter()
+            .map(|&(years, basis)| {
+                OvernightIborBasisSwapRateHelper::new(
+                    quote(basis),
+                    Period::new(years, Years),
+                    2,
+                    calendar.clone(),
+                    Following,
+                    false,
+                    &sofr,
+                    &libor(Handle::empty()),
+                    discount.clone(),
+                )
+                .unwrap() as Shared<dyn RateHelper>
+            })
+            .collect();
+        let fitted = Handle::new(
+            PiecewiseYieldCurve::<ZeroYield, Linear>::new(
+                today,
+                helpers,
+                Actual365Fixed::new(),
+                Linear,
+            )
+            .unwrap() as Shared<dyn YieldTermStructure>,
+        );
+        let libor = libor(fitted.clone());
+        let pricing = if external { discount } else { fitted };
+        let spot = calendar.advance(today, 2, Days, Following, false);
+        for (years, basis) in quotes {
+            let schedule = MakeSchedule::new()
+                .from(spot)
+                .to(spot + Period::new(years, Years))
+                .with_tenor(libor.tenor())
+                .with_calendar(calendar.clone())
+                .with_convention(Following)
+                .backwards()
+                .build();
+            let overnight_leg = OvernightLeg::new(schedule.clone(), sofr.clone())
+                .with_notional(100.0)
+                .with_spread(basis)
+                .build()
+                .unwrap();
+            let ibor_leg = IborLeg::new(schedule, libor.clone())
+                .with_notional(100.0)
+                .build()
+                .unwrap();
+            let mut swap = Swap::two_leg(overnight_leg, ibor_leg, settings.clone());
+            swap.base_mut()
+                .set_pricing_engine(shared_mut(DiscountingSwapEngine::new(
+                    pricing.clone(),
+                    None,
+                    None,
+                    None,
+                    settings.clone(),
+                )) as SharedMut<dyn PricingEngine>);
+            let npv = swap.npv().unwrap();
+            assert!(npv.abs() < 1e-8, "external={external}, {years}Y NPV {npv}");
+        }
+    }
+}
+
+/// The default rule is `Backward` (v1.44 `basisswapratehelpers.hpp:147`): on a
+/// 15M tenor paced by 6M Euribor the short stub sits at the front, so the
+/// implied basis zeroes the backward swap but not the forward one (the v1.44
+/// `:531-557` stub-placement check, on the default rule).
+#[test]
+fn overnight_basis_default_rule_places_the_stub_at_the_front() {
+    let settings = shared(Settings::<Date>::new());
+    let today = Date::new(23, Month::October, 2025);
+    settings.set_evaluation_date(today);
+    let overnight = shared(Estr::new(flat(today, 0.021), settings.clone()));
+    let ibor_curve = flat(today, 0.034);
+    let ibor = shared(Euribor::six_months(ibor_curve.clone(), settings.clone()));
+    let discount = flat(today, 0.012);
+    let tenor = Period::new(15, Months);
+    let h = OvernightIborBasisSwapRateHelper::new(
+        quote(0.002),
+        tenor,
+        2,
+        Target::new(),
+        ModifiedFollowing,
+        false,
+        &overnight,
+        &ibor,
+        discount.clone(),
+    )
+    .unwrap();
+    h.set_term_structure(&ibor_curve.current_link().unwrap());
+    let basis = h.implied_quote().unwrap();
+    let npv = |rule| {
+        let schedule = MakeSchedule::new()
+            .from(h.earliest_date())
+            .to(h.earliest_date() + tenor)
+            .with_tenor(ibor.tenor())
+            .with_calendar(Target::new())
+            .with_convention(ModifiedFollowing)
+            .with_rule(rule)
+            .build();
+        let overnight_leg = OvernightLeg::new(schedule.clone(), overnight.clone())
+            .with_notional(1.0)
+            .with_spread(basis)
+            .build()
+            .unwrap();
+        let ibor_leg = IborLeg::new(schedule, ibor.clone())
+            .with_notional(1.0)
+            .build()
+            .unwrap();
+        let mut swap = Swap::two_leg(overnight_leg, ibor_leg, settings.clone());
+        swap.base_mut()
+            .set_pricing_engine(shared_mut(DiscountingSwapEngine::new(
+                discount.clone(),
+                None,
+                None,
+                None,
+                settings.clone(),
+            )) as SharedMut<dyn PricingEngine>);
+        swap.npv().unwrap()
+    };
+    let backward = npv(DateGeneration::Backward);
+    let forward = npv(DateGeneration::Forward);
+    assert!(backward.abs() < 1e-12, "backward NPV {backward}");
+    assert!(forward.abs() > 1e-9, "forward NPV {forward}");
 }

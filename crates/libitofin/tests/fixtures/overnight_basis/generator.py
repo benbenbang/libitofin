@@ -1,4 +1,4 @@
-"""Generate independent QuantLib 1.43 overnight-basis fixtures."""
+"""Generate independent QuantLib 1.44 overnight-basis fixtures."""
 import sys
 
 import QuantLib as q
@@ -30,7 +30,7 @@ def curve(helpers):
 def emit(mode, basis, fitted, helpers, overnight, discount):
     for year, helper in enumerate(helpers, 1):
         assert abs(helper.impliedQuote() / basis - 1) < 1e-12
-        schedule = q.Schedule(helper.earliestDate(), helper.maturityDate(), q.Period(3, q.Months), calendar, q.ModifiedFollowing, q.ModifiedFollowing, q.DateGeneration.Forward, False)
+        schedule = q.Schedule(helper.earliestDate(), helper.earliestDate() + q.Period(year, q.Years), q.Period(3, q.Months), calendar, q.ModifiedFollowing, q.ModifiedFollowing, q.DateGeneration.Backward, False)
         swap = q.Swap(q.OvernightLeg([1.0], schedule, overnight, spreads=[basis]), q.IborLeg([1.0], schedule, q.Euribor3M(handle(fitted))))
         swap.setPricingEngine(q.DiscountingSwapEngine(discount if discount else handle(fitted)))
         assert abs(swap.NPV()) < 1e-10
