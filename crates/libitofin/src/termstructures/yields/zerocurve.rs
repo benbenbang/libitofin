@@ -9,10 +9,6 @@
 //!
 //! ## Divergences from QuantLib
 //!
-//! - Jump quotes (`jumps`/`jumpDates`) are taken by
-//!   [`with_jumps`](InterpolatedZeroCurve::with_jumps), which reads the rates
-//!   as continuously compounded; there is no constructor taking both a
-//!   compounding convention and jumps.
 //! - The protected detached/moving constructors (used only by bootstrapped
 //!   subclasses) follow with the bootstrap work; the public date-vector
 //!   constructors are ported.
@@ -92,14 +88,47 @@ impl<I: Interpolator> InterpolatedZeroCurve<I> {
         jumps: Vec<Handle<dyn Quote>>,
         jump_dates: Vec<Date>,
     ) -> QlResult<InterpolatedZeroCurve<I>> {
+        Self::with_jumps_and_compounding(
+            dates,
+            yields,
+            day_counter,
+            calendar,
+            interpolator,
+            jumps,
+            jump_dates,
+            Compounding::Continuous,
+            Frequency::Annual,
+        )
+    }
+
+    /// Builds the curve as [`with_compounding`](Self::with_compounding) with
+    /// multiplicative discount jumps as in [`with_jumps`](Self::with_jumps)
+    /// (C++'s full constructor taking both `jumps`/`jumpDates` and a
+    /// compounding convention).
+    ///
+    /// # Errors
+    /// Returns the [`with_compounding`](Self::with_compounding) errors, or a
+    /// [`YieldJumps`] construction error.
+    #[allow(clippy::too_many_arguments)]
+    pub fn with_jumps_and_compounding(
+        dates: Vec<Date>,
+        yields: Vec<Rate>,
+        day_counter: DayCounter,
+        calendar: Option<Calendar>,
+        interpolator: I,
+        jumps: Vec<Handle<dyn Quote>>,
+        jump_dates: Vec<Date>,
+        compounding: Compounding,
+        frequency: Frequency,
+    ) -> QlResult<InterpolatedZeroCurve<I>> {
         let mut curve = Self::with_compounding(
             dates,
             yields,
             day_counter,
             calendar,
             interpolator,
-            Compounding::Continuous,
-            Frequency::Annual,
+            compounding,
+            frequency,
         )?;
         curve.jumps = Some(YieldJumps::new(&curve.base, jumps, jump_dates)?);
         Ok(curve)
@@ -243,6 +272,9 @@ mod tests {
     use crate::test_support::{Flag, as_observer};
     use crate::time::date::Month;
     use crate::time::daycounters::actual360::Actual360;
+    use crate::time::daycounters::actual365fixed::Actual365Fixed;
+    use crate::time::period::Period;
+    use crate::time::timeunit::TimeUnit;
 
     fn reference() -> Date {
         Date::new(15, Month::June, 2026)
@@ -509,5 +541,112 @@ mod tests {
         assert!(Flag::is_up(&flag));
         let expected = 0.95 * sample().discount(1.0, false).unwrap();
         assert!((curve.discount(1.0, false).unwrap() - expected).abs() < 1.0e-15);
+    }
+
+    fn simple_oracle_dates() -> (Date, Vec<Date>, Vec<Date>) {
+        let r = reference();
+        let nodes = [0, 1, 2, 5]
+            .map(|n| r + Period::new(n, TimeUnit::Years))
+            .to_vec();
+        let jumps = [6, 18]
+            .map(|n| r + Period::new(n, TimeUnit::Months))
+            .to_vec();
+        (r, nodes, jumps)
+    }
+
+    fn simple_oracle_curve(compounding: Compounding, frequency: Frequency) -> ZeroCurve {
+        let (_, nodes, jump_dates) = simple_oracle_dates();
+        ZeroCurve::with_jumps_and_compounding(
+            nodes,
+            vec![0.02, 0.025, 0.03, 0.035],
+            Actual365Fixed::new(),
+            None,
+            Linear,
+            vec![quote(0.99), quote(0.98)],
+            jump_dates,
+            compounding,
+            frequency,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn simple_compounded_quotes_combine_with_jumps() {
+        let (r, nodes, jump_dates) = simple_oracle_dates();
+        let dc = Actual365Fixed::new();
+        let curve = simple_oracle_curve(Compounding::Simple, Frequency::Annual);
+        let rates: [Rate; 4] = [0.02, 0.025, 0.03, 0.035];
+        let times: Vec<Time> = nodes.iter().map(|&d| dc.year_fraction(r, d)).collect();
+        let zeros: Vec<Rate> = (0..4)
+            .map(|i| {
+                if i == 0 {
+                    365.0 * (1.0 + rates[0] / 365.0).ln()
+                } else {
+                    (1.0 + rates[i] * times[i]).ln() / times[i]
+                }
+            })
+            .collect();
+        let jump_times: Vec<Time> = jump_dates.iter().map(|&d| dc.year_fraction(r, d)).collect();
+        let jump_values = [0.99, 0.98];
+        let expected = |t: Time| {
+            let i = (1..3).find(|&i| t <= times[i]).unwrap_or(3) - 1;
+            let z =
+                zeros[i] + (t - times[i]) * (zeros[i + 1] - zeros[i]) / (times[i + 1] - times[i]);
+            let factor: Real = jump_times
+                .iter()
+                .zip(jump_values)
+                .filter(|&(&tk, _)| 0.0 < tk && tk < t)
+                .map(|(_, j)| j)
+                .product();
+            (-z * t).exp() * factor
+        };
+        let rel = |got: Real, exp: Real| (got - exp).abs() / exp.abs();
+
+        let unjumped = ZeroCurve::with_compounding(
+            nodes,
+            rates.to_vec(),
+            dc,
+            None,
+            Linear,
+            Compounding::Simple,
+            Frequency::Annual,
+        )
+        .unwrap();
+        assert_eq!(curve.jump_times().unwrap(), jump_times);
+        for t in [0.25, 1.0, 1.25, 3.0, jump_times[0], jump_times[1]] {
+            let got = curve.discount(t, false).unwrap();
+            assert!(rel(got, expected(t)) < 1.0e-14, "t = {t}");
+            let product: Real = jump_times
+                .iter()
+                .zip(jump_values)
+                .filter(|&(&tk, _)| tk < t)
+                .map(|(_, j)| j)
+                .product();
+            let composed = unjumped.discount(t, false).unwrap() * product;
+            assert!(rel(got, composed) < 1.0e-14, "t = {t}");
+        }
+    }
+
+    #[test]
+    fn continuous_annual_matches_with_jumps_bitwise() {
+        let (_, nodes, jump_dates) = simple_oracle_dates();
+        let combined = simple_oracle_curve(Compounding::Continuous, Frequency::Annual);
+        let jumped = ZeroCurve::with_jumps(
+            nodes,
+            vec![0.02, 0.025, 0.03, 0.035],
+            Actual365Fixed::new(),
+            None,
+            Linear,
+            vec![quote(0.99), quote(0.98)],
+            jump_dates,
+        )
+        .unwrap();
+        assert_eq!(combined.zero_rates(), jumped.zero_rates());
+        for t in [0.25, 0.5, 1.0, 1.25, 1.5, 3.0] {
+            assert_eq!(
+                combined.discount(t, false).unwrap().to_bits(),
+                jumped.discount(t, false).unwrap().to_bits()
+            );
+        }
     }
 }
