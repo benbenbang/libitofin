@@ -628,6 +628,37 @@ mod tests {
     }
 
     #[test]
+    fn semiannual_compounded_quotes_combine_with_jumps() {
+        let (r, nodes, jump_dates) = simple_oracle_dates();
+        let dc = Actual365Fixed::new();
+        let curve = simple_oracle_curve(Compounding::Compounded, Frequency::Semiannual);
+        let annual = simple_oracle_curve(Compounding::Compounded, Frequency::Annual);
+        let rates: [Rate; 4] = [0.02, 0.025, 0.03, 0.035];
+        let times: Vec<Time> = nodes.iter().map(|&d| dc.year_fraction(r, d)).collect();
+        let zeros: Vec<Rate> = rates.iter().map(|&q| 2.0 * (1.0 + q / 2.0).ln()).collect();
+        let jump_times: Vec<Time> = jump_dates.iter().map(|&d| dc.year_fraction(r, d)).collect();
+        let expected = |t: Time| {
+            let i = (1..3).find(|&i| t <= times[i]).unwrap_or(3) - 1;
+            let z =
+                zeros[i] + (t - times[i]) * (zeros[i + 1] - zeros[i]) / (times[i + 1] - times[i]);
+            let factor: Real = jump_times
+                .iter()
+                .zip([0.99, 0.98])
+                .filter(|&(&tk, _)| 0.0 < tk && tk < t)
+                .map(|(_, j)| j)
+                .product();
+            (-z * t).exp() * factor
+        };
+        for t in [0.25, 1.0, 1.25, 3.0, jump_times[0], jump_times[1]] {
+            let got = curve.discount(t, false).unwrap();
+            let exp = expected(t);
+            assert!((got - exp).abs() / exp < 1.0e-14, "t = {t}");
+            let other = annual.discount(t, false).unwrap();
+            assert!((got - other).abs() / exp > 1.0e-6, "t = {t}");
+        }
+    }
+
+    #[test]
     fn continuous_annual_matches_with_jumps_bitwise() {
         let (_, nodes, jump_dates) = simple_oracle_dates();
         let combined = simple_oracle_curve(Compounding::Continuous, Frequency::Annual);
