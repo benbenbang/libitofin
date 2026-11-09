@@ -1,4 +1,4 @@
-//! Bounded weighted vector statistics with centered covariance arithmetic.
+//! Stored weighted vector statistics with centered covariance arithmetic.
 
 use crate::errors::QlResult;
 use crate::require;
@@ -51,7 +51,8 @@ pub fn evaluate_sequence_batch(
     }
 }
 
-/// Bounded accumulator for weighted vector samples.
+/// Accumulator storing every weighted vector sample, as QuantLib's
+/// `SequenceStatistics` does; only matrix queries bound their work.
 ///
 /// Unlike native raw second moments, centered arithmetic preserves variance
 /// near large offsets. Weights are normalized before moment multiplication.
@@ -95,7 +96,7 @@ impl SequenceStatistics {
     /// Add one unit-weight sample atomically.
     ///
     /// # Errors
-    /// Rejects an invalid row or an exceeded storage limit without changing samples.
+    /// Rejects an invalid row without changing samples.
     pub fn add(&mut self, sample: &[Real]) -> QlResult<()> {
         self.add_weighted(sample, 1.0)
     }
@@ -104,7 +105,7 @@ impl SequenceStatistics {
     ///
     /// # Errors
     /// Rejects mismatched or nonfinite samples, negative/nonfinite weights,
-    /// overflowing weight sums, and exceeded storage limits.
+    /// overflowing weight sums, and overflowing row counts.
     pub fn add_weighted(&mut self, sample: &[Real], weight: Real) -> QlResult<()> {
         require!(
             sample.len() == self.dimension,

@@ -48,7 +48,7 @@ fn rejects_invalid_shapes_weights_and_moments() {
     ] {
         assert!(benchmark_beta(&a, &b, w.as_deref()).is_err());
     }
-    let huge = vec![0.0; super::super::MAX_SEQUENCE_ROWS + 1];
+    let huge = vec![0.0; super::super::MAX_SEQUENCE_MATRIX_WORK / 4 + 1];
     assert!(benchmark_beta(&huge, &huge, None).is_err());
 }
 

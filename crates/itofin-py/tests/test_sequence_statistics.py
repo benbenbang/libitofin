@@ -201,10 +201,10 @@ def test_keyword_only_weights_and_bad_element_types(measure):
 
 
 def test_shape_limits_and_matrix_work_limit():
-    """Row, dimension, total value and matrix work bounds are distinct contracts."""
-    for samples in ([[0.0]] * 100_001, [[0.0] * 257] * 2, [[0.0] * 256] * 3907):
-        with pytest.raises(itofin.ItofinError):
-            statistics.sequence_mean(samples)
+    """Dimension and matrix work bounds are distinct contracts; rows are unbounded."""
+    with pytest.raises(itofin.ItofinError):
+        statistics.sequence_mean([[0.0] * 257] * 2)
+    assert statistics.sequence_mean([[0.0]] * 100_001) == [0.0]
     samples = [[1.0] * 256] * 1526
     assert statistics.sequence_mean(samples) == [1.0] * 256
     for measure in MATRICES:

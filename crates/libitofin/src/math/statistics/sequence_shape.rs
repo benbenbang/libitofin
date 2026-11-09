@@ -3,10 +3,6 @@ use crate::require;
 
 /// Maximum supported sample dimension.
 pub const MAX_SEQUENCE_DIMENSION: usize = 256;
-/// Maximum number of sample rows.
-pub const MAX_SEQUENCE_ROWS: usize = 100_000;
-/// Maximum total number of sample components.
-pub const MAX_SEQUENCE_COMPONENTS: usize = 1_000_000;
 /// Maximum row/component-pair work for a matrix query.
 pub const MAX_SEQUENCE_MATRIX_WORK: usize = 100_000_000;
 
@@ -35,8 +31,9 @@ pub enum SequenceStatistic {
 ///
 /// # Errors
 ///
-/// Rejects empty or oversized shapes, overflowing products, and matrix work
-/// above [`MAX_SEQUENCE_MATRIX_WORK`].
+/// Rejects empty rows, dimensions outside `1..=MAX_SEQUENCE_DIMENSION`,
+/// overflowing products, and matrix work above [`MAX_SEQUENCE_MATRIX_WORK`].
+/// Like QuantLib's `SequenceStatistics`, the row count is otherwise unbounded.
 pub fn validate_sequence_shape(
     rows: usize,
     dimension: usize,
@@ -46,14 +43,10 @@ pub fn validate_sequence_shape(
         dimension > 0 && dimension <= MAX_SEQUENCE_DIMENSION,
         "sequence dimension must be in 1..={MAX_SEQUENCE_DIMENSION}"
     );
+    require!(rows > 0, "sequence rows must be positive");
     require!(
-        rows > 0 && rows <= MAX_SEQUENCE_ROWS,
-        "sequence rows must be in 1..={MAX_SEQUENCE_ROWS}"
-    );
-    require!(
-        rows.checked_mul(dimension)
-            .is_some_and(|size| size <= MAX_SEQUENCE_COMPONENTS),
-        "sequence component limit exceeded"
+        rows.checked_mul(dimension).is_some(),
+        "sequence component count overflow"
     );
     if matches!(
         measure,

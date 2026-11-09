@@ -3913,7 +3913,8 @@ int32_t itofin_heston_paths(const struct ItofinHestonInput *input,
 /**
  * Compute asset/benchmark beta from already aligned return samples.
  *
- * Requires 2-100,000 observations and equal asset/benchmark lengths. Null
+ * Requires at least two observations, equal asset/benchmark lengths and at
+ * most 25,000,000 rows (the covariance work bound). Null
  * weights with zero length selects unit weights; otherwise weights must have
  * one finite nonnegative entry per observation and a finite positive total.
  * Count-corrected covariance/benchmark variance uses all rows, including
@@ -9149,8 +9150,8 @@ int32_t itofin_scalar_payoff_info(struct ItofinContext *ctx,
  * The exact output length is `dimension` for 0-5 and `dimension * dimension`
  * for 6-7. Variance/covariance use the observation-count N/(N-1) correction,
  * counting zero-weight rows. On every error, the entire output is unchanged.
- * Dimensions are limited to 1-256, rows to 1-100,000, inputs to 1,000,000
- * values and covariance/correlation work to 100,000,000 row-coordinate pairs.
+ * Dimensions are limited to 1-256, rows must be positive and
+ * covariance/correlation work is limited to 100,000,000 row-coordinate pairs.
  *
  * # Safety
  *

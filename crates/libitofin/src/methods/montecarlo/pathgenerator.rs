@@ -215,7 +215,7 @@ mod tests {
     use crate::math::randomnumbers::rngtraits::{McRngTraits, PseudoRandom};
     use crate::math::randomnumbers::sobol::{DirectionIntegers, SobolRsg};
     use crate::math::randomnumbers::{InverseCumulativeRsg, SobolSequence};
-    use crate::methods::montecarlo::brownianbridge::tests::Moments;
+    use crate::math::statistics::SequenceStatistics;
     use crate::patterns::observable::{AsObservable, Observable};
     use crate::processes::{BlackScholesMertonProcess, GeometricBrownianMotionProcess};
     use crate::quotes::make_quote_handle;
@@ -359,9 +359,7 @@ mod tests {
 
     /// `test-suite/brownianbridge.cpp:166` `testPathGeneration`: bridged and
     /// unbridged Sobol paths share their first two moments. The two generators
-    /// are built identically, as C++ copies one `gsg` into both, and the
-    /// moments are accumulated locally for the reason given on
-    /// `brownianbridge.rs`'s `variates_match_brownian_moments`. Equal moments
+    /// are built identically, as C++ copies one `gsg` into both. Equal moments
     /// alone would also hold if the bridge were skipped, so the second path
     /// pair (the first Sobol point is all-zero noise) is required to differ.
     #[test]
@@ -405,16 +403,16 @@ mod tests {
                 .unwrap();
         let mut generator2 = PathGenerator::from_time_grid(process, grid, sobol(), true).unwrap();
 
-        let mut stats1 = Moments::new(n);
-        let mut stats2 = Moments::new(n);
+        let mut stats1 = SequenceStatistics::new(n).unwrap();
+        let mut stats2 = SequenceStatistics::new(n).unwrap();
         for i in 0..samples {
             let path1 = generator1.next().unwrap().value;
             let path2 = generator2.next().unwrap().value;
             if i == 1 {
                 assert_ne!(path1.values(), path2.values(), "the bridge must act");
             }
-            stats1.add(&path1.values()[1..]);
-            stats2.add(&path2.values()[1..]);
+            stats1.add(&path1.values()[1..]).unwrap();
+            stats2.add(&path2.values()[1..]).unwrap();
         }
 
         let max_rel_diff = |a: &[Real], b: &[Real]| {
@@ -423,8 +421,8 @@ mod tests {
                 .map(|(x, y)| ((x - y) / y).abs())
                 .fold(0.0, Real::max)
         };
-        let mean_error = max_rel_diff(&stats2.mean(), &stats1.mean());
-        let cov_error = max_rel_diff(&stats2.covariance(), &stats1.covariance());
+        let mean_error = max_rel_diff(&stats2.mean().unwrap(), &stats1.mean().unwrap());
+        let cov_error = max_rel_diff(&stats2.covariance().unwrap(), &stats1.covariance().unwrap());
         assert!(mean_error <= 3.0e-5, "mean error {mean_error}");
         assert!(cov_error <= 3.0e-3, "covariance error {cov_error}");
     }

@@ -10,7 +10,7 @@ use crate::{errors::QlResult, require, types::Real};
 /// supplied weights must be finite, nonnegative and have a finite positive sum.
 /// Both moments use the observation-count `N/(N-1)` correction, including
 /// zero-weight rows, so that common correction cancels in the ratio.
-/// Inputs are borrowed and unchanged; at most 100,000 paired rows are supported.
+/// Inputs are borrowed and unchanged; covariance work bounds the paired rows.
 ///
 /// # Errors
 /// Rejects unequal lengths, fewer than two rows, invalid samples/weights,

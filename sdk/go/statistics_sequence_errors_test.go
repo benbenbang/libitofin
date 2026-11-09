@@ -46,7 +46,7 @@ func TestStatisticsSequenceRejectsInvalidInputs(t *testing.T) {
 }
 
 func TestStatisticsSequenceBounds(t *testing.T) {
-	for _, shape := range [][2]int{{100001, 1}, {1, 257}, {100000, 11}} {
+	for _, shape := range [][2]int{{1, 257}, {2, 0}} {
 		samples := make([][]float64, shape[0])
 		samples[0] = make([]float64, shape[1])
 		if got, err := StatisticsSequenceMean(samples, nil); err == nil || got != nil {
@@ -60,7 +60,7 @@ func TestStatisticsSequenceBounds(t *testing.T) {
 			t.Fatal("accepted matrix work above 100000000")
 		}
 	}
-	samples = make([][]float64, 100000)
+	samples = make([][]float64, 100001)
 	row := make([]float64, 10)
 	for i := range samples {
 		samples[i] = row

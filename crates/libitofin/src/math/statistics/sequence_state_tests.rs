@@ -89,21 +89,21 @@ fn one_row_allows_mean_extrema_but_not_moments() {
 }
 
 #[test]
-fn shape_validation_checks_every_cap_before_allocation() {
+fn shape_validation_checks_every_guard_before_allocation() {
     let mean = SequenceStatistic::Mean;
     let covariance = SequenceStatistic::Covariance;
     for (rows, dimension) in [
         (0, 1),
         (1, 0),
         (1, 257),
-        (100_001, 1),
-        (100_000, 11),
+        (usize::MAX, 2),
         (usize::MAX, usize::MAX),
     ] {
         assert!(validate_sequence_shape(rows, dimension, mean).is_err());
     }
-    assert_eq!(validate_sequence_shape(100_000, 10, mean).unwrap(), 10);
-    assert_eq!(validate_sequence_shape(3_906, 256, mean).unwrap(), 256);
+    assert_eq!(validate_sequence_shape(100_001, 1, mean).unwrap(), 1);
+    assert_eq!(validate_sequence_shape(usize::MAX, 1, mean).unwrap(), 1);
+    assert_eq!(validate_sequence_shape(262_143, 256, mean).unwrap(), 256);
     assert!(validate_sequence_shape(1_526, 256, covariance).is_err());
     assert_eq!(
         validate_sequence_shape(1_525, 256, covariance).unwrap(),
@@ -117,22 +117,23 @@ fn shape_validation_checks_every_cap_before_allocation() {
 }
 
 #[test]
-fn row_and_component_caps_reject_adds_without_mutation() {
+fn rows_are_unbounded_and_matrix_work_guard_rejects_without_mutation() {
     let mut rows = SequenceStatistics::new(1).unwrap();
-    for _ in 0..MAX_SEQUENCE_ROWS {
+    for _ in 0..100_001 {
         rows.add(&[2.0]).unwrap();
     }
-    assert!(rows.add(&[3.0]).is_err());
-    assert_eq!(rows.samples(), MAX_SEQUENCE_ROWS);
-    assert_eq!(rows.mean().unwrap(), [2.0]);
+    rows.add(&[3.0]).unwrap();
+    assert_eq!(rows.samples(), 100_002);
+    assert!(rows.mean().unwrap()[0] > 2.0);
     let mut components = SequenceStatistics::new(256).unwrap();
-    for _ in 0..3_906 {
+    for _ in 0..1_525 {
         components.add(&[2.0; 256]).unwrap();
     }
-    assert!(components.add(&[3.0; 256]).is_err());
-    assert_eq!(components.samples(), 3_906);
-    assert_eq!(components.mean().unwrap(), vec![2.0; 256]);
+    assert_eq!(components.covariance().unwrap(), vec![0.0; 65_536]);
+    components.add(&[2.0; 256]).unwrap();
     assert!(components.covariance().is_err());
     assert!(components.correlation().is_err());
+    assert_eq!(components.samples(), 1_526);
+    assert_eq!(components.mean().unwrap(), vec![2.0; 256]);
     assert_eq!(components.variance().unwrap(), vec![0.0; 256]);
 }
