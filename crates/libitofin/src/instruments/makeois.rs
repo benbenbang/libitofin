@@ -27,6 +27,7 @@
 //! [`with_averaging_method`](MakeOis::with_averaging_method),
 //! [`with_fixed_leg_day_count`](MakeOis::with_fixed_leg_day_count),
 //! [`with_settlement_days`](MakeOis::with_settlement_days),
+//! [`with_settlement_calendar`](MakeOis::with_settlement_calendar),
 //! [`with_termination_date`](MakeOis::with_termination_date),
 //! [`with_payment_frequency`](MakeOis::with_payment_frequency),
 //! [`with_payment_adjustment`](MakeOis::with_payment_adjustment),
@@ -66,7 +67,9 @@
 //!   the two-schedule split is not built;
 //! - `withPricingEngine`: the engine is always the
 //!   [`DiscountingSwapEngine`] over the discounting curve (set) or the index's
-//!   forwarding curve (default), matching `makeois.cpp:145-156/172-180`.
+//!   forwarding curve (default), matching `makeois.cpp:145-156/172-180`;
+//! - `withRoundingPrecision` (v1.44 `makeois.cpp:401`): the coupon rounding
+//!   precision is not ported (#1423).
 //!
 //! [`OISRateHelper`]: crate::termstructures::yields::ratehelpers::OISRateHelper
 //! [`OISRateHelper::initialize_dates`]: crate::termstructures::yields::ratehelpers::OISRateHelper
@@ -129,6 +132,7 @@ pub struct MakeOis {
     discounting_curve: Option<Handle<dyn YieldTermStructure>>,
 
     settlement_days: Option<Natural>,
+    settlement_calendar: Option<Calendar>,
     termination_date: Option<Date>,
     payment_frequency: Frequency,
     payment_calendar: Option<Calendar>,
@@ -174,6 +178,7 @@ impl MakeOis {
             fixed_day_count: None,
             discounting_curve: None,
             settlement_days: None,
+            settlement_calendar: None,
             termination_date: None,
             payment_frequency: Frequency::Annual,
             payment_calendar: None,
@@ -254,6 +259,14 @@ impl MakeOis {
     /// effective date is set.
     pub fn with_settlement_days(mut self, settlement_days: Natural) -> MakeOis {
         self.settlement_days = Some(settlement_days);
+        self
+    }
+
+    /// Sets the calendar the settlement days are counted on, in place of the
+    /// index fixing calendar (`makeois.cpp:227`). The forward-start adjustment
+    /// and the schedules stay on the fixing calendar (`makeois.cpp:85-89`).
+    pub fn with_settlement_calendar(mut self, calendar: Calendar) -> MakeOis {
+        self.settlement_calendar = Some(calendar);
         self
     }
 
@@ -362,7 +375,8 @@ impl MakeOis {
     /// `operator shared_ptr<OvernightIndexedSwap>()`, `makeois.cpp:42/47`).
     ///
     /// Derives the start date (explicit effective date or settlement-days
-    /// dispatch), the default end-of-month flag, the end date, the two annual
+    /// dispatch, counted from the unadjusted evaluation date on the settlement
+    /// calendar, `makeois.cpp:78-84`), the default end-of-month flag, the end date, the two annual
     /// schedules and the fixed rate (given or fair-rate-filled), then attaches a
     /// [`DiscountingSwapEngine`].
     ///
@@ -406,18 +420,22 @@ impl MakeOis {
                     .settlement_days
                     .unwrap_or_else(|| default_settlement_days(self.overnight_index.family_name()));
                 let ref_date = match self.settings.evaluation_date() {
-                    Some(today) => calendar.adjust(today, BusinessDayConvention::Following),
+                    Some(today) => today,
                     None => crate::fail!(
                         "no evaluation date set: MakeOIS needs a reference date to derive the start date"
                     ),
                 };
-                let spot_date = calendar.advance(
-                    ref_date,
-                    settlement_days as Integer,
-                    TimeUnit::Days,
-                    BusinessDayConvention::Following,
-                    false,
-                );
+                let spot_date = self
+                    .settlement_calendar
+                    .as_ref()
+                    .unwrap_or(&calendar)
+                    .advance(
+                        ref_date,
+                        settlement_days as Integer,
+                        TimeUnit::Days,
+                        BusinessDayConvention::Following,
+                        false,
+                    );
                 let start = spot_date + self.forward_start;
                 if self.forward_start.length() < 0 {
                     calendar.adjust(start, BusinessDayConvention::Preceding)
@@ -939,6 +957,91 @@ mod tests {
         assert!(
             overridden_start > default_start,
             "a larger settlement-days override starts later: {overridden_start} vs {default_start}"
+        );
+    }
+
+    fn ois_start(today: Date, settlement_calendar: Option<Calendar>) -> Date {
+        let settings = settings_at(today);
+        let mut maker = MakeOis::new(
+            Period::new(1, TimeUnit::Years),
+            estr_on(common_curve(), &settings),
+            Some(0.03),
+            Period::new(0, TimeUnit::Days),
+            Shared::clone(&settings),
+        )
+        .with_settlement_days(2);
+        if let Some(calendar) = settlement_calendar {
+            maker = maker.with_settlement_calendar(calendar);
+        }
+        maker.build().unwrap().overnight_schedule().start_date()
+    }
+
+    /// `testSpotDateFromNonBusinessEvaluationDate` (v1.44
+    /// `overnightindexedswap.cpp:1261`): on Saturday 20 June 2026 the two
+    /// settlement days count from the Saturday (`makeois.cpp:78-84`), giving
+    /// Tuesday 23 June, not Wednesday 24 June.
+    #[test]
+    fn settlement_days_count_from_a_saturday() {
+        let today = Date::new(20, Month::June, 2026);
+        let start = ois_start(today, None);
+        assert_eq!(start, Date::new(23, Month::June, 2026));
+        assert_eq!(
+            start,
+            Target::new().advance(
+                today,
+                2,
+                TimeUnit::Days,
+                BusinessDayConvention::Following,
+                false
+            )
+        );
+    }
+
+    /// The index-family default settlement days (2 for Estr) also count from
+    /// the unadjusted Saturday (v1.44 `makeois.cpp:64-84`).
+    #[test]
+    fn default_settlement_days_count_from_a_saturday() {
+        let settings = settings_at(Date::new(20, Month::June, 2026));
+        let start = MakeOis::new(
+            Period::new(1, TimeUnit::Years),
+            estr_on(common_curve(), &settings),
+            Some(0.03),
+            Period::new(0, TimeUnit::Days),
+            Shared::clone(&settings),
+        )
+        .build()
+        .unwrap()
+        .overnight_schedule()
+        .start_date();
+        assert_eq!(start, Date::new(23, Month::June, 2026));
+    }
+
+    /// `testSettlementCalendar` (v1.44 `overnightindexedswap.cpp:1288`): on
+    /// Thursday 2 July 2026 the TARGET + US settlement joint calendar skips
+    /// Friday 3 July (Independence Day observed), so the spot is Tuesday 7 July
+    /// while TARGET alone gives Monday 6 July.
+    #[test]
+    fn settlement_calendar_counts_the_settlement_days() {
+        use crate::time::calendars::unitedstates::Market;
+        use crate::time::calendars::{JointCalendar, JointCalendarRule, UnitedStates};
+
+        let today = Date::new(2, Month::July, 2026);
+        let calendar = JointCalendar::of_two(
+            Target::new(),
+            UnitedStates::new(Market::Settlement),
+            JointCalendarRule::JoinHolidays,
+        );
+        let start = ois_start(today, Some(calendar));
+        assert_eq!(start, Date::new(7, Month::July, 2026));
+        assert_ne!(
+            start,
+            Target::new().advance(
+                today,
+                2,
+                TimeUnit::Days,
+                BusinessDayConvention::Following,
+                false
+            )
         );
     }
 }
