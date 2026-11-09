@@ -18,7 +18,7 @@ use crate::time::weekday::Weekday;
 /// Last year for which Indonesia's public holidays are tabulated (matching
 /// QuantLib's data). Past this year the calendar falls through to its weekend
 /// and recurring rules, exactly like QuantLib (which never checks the year).
-pub const HOLIDAY_HORIZON: Year = 2014;
+pub const HOLIDAY_HORIZON: Year = 2026;
 
 /// Indonesian markets.
 ///
@@ -38,8 +38,8 @@ pub enum Market {
 ///
 /// # Accuracy
 ///
-/// Indonesia's public holidays are tabulated (from QuantLib) only through 2014.
-/// After 2014 the tabulated holidays are not observed and the calendar falls
+/// Indonesia's public holidays are tabulated (from QuantLib) only through 2026.
+/// After 2026 the tabulated holidays are not observed and the calendar falls
 /// through to its weekend and recurring rules, exactly like QuantLib (which
 /// never checks the year).
 pub struct Indonesia;
@@ -483,6 +483,184 @@ impl CalendarImpl for BejImpl {
             }
         }
 
+        if y == 2021 {
+            if
+            // Chinese New Year
+            (d == 12 && m == Month::February)
+                // Isra' Mi'raj of the prophet Muhammad SAW
+                || (d == 11 && m == Month::March)
+                // Ied ul-Fitr
+                || (d == 12 && m == Month::May)
+                || (d == 14 && m == Month::May)
+                // Birth of Buddha
+                || (d == 26 && m == Month::May)
+                // Eid ul-Adha
+                || (d == 20 && m == Month::July)
+                // Islamic New Year
+                || (d == 11 && m == Month::August)
+                // Birthday of the prophet Muhammad SAW
+                || (d == 20 && m == Month::October)
+                // Trading Holiday
+                || (d == 31 && m == Month::December)
+            {
+                return false;
+            }
+        }
+
+        if y == 2022 {
+            if
+            // Chinese New Year
+            (d == 1 && m == Month::February)
+                // Isra' Mi'raj of the prophet Muhammad SAW
+                || (d == 28 && m == Month::February)
+                // Saka New Year
+                || (d == 3 && m == Month::March)
+                // Ied ul-Fitr
+                || ((d == 2 || d == 3) && m == Month::May)
+                // Birth of Buddha
+                || (d == 16 && m == Month::May)
+            {
+                return false;
+            }
+        }
+
+        if y == 2023 {
+            if
+            // National leave
+            (d == 23 && m == Month::January)
+                // Saka New Year
+                || (d == 22 && m == Month::March)
+                // National leave
+                || (d == 23 && m == Month::March)
+                // Ied ul-Fitr
+                || (d >= 19 && d <= 21 && m == Month::April)
+                || ((d == 24 || d == 25) && m == Month::April)
+                // National leave
+                || (d == 2 && m == Month::June)
+                || (d == 28 && m == Month::June)
+                // Eid ul-Adha
+                || (d == 29 && m == Month::June)
+                // National leave
+                || (d == 30 && m == Month::June)
+                // Islamic New Year
+                || (d == 19 && m == Month::July)
+                // Birthday of the prophet Muhammad SAW
+                || (d == 28 && m == Month::September)
+                // National leave
+                || (d == 26 && m == Month::December)
+            {
+                return false;
+            }
+        }
+
+        if y == 2024 {
+            if
+            // Isra' Mi'raj of the prophet Muhammad SAW
+            (d == 8 && m == Month::February)
+                // National leave
+                || (d == 9 && m == Month::February)
+                // General elections
+                || (d == 14 && m == Month::February)
+                // Saka New Year
+                || (d == 11 && m == Month::March)
+                // National leave
+                || (d == 12 && m == Month::March)
+                // Ied ul-Fitr
+                || (d >= 8 && d <= 12 && m == Month::April)
+                || (d == 15 && m == Month::April)
+                // National leave
+                || (d == 10 && m == Month::May)
+                // Birth of Buddha
+                || (d == 23 && m == Month::May)
+                // National leave
+                || (d == 24 && m == Month::May)
+                // Eid ul-Adha
+                || (d == 17 && m == Month::June)
+                // National leave
+                || (d == 18 && m == Month::June)
+                // Birthday of the prophet Muhammad SAW
+                || (d == 16 && m == Month::September)
+                // Regional elections
+                || (d == 27 && m == Month::November)
+                // National leave
+                || (d == 26 && m == Month::December)
+                // Trading Holiday
+                || (d == 31 && m == Month::December)
+            {
+                return false;
+            }
+        }
+
+        if y == 2025 {
+            if
+            // Isra' Mi'raj of the prophet Muhammad SAW
+            (d == 27 && m == Month::January)
+                // National leave
+                || (d == 28 && m == Month::January)
+                // Chinese New Year
+                || (d == 29 && m == Month::January)
+                // National leave
+                || (d == 28 && m == Month::March)
+                // Ied ul-Fitr
+                || (d == 31 && m == Month::March)
+                || (d >= 1 && d <= 4 && m == Month::April)
+                || (d == 7 && m == Month::April)
+                // Birth of Buddha
+                || (d == 12 && m == Month::May)
+                // National leave
+                || (d == 13 && m == Month::May)
+                || (d == 30 && m == Month::May)
+                // Eid ul-Adha
+                || (d == 6 && m == Month::June)
+                // National leave
+                || (d == 9 && m == Month::June)
+                // Islamic New Year
+                || (d == 27 && m == Month::June)
+                // Birthday of the prophet Muhammad SAW
+                || (d == 5 && m == Month::September)
+                // National leave
+                || (d == 26 && m == Month::December)
+                // Trading Holiday
+                || (d == 31 && m == Month::December)
+            {
+                return false;
+            }
+        }
+
+        if y == 2026 {
+            if
+            // Isra' Mi'raj of the prophet Muhammad SAW
+            (d == 16 && m == Month::January)
+                // National leave
+                || (d == 16 && m == Month::February)
+                // Chinese New Year
+                || (d == 17 && m == Month::February)
+                // National leave
+                || (d == 18 && m == Month::March)
+                // Saka New Year
+                || (d == 19 && m == Month::March)
+                // Ied ul-Fitr
+                || (d == 20 && m == Month::March)
+                || ((d == 23 || d == 24) && m == Month::March)
+                // National leave
+                || (d == 15 && m == Month::May)
+                // Eid ul-Adha
+                || (d == 27 && m == Month::May)
+                // National leave
+                || (d == 28 && m == Month::May)
+                // Islamic New Year
+                || (d == 16 && m == Month::June)
+                // Birthday of the prophet Muhammad SAW
+                || (d == 25 && m == Month::August)
+                // National leave
+                || (d == 24 && m == Month::December)
+                // Trading Holiday
+                || (d == 31 && m == Month::December)
+            {
+                return false;
+            }
+        }
+
         true
     }
 }
@@ -558,9 +736,57 @@ mod tests {
         // QuantLib never checks the year: past the tables only weekends and
         // recurring rules apply, and tabulated dates do not recur.
         let c = Indonesia::new(Market::Idx);
-        assert!(c.is_holiday(Date::new(17, Month::August, 2026)));
-        assert!(c.is_holiday(Date::new(14, Month::May, 2026)));
-        assert!(c.is_business_day(Date::new(14, Month::January, 2026)));
-        assert!(c.is_business_day(Date::new(18, Month::August, 2026)));
+        assert!(c.is_holiday(Date::new(17, Month::August, 2027)));
+        assert!(c.is_holiday(Date::new(1, Month::June, 2027)));
+        assert!(c.is_business_day(Date::new(27, Month::May, 2027)));
+        assert!(c.is_business_day(Date::new(31, Month::December, 2027)));
+    }
+
+    /// Port of `testIndonesiaCalendar` (`test-suite/calendars.cpp:2902`,
+    /// QuantLib v1.44).
+    #[test]
+    fn indonesia_calendar() {
+        let calendar = Indonesia::new(Market::Idx);
+        assert!(calendar.is_holiday(Date::new(1, Month::January, 2024)));
+        assert!(calendar.is_holiday(Date::new(29, Month::March, 2024)));
+        assert!(calendar.is_holiday(Date::new(1, Month::May, 2024)));
+        assert!(calendar.is_holiday(Date::new(1, Month::June, 2024)));
+        assert!(calendar.is_holiday(Date::new(17, Month::August, 2024)));
+        assert!(calendar.is_holiday(Date::new(25, Month::December, 2024)));
+        assert!(calendar.is_holiday(Date::new(21, Month::January, 2005)));
+        assert!(calendar.is_business_day(Date::new(2, Month::January, 2024)));
+        let historical = [
+            (9, Month::February, 2005),
+            (11, Month::March, 2005),
+            (24, Month::May, 2005),
+            (10, Month::January, 2006),
+            (30, Month::March, 2006),
+            (24, Month::October, 2006),
+            (19, Month::March, 2007),
+            (20, Month::December, 2007),
+            (7, Month::February, 2008),
+            (30, Month::September, 2008),
+            (26, Month::January, 2009),
+            (18, Month::September, 2009),
+            (3, Month::February, 2011),
+            (23, Month::January, 2012),
+            (24, Month::January, 2013),
+            (14, Month::January, 2014),
+            (19, Month::February, 2015),
+            (8, Month::February, 2016),
+            (2, Month::January, 2017),
+            (16, Month::February, 2018),
+            (5, Month::February, 2019),
+            (25, Month::March, 2020),
+            (12, Month::February, 2021),
+            (1, Month::February, 2022),
+            (23, Month::January, 2023),
+            (8, Month::February, 2024),
+            (27, Month::January, 2025),
+            (16, Month::January, 2026),
+        ];
+        for (d, m, y) in historical {
+            assert!(calendar.is_holiday(Date::new(d, m, y)), "{d} {m:?} {y}");
+        }
     }
 }

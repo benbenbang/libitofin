@@ -968,7 +968,7 @@ impl PyCalendar {
 
     /// The Indonesian calendar.
     ///
-    /// Its public holidays are tabulated through 2014 only, as in QuantLib;
+    /// Its public holidays are tabulated through 2026 only, as in QuantLib;
     /// every query on this calendar raises ItofinError for a later date
     /// rather than silently omitting holidays.
     ///

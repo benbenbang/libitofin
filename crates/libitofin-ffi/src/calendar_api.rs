@@ -326,7 +326,7 @@ mod tests {
             })
             .collect();
         assert_eq!(first_years, [(35, 1, 2012)]);
-        for (country, year) in [(25, 2014), (36, 2029)] {
+        for (country, year) in [(25, 2026), (36, 2029)] {
             let cal = country_calendar(country, 0).unwrap();
             assert!(cal.checked(Date::new(1, Month::June, year)).is_ok());
             assert!(cal.checked(Date::new(1, Month::January, year + 1)).is_err());

@@ -103,7 +103,7 @@ func TestCalendarHorizonDoesNotPoisonSession(t *testing.T) {
 	for _, tc := range []struct {
 		build func(...string) (*Calendar, error)
 		year  int
-	}{{s.Indonesia, 2014}, {s.SaudiArabia, 2029}} {
+	}{{s.Indonesia, 2026}, {s.SaudiArabia, 2029}} {
 		cal, _ := tc.build()
 		inside, outside := testDate(t, 1, 6, tc.year), testDate(t, 1, 1, tc.year+1)
 		joint, _ := s.JointCalendar([]*Calendar{cal})

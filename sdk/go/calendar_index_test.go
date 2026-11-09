@@ -50,7 +50,7 @@ func TestCalendarBoundsSurviveIndexInspection(t *testing.T) {
 				if got, err := inspected.Key(); err != nil || got != key {
 					t.Fatal(got, err)
 				}
-				invalid := testDate(t, 1, 1, 2015)
+				invalid := testDate(t, 1, 1, 2027)
 				if kind == "MOEX" {
 					invalid = testDate(t, 1, 1, 2011)
 				}
