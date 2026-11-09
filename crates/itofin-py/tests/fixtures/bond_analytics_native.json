@@ -98,8 +98,8 @@
             2028
           ]
         ],
-        "yield_from_clean": 0.05200000000000938,
-        "yield_from_dirty": 0.05200000000000938,
+        "yield_from_clean": 0.051999999999999845,
+        "yield_from_dirty": 0.051999999999999845,
         "z_spread_from_clean": 0.0069999999999979376,
         "z_spread_from_dirty": 0.0069999999999979376
       },
@@ -225,8 +225,8 @@
             2028
           ]
         ],
-        "yield_from_clean": 0.05200000000000938,
-        "yield_from_dirty": 0.05200000000000938,
+        "yield_from_clean": 0.051999999999999845,
+        "yield_from_dirty": 0.051999999999999845,
         "z_spread_from_clean": 0.0069999999999979376,
         "z_spread_from_dirty": 0.0069999999999979376
       },
@@ -352,8 +352,8 @@
             2028
           ]
         ],
-        "yield_from_clean": 0.05200000000000938,
-        "yield_from_dirty": 0.05200000000000938,
+        "yield_from_clean": 0.051999999999999845,
+        "yield_from_dirty": 0.051999999999999845,
         "z_spread_from_clean": 0.0069999999999979376,
         "z_spread_from_dirty": 0.0069999999999979376
       },
@@ -479,8 +479,8 @@
             2028
           ]
         ],
-        "yield_from_clean": 0.05200000000000938,
-        "yield_from_dirty": 0.05200000000000938,
+        "yield_from_clean": 0.051999999999999845,
+        "yield_from_dirty": 0.051999999999999845,
         "z_spread_from_clean": 0.0069999999999979376,
         "z_spread_from_dirty": 0.0069999999999979376
       },
@@ -1545,11 +1545,11 @@
       "expected": {
         "accrued": 1.227222222222224,
         "clean_curve": 106.00531135179834,
-        "clean_yield": 102.54162760350806,
-        "clean_z_spread": 104.78567521007763,
+        "clean_yield": 102.63664068418541,
+        "clean_z_spread": null,
         "dirty_curve": 107.23253357402056,
-        "dirty_yield": 103.76884982573029,
-        "dirty_z_spread": 106.01289743229985,
+        "dirty_yield": 103.86386290640763,
+        "dirty_z_spread": null,
         "flows": [
           {
             "amount": 6.005555555555542,
@@ -1592,8 +1592,8 @@
             ]
           }
         ],
-        "leg_npv_distinct_npv_date": 264.31573534903464,
-        "leg_z_spread": 0.006999999999999028,
+        "leg_npv_distinct_npv_date": null,
+        "leg_z_spread": null,
         "notional": 250.0,
         "schedule": [
           [
@@ -1622,10 +1622,10 @@
             2028
           ]
         ],
-        "yield_from_clean": 0.05200000000000458,
-        "yield_from_dirty": 0.05200000000000458,
-        "z_spread_from_clean": 0.006999999999999348,
-        "z_spread_from_dirty": 0.006999999999999348
+        "yield_from_clean": 0.0519999999999997,
+        "yield_from_dirty": 0.0519999999999997,
+        "z_spread_from_clean": null,
+        "z_spread_from_dirty": null
       },
       "face": 250.0,
       "frequency": "Annual",
@@ -1673,10 +1673,10 @@
         "accrued": 1.227222222222224,
         "clean_curve": 106.00531135179834,
         "clean_yield": 102.54035988237182,
-        "clean_z_spread": 104.76335300066555,
+        "clean_z_spread": null,
         "dirty_curve": 107.23253357402056,
         "dirty_yield": 103.76758210459404,
-        "dirty_z_spread": 105.99057522288777,
+        "dirty_z_spread": null,
         "flows": [
           {
             "amount": 6.005555555555542,
@@ -1719,8 +1719,8 @@
             ]
           }
         ],
-        "leg_npv_distinct_npv_date": 264.2600806943815,
-        "leg_z_spread": 0.007000000000000048,
+        "leg_npv_distinct_npv_date": null,
+        "leg_z_spread": null,
         "notional": 250.0,
         "schedule": [
           [
@@ -1749,10 +1749,10 @@
             2028
           ]
         ],
-        "yield_from_clean": 0.05199999999999988,
-        "yield_from_dirty": 0.05199999999999988,
-        "z_spread_from_clean": 0.006999999999999837,
-        "z_spread_from_dirty": 0.006999999999999837
+        "yield_from_clean": 0.05199999999999994,
+        "yield_from_dirty": 0.05199999999999994,
+        "z_spread_from_clean": null,
+        "z_spread_from_dirty": null
       },
       "face": 250.0,
       "frequency": "Semiannual",
@@ -1800,10 +1800,10 @@
         "accrued": 1.227222222222224,
         "clean_curve": 106.00531135179834,
         "clean_yield": 102.49102373949435,
-        "clean_z_spread": 104.7519533693276,
+        "clean_z_spread": null,
         "dirty_curve": 107.23253357402056,
         "dirty_yield": 103.71824596171658,
-        "dirty_z_spread": 105.97917559154982,
+        "dirty_z_spread": null,
         "flows": [
           {
             "amount": 6.005555555555542,
@@ -1846,8 +1846,8 @@
             ]
           }
         ],
-        "leg_npv_distinct_npv_date": 264.23165866260257,
-        "leg_z_spread": 0.006999999999999712,
+        "leg_npv_distinct_npv_date": null,
+        "leg_z_spread": null,
         "notional": 250.0,
         "schedule": [
           [
@@ -1878,8 +1878,8 @@
         ],
         "yield_from_clean": 0.05199999999999928,
         "yield_from_dirty": 0.05199999999999928,
-        "z_spread_from_clean": 0.0069999999999997,
-        "z_spread_from_dirty": 0.0069999999999997
+        "z_spread_from_clean": null,
+        "z_spread_from_dirty": null
       },
       "face": 250.0,
       "frequency": "Quarterly",
@@ -1926,11 +1926,11 @@
       "expected": {
         "accrued": 1.227222222222224,
         "clean_curve": 106.00531135179834,
-        "clean_yield": 102.45190079932934,
-        "clean_z_spread": 104.74426467440227,
+        "clean_yield": 102.45767476478396,
+        "clean_z_spread": null,
         "dirty_curve": 107.23253357402056,
-        "dirty_yield": 103.67912302155156,
-        "dirty_z_spread": 105.9714868966245,
+        "dirty_yield": 103.68489698700618,
+        "dirty_z_spread": null,
         "flows": [
           {
             "amount": 6.005555555555542,
@@ -1973,8 +1973,8 @@
             ]
           }
         ],
-        "leg_npv_distinct_npv_date": 264.2124888907891,
-        "leg_z_spread": 0.0070000000000003,
+        "leg_npv_distinct_npv_date": null,
+        "leg_z_spread": null,
         "notional": 250.0,
         "schedule": [
           [
@@ -2003,10 +2003,10 @@
             2028
           ]
         ],
-        "yield_from_clean": 0.052000000000000525,
-        "yield_from_dirty": 0.052000000000000525,
-        "z_spread_from_clean": 0.006999999999998929,
-        "z_spread_from_dirty": 0.006999999999998929
+        "yield_from_clean": 0.05199999999999914,
+        "yield_from_dirty": 0.05199999999999914,
+        "z_spread_from_clean": null,
+        "z_spread_from_dirty": null
       },
       "face": 250.0,
       "frequency": "Monthly",
@@ -2053,11 +2053,11 @@
       "expected": {
         "accrued": 1.227222222222224,
         "clean_curve": 106.00531135179834,
-        "clean_yield": 102.66187713107826,
-        "clean_z_spread": 104.81992752888898,
+        "clean_yield": 102.63108002959311,
+        "clean_z_spread": null,
         "dirty_curve": 107.23253357402056,
-        "dirty_yield": 103.88909935330048,
-        "dirty_z_spread": 106.0471497511112,
+        "dirty_yield": 103.85830225181533,
+        "dirty_z_spread": null,
         "flows": [
           {
             "amount": 6.005555555555542,
@@ -2100,8 +2100,8 @@
             ]
           }
         ],
-        "leg_npv_distinct_npv_date": 264.4052861452025,
-        "leg_z_spread": 0.0069999999999979905,
+        "leg_npv_distinct_npv_date": null,
+        "leg_z_spread": null,
         "notional": 250.0,
         "schedule": [
           [
@@ -2130,10 +2130,10 @@
             2028
           ]
         ],
-        "yield_from_clean": 0.05199999999999808,
-        "yield_from_dirty": 0.05199999999999808,
-        "z_spread_from_clean": 0.006999999999998037,
-        "z_spread_from_dirty": 0.006999999999998037
+        "yield_from_clean": 0.05199999999999991,
+        "yield_from_dirty": 0.05199999999999991,
+        "z_spread_from_clean": null,
+        "z_spread_from_dirty": null
       },
       "face": 250.0,
       "frequency": "Annual",
@@ -2180,11 +2180,11 @@
       "expected": {
         "accrued": 1.227222222222224,
         "clean_curve": 106.00531135179834,
-        "clean_yield": 102.55017351652978,
-        "clean_z_spread": 104.82062360521431,
+        "clean_yield": 102.54925722935592,
+        "clean_z_spread": null,
         "dirty_curve": 107.23253357402056,
-        "dirty_yield": 103.777395738752,
-        "dirty_z_spread": 106.04784582743653,
+        "dirty_yield": 103.77647945157814,
+        "dirty_z_spread": null,
         "flows": [
           {
             "amount": 6.005555555555542,
@@ -2227,8 +2227,8 @@
             ]
           }
         ],
-        "leg_npv_distinct_npv_date": 264.40481119010025,
-        "leg_z_spread": 0.006999999999997985,
+        "leg_npv_distinct_npv_date": null,
+        "leg_z_spread": null,
         "notional": 250.0,
         "schedule": [
           [
@@ -2257,10 +2257,10 @@
             2028
           ]
         ],
-        "yield_from_clean": 0.052000000000007485,
-        "yield_from_dirty": 0.052000000000007485,
-        "z_spread_from_clean": 0.006999999999998235,
-        "z_spread_from_dirty": 0.006999999999998235
+        "yield_from_clean": 0.0520000000000001,
+        "yield_from_dirty": 0.0520000000000001,
+        "z_spread_from_clean": null,
+        "z_spread_from_dirty": null
       },
       "face": 250.0,
       "frequency": "Semiannual",
@@ -2307,11 +2307,11 @@
       "expected": {
         "accrued": 1.227222222222224,
         "clean_curve": 106.00531135179834,
-        "clean_yield": 102.54162760350806,
-        "clean_z_spread": 104.82104041700498,
+        "clean_yield": 102.50732455858935,
+        "clean_z_spread": null,
         "dirty_curve": 107.23253357402056,
-        "dirty_yield": 103.76884982573029,
-        "dirty_z_spread": 106.0482626392272,
+        "dirty_yield": 103.73454678081157,
+        "dirty_z_spread": null,
         "flows": [
           {
             "amount": 6.005555555555542,
@@ -2354,8 +2354,8 @@
             ]
           }
         ],
-        "leg_npv_distinct_npv_date": 264.4047276353905,
-        "leg_z_spread": 0.006999999999998028,
+        "leg_npv_distinct_npv_date": null,
+        "leg_z_spread": null,
         "notional": 250.0,
         "schedule": [
           [
@@ -2384,10 +2384,10 @@
             2028
           ]
         ],
-        "yield_from_clean": 0.05200000000000938,
-        "yield_from_dirty": 0.05200000000000938,
-        "z_spread_from_clean": 0.006999999999998097,
-        "z_spread_from_dirty": 0.006999999999998097
+        "yield_from_clean": 0.051999999999999734,
+        "yield_from_dirty": 0.051999999999999734,
+        "z_spread_from_clean": null,
+        "z_spread_from_dirty": null
       },
       "face": 250.0,
       "frequency": "Quarterly",
@@ -2434,11 +2434,11 @@
       "expected": {
         "accrued": 1.227222222222224,
         "clean_curve": 106.00531135179834,
-        "clean_yield": 102.54162760350806,
-        "clean_z_spread": 104.82134328530545,
+        "clean_yield": 102.47897803826496,
+        "clean_z_spread": null,
         "dirty_curve": 107.23253357402056,
-        "dirty_yield": 103.76884982573029,
-        "dirty_z_spread": 106.04856550752767,
+        "dirty_yield": 103.70620026048718,
+        "dirty_z_spread": null,
         "flows": [
           {
             "amount": 6.005555555555542,
@@ -2481,8 +2481,8 @@
             ]
           }
         ],
-        "leg_npv_distinct_npv_date": 264.4047276353905,
-        "leg_z_spread": 0.006999999999998028,
+        "leg_npv_distinct_npv_date": null,
+        "leg_z_spread": null,
         "notional": 250.0,
         "schedule": [
           [
@@ -2511,10 +2511,10 @@
             2028
           ]
         ],
-        "yield_from_clean": 0.05200000000000938,
-        "yield_from_dirty": 0.05200000000000938,
-        "z_spread_from_clean": 0.006999999999998111,
-        "z_spread_from_dirty": 0.006999999999998111
+        "yield_from_clean": 0.05199999999999991,
+        "yield_from_dirty": 0.05199999999999991,
+        "z_spread_from_clean": null,
+        "z_spread_from_dirty": null
       },
       "face": 250.0,
       "frequency": "Monthly",
@@ -2638,8 +2638,8 @@
             2028
           ]
         ],
-        "yield_from_clean": -0.010000000000003867,
-        "yield_from_dirty": -0.010000000000003867,
+        "yield_from_clean": -0.009999999999999908,
+        "yield_from_dirty": -0.009999999999999908,
         "z_spread_from_clean": -0.005,
         "z_spread_from_dirty": -0.005
       },
@@ -2765,8 +2765,8 @@
             2028
           ]
         ],
-        "yield_from_clean": -0.010000000000000103,
-        "yield_from_dirty": -0.010000000000000103,
+        "yield_from_clean": -0.010000000000000106,
+        "yield_from_dirty": -0.010000000000000106,
         "z_spread_from_clean": -0.005,
         "z_spread_from_dirty": -0.005
       },
@@ -2943,10 +2943,10 @@
         "accrued": 1.227222222222224,
         "clean_curve": 106.00531135179834,
         "clean_yield": 113.93131671115323,
-        "clean_z_spread": 106.90432623718199,
+        "clean_z_spread": null,
         "dirty_curve": 107.23253357402056,
         "dirty_yield": 115.15853893337545,
-        "dirty_z_spread": 108.13154845940421,
+        "dirty_z_spread": null,
         "flows": [
           {
             "amount": 0.8888222222222202,
@@ -2989,8 +2989,8 @@
             ]
           }
         ],
-        "leg_npv_distinct_npv_date": 39.93369857035637,
-        "leg_z_spread": -0.005,
+        "leg_npv_distinct_npv_date": null,
+        "leg_z_spread": null,
         "notional": 37.0,
         "schedule": [
           [
@@ -3019,10 +3019,10 @@
             2028
           ]
         ],
-        "yield_from_clean": -0.010000000000000092,
-        "yield_from_dirty": -0.010000000000000092,
-        "z_spread_from_clean": -0.005,
-        "z_spread_from_dirty": -0.005
+        "yield_from_clean": -0.01,
+        "yield_from_dirty": -0.01,
+        "z_spread_from_clean": null,
+        "z_spread_from_dirty": null
       },
       "face": 37.0,
       "frequency": "Semiannual",
@@ -3069,11 +3069,11 @@
       "expected": {
         "accrued": 1.227222222222224,
         "clean_curve": 106.00531135179834,
-        "clean_yield": 113.93173280917186,
-        "clean_z_spread": 106.8689240786857,
+        "clean_yield": 113.93169349012035,
+        "clean_z_spread": null,
         "dirty_curve": 107.23253357402056,
-        "dirty_yield": 115.15895503139409,
-        "dirty_z_spread": 108.09614630090792,
+        "dirty_yield": 115.15891571234258,
+        "dirty_z_spread": null,
         "flows": [
           {
             "amount": 0.8888222222222202,
@@ -3116,8 +3116,8 @@
             ]
           }
         ],
-        "leg_npv_distinct_npv_date": 39.92044948315094,
-        "leg_z_spread": -0.005,
+        "leg_npv_distinct_npv_date": null,
+        "leg_z_spread": null,
         "notional": 37.0,
         "schedule": [
           [
@@ -3146,10 +3146,10 @@
             2028
           ]
         ],
-        "yield_from_clean": -0.010000000000003435,
-        "yield_from_dirty": -0.010000000000003435,
-        "z_spread_from_clean": -0.005,
-        "z_spread_from_dirty": -0.005
+        "yield_from_clean": -0.009999999999999969,
+        "yield_from_dirty": -0.009999999999999969,
+        "z_spread_from_clean": null,
+        "z_spread_from_dirty": null
       },
       "face": 37.0,
       "frequency": "Semiannual",
@@ -3197,10 +3197,10 @@
         "accrued": 0.0,
         "clean_curve": 98.79645288870618,
         "clean_yield": 96.97148953700868,
-        "clean_z_spread": 98.13455074500455,
+        "clean_z_spread": null,
         "dirty_curve": 98.79645288870618,
         "dirty_yield": 96.97148953700868,
-        "dirty_z_spread": 98.13455074500455,
+        "dirty_z_spread": null,
         "flows": [
           {
             "amount": 255.0,
@@ -3211,14 +3211,14 @@
             ]
           }
         ],
-        "leg_npv_distinct_npv_date": 244.67311592796935,
-        "leg_z_spread": 0.006999999999999632,
+        "leg_npv_distinct_npv_date": null,
+        "leg_z_spread": null,
         "notional": 250.0,
         "schedule": [],
         "yield_from_clean": 0.051999999999999956,
         "yield_from_dirty": 0.051999999999999956,
-        "z_spread_from_clean": 0.006999999999999838,
-        "z_spread_from_dirty": 0.006999999999999838
+        "z_spread_from_clean": null,
+        "z_spread_from_dirty": null
       },
       "face": 250.0,
       "frequency": "Annual",
@@ -3266,10 +3266,10 @@
         "accrued": 0.0,
         "clean_curve": 98.78767137207815,
         "clean_yield": 96.95817490494296,
-        "clean_z_spread": 98.1239864019256,
+        "clean_z_spread": null,
         "dirty_curve": 98.78767137207815,
         "dirty_yield": 96.95817490494296,
-        "dirty_z_spread": 98.1239864019256,
+        "dirty_z_spread": null,
         "flows": [
           {
             "amount": 255.0,
@@ -3280,14 +3280,14 @@
             ]
           }
         ],
-        "leg_npv_distinct_npv_date": 244.6467764713842,
-        "leg_z_spread": 0.006999999999999755,
+        "leg_npv_distinct_npv_date": null,
+        "leg_z_spread": null,
         "notional": 250.0,
         "schedule": [],
         "yield_from_clean": 0.05200000000000003,
         "yield_from_dirty": 0.05200000000000003,
-        "z_spread_from_clean": 0.007000000000000007,
-        "z_spread_from_dirty": 0.007000000000000007
+        "z_spread_from_clean": null,
+        "z_spread_from_dirty": null
       },
       "face": 250.0,
       "frequency": "Annual",
@@ -3334,11 +3334,11 @@
       "expected": {
         "accrued": 0.0,
         "clean_curve": 98.77889063599468,
-        "clean_yield": 96.94452277771592,
-        "clean_z_spread": 98.11342319611528,
+        "clean_yield": 96.94486392869588,
+        "clean_z_spread": null,
         "dirty_curve": 98.77889063599468,
-        "dirty_yield": 96.94452277771592,
-        "dirty_z_spread": 98.11342319611528,
+        "dirty_yield": 96.94486392869588,
+        "dirty_z_spread": null,
         "flows": [
           {
             "amount": 255.0,
@@ -3349,14 +3349,14 @@
             ]
           }
         ],
-        "leg_npv_distinct_npv_date": 244.62043985028407,
-        "leg_z_spread": 0.006999999999999725,
+        "leg_npv_distinct_npv_date": null,
+        "leg_z_spread": null,
         "notional": 250.0,
         "schedule": [],
-        "yield_from_clean": 0.05200000000000005,
-        "yield_from_dirty": 0.05200000000000005,
-        "z_spread_from_clean": 0.006999999999999745,
-        "z_spread_from_dirty": 0.006999999999999745
+        "yield_from_clean": 0.052000000000000136,
+        "yield_from_dirty": 0.052000000000000136,
+        "z_spread_from_clean": null,
+        "z_spread_from_dirty": null
       },
       "face": 250.0,
       "frequency": "Annual",
@@ -3404,10 +3404,10 @@
         "accrued": 0.0,
         "clean_curve": 100.3899097965862,
         "clean_yield": 99.42920272509666,
-        "clean_z_spread": 100.04795482204138,
+        "clean_z_spread": null,
         "dirty_curve": 100.3899097965862,
         "dirty_yield": 99.42920272509666,
-        "dirty_z_spread": 100.04795482204138,
+        "dirty_z_spread": null,
         "flows": [
           {
             "amount": 255.0,
@@ -3418,14 +3418,14 @@
             ]
           }
         ],
-        "leg_npv_distinct_npv_date": 249.44369401696838,
-        "leg_z_spread": 0.007000000000000171,
+        "leg_npv_distinct_npv_date": null,
+        "leg_z_spread": null,
         "notional": 250.0,
         "schedule": [],
         "yield_from_clean": 0.05200000000000022,
         "yield_from_dirty": 0.05200000000000022,
-        "z_spread_from_clean": 0.006999999999999872,
-        "z_spread_from_dirty": 0.006999999999999872
+        "z_spread_from_clean": null,
+        "z_spread_from_dirty": null
       },
       "face": 250.0,
       "frequency": "Semiannual",
@@ -3473,10 +3473,10 @@
         "accrued": 0.0,
         "clean_curve": 100.38098664563908,
         "clean_yield": 99.41520467836257,
-        "clean_z_spread": 100.03715104495876,
+        "clean_z_spread": null,
         "dirty_curve": 100.38098664563908,
         "dirty_yield": 99.41520467836257,
-        "dirty_z_spread": 100.03715104495876,
+        "dirty_z_spread": null,
         "flows": [
           {
             "amount": 255.0,
@@ -3487,14 +3487,14 @@
             ]
           }
         ],
-        "leg_npv_distinct_npv_date": 249.41675759363403,
-        "leg_z_spread": 0.006999999999999778,
+        "leg_npv_distinct_npv_date": null,
+        "leg_z_spread": null,
         "notional": 250.0,
         "schedule": [],
         "yield_from_clean": 0.052000000000000435,
         "yield_from_dirty": 0.052000000000000435,
-        "z_spread_from_clean": 0.0069999999999997295,
-        "z_spread_from_dirty": 0.0069999999999997295
+        "z_spread_from_clean": null,
+        "z_spread_from_dirty": null
       },
       "face": 250.0,
       "frequency": "Semiannual",
@@ -3541,11 +3541,11 @@
       "expected": {
         "accrued": 0.0,
         "clean_curve": 100.37206428782571,
-        "clean_yield": 99.40102922077206,
-        "clean_z_spread": 100.02634843453262,
+        "clean_yield": 99.40121057247732,
+        "clean_z_spread": null,
         "dirty_curve": 100.37206428782571,
-        "dirty_yield": 99.40102922077206,
-        "dirty_z_spread": 100.02634843453262,
+        "dirty_yield": 99.40121057247732,
+        "dirty_z_spread": null,
         "flows": [
           {
             "amount": 255.0,
@@ -3556,14 +3556,14 @@
             ]
           }
         ],
-        "leg_npv_distinct_npv_date": 249.3898240790558,
-        "leg_z_spread": 0.0070000000000001415,
+        "leg_npv_distinct_npv_date": null,
+        "leg_z_spread": null,
         "notional": 250.0,
         "schedule": [],
-        "yield_from_clean": 0.05199999999999996,
-        "yield_from_dirty": 0.05199999999999996,
-        "z_spread_from_clean": 0.007000000000000078,
-        "z_spread_from_dirty": 0.007000000000000078
+        "yield_from_clean": 0.05200000000000056,
+        "yield_from_dirty": 0.05200000000000056,
+        "z_spread_from_clean": null,
+        "z_spread_from_dirty": null
       },
       "face": 250.0,
       "frequency": "Semiannual",
@@ -3611,10 +3611,10 @@
         "accrued": 0.0,
         "clean_curve": 101.19625013583868,
         "clean_yield": 100.70537643845233,
-        "clean_z_spread": 101.02313188266452,
+        "clean_z_spread": null,
         "dirty_curve": 101.19625013583868,
         "dirty_yield": 100.70537643845233,
-        "dirty_z_spread": 101.02313188266452,
+        "dirty_z_spread": null,
         "flows": [
           {
             "amount": 255.0,
@@ -3625,14 +3625,14 @@
             ]
           }
         ],
-        "leg_npv_distinct_npv_date": 251.8750457497962,
-        "leg_z_spread": 0.007000000000000313,
+        "leg_npv_distinct_npv_date": null,
+        "leg_z_spread": null,
         "notional": 250.0,
         "schedule": [],
         "yield_from_clean": 0.05200000000000007,
         "yield_from_dirty": 0.05200000000000007,
-        "z_spread_from_clean": 0.007000000000000128,
-        "z_spread_from_dirty": 0.007000000000000128
+        "z_spread_from_clean": null,
+        "z_spread_from_dirty": null
       },
       "face": 250.0,
       "frequency": "Quarterly",
@@ -3680,10 +3680,10 @@
         "accrued": 0.0,
         "clean_curve": 101.18725531338019,
         "clean_yield": 100.69101678183614,
-        "clean_z_spread": 101.0122056425319,
+        "clean_z_spread": null,
         "dirty_curve": 101.18725531338019,
         "dirty_yield": 100.69101678183614,
-        "dirty_z_spread": 101.0122056425319,
+        "dirty_z_spread": null,
         "flows": [
           {
             "amount": 255.0,
@@ -3694,14 +3694,14 @@
             ]
           }
         ],
-        "leg_npv_distinct_npv_date": 251.84780399652652,
-        "leg_z_spread": 0.006999999999999673,
+        "leg_npv_distinct_npv_date": null,
+        "leg_z_spread": null,
         "notional": 250.0,
         "schedule": [],
         "yield_from_clean": 0.05199999999999919,
         "yield_from_dirty": 0.05199999999999919,
-        "z_spread_from_clean": 0.0069999999999992004,
-        "z_spread_from_dirty": 0.0069999999999992004
+        "z_spread_from_clean": null,
+        "z_spread_from_dirty": null
       },
       "face": 250.0,
       "frequency": "Quarterly",
@@ -3748,11 +3748,11 @@
       "expected": {
         "accrued": 0.0,
         "clean_curve": 101.17826129042597,
-        "clean_yield": 100.67656728698753,
-        "clean_z_spread": 101.00128058413578,
+        "clean_yield": 100.67666121974491,
+        "clean_z_spread": null,
         "dirty_curve": 101.17826129042597,
-        "dirty_yield": 100.67656728698753,
-        "dirty_z_spread": 101.00128058413578,
+        "dirty_yield": 100.67666121974491,
+        "dirty_z_spread": null,
         "flows": [
           {
             "amount": 255.0,
@@ -3763,14 +3763,14 @@
             ]
           }
         ],
-        "leg_npv_distinct_npv_date": 251.82056518961113,
-        "leg_z_spread": 0.006999999999998704,
+        "leg_npv_distinct_npv_date": null,
+        "leg_z_spread": null,
         "notional": 250.0,
         "schedule": [],
-        "yield_from_clean": 0.05200000000000011,
-        "yield_from_dirty": 0.05200000000000011,
-        "z_spread_from_clean": 0.006999999999999914,
-        "z_spread_from_dirty": 0.006999999999999914
+        "yield_from_clean": 0.052000000000000095,
+        "yield_from_dirty": 0.052000000000000095,
+        "z_spread_from_clean": null,
+        "z_spread_from_dirty": null
       },
       "face": 250.0,
       "frequency": "Quarterly",
@@ -3818,10 +3818,10 @@
         "accrued": 0.0,
         "clean_curve": 101.73740526751013,
         "clean_yield": 101.57451564004117,
-        "clean_z_spread": 101.68024645957816,
+        "clean_z_spread": null,
         "dirty_curve": 101.73740526751013,
         "dirty_yield": 101.57451564004117,
-        "dirty_z_spread": 101.68024645957816,
+        "dirty_z_spread": null,
         "flows": [
           {
             "amount": 255.0,
@@ -3832,14 +3832,14 @@
             ]
           }
         ],
-        "leg_npv_distinct_npv_date": 253.51339095884413,
-        "leg_z_spread": 0.00700000000000023,
+        "leg_npv_distinct_npv_date": null,
+        "leg_z_spread": null,
         "notional": 250.0,
         "schedule": [],
         "yield_from_clean": 0.05199999999999876,
         "yield_from_dirty": 0.05199999999999876,
-        "z_spread_from_clean": 0.007000000000001329,
-        "z_spread_from_dirty": 0.007000000000001329
+        "z_spread_from_clean": null,
+        "z_spread_from_dirty": null
       },
       "face": 250.0,
       "frequency": "Monthly",
@@ -3887,10 +3887,10 @@
         "accrued": 0.0,
         "clean_curve": 101.7283623445111,
         "clean_yield": 101.55990706936608,
-        "clean_z_spread": 101.66923753421118,
+        "clean_z_spread": null,
         "dirty_curve": 101.7283623445111,
         "dirty_yield": 101.55990706936608,
-        "dirty_z_spread": 101.66923753421118,
+        "dirty_z_spread": null,
         "flows": [
           {
             "amount": 255.0,
@@ -3901,14 +3901,14 @@
             ]
           }
         ],
-        "leg_npv_distinct_npv_date": 253.48594305133236,
-        "leg_z_spread": 0.00700000000000234,
+        "leg_npv_distinct_npv_date": null,
+        "leg_z_spread": null,
         "notional": 250.0,
         "schedule": [],
         "yield_from_clean": 0.052000000000002225,
         "yield_from_dirty": 0.052000000000002225,
-        "z_spread_from_clean": 0.007000000000002725,
-        "z_spread_from_dirty": 0.007000000000002725
+        "z_spread_from_clean": null,
+        "z_spread_from_dirty": null
       },
       "face": 250.0,
       "frequency": "Monthly",
@@ -3955,11 +3955,11 @@
       "expected": {
         "accrued": 0.0,
         "clean_curve": 101.71932022529172,
-        "clean_yield": 101.54527005283597,
-        "clean_z_spread": 101.65822980078106,
+        "clean_yield": 101.54530270013163,
+        "clean_z_spread": null,
         "dirty_curve": 101.71932022529172,
-        "dirty_yield": 101.54527005283597,
-        "dirty_z_spread": 101.65822980078106,
+        "dirty_yield": 101.54530270013163,
+        "dirty_z_spread": null,
         "flows": [
           {
             "amount": 255.0,
@@ -3970,14 +3970,14 @@
             ]
           }
         ],
-        "leg_npv_distinct_npv_date": 253.45849811560683,
-        "leg_z_spread": 0.007000000000002324,
+        "leg_npv_distinct_npv_date": null,
+        "leg_z_spread": null,
         "notional": 250.0,
         "schedule": [],
-        "yield_from_clean": 0.052000000000000365,
-        "yield_from_dirty": 0.052000000000000365,
-        "z_spread_from_clean": 0.007000000000004868,
-        "z_spread_from_dirty": 0.007000000000004868
+        "yield_from_clean": 0.05199999999999985,
+        "yield_from_dirty": 0.05199999999999985,
+        "z_spread_from_clean": null,
+        "z_spread_from_dirty": null
       },
       "face": 250.0,
       "frequency": "Monthly",
@@ -4024,11 +4024,11 @@
       "expected": {
         "accrued": 0.0,
         "clean_curve": 98.79645288870618,
-        "clean_yield": 96.97182895471882,
-        "clean_z_spread": 98.13467026646991,
+        "clean_yield": 96.97148953700868,
+        "clean_z_spread": null,
         "dirty_curve": 98.79645288870618,
-        "dirty_yield": 96.97182895471882,
-        "dirty_z_spread": 98.13467026646991,
+        "dirty_yield": 96.97148953700868,
+        "dirty_z_spread": null,
         "flows": [
           {
             "amount": 255.0,
@@ -4039,14 +4039,14 @@
             ]
           }
         ],
-        "leg_npv_distinct_npv_date": 244.67725566852576,
-        "leg_z_spread": 0.006999999999999725,
+        "leg_npv_distinct_npv_date": null,
+        "leg_z_spread": null,
         "notional": 250.0,
         "schedule": [],
-        "yield_from_clean": 0.052000000000000206,
-        "yield_from_dirty": 0.052000000000000206,
-        "z_spread_from_clean": 0.00699999999999968,
-        "z_spread_from_dirty": 0.00699999999999968
+        "yield_from_clean": 0.051999999999999956,
+        "yield_from_dirty": 0.051999999999999956,
+        "z_spread_from_clean": null,
+        "z_spread_from_dirty": null
       },
       "face": 250.0,
       "frequency": "Annual",
@@ -4094,10 +4094,10 @@
         "accrued": 0.0,
         "clean_curve": 98.78767137207815,
         "clean_yield": 96.95817490494296,
-        "clean_z_spread": 98.12417948836644,
+        "clean_z_spread": null,
         "dirty_curve": 98.78767137207815,
         "dirty_yield": 96.95817490494296,
-        "dirty_z_spread": 98.12417948836644,
+        "dirty_z_spread": null,
         "flows": [
           {
             "amount": 255.0,
@@ -4108,14 +4108,14 @@
             ]
           }
         ],
-        "leg_npv_distinct_npv_date": 244.65109921648678,
-        "leg_z_spread": 0.0069999999999997495,
+        "leg_npv_distinct_npv_date": null,
+        "leg_z_spread": null,
         "notional": 250.0,
         "schedule": [],
         "yield_from_clean": 0.05200000000000003,
         "yield_from_dirty": 0.05200000000000003,
-        "z_spread_from_clean": 0.006999999999999953,
-        "z_spread_from_dirty": 0.006999999999999953
+        "z_spread_from_clean": null,
+        "z_spread_from_dirty": null
       },
       "face": 250.0,
       "frequency": "Annual",
@@ -4163,10 +4163,10 @@
         "accrued": 0.0,
         "clean_curve": 98.77889063599468,
         "clean_yield": 96.94486392869588,
-        "clean_z_spread": 98.11369018342126,
+        "clean_z_spread": null,
         "dirty_curve": 98.77889063599468,
         "dirty_yield": 96.94486392869588,
-        "dirty_z_spread": 98.11369018342126,
+        "dirty_z_spread": null,
         "flows": [
           {
             "amount": 255.0,
@@ -4177,14 +4177,14 @@
             ]
           }
         ],
-        "leg_npv_distinct_npv_date": 244.6249464374446,
-        "leg_z_spread": 0.006999999999999896,
+        "leg_npv_distinct_npv_date": null,
+        "leg_z_spread": null,
         "notional": 250.0,
         "schedule": [],
         "yield_from_clean": 0.052000000000000136,
         "yield_from_dirty": 0.052000000000000136,
-        "z_spread_from_clean": 0.006999999999999857,
-        "z_spread_from_dirty": 0.006999999999999857
+        "z_spread_from_clean": null,
+        "z_spread_from_dirty": null
       },
       "face": 250.0,
       "frequency": "Annual",
@@ -4231,11 +4231,11 @@
       "expected": {
         "accrued": 0.0,
         "clean_curve": 100.3899097965862,
-        "clean_yield": 99.42938215749753,
-        "clean_z_spread": 100.04813865849631,
+        "clean_yield": 99.42920272509666,
+        "clean_z_spread": null,
         "dirty_curve": 100.3899097965862,
-        "dirty_yield": 99.42938215749753,
-        "dirty_z_spread": 100.04813865849631,
+        "dirty_yield": 99.42920272509666,
+        "dirty_z_spread": null,
         "flows": [
           {
             "amount": 255.0,
@@ -4246,14 +4246,14 @@
             ]
           }
         ],
-        "leg_npv_distinct_npv_date": 249.4459836078703,
-        "leg_z_spread": 0.007000000000000151,
+        "leg_npv_distinct_npv_date": null,
+        "leg_z_spread": null,
         "notional": 250.0,
         "schedule": [],
-        "yield_from_clean": 0.05199999999999944,
-        "yield_from_dirty": 0.05199999999999944,
-        "z_spread_from_clean": 0.007000000000000083,
-        "z_spread_from_dirty": 0.007000000000000083
+        "yield_from_clean": 0.05200000000000022,
+        "yield_from_dirty": 0.05200000000000022,
+        "z_spread_from_clean": null,
+        "z_spread_from_dirty": null
       },
       "face": 250.0,
       "frequency": "Semiannual",
@@ -4301,10 +4301,10 @@
         "accrued": 0.0,
         "clean_curve": 100.38098664563908,
         "clean_yield": 99.41520467836257,
-        "clean_z_spread": 100.03737775312477,
+        "clean_z_spread": null,
         "dirty_curve": 100.38098664563908,
         "dirty_yield": 99.41520467836257,
-        "dirty_z_spread": 100.03737775312477,
+        "dirty_z_spread": null,
         "flows": [
           {
             "amount": 255.0,
@@ -4315,14 +4315,14 @@
             ]
           }
         ],
-        "leg_npv_distinct_npv_date": 249.4191538770936,
-        "leg_z_spread": 0.006999999999999767,
+        "leg_npv_distinct_npv_date": null,
+        "leg_z_spread": null,
         "notional": 250.0,
         "schedule": [],
         "yield_from_clean": 0.052000000000000435,
         "yield_from_dirty": 0.052000000000000435,
-        "z_spread_from_clean": 0.00699999999999984,
-        "z_spread_from_dirty": 0.00699999999999984
+        "z_spread_from_clean": null,
+        "z_spread_from_dirty": null
       },
       "face": 250.0,
       "frequency": "Semiannual",
@@ -4370,10 +4370,10 @@
         "accrued": 0.0,
         "clean_curve": 100.37206428782571,
         "clean_yield": 99.40121057247732,
-        "clean_z_spread": 100.02661837516392,
+        "clean_z_spread": null,
         "dirty_curve": 100.37206428782571,
         "dirty_yield": 99.40121057247732,
-        "dirty_z_spread": 100.02661837516392,
+        "dirty_z_spread": null,
         "flows": [
           {
             "amount": 255.0,
@@ -4384,14 +4384,14 @@
             ]
           }
         ],
-        "leg_npv_distinct_npv_date": 249.3923279545483,
-        "leg_z_spread": 0.007000000000000081,
+        "leg_npv_distinct_npv_date": null,
+        "leg_z_spread": null,
         "notional": 250.0,
         "schedule": [],
         "yield_from_clean": 0.05200000000000056,
         "yield_from_dirty": 0.05200000000000056,
-        "z_spread_from_clean": 0.006999999999999522,
-        "z_spread_from_dirty": 0.006999999999999522
+        "z_spread_from_clean": null,
+        "z_spread_from_dirty": null
       },
       "face": 250.0,
       "frequency": "Semiannual",
@@ -4438,11 +4438,11 @@
       "expected": {
         "accrued": 0.0,
         "clean_curve": 101.19625013583868,
-        "clean_yield": 100.70546835053277,
-        "clean_z_spread": 101.02334289675476,
+        "clean_yield": 100.70537643845233,
+        "clean_z_spread": null,
         "dirty_curve": 101.19625013583868,
-        "dirty_yield": 100.70546835053277,
-        "dirty_z_spread": 101.02334289675476,
+        "dirty_yield": 100.70537643845233,
+        "dirty_z_spread": null,
         "flows": [
           {
             "amount": 255.0,
@@ -4453,14 +4453,14 @@
             ]
           }
         ],
-        "leg_npv_distinct_npv_date": 251.8763513769503,
-        "leg_z_spread": 0.007000000000000676,
+        "leg_npv_distinct_npv_date": null,
+        "leg_z_spread": null,
         "notional": 250.0,
         "schedule": [],
-        "yield_from_clean": 0.05199999999999978,
-        "yield_from_dirty": 0.05199999999999978,
-        "z_spread_from_clean": 0.007000000000000846,
-        "z_spread_from_dirty": 0.007000000000000846
+        "yield_from_clean": 0.05200000000000007,
+        "yield_from_dirty": 0.05200000000000007,
+        "z_spread_from_clean": null,
+        "z_spread_from_dirty": null
       },
       "face": 250.0,
       "frequency": "Quarterly",
@@ -4508,10 +4508,10 @@
         "accrued": 0.0,
         "clean_curve": 101.18725531338019,
         "clean_yield": 100.69101678183614,
-        "clean_z_spread": 101.01244320308314,
+        "clean_z_spread": null,
         "dirty_curve": 101.18725531338019,
         "dirty_yield": 100.69101678183614,
-        "dirty_z_spread": 101.01244320308314,
+        "dirty_z_spread": null,
         "flows": [
           {
             "amount": 255.0,
@@ -4522,14 +4522,14 @@
             ]
           }
         ],
-        "leg_npv_distinct_npv_date": 251.84917572630945,
-        "leg_z_spread": 0.006999999999999822,
+        "leg_npv_distinct_npv_date": null,
+        "leg_z_spread": null,
         "notional": 250.0,
         "schedule": [],
         "yield_from_clean": 0.05199999999999919,
         "yield_from_dirty": 0.05199999999999919,
-        "z_spread_from_clean": 0.00699999999999965,
-        "z_spread_from_dirty": 0.00699999999999965
+        "z_spread_from_clean": null,
+        "z_spread_from_dirty": null
       },
       "face": 250.0,
       "frequency": "Quarterly",
@@ -4577,10 +4577,10 @@
         "accrued": 0.0,
         "clean_curve": 101.17826129042597,
         "clean_yield": 100.67666121974491,
-        "clean_z_spread": 101.00154506496669,
+        "clean_z_spread": null,
         "dirty_curve": 101.17826129042597,
         "dirty_yield": 100.67666121974491,
-        "dirty_z_spread": 101.00154506496669,
+        "dirty_z_spread": null,
         "flows": [
           {
             "amount": 255.0,
@@ -4591,14 +4591,14 @@
             ]
           }
         ],
-        "leg_npv_distinct_npv_date": 251.822003954055,
-        "leg_z_spread": 0.0070000000000003185,
+        "leg_npv_distinct_npv_date": null,
+        "leg_z_spread": null,
         "notional": 250.0,
         "schedule": [],
         "yield_from_clean": 0.052000000000000095,
         "yield_from_dirty": 0.052000000000000095,
-        "z_spread_from_clean": 0.006999999999998641,
-        "z_spread_from_dirty": 0.006999999999998641
+        "z_spread_from_clean": null,
+        "z_spread_from_dirty": null
       },
       "face": 250.0,
       "frequency": "Quarterly",
@@ -4645,11 +4645,11 @@
       "expected": {
         "accrued": 0.0,
         "clean_curve": 101.73740526751013,
-        "clean_yield": 101.57454619571631,
-        "clean_z_spread": 101.68047359807122,
+        "clean_yield": 101.57451564004117,
+        "clean_z_spread": null,
         "dirty_curve": 101.73740526751013,
-        "dirty_yield": 101.57454619571631,
-        "dirty_z_spread": 101.68047359807122,
+        "dirty_yield": 101.57451564004117,
+        "dirty_z_spread": null,
         "flows": [
           {
             "amount": 255.0,
@@ -4660,14 +4660,14 @@
             ]
           }
         ],
-        "leg_npv_distinct_npv_date": 253.51401783579206,
-        "leg_z_spread": 0.007000000000000184,
+        "leg_npv_distinct_npv_date": null,
+        "leg_z_spread": null,
         "notional": 250.0,
         "schedule": [],
-        "yield_from_clean": 0.05200000000000058,
-        "yield_from_dirty": 0.05200000000000058,
-        "z_spread_from_clean": 0.006999999999999225,
-        "z_spread_from_dirty": 0.006999999999999225
+        "yield_from_clean": 0.05199999999999876,
+        "yield_from_dirty": 0.05199999999999876,
+        "z_spread_from_clean": null,
+        "z_spread_from_dirty": null
       },
       "face": 250.0,
       "frequency": "Monthly",
@@ -4715,10 +4715,10 @@
         "accrued": 0.0,
         "clean_curve": 101.7283623445111,
         "clean_yield": 101.55990706936608,
-        "clean_z_spread": 101.66947995720172,
+        "clean_z_spread": null,
         "dirty_curve": 101.7283623445111,
         "dirty_yield": 101.55990706936608,
-        "dirty_z_spread": 101.66947995720172,
+        "dirty_z_spread": null,
         "flows": [
           {
             "amount": 255.0,
@@ -4729,14 +4729,14 @@
             ]
           }
         ],
-        "leg_npv_distinct_npv_date": 253.48660802967248,
-        "leg_z_spread": 0.006999999999999724,
+        "leg_npv_distinct_npv_date": null,
+        "leg_z_spread": null,
         "notional": 250.0,
         "schedule": [],
         "yield_from_clean": 0.052000000000002225,
         "yield_from_dirty": 0.052000000000002225,
-        "z_spread_from_clean": 0.006999999999997094,
-        "z_spread_from_dirty": 0.006999999999997094
+        "z_spread_from_clean": null,
+        "z_spread_from_dirty": null
       },
       "face": 250.0,
       "frequency": "Monthly",
@@ -4784,10 +4784,10 @@
         "accrued": 0.0,
         "clean_curve": 101.71932022529172,
         "clean_yield": 101.54530270013163,
-        "clean_z_spread": 101.65848789104194,
+        "clean_z_spread": null,
         "dirty_curve": 101.71932022529172,
         "dirty_yield": 101.54530270013163,
-        "dirty_z_spread": 101.65848789104194,
+        "dirty_z_spread": null,
         "flows": [
           {
             "amount": 255.0,
@@ -4798,14 +4798,14 @@
             ]
           }
         ],
-        "leg_npv_distinct_npv_date": 253.45920214968515,
-        "leg_z_spread": 0.006999999999999812,
+        "leg_npv_distinct_npv_date": null,
+        "leg_z_spread": null,
         "notional": 250.0,
         "schedule": [],
         "yield_from_clean": 0.05199999999999985,
         "yield_from_dirty": 0.05199999999999985,
-        "z_spread_from_clean": 0.006999999999998918,
-        "z_spread_from_dirty": 0.006999999999998918
+        "z_spread_from_clean": null,
+        "z_spread_from_dirty": null
       },
       "face": 250.0,
       "frequency": "Monthly",
@@ -4903,8 +4903,8 @@
             2027
           ]
         ],
-        "yield_from_clean": 0.0520000000000003,
-        "yield_from_dirty": 0.0520000000000003,
+        "yield_from_clean": 0.052000000000000636,
+        "yield_from_dirty": 0.052000000000000636,
         "z_spread_from_clean": 0.007000000000000011,
         "z_spread_from_dirty": 0.007000000000000011
       },
@@ -4953,11 +4953,11 @@
       "expected": {
         "accrued": 0.8055555555555483,
         "clean_curve": 106.56396400901819,
-        "clean_yield": 102.81132828931305,
-        "clean_z_spread": 105.22458540770192,
+        "clean_yield": 102.81756672572999,
+        "clean_z_spread": null,
         "dirty_curve": 107.36951956457374,
-        "dirty_yield": 103.6168838448686,
-        "dirty_z_spread": 106.03014096325747,
+        "dirty_yield": 103.62312228128553,
+        "dirty_z_spread": null,
         "flows": [
           {
             "amount": 0.7833333333333581,
@@ -5008,8 +5008,8 @@
             ]
           }
         ],
-        "leg_npv_distinct_npv_date": 264.3587276327611,
-        "leg_z_spread": 0.006999999999999233,
+        "leg_npv_distinct_npv_date": null,
+        "leg_z_spread": null,
         "notional": 250.0,
         "schedule": [
           [
@@ -5043,10 +5043,10 @@
             2028
           ]
         ],
-        "yield_from_clean": 0.05200000000000004,
-        "yield_from_dirty": 0.05200000000000004,
-        "z_spread_from_clean": 0.006999999999999337,
-        "z_spread_from_dirty": 0.006999999999999337
+        "yield_from_clean": 0.05199999999999976,
+        "yield_from_dirty": 0.05199999999999976,
+        "z_spread_from_clean": null,
+        "z_spread_from_dirty": null
       },
       "face": 250.0,
       "frequency": "Quarterly",
@@ -5296,8 +5296,8 @@
     "Hybrid zero-coupon cases use Actual360 times immediately below, at and above 1/f.",
     "Yield pricing uses native stepwise cashflow discounting, not terminal-factor replacement."
   ],
-  "oracle": "QuantLib 1.43",
+  "oracle": "QuantLib 1.44",
   "solver_fixture_accuracy": 1e-12,
   "solver_fixture_max_evaluations": 1000,
-  "source_generator_sha256": "782e283e7bb9a18e4cadbdccd0241824ec445077ed93b3180da8e60cd12574cd"
+  "source_generator_sha256": "2ce492adbe79817e006b62c405dd9839d4ceaa94bb7f7aac058a530c39fb1614"
 }

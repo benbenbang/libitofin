@@ -14,8 +14,8 @@ FREQUENCIES = [ql.Annual, ql.Semiannual, ql.Quarterly, ql.Monthly]
 
 def observations() -> list[dict]:
     """Use the independently established Go analytics fixture construction contract."""
-    if ql.__version__ != "1.43":
-        raise RuntimeError("QuantLib 1.43 is required for this pinned producer")
+    if ql.__version__ != "1.44":
+        raise RuntimeError("QuantLib 1.44 is required for this pinned producer")
     rows = []
     for source in json.loads(SOURCE.read_text())["cases"]:
         start, end, reference, settlement = [ql.Date(source[key]) for key in ["start", "end", "reference", "settlement"]]

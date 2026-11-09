@@ -35,14 +35,14 @@ def values(bond, rate, dc, mode, settlement):
 def test_zero_analytical_derivatives_and_unscaled_currency(mode, rate):
     """Closed-form one-payment derivatives independently pin signs and face scaling."""
     bond, settings, dc, settlement, t = zero()
-    if mode in [Compounding.Simple, Compounding.CompoundedThenSimple]:
+    if mode in [Compounding.Simple, Compounding.SimpleThenCompounded, Compounding.CompoundedThenSimple]:
         discount, modified, convexity = 1 / (1 + rate*t), t / (1 + rate*t), 2*t*t / (1 + rate*t)**2
     elif mode == Compounding.Continuous:
         discount, modified, convexity = math.exp(-rate*t), t, t*t
     else:
         discount, modified, convexity = (1 + rate/2)**(-2*t), t / (1 + rate/2), t*(t+.5) / (1 + rate/2)**2
     price = 375 * discount
-    expected = [t, modified, convexity, -modified*price*.0001 + convexity/100*price*.0001**2/2, .01 / (-price*modified)]
+    expected = [t, modified, convexity, -modified*price*.0001 + convexity*price*.0001**2/2, .01 / (-price*modified)]
     assert values(bond, rate, dc, mode, settlement) == pytest.approx(expected, rel=2e-13, abs=3e-12)
     twice, _, _, _, _ = zero(750)
     scaled = values(twice, rate, dc, mode, settlement)
@@ -118,7 +118,7 @@ def risk_oracles():
 
 @pytest.mark.parametrize("row", list(risk_oracles()), ids=lambda row: row["name"])
 def test_quantlib_wheel_risk_oracles(row):
-    """Pin six independent scalar routes to fresh QuantLib 1.43 wheel queries."""
+    """Pin six independent scalar routes to fresh QuantLib 1.44 wheel queries."""
     def date(serial):
         value = datetime.date(1899, 12, 30) + datetime.timedelta(days=serial)
         return Date(value.day, value.month, value.year)

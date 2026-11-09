@@ -89,7 +89,7 @@ use crate::quotes::{Quote, SimpleQuote};
 use crate::require;
 use crate::settings::Settings;
 use crate::shared::{Shared, shared};
-use crate::termstructures::yields::{FlatForward, ZeroSpreadedTermStructure};
+use crate::termstructures::yields::ZeroSpreadedTermStructure;
 use crate::termstructures::yieldtermstructure::YieldTermStructure;
 use crate::time::date::Date;
 use crate::time::daycounter::DayCounter;
@@ -685,8 +685,11 @@ impl CashFlows {
     /// Each surviving flow is discounted by the running product of the yield's
     /// discount factors over the steps between consecutive flows, rather than by
     /// its discount factor at the total time - the two agree for a compounded or
-    /// continuous yield and part ways for a simple one. `settlement_date`
-    /// defaults to the evaluation date and `npv_date` to `settlement_date`.
+    /// continuous yield and part ways for a simple one. A composite yield is
+    /// positional: `SimpleThenCompounded` discounts the first step simply and
+    /// `CompoundedThenSimple` the steps to the leg's last payment date, and
+    /// every other step is compounded. `settlement_date` defaults to the
+    /// evaluation date and `npv_date` to `settlement_date`.
     ///
     /// A flow trading ex-coupon is discounted as a zero amount rather than
     /// dropped, so that it still advances the step the next flow discounts over.
@@ -706,39 +709,26 @@ impl CashFlows {
         if leg.is_empty() {
             return Ok(0.0);
         }
-        let (settlement, npv_date) = Self::yield_dates(settings, settlement_date, npv_date)?;
-
-        let mut npv = 0.0;
-        let mut discount: DiscountFactor = 1.0;
-        let mut last_date = npv_date;
-        for flow in leg {
-            if flow.has_occurred(settings, Some(settlement), include_settlement_date_flows)? {
-                continue;
-            }
-            let amount = if flow.trading_ex_coupon(settings, Some(settlement))? {
-                0.0
-            } else {
-                flow.amount()?
-            };
-            let step = stepwise_discount_time(
-                flow.as_ref(),
-                yield_rate.day_counter(),
-                npv_date,
-                last_date,
-            );
-            discount *= yield_rate.discount_factor(step)?;
-            last_date = flow.date();
-            npv += amount * discount;
-        }
-        Ok(npv)
+        Ok(Self::yield_results(
+            leg,
+            yield_rate,
+            settings,
+            include_settlement_date_flows,
+            settlement_date,
+            npv_date,
+            false,
+        )?
+        .npv)
     }
 
     /// The change in [`npv_at_yield`](Self::npv_at_yield) for a uniform
     /// one-basis-point change in the rate the coupons pay.
     ///
-    /// As in C++, this is the discount-curve [`bps`](Self::bps) taken against a
-    /// flat curve built from the yield, which discounts each flow at its own
-    /// time rather than stepwise; the two paths need not agree to the last bit.
+    /// The coupons are discounted stepwise as in
+    /// [`npv_at_yield`](Self::npv_at_yield), except that, as in C++, a flow
+    /// that is not a coupon neither counts nor advances the step, a coupon
+    /// trading ex-coupon still counts, and nothing is divided by a discount
+    /// factor at the NPV date.
     ///
     /// # Errors
     ///
@@ -755,21 +745,33 @@ impl CashFlows {
             return Ok(0.0);
         }
         let (settlement, npv_date) = Self::yield_dates(settings, settlement_date, npv_date)?;
-        let flat_rate = FlatForward::with_rate(
-            settlement,
-            yield_rate.rate(),
-            yield_rate.day_counter().clone(),
-            yield_rate.compounding(),
-            yield_rate.frequency(),
-        );
-        Self::bps(
-            leg,
-            &flat_rate,
-            settings,
-            include_settlement_date_flows,
-            Some(settlement),
-            Some(npv_date),
-        )
+        let stepwise = StepwiseYield::new(yield_rate, leg)?;
+
+        let mut bps = 0.0;
+        let mut discount: DiscountFactor = 1.0;
+        let mut last_date = npv_date;
+        let mut in_first_period = true;
+        for flow in leg {
+            if flow.has_occurred(settings, Some(settlement), include_settlement_date_flows)? {
+                continue;
+            }
+            let Some(coupon) = flow.as_coupon() else {
+                continue;
+            };
+            let step = stepwise_discount_time(
+                flow.as_ref(),
+                yield_rate.day_counter(),
+                npv_date,
+                last_date,
+            );
+            discount *= stepwise
+                .at(in_first_period, flow.date())
+                .discount_factor(step)?;
+            bps += coupon.nominal() * coupon.accrual_period() * discount;
+            last_date = flow.date();
+            in_first_period = false;
+        }
+        Ok(BASIS_POINT * bps)
     }
 
     /// The internal rate of return: the flat yield at which the leg is worth
@@ -888,27 +890,32 @@ impl CashFlows {
         if leg.is_empty() {
             return Ok(0.0);
         }
-        let flows = Self::discounted_flows(
+        if duration_type == Duration::Macaulay {
+            require!(
+                yield_rate.compounding() == Compounding::Compounded,
+                "compounded rate required for a Macaulay duration"
+            );
+        }
+        let results = Self::yield_results(
             leg,
             yield_rate,
             settings,
             include_settlement_date_flows,
             settlement_date,
             npv_date,
+            duration_type != Duration::Simple,
         )?;
-
-        match duration_type {
-            Duration::Simple => Ok(Self::simple_duration(&flows)),
-            Duration::Modified => Ok(Self::modified_duration(&flows, yield_rate)),
-            Duration::Macaulay => {
-                require!(
-                    yield_rate.compounding() == Compounding::Compounded,
-                    "compounded rate required for a Macaulay duration"
-                );
-                let n = frequency_of(yield_rate);
-                Ok((1.0 + yield_rate.rate() / n) * Self::modified_duration(&flows, yield_rate))
-            }
+        if results.npv == 0.0 {
+            return Ok(0.0);
         }
+        Ok(match duration_type {
+            Duration::Simple => results.weighted_time / results.npv,
+            Duration::Modified => -results.first_derivative / results.npv,
+            Duration::Macaulay => {
+                let n = yield_rate.frequency() as i16 as Real;
+                (1.0 + yield_rate.rate() / n) * (-results.first_derivative / results.npv)
+            }
+        })
     }
 
     /// The convexity of the leg under a flat `yield_rate`: `(1 / P) d2P/dy2`.
@@ -930,40 +937,25 @@ impl CashFlows {
         if leg.is_empty() {
             return Ok(0.0);
         }
-        let flows = Self::discounted_flows(
+        let results = Self::yield_results(
             leg,
             yield_rate,
             settings,
             include_settlement_date_flows,
             settlement_date,
             npv_date,
+            true,
         )?;
-
-        let (rate, n) = (yield_rate.rate(), frequency_of(yield_rate));
-        let mut present_value = 0.0;
-        let mut second_derivative = 0.0;
-        for &(amount, t, discount) in &flows {
-            present_value += amount * discount;
-            second_derivative += amount
-                * match effective_compounding(yield_rate.compounding(), t, n) {
-                    Compounding::Simple => 2.0 * discount.powi(3) * t * t,
-                    Compounding::Continuous => discount * t * t,
-                    _ => discount * t * (n * t + 1.0) / (n * (1.0 + rate / n).powi(2)),
-                };
-        }
-        if present_value == 0.0 {
+        if results.npv == 0.0 {
             return Ok(0.0);
         }
-        Ok(second_derivative / present_value)
+        Ok(results.second_derivative / results.npv)
     }
 
     /// The change in the leg's value for a one-basis-point rise in the yield,
     /// from the second-order Taylor expansion `dP = delta dy + gamma dy^2 / 2`.
     ///
-    /// Negative for a leg that pays: a higher yield is worth less. The gamma
-    /// term takes [`convexity`](Self::convexity) divided by 100, as C++ does -
-    /// which makes it a hundredth of the second-order term the expansion asks
-    /// for, and immaterial at a one-basis-point shift.
+    /// Negative for a leg that pays: a higher yield is worth less.
     ///
     /// # Errors
     ///
@@ -1007,7 +999,7 @@ impl CashFlows {
 
         let shift = 0.0001;
         let delta = -modified * npv * shift;
-        let gamma = (convexity / 100.0) * npv * shift * shift;
+        let gamma = convexity * npv * shift * shift;
         Ok(delta + 0.5 * gamma)
     }
 
@@ -1050,64 +1042,32 @@ impl CashFlows {
         Ok(shift / (-npv * modified))
     }
 
-    /// `sum(t c B) / sum(c B)`, the discounted-time average of the flows.
-    fn simple_duration(flows: &[(Real, Time, DiscountFactor)]) -> Time {
-        let mut present_value = 0.0;
-        let mut derivative = 0.0;
-        for &(amount, t, discount) in flows {
-            present_value += amount * discount;
-            derivative += t * amount * discount;
-        }
-        if present_value == 0.0 {
-            return 0.0;
-        }
-        derivative / present_value
-    }
-
-    /// `-(1 / P) dP/dy`, differentiating each flow's discount factor in the
-    /// yield's own compounding convention.
-    fn modified_duration(
-        flows: &[(Real, Time, DiscountFactor)],
-        yield_rate: &InterestRate,
-    ) -> Time {
-        let (rate, n) = (yield_rate.rate(), frequency_of(yield_rate));
-        let mut present_value = 0.0;
-        let mut derivative = 0.0;
-        for &(amount, t, discount) in flows {
-            present_value += amount * discount;
-            derivative -= amount
-                * match effective_compounding(yield_rate.compounding(), t, n) {
-                    Compounding::Simple => discount * discount * t,
-                    Compounding::Continuous => discount * t,
-                    _ => t * discount / (1.0 + rate / n),
-                };
-        }
-        if present_value == 0.0 {
-            return 0.0;
-        }
-        -derivative / present_value
-    }
-
-    /// Every surviving flow as `(amount, time from the NPV date, discount
-    /// factor)`, the one pass [`duration`](Self::duration) and
-    /// [`convexity`](Self::convexity) differentiate.
+    /// One stepwise pass over the leg at a flat yield (`cashFlowResults` of
+    /// `cashflows.cpp`): the NPV, the time-weighted NPV, and, when asked for,
+    /// the first and second derivatives of the NPV in the yield.
     ///
-    /// The times accumulate the same steps [`npv_at_yield`](Self::npv_at_yield)
-    /// discounts over, but the discount factor is taken at the total time rather
-    /// than chained - which is what C++ does, and what makes the two agree only
-    /// for a compounded or continuous yield.
-    fn discounted_flows(
+    /// Each derivative differentiates the running product of the steps'
+    /// discount factors by the product rule, so it is exact for the NPV
+    /// [`npv_at_yield`](Self::npv_at_yield) returns, composite yields included.
+    fn yield_results(
         leg: &Leg,
         yield_rate: &InterestRate,
         settings: &Settings<Date>,
         include_settlement_date_flows: Option<bool>,
         settlement_date: Option<Date>,
         npv_date: Option<Date>,
-    ) -> QlResult<Vec<(Real, Time, DiscountFactor)>> {
+        derivatives: bool,
+    ) -> QlResult<YieldResults> {
         let (settlement, npv_date) = Self::yield_dates(settings, settlement_date, npv_date)?;
-        let mut flows = Vec::with_capacity(leg.len());
+        let stepwise = StepwiseYield::new(yield_rate, leg)?;
+
+        let mut results = YieldResults::default();
+        let mut discount: DiscountFactor = 1.0;
+        let mut first_derivative = 0.0;
+        let mut second_derivative = 0.0;
         let mut t = 0.0;
         let mut last_date = npv_date;
+        let mut in_first_period = true;
         for flow in leg {
             if flow.has_occurred(settings, Some(settlement), include_settlement_date_flows)? {
                 continue;
@@ -1117,16 +1077,34 @@ impl CashFlows {
             } else {
                 flow.amount()?
             };
-            t += stepwise_discount_time(
+            let step = stepwise_discount_time(
                 flow.as_ref(),
                 yield_rate.day_counter(),
                 npv_date,
                 last_date,
             );
-            flows.push((amount, t, yield_rate.discount_factor(t)?));
+            t += step;
+
+            let rate = stepwise.at(in_first_period, flow.date());
+            let this_discount = rate.discount_factor(step)?;
+            if derivatives {
+                let this_first = rate.discount_factor_first_derivative(step)?;
+                let this_second = rate.discount_factor_second_derivative(step)?;
+                second_derivative = second_derivative * this_discount
+                    + 2.0 * first_derivative * this_first
+                    + discount * this_second;
+                first_derivative = first_derivative * this_discount + discount * this_first;
+                results.first_derivative += amount * first_derivative;
+                results.second_derivative += amount * second_derivative;
+            }
+            discount *= this_discount;
+
+            results.npv += amount * discount;
+            results.weighted_time += t * amount * discount;
             last_date = flow.date();
+            in_first_period = false;
         }
-        Ok(flows)
+        Ok(results)
     }
 
     /// The settlement and NPV dates the yield analytics resolve up front, each
@@ -1229,26 +1207,73 @@ impl CashFlows {
     }
 }
 
-/// The yield's compounding frequency as the `Natural N` the derivative formulas
-/// divide by.
-///
-/// A yield that compounds nothing reports `Frequency::NoFrequency`, whose `-1`
-/// no formula may see; the branches that use `N` are exactly the ones whose
-/// convention carries a frequency, so those never reach it.
-fn frequency_of(yield_rate: &InterestRate) -> Real {
-    yield_rate.frequency() as i16 as Real
+/// The sums of [`CashFlows::yield_results`] (`CashFlowResults` of
+/// `cashflows.cpp`), each over the surviving flows.
+#[derive(Default)]
+struct YieldResults {
+    /// `sum(c B)`.
+    npv: Real,
+    /// `sum(c dB/dy)`.
+    first_derivative: Real,
+    /// `sum(c d2B/dy2)`.
+    second_derivative: Real,
+    /// `sum(t c B)`.
+    weighted_time: Real,
 }
 
-/// The convention a hybrid yield actually applies at time `t`, so the
-/// derivative formulas need only the three pure cases.
-fn effective_compounding(compounding: Compounding, t: Time, n: Real) -> Compounding {
-    match compounding {
-        Compounding::SimpleThenCompounded if t <= 1.0 / n => Compounding::Simple,
-        Compounding::CompoundedThenSimple if t > 1.0 / n => Compounding::Simple,
-        Compounding::SimpleThenCompounded | Compounding::CompoundedThenSimple => {
-            Compounding::Compounded
+/// A flat yield as its steps apply it (`stepwiseYields` and `choose` of
+/// `cashflows.cpp`).
+///
+/// A pure convention discounts every step with the yield itself. A composite
+/// one splits into its compounded and its simple part, and the simple part
+/// takes the first step for `SimpleThenCompounded` and the steps paying on the
+/// leg's last payment date for `CompoundedThenSimple`, so that no composite
+/// rate ever reaches [`InterestRate::discount_factor`].
+struct StepwiseYield {
+    main: InterestRate,
+    exception: InterestRate,
+    compounding: Compounding,
+    final_payment: Date,
+}
+
+impl StepwiseYield {
+    fn new(yield_rate: &InterestRate, leg: &Leg) -> QlResult<Self> {
+        let compounding = yield_rate.compounding();
+        let part = |compounding| {
+            InterestRate::new(
+                yield_rate.rate(),
+                yield_rate.day_counter().clone(),
+                compounding,
+                yield_rate.frequency(),
+            )
+        };
+        let (main, exception) = match compounding {
+            Compounding::SimpleThenCompounded | Compounding::CompoundedThenSimple => {
+                (part(Compounding::Compounded)?, part(Compounding::Simple)?)
+            }
+            _ => (yield_rate.clone(), yield_rate.clone()),
+        };
+        let final_payment = leg.last().map_or_else(Date::null, |flow| flow.date());
+        Ok(Self {
+            main,
+            exception,
+            compounding,
+            final_payment,
+        })
+    }
+
+    /// The rate the step ending on `payment_date` discounts with.
+    fn at(&self, in_first_period: bool, payment_date: Date) -> &InterestRate {
+        let exceptional = match self.compounding {
+            Compounding::SimpleThenCompounded => in_first_period,
+            Compounding::CompoundedThenSimple => payment_date == self.final_payment,
+            _ => false,
+        };
+        if exceptional {
+            &self.exception
+        } else {
+            &self.main
         }
-        other => other,
     }
 }
 
@@ -1921,28 +1946,25 @@ mod analytics_tests {
         assert!((npv - stepwise).abs() < 1e-12);
     }
 
-    /// C++ routes `bps(leg, InterestRate)` through a `FlatForward` built from
-    /// the yield at the settlement date, so the yield form is the curve form on
-    /// that curve, to the bit.
+    /// **Hand-derived** from `cashflows.cpp:926-966`: the coupons are
+    /// discounted stepwise, as [`CashFlows::npv_at_yield`] discounts them, and
+    /// nothing is divided by a discount factor at the NPV date.
     #[test]
-    fn the_bps_at_yield_is_the_bps_off_a_flat_curve_of_the_yield() {
+    fn the_bps_at_yield_discounts_the_coupons_stepwise() {
         let (settings, leg) = (settings(), fixed_leg(RATE));
         let yield_rate = simple_365(FORWARD);
-        let flat = FlatForward::with_rate(
-            today(),
-            FORWARD,
-            Actual365Fixed::new(),
-            Compounding::Simple,
-            Frequency::NoFrequency,
-        );
+        let mut expected = 0.0;
+        let mut discount = 1.0;
+        let mut last = today();
+        for (start, end) in periods() {
+            discount /= 1.0 + FORWARD * f64::from(end - last) / 365.0;
+            expected += NOMINAL * accrual(start, end) * discount;
+            last = end;
+        }
 
         let at_yield =
             CashFlows::bps_at_yield(&leg, &yield_rate, &settings, None, None, None).unwrap();
-        assert_eq!(
-            at_yield,
-            CashFlows::bps(&leg, &flat, &settings, None, None, None).unwrap()
-        );
-        assert!(at_yield > 0.0);
+        assert!((at_yield - 1.0e-4 * expected).abs() < 1e-15);
     }
 
     /// Both yield analytics short-circuit an empty leg before resolving the
@@ -2272,13 +2294,12 @@ mod analytics_tests {
     /// numbers below are not from that case: they come from the definition at
     /// `cashflows.cpp:1055-1080` and from the leg itself.
     ///
-    /// The delta and gamma terms are the ones the doc comment names. The last
-    /// two assertions pin the `convexity / 100.0` that C++ writes into gamma:
-    /// undo the division and the expansion reproduces the leg's actual price
-    /// change to nine decimals; leave it in and the value is short by a
-    /// hundredth of the second-order term.
+    /// The delta and gamma terms are the ones the doc comment names. Since
+    /// QuantLib 1.44 the gamma term is the full second-order term
+    /// (`cashflows.cpp:1114`), so the expansion reproduces the leg's actual
+    /// price change to nine decimals.
     #[test]
-    fn the_basis_point_value_is_the_taylor_expansion_with_a_hundredth_of_the_gamma() {
+    fn the_basis_point_value_is_the_second_order_taylor_expansion() {
         let (settings, leg) = (settings(), redeeming_leg());
         let rate = compounded(FORWARD);
         let npv =
@@ -2290,15 +2311,14 @@ mod analytics_tests {
 
         let shift = 1.0e-4;
         let delta = -modified * npv(FORWARD) * shift;
-        let gamma = 0.5 * (convexity / 100.0) * npv(FORWARD) * shift * shift;
+        let gamma = 0.5 * convexity * npv(FORWARD) * shift * shift;
 
         let bpv = CashFlows::basis_point_value(&leg, &rate, &settings, None, None, None).unwrap();
         assert!(bpv < -0.01);
         assert!((bpv - (delta + gamma)).abs() < 1e-16);
 
         let actual = npv(FORWARD + shift) - npv(FORWARD);
-        assert!(((delta + 100.0 * gamma) - actual).abs() < 1e-9);
-        assert!((bpv - actual).abs() > 1e-6);
+        assert!((bpv - actual).abs() < 1e-9);
     }
 
     /// **Hand-derived.** As for the basis-point value, the C++ test-suite reaches
@@ -2419,17 +2439,12 @@ mod analytics_tests {
         vec![shared(SimpleCashFlow::new(NOMINAL, today() + days).unwrap()) as Shared<dyn CashFlow>]
     }
 
-    /// **Self-consistency.** No `bonds.cpp` case quotes a hybrid yield, so the
-    /// convention switch of `effective_compounding` has no C++ oracle. Away
-    /// from `t = 1/n` a hybrid yield *is* the matching pure convention: the
-    /// discount factor and the derivative formula follow the same code paths,
-    /// so duration and convexity must match to the bit. Below the first
-    /// semiannual period (`t = 150/360`) `SimpleThenCompounded` is `Simple`
-    /// and `CompoundedThenSimple` is `Compounded`; above it (`t = 210/360`)
-    /// the roles swap. The cross-convention inequalities pin that the two
-    /// pure results really differ, so each equality picks out one arm.
+    /// `cashflows.cpp:611-627`: a single flow's step is both the first and the
+    /// last, so both composite conventions discount it simply, on either side
+    /// of `t = 1/n`, and their duration and convexity are the simple ones to
+    /// the bit.
     #[test]
-    fn a_hybrid_yield_is_the_pure_convention_on_each_side_of_the_switch() {
+    fn a_single_flow_is_discounted_simply_under_both_composite_yields() {
         let settings = settings();
         let dur = |leg: &Leg, rate: &InterestRate| {
             CashFlows::duration(leg, rate, Duration::Modified, &settings, None, None, None).unwrap()
@@ -2438,60 +2453,17 @@ mod analytics_tests {
             CashFlows::convexity(leg, rate, &settings, None, None, None).unwrap()
         };
         let rate = |compounding| semiannual_360(0.04, compounding);
-        let stc = rate(Compounding::SimpleThenCompounded);
-        let cts = rate(Compounding::CompoundedThenSimple);
         let simple = rate(Compounding::Simple);
-        let compounded = rate(Compounding::Compounded);
-
-        let below = single_flow_leg(150);
-        assert_eq!(dur(&below, &stc), dur(&below, &simple));
-        assert_eq!(conv(&below, &stc), conv(&below, &simple));
-        assert_eq!(dur(&below, &cts), dur(&below, &compounded));
-        assert_eq!(conv(&below, &cts), conv(&below, &compounded));
-        assert_ne!(dur(&below, &simple), dur(&below, &compounded));
-
-        let above = single_flow_leg(210);
-        assert_eq!(dur(&above, &stc), dur(&above, &compounded));
-        assert_eq!(conv(&above, &stc), conv(&above, &compounded));
-        assert_eq!(dur(&above, &cts), dur(&above, &simple));
-        assert_eq!(conv(&above, &cts), conv(&above, &simple));
-        assert_ne!(dur(&above, &simple), dur(&above, &compounded));
-    }
-
-    /// **Self-consistency**, as above. At exactly `t = 1/n` the two
-    /// conventions price identically - `1 + r t` equals `(1 + r/n)^(n t)`
-    /// there, and so do the duration and convexity formulas - which is what
-    /// makes the hybrid switch seamless; the last pair of assertions pins that
-    /// seam. The branches are still asymmetric: `SimpleThenCompounded` keeps
-    /// `Simple` at the boundary (`t <= 1/n` is inclusive) while
-    /// `CompoundedThenSimple` keeps `Compounded` (`t > 1/n` is strict), and
-    /// each must land on its own pure convention to the bit. The rate is
-    /// chosen so that the two convexity arms round differently in the last
-    /// place: a hybrid sent down the wrong arm at the boundary would not
-    /// reproduce its own convention's bits.
-    #[test]
-    fn the_hybrid_yield_switch_is_exact_at_the_first_period_boundary() {
-        let settings = settings();
-        let dur = |leg: &Leg, rate: &InterestRate| {
-            CashFlows::duration(leg, rate, Duration::Modified, &settings, None, None, None).unwrap()
-        };
-        let conv = |leg: &Leg, rate: &InterestRate| {
-            CashFlows::convexity(leg, rate, &settings, None, None, None).unwrap()
-        };
-        let rate = |compounding| semiannual_360(0.04, compounding);
-        let stc = rate(Compounding::SimpleThenCompounded);
-        let cts = rate(Compounding::CompoundedThenSimple);
-        let simple = rate(Compounding::Simple);
-        let compounded = rate(Compounding::Compounded);
-
-        let boundary = single_flow_leg(180);
-        assert_eq!(dur(&boundary, &stc), dur(&boundary, &simple));
-        assert_eq!(conv(&boundary, &stc), conv(&boundary, &simple));
-        assert_eq!(dur(&boundary, &cts), dur(&boundary, &compounded));
-        assert_eq!(conv(&boundary, &cts), conv(&boundary, &compounded));
-
-        assert!((dur(&boundary, &stc) - dur(&boundary, &cts)).abs() < 1e-15);
-        assert!((conv(&boundary, &stc) - conv(&boundary, &cts)).abs() < 1e-15);
+        for days in [150, 180, 210] {
+            let leg = single_flow_leg(days);
+            for composite in [
+                Compounding::SimpleThenCompounded,
+                Compounding::CompoundedThenSimple,
+            ] {
+                assert_eq!(dur(&leg, &rate(composite)), dur(&leg, &simple));
+                assert_eq!(conv(&leg, &rate(composite)), conv(&leg, &simple));
+            }
+        }
     }
 
     /// **Self-consistency.** The `bonds.cpp` oracle legs are all-coupon, so
@@ -2929,10 +2901,10 @@ mod basis_point_value_tests {
 
         let rate = InterestRate::new(irr, day_counter, comp, freq).unwrap();
         let cases = [
-            (settlement, -795.459834, -0.0012571287),
+            (settlement, -795.098043, -0.0012571287),
             (
                 Date::new(12, Month::February, 2024),
-                -793.149033,
+                -792.789400,
                 -0.0012607913,
             ),
         ];

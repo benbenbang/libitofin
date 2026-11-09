@@ -1,9 +1,9 @@
 # Ordinary bond coupon BPS and own-NPV ATM oracle
 
-- Producer: independent calls to the separately installed compiled QuantLib 1.43
+- Producer: independent calls to the separately installed compiled QuantLib 1.44 (1.43 before #1405)
   Python distribution, not the Rust implementation.
-- Local source inspection reference: QuantLib commit
-  `9863b578af0caa4cecabf697196533e84a8308b6`,
+- Local source inspection reference: QuantLib tag `v1.44`
+  (`ab4cb476d35f7275834bc05b47d1324403d1823b`),
   `ql/pricingengines/bond/bondfunctions.{hpp,cpp}` and `ql/cashflows/cashflows.cpp`.
   The compiled distribution is not claimed to be built from that checkout.
 - Inputs reuse the established `sdk/go/testdata/bond_analytics_oracle.json`
@@ -23,5 +23,5 @@
   Independent annuity-law, face-invariance, live/frozen-state, amount-free
   missing-fixing BPS, invalid-domain and ownership tests complement the table.
 
-Run the generator with an environment containing QuantLib 1.43 to regenerate.
+Run the generator with an environment containing QuantLib 1.44 to regenerate.
 No external package is required to execute the committed regression tests.

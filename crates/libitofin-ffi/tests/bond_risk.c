@@ -18,7 +18,7 @@ int main(void) {
     assert(itofin_zero_coupon_bond_new(ctx, bc, maturity, &bond, &error) == 0);
     ItofinBondYieldAnalyticsConfig config = {dc, 1, 1, settlement};
     double t = (maturity - settlement) / 365.0;
-    double expected[6] = {t, t, t, t * (t + 0.5), -375 * t * 0.0001 + t * (t + 0.5) / 100 * 375 * 0.0001 * 0.0001 / 2, 0.01 / (-375 * t)};
+    double expected[6] = {t, t, t, t * (t + 0.5), -375 * t * 0.0001 + t * (t + 0.5) * 375 * 0.0001 * 0.0001 / 2, 0.01 / (-375 * t)};
     double value = -123;
     assert(itofin_handle_release(ctx, calendar, &error) == 0);
     assert(itofin_handle_release(ctx, settings, &error) == 0);
