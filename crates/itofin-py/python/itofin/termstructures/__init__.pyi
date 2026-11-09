@@ -160,12 +160,13 @@ class BlackVarianceCurve(BlackVolTermStructure):
 @typing.final
 class BlackVarianceSurface(BlackVolTermStructure):
     r"""
-    A Black volatility surface in strike and expiry, interpolating bilinearly.
+    A Black volatility surface in strike and expiry, interpolating bilinearly
+    unless bicubic is chosen at construction.
 
     Finite in both time and strike, so out-of-grid queries require
     enable_extrapolation().
     """
-    def __init__(self, reference_date: time.Date, dates: typing.Sequence[time.Date], strikes: typing.Sequence[builtins.float], black_vol_matrix: typing.Sequence[typing.Sequence[builtins.float]], day_counter: time.DayCounter, calendar: typing.Optional[time.Calendar] = None) -> None:
+    def __init__(self, reference_date: time.Date, dates: typing.Sequence[time.Date], strikes: typing.Sequence[builtins.float], black_vol_matrix: typing.Sequence[typing.Sequence[builtins.float]], day_counter: time.DayCounter, calendar: typing.Optional[time.Calendar] = None, interpolation: builtins.str = 'bilinear') -> None:
         r"""
         Build the surface over its strike-by-expiry grid.
 
@@ -177,10 +178,13 @@ class BlackVarianceSurface(BlackVolTermStructure):
                 strike and one column per date.
             day_counter (DayCounter): The day count turning dates into times.
             calendar (Calendar | None): The surface's calendar, if any.
+            interpolation (str): The variance interpolator, "bilinear" (the
+                default) or "bicubic". Strike extrapolation is deferred (#624).
 
         Raises:
             ItofinError: On an empty or ragged matrix, and on whatever the core
                 rejects about the grid dimensions.
+            ValueError: On an unknown interpolation.
         """
 
 class BlackVolTermStructure:
