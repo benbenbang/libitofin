@@ -8,8 +8,10 @@
 //! below). The convex skew `vol = 0.20 - 0.1 m + 0.05 m^2`, with
 //! `m = ln(strike / spot)`, keeps the bilinear kinks positive and keeps
 //! #1365's criterion `sign * (mc - flat) > 5 * se`. #1399 adds the Bicubic
-//! choice, and the original tanh grid under it matches the core oracle
-//! (`mc_local_vol_oracle.rs`) bit for bit.
+//! choice: the original tanh grid under it matches the same chain built
+//! through the core in-process bit for bit. The pinned macOS NPVs of the core
+//! oracle (`mc_local_vol_oracle.rs`) hold to 1e-8 only, since the MC path calls
+//! the platform `exp` and `log`.
 use crate::boundary::*;
 use crate::curves_api::itofin_flat_forward_new;
 use crate::local_vol_api::*;
@@ -20,10 +22,25 @@ use crate::vol_api::{
     itofin_black_variance_curve_new, itofin_black_variance_surface_new,
     itofin_black_variance_surface_new_with_interpolation, itofin_black_vol_query,
 };
+use libitofin::exercise::EuropeanExercise;
+use libitofin::handle::Handle;
+use libitofin::instrument::Instrument;
+use libitofin::instruments::{EuropeanOption, PlainVanillaPayoff};
+use libitofin::math::randomnumbers::rngtraits::PseudoRandom;
+use libitofin::math::{interpolations::bicubic::Bicubic, matrix::Matrix};
 use libitofin::option::OptionType;
+use libitofin::pricingengine::PricingEngine;
 use libitofin::pricingengines::blackformula::black_formula;
+use libitofin::pricingengines::vanilla::MakeMcEuropeanEngine;
+use libitofin::processes::GeneralizedBlackScholesProcess;
+use libitofin::quotes::{Quote, SimpleQuote};
 use libitofin::settings::Settings;
 use libitofin::shared::shared;
+use libitofin::shared::{Shared, SharedMut, shared_mut};
+use libitofin::termstructures::volatility::{
+    BlackVarianceSurface, BlackVolTermStructure, LocalVolSurface, LocalVolTermStructure,
+};
+use libitofin::termstructures::yieldtermstructure::YieldTermStructure;
 use libitofin::time::date::{Date, Month};
 use libitofin::time::daycounters::actual360::Actual360;
 use std::os::raw::c_char;
@@ -429,17 +446,47 @@ fn surface_query_matches_the_core_argument_order() {
     }
 }
 
-fn tanh(m: f64) -> f64 {
-    0.2 - 0.1 * (2.0 * m).tanh()
+/// The core #1365 fixture vols `0.20 - 0.1 tanh(2m)` at `m = 0.2k`,
+/// `k = -7..=7`, as computed by Apple libm. glibc `tanh` is one ulp away at
+/// `k = -1` and `k = 3`, so every binding feeds these exact bits instead.
+const CORE_TANH_VOLS: [f64; 15] = [
+    0.29926315202011283,
+    0.29836748576936806,
+    0.2964027580075817,
+    0.29216685544064713,
+    0.28336546070121554,
+    0.2664036770267849,
+    0.2379948962255225,
+    0.2,
+    0.16200510377447752,
+    0.1335963229732151,
+    0.11663453929878446,
+    0.10783314455935288,
+    0.10359724199241832,
+    0.10163251423063198,
+    0.1007368479798872,
+];
+
+fn tanh_grid(ks: &[i32]) -> (Vec<f64>, Vec<f64>) {
+    ks.iter()
+        .map(|&k| {
+            (
+                SPOT * (0.2 * f64::from(k)).exp(),
+                CORE_TANH_VOLS[(k + 7) as usize],
+            )
+        })
+        .unzip()
 }
 
+type CoreLocal = Shared<dyn LocalVolTermStructure>;
+
+const SMILE_GRID: [i32; 15] = [-7, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7];
+
 impl Market {
-    fn interpolated(&mut self, strikes: &[f64], interpolation: i32) -> (u64, i32, String) {
+    fn interpolated(&mut self, ks: &[i32], interpolation: i32) -> (u64, i32, String) {
         let dates: Vec<i32> = [60, 120, 240].iter().map(|d| self.today + d).collect();
-        let vols: Vec<f64> = strikes
-            .iter()
-            .flat_map(|k| [tanh((k / SPOT).ln()); 3])
-            .collect();
+        let (strikes, smile) = tanh_grid(ks);
+        let vols: Vec<f64> = smile.iter().flat_map(|v| [*v; 3]).collect();
         let (today, dc, n, mut id) = (self.today, self.dc, strikes.len(), 0);
         let (d, k, v) = (dates.as_ptr(), strikes.as_ptr(), vols.as_ptr());
         let mut e = ItofinError {
@@ -477,33 +524,109 @@ impl Market {
         self.ok(|c, e| unsafe { itofin_black_vol_query(c, id, 0, t, 0.0, strike, 0, &mut v, e) });
         v
     }
-}
 
-fn smile_strikes() -> Vec<f64> {
-    (-7..=7)
-        .map(|k| SPOT * (0.2 * f64::from(k)).exp())
-        .collect()
+    fn core_local(&self, ks: &[i32]) -> (Handle<dyn BlackVolTermStructure>, CoreLocal) {
+        let today = Date::from_serial(self.today);
+        let dates = [today + 60, today + 120, today + 240];
+        let (strikes, smile) = tanh_grid(ks);
+        let mut vols = Matrix::with_size(ks.len(), 3);
+        for (i, v) in smile.iter().enumerate() {
+            for j in 0..3 {
+                vols[(i, j)] = *v;
+            }
+        }
+        let mut surface =
+            BlackVarianceSurface::new(today, None, &dates, strikes, &vols, Actual360::new())
+                .unwrap();
+        surface.set_interpolation(&Bicubic).unwrap();
+        let black = Handle::new(shared(surface) as Shared<dyn BlackVolTermStructure>);
+        let local = shared(LocalVolSurface::new(
+            black.clone(),
+            self.curve(self.risk_free),
+            self.curve(self.dividend),
+            self.spot_handle(),
+        )) as CoreLocal;
+        (black, local)
+    }
+
+    fn curve(&self, id: u64) -> Handle<dyn YieldTermStructure> {
+        self.c.get::<Handle<dyn YieldTermStructure>>(id).unwrap()
+    }
+
+    fn spot_handle(&self) -> Handle<dyn Quote> {
+        Handle::new(self.c.get::<Shared<SimpleQuote>>(self.spot).unwrap() as Shared<dyn Quote>)
+    }
+
+    fn core_bicubic_mc(&self, option_type: OptionType, strike: f64) -> (f64, f64) {
+        let today = Date::from_serial(self.today);
+        let (black, local) = self.core_local(&SMILE_GRID);
+        let process = shared(GeneralizedBlackScholesProcess::with_local_vol(
+            self.spot_handle(),
+            self.curve(self.dividend),
+            self.curve(self.risk_free),
+            black,
+            Handle::new(local),
+        ));
+        let engine = shared_mut(
+            MakeMcEuropeanEngine::<PseudoRandom>::new(process)
+                .with_steps_per_year(12)
+                .with_samples(4_000)
+                .with_seed(42)
+                .build()
+                .unwrap(),
+        ) as SharedMut<dyn PricingEngine>;
+        let mut option = EuropeanOption::new(
+            shared(PlainVanillaPayoff::new(option_type, strike)),
+            shared(EuropeanExercise::new(today + 180)),
+            self.c.get::<Shared<Settings<Date>>>(self.settings).unwrap(),
+        );
+        option.base_mut().set_pricing_engine(engine);
+        (option.npv().unwrap(), option.error_estimate().unwrap())
+    }
 }
 
 #[test]
 fn tanh_smile_under_bicubic_matches_the_core_oracle() {
     let mut m = market();
-    let (surface, code, message) = m.interpolated(&smile_strikes(), 1);
+    let (surface, code, message) = m.interpolated(&SMILE_GRID, 1);
     assert_eq!(code, 0, "{message}");
     let (_, process) = m.local_process(surface);
     let (today, dc, mut flat) = (m.today, m.dc, 0);
     m.ok(|c, e| unsafe { itofin_black_scholes_new(c, SPOT, R, Q, 0.20, today, dc, &mut flat, e) });
-    for (kind, strike, sign, npv, error) in [
-        (0, 115.0, -1.0, 1.0751944785024798, 0.05164019195806817),
-        (1, 85.0, 1.0, 1.0122245200291142, 0.05721888187042385),
+    for (kind, option_type, strike, sign, npv, error) in [
+        (
+            0,
+            OptionType::Call,
+            115.0,
+            -1.0,
+            1.0751944785024798,
+            0.05164019195806817,
+        ),
+        (
+            1,
+            OptionType::Put,
+            85.0,
+            1.0,
+            1.0122245200291142,
+            0.05721888187042385,
+        ),
     ] {
         let (flat, _) = m.price(flat, kind, strike, 180, 0).unwrap();
         let (mc, se) = m.price(process, kind, strike, 180, 4_000).unwrap();
-        assert_eq!(mc.to_bits(), f64::to_bits(npv), "K={strike}: {mc} vs {npv}");
+        let (core_mc, core_se) = m.core_bicubic_mc(option_type, strike);
+        assert_eq!(
+            mc.to_bits(),
+            core_mc.to_bits(),
+            "K={strike}: {mc} vs core {core_mc}"
+        );
         assert_eq!(
             se.to_bits(),
-            f64::to_bits(error),
-            "K={strike}: {se} vs {error}"
+            core_se.to_bits(),
+            "K={strike}: {se} vs core {core_se}"
+        );
+        assert!(
+            (mc - npv).abs() < 1e-8 && (se - error).abs() < 1e-8,
+            "K={strike}: {mc} {se} vs pinned {npv} {error}"
         );
         assert!(
             sign * (mc - flat) > 5.0 * se,
@@ -515,9 +638,9 @@ fn tanh_smile_under_bicubic_matches_the_core_oracle() {
 #[test]
 fn default_surface_is_bilinear_and_bicubic_differs_off_node() {
     let mut m = market();
-    let default = m.surface(tanh);
-    let (bilinear, _, _) = m.interpolated(&smile_strikes(), 0);
-    let (bicubic, _, _) = m.interpolated(&smile_strikes(), 1);
+    let default = m.surface(|x| CORE_TANH_VOLS[((x / 0.2).round() as i32 + 7) as usize]);
+    let (bilinear, _, _) = m.interpolated(&SMILE_GRID, 0);
+    let (bicubic, _, _) = m.interpolated(&SMILE_GRID, 1);
     for (t, strike) in [(0.25, 95.0), (0.5, 130.0), (1.0 / 6.0, 100.0)] {
         let (a, b) = (m.vol(default, t, strike), m.vol(bilinear, t, strike));
         assert_eq!(a.to_bits(), b.to_bits(), "t={t} K={strike}: {a} vs {b}");
@@ -529,13 +652,34 @@ fn default_surface_is_bilinear_and_bicubic_differs_off_node() {
 #[test]
 fn interpolation_choice_errors() {
     let mut m = market();
-    let (_, code, message) = m.interpolated(&smile_strikes(), 2);
+    let (_, code, message) = m.interpolated(&SMILE_GRID, 2);
     assert_eq!(code, INVALID_ARGUMENT, "{message}");
     assert!(message.contains("unknown interpolation"), "{message}");
-    let (_, code, message) = m.interpolated(&[100.0], 1);
+    let (_, code, message) = m.interpolated(&[0], 1);
     assert_eq!(code, CORE_ERROR, "{message}");
     assert!(
         message.contains("bilinear interpolation needs at least 2"),
         "{message}"
     );
+}
+
+#[test]
+fn two_strike_bicubic_grid_prices_and_extrapolates_like_the_core() {
+    let mut m = market();
+    let (surface, code, message) = m.interpolated(&[-1, 1], 1);
+    assert_eq!(code, 0, "{message}");
+    let (local, process) = m.local_process(surface);
+    let (npv, _) = m.price(process, 0, 100.0, 180, 0).unwrap();
+    assert!(npv.is_finite() && npv > 0.0, "{npv}");
+    let (_, core) = m.core_local(&[-1, 1]);
+    for strike in [40.0, 250.0] {
+        let mut v = 0.0;
+        let binding = m
+            .call(|c, e| unsafe { itofin_local_vol_query(c, local, 0.4, strike, 1, &mut v, e) })
+            .map(|()| v);
+        match core.local_vol(0.4, strike, true) {
+            Ok(v) => assert_eq!(binding.unwrap().to_bits(), v.to_bits(), "K={strike}"),
+            Err(e) => assert!(binding.unwrap_err().contains(e.message()), "K={strike}"),
+        }
+    }
 }
