@@ -42,7 +42,7 @@ func (b *Bond) Convexity(rate float64, a BondYieldConfig) (float64, error) {
 }
 
 // BasisPointValue returns signed, unscaled currency value for a +1 bp yield change.
-// It is not a per-100 quote and retains the native convexity/100 correction.
+// It is not a per-100 quote and includes the full second-order convexity term (QuantLib 1.44).
 func (b *Bond) BasisPointValue(rate float64, a BondYieldConfig) (float64, error) {
 	return b.risk(4, rate, a)
 }

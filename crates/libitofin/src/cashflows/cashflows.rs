@@ -1988,6 +1988,51 @@ mod analytics_tests {
         assert_eq!(bps(&with_flow), bps(&plain));
     }
 
+    /// `cashflows.cpp:926-966` with the NPV date a month after settlement:
+    /// QuantLib 1.44 discounts from the NPV date and divides by nothing.
+    /// Expected from the 1.44 wheel: `CashFlows.bps(leg, InterestRate(0.03,
+    /// Actual365Fixed(), Compounded, Semiannual), False, today, today + 30)`.
+    #[test]
+    fn the_bps_at_yield_starts_at_the_npv_date_without_dividing_by_its_discount() {
+        let (settings, leg) = (settings(), fixed_leg(RATE));
+        let bps = CashFlows::bps_at_yield(
+            &leg,
+            &compounded(FORWARD),
+            &settings,
+            Some(false),
+            Some(today()),
+            Some(today() + 30),
+        )
+        .unwrap();
+        assert!((bps - 0.019587468533005217).abs() < 1e-15, "{bps}");
+    }
+
+    /// `cashflows.cpp:950-966` under `SimpleThenCompounded`: a plain flow
+    /// before the first coupon is skipped without ending the first period, so
+    /// the first coupon is still discounted simply. Expected from the 1.44
+    /// wheel: `CashFlows.bps([SimpleCashFlow(100, Date(15, 4, 2026))] + leg,
+    /// InterestRate(0.03, Actual365Fixed(), SimpleThenCompounded, Semiannual),
+    /// False, today, today)`.
+    #[test]
+    fn a_skipped_plain_flow_keeps_the_first_period_of_a_composite_bps_at_yield() {
+        let settings = settings();
+        let mut leg = fixed_leg(RATE);
+        leg.insert(
+            0,
+            shared(SimpleCashFlow::new(NOMINAL, day(Month::April, 2026)).unwrap())
+                as Shared<dyn CashFlow>,
+        );
+        let rate = InterestRate::new(
+            FORWARD,
+            Actual365Fixed::new(),
+            Compounding::SimpleThenCompounded,
+            Frequency::Semiannual,
+        )
+        .unwrap();
+        let bps = CashFlows::bps_at_yield(&leg, &rate, &settings, Some(false), None, None).unwrap();
+        assert!((bps - 0.019539570365829526).abs() < 1e-15, "{bps}");
+    }
+
     /// Both yield analytics short-circuit an empty leg before resolving the
     /// settlement date, so they stand with no evaluation date set.
     #[test]
@@ -2036,8 +2081,9 @@ mod analytics_tests {
 
     /// The modified duration is `-(1 / P) dP/dy` by definition, so it must agree
     /// with a central finite difference of [`CashFlows::npv_at_yield`] in the
-    /// yield. The two code paths share nothing but the flow times: `npv_at_yield`
-    /// chains per-step discount factors, `duration` differentiates a closed form.
+    /// yield. `duration` differentiates the same chained per-step discount
+    /// factors `npv_at_yield` multiplies, by the product rule, rather than
+    /// differencing the NPV.
     #[test]
     fn the_modified_duration_is_the_finite_difference_of_the_npv() {
         let (settings, leg) = (settings(), fixed_leg(RATE));
@@ -2123,9 +2169,8 @@ mod analytics_tests {
         assert!((convexity - second).abs() < 1e-5);
     }
 
-    /// The `Simple` arm of those same two formulas, on a single-flow leg, where
-    /// the chained discount of `npv_at_yield` and the discount at the total time
-    /// `duration` differentiates are the same factor. A simple yield discounts
+    /// The `Simple` derivatives of a single-flow leg, whose one step makes the
+    /// chained discount a single factor. A simple yield discounts
     /// by `B = 1 / (1 + y t)`, so `P = c B`, `-dP/dy = c t B^2` and
     /// `d2P/dy2 = 2 c t^2 B^3`, leaving `D = t B` and `C = 2 t^2 B^2`.
     #[test]
