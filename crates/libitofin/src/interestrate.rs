@@ -243,6 +243,55 @@ impl InterestRate {
         Ok(1.0 / self.compound_factor_between_ref(d1, d2, ref_start, ref_end)?)
     }
 
+    /// The derivative of [`discount_factor`](Self::discount_factor) at time
+    /// `t` with respect to the rate.
+    ///
+    /// # Errors
+    ///
+    /// As [`discount_factor`](Self::discount_factor), and for the composite
+    /// conventions, whose discount factor is defined only stepwise over a leg.
+    pub fn discount_factor_first_derivative(&self, t: Time) -> QlResult<Real> {
+        self.require_direct()?;
+        let discount = self.discount_factor(t)?;
+        Ok(match self.compounding {
+            Compounding::Simple => -t * discount * discount,
+            Compounding::Continuous => -t * discount,
+            _ => -t * discount / (1.0 + self.rate / self.freq_real()),
+        })
+    }
+
+    /// The second derivative of [`discount_factor`](Self::discount_factor) at
+    /// time `t` with respect to the rate.
+    ///
+    /// # Errors
+    ///
+    /// As [`discount_factor_first_derivative`](Self::discount_factor_first_derivative).
+    pub fn discount_factor_second_derivative(&self, t: Time) -> QlResult<Real> {
+        self.require_direct()?;
+        let discount = self.discount_factor(t)?;
+        Ok(match self.compounding {
+            Compounding::Simple => 2.0 * t * t * discount * discount * discount,
+            Compounding::Continuous => t * t * discount,
+            _ => {
+                let freq = self.freq_real();
+                let compound = 1.0 + self.rate / freq;
+                discount * t * (freq * t + 1.0) / (freq * compound * compound)
+            }
+        })
+    }
+
+    fn require_direct(&self) -> QlResult<()> {
+        if let Compounding::SimpleThenCompounded | Compounding::CompoundedThenSimple =
+            self.compounding
+        {
+            fail!(
+                "{} is not supported for direct calculations: use the CashFlow methods",
+                self.compounding
+            );
+        }
+        Ok(())
+    }
+
     /// Implied interest rate for a given compound factor at a given time.
     ///
     /// The resulting rate carries the day counter provided as input; time must
@@ -536,6 +585,50 @@ mod tests {
             (cts.compound_factor(0.25).expect("valid time") - 1.03_f64.powf(0.5)).abs() < 1e-15
         );
         assert_eq!(cts.compound_factor(0.75).expect("valid time"), 1.045);
+    }
+
+    /// `interestrate.cpp:63-101`: each closed form against a central finite
+    /// difference of [`InterestRate::discount_factor`] in the rate.
+    #[test]
+    fn discount_factor_derivatives_match_finite_differences() {
+        let (t, r, h) = (1.75, 0.045, 1e-4);
+        for (comp, freq) in [
+            (Compounding::Simple, Frequency::Annual),
+            (Compounding::Compounded, Frequency::Quarterly),
+            (Compounding::Continuous, Frequency::Annual),
+        ] {
+            let at = |rate: Rate| InterestRate::new(rate, Actual360::new(), comp, freq).unwrap();
+            let df = |rate: Rate| at(rate).discount_factor(t).unwrap();
+            let first = (df(r + h) - df(r - h)) / (2.0 * h);
+            let second = (df(r + h) - 2.0 * df(r) + df(r - h)) / (h * h);
+            let rate = at(r);
+            let d1 = rate.discount_factor_first_derivative(t).unwrap();
+            let d2 = rate.discount_factor_second_derivative(t).unwrap();
+            assert!((d1 - first).abs() < 1e-7, "{comp}: {d1} vs {first}");
+            assert!((d2 - second).abs() < 1e-5, "{comp}: {d2} vs {second}");
+        }
+    }
+
+    /// `interestrates.cpp:179-180`: the composite conventions have no direct
+    /// derivative.
+    #[test]
+    fn composite_conventions_have_no_direct_derivatives() {
+        for comp in [
+            Compounding::SimpleThenCompounded,
+            Compounding::CompoundedThenSimple,
+        ] {
+            let rate = InterestRate::new(0.05, Actual360::new(), comp, Frequency::Semiannual)
+                .expect("valid interest rate");
+            let expected = format!(
+                "{comp} is not supported for direct calculations: use the CashFlow methods"
+            );
+            for error in [
+                rate.discount_factor_first_derivative(1.0).unwrap_err(),
+                rate.discount_factor_second_derivative(1.0).unwrap_err(),
+            ] {
+                assert_eq!(error.message(), expected);
+            }
+        }
     }
 
     #[test]
