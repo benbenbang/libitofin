@@ -95,14 +95,24 @@ func (s *Session) BlackVarianceCurve(cfg BlackVarianceCurveConfig) (*BlackVolTer
 	return &BlackVolTermStructure{object{s, uint64(id)}}, nil
 }
 
+// SurfaceInterpolation selects the variance interpolator of a
+// BlackVarianceSurface; the zero value is the construction-default Bilinear.
+type SurfaceInterpolation int32
+
+const (
+	Bilinear SurfaceInterpolation = iota
+	Bicubic
+)
+
 type BlackVarianceSurfaceConfig struct {
 	ReferenceDate Date
 	Dates         []Date
 	Strikes       []float64
 	// Volatilities contains one row per strike, one column per expiry.
-	Volatilities [][]float64
-	DayCounter   *DayCounter
-	Calendar     *Calendar
+	Volatilities  [][]float64
+	DayCounter    *DayCounter
+	Calendar      *Calendar
+	Interpolation SurfaceInterpolation
 }
 
 func (s *Session) BlackVarianceSurface(cfg BlackVarianceSurfaceConfig) (*BlackVolTermStructure, error) {
@@ -139,7 +149,7 @@ func (s *Session) BlackVarianceSurface(cfg BlackVarianceSurfaceConfig) (*BlackVo
 	var id C.uint64_t
 	err := s.invoke(func() error {
 		var e C.ItofinError
-		return ffiError(C.itofin_black_variance_surface_new(s.ctx, C.int32_t(cfg.ReferenceDate.serial), &dates[0], C.size_t(len(dates)), &strikes[0], C.size_t(len(strikes)), &vols[0], C.size_t(len(vols)), C.uint64_t(cfg.DayCounter.id), C.uint64_t(cal), &id, &e), &e)
+		return ffiError(C.itofin_black_variance_surface_new_with_interpolation(s.ctx, C.int32_t(cfg.ReferenceDate.serial), &dates[0], C.size_t(len(dates)), &strikes[0], C.size_t(len(strikes)), &vols[0], C.size_t(len(vols)), C.uint64_t(cfg.DayCounter.id), C.uint64_t(cal), C.int32_t(cfg.Interpolation), &id, &e), &e)
 	})
 	if err != nil {
 		return nil, err

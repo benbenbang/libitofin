@@ -60,8 +60,12 @@ func (m *localVolMarket) option(kind OptionType, strike float64, days int64) *Va
 }
 
 func (m *localVolMarket) mc(p *BlackScholesProcess, kind OptionType, strike float64, days int64) (*VanillaOption, float64, float64, error) {
+	return m.mcSamples(p, kind, strike, days, 20000)
+}
+
+func (m *localVolMarket) mcSamples(p *BlackScholesProcess, kind OptionType, strike float64, days int64, samples uint) (*VanillaOption, float64, float64, error) {
 	o := m.option(kind, strike, days)
-	cfg := MCConfig{StepsPerYear: pricingPtr(uint(12)), Samples: pricingPtr(uint(20000)), Seed: pricingPtr(uint32(42))}
+	cfg := MCConfig{StepsPerYear: pricingPtr(uint(12)), Samples: pricingPtr(samples), Seed: pricingPtr(uint32(42))}
 	if err := o.SetMCEngine(pricingMust(m.s.NewMCEuropeanEngine(p, cfg))); err != nil {
 		return nil, 0, 0, err
 	}
@@ -183,5 +187,60 @@ func TestLocalVolCurveQueriesAndPrices(t *testing.T) {
 	}
 	if _, err := m.s.NewLocalVolCurve(BlackVarianceCurveConfig{}); err == nil {
 		t.Fatal("missing day counter accepted")
+	}
+}
+
+func (m *localVolMarket) tanhSmile(interpolation SurfaceInterpolation, ks ...int) (*BlackVolTermStructure, error) {
+	var strikes []float64
+	var vols [][]float64
+	for _, k := range ks {
+		v := coreTanhVols[k+7]
+		strikes, vols = append(strikes, 100*math.Exp(0.2*float64(k))), append(vols, []float64{v, v, v})
+	}
+	return m.s.BlackVarianceSurface(BlackVarianceSurfaceConfig{ReferenceDate: m.today, Dates: m.dates(60, 120, 240), Strikes: strikes, Volatilities: vols, DayCounter: m.dc, Interpolation: interpolation})
+}
+
+// coreTanhVols is the core oracle's 0.20 - 0.1*tanh(2m) at m = 0.2k, as Rust
+// computes it: Go's math.Tanh is one ulp away at k = -1 and k = 3.
+var coreTanhVols = []float64{0.29926315202011283, 0.29836748576936806, 0.2964027580075817, 0.29216685544064713, 0.28336546070121554, 0.2664036770267849, 0.2379948962255225, 0.2, 0.16200510377447752, 0.1335963229732151, 0.11663453929878446, 0.10783314455935288, 0.10359724199241832, 0.10163251423063198, 0.1007368479798872}
+
+var smileGrid = []int{-7, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7}
+
+func TestLocalVolTanhSmileBicubicMatchesCoreOracle(t *testing.T) {
+	m := newLocalVolMarket(t)
+	_, p := m.process(pricingMust(m.tanhSmile(Bicubic, smileGrid...)))
+	flat := pricingMust(m.s.NewBlackScholesProcess(BlackScholesConfig{Spot: 100, RiskFreeRate: .05, DividendYield: .02, Volatility: .2, ReferenceDate: m.today, DayCounter: m.dc}))
+	for _, c := range []struct {
+		kind                     OptionType
+		strike, sign, npv, error float64
+	}{{Call, 115, -1, 1.0751944785024798, 0.05164019195806817}, {Put, 85, 1, 1.0122245200291142, 0.05721888187042385}} {
+		base := pricingMust(m.option(c.kind, c.strike, 180).Price(flat))
+		_, mc, se, err := m.mcSamples(p, c.kind, c.strike, 180, 4000)
+		pricingOK(t, err)
+		if math.Float64bits(mc) != math.Float64bits(c.npv) || math.Float64bits(se) != math.Float64bits(c.error) {
+			t.Fatalf("K=%g: mc %v se %v, core %v %v", c.strike, mc, se, c.npv, c.error)
+		}
+		if c.sign*(mc-base) <= 5*se {
+			t.Fatalf("K=%g: mc %g flat %g se %g", c.strike, mc, base, se)
+		}
+	}
+}
+
+func TestBlackVarianceSurfaceInterpolationChoice(t *testing.T) {
+	m := newLocalVolMarket(t)
+	zero := pricingMust(m.s.BlackVarianceSurface(BlackVarianceSurfaceConfig{ReferenceDate: m.today, Dates: m.dates(60, 120, 240), Strikes: []float64{90, 100, 110}, Volatilities: [][]float64{{.22, .21, .2}, {.2, .2, .2}, {.18, .19, .2}}, DayCounter: m.dc}))
+	bilinear := pricingMust(m.s.BlackVarianceSurface(BlackVarianceSurfaceConfig{ReferenceDate: m.today, Dates: m.dates(60, 120, 240), Strikes: []float64{90, 100, 110}, Volatilities: [][]float64{{.22, .21, .2}, {.2, .2, .2}, {.18, .19, .2}}, DayCounter: m.dc, Interpolation: Bilinear}))
+	if a, b := pricingMust(zero.BlackVol(.25, 95, false)), pricingMust(bilinear.BlackVol(.25, 95, false)); math.Float64bits(a) != math.Float64bits(b) {
+		t.Fatalf("zero value %v vs Bilinear %v", a, b)
+	}
+	lin, cub := pricingMust(m.tanhSmile(Bilinear, smileGrid...)), pricingMust(m.tanhSmile(Bicubic, smileGrid...))
+	if a, b := pricingMust(lin.BlackVol(.25, 95, false)), pricingMust(cub.BlackVol(.25, 95, false)); math.Abs(a-b) <= 1e-6 {
+		t.Fatalf("bilinear %v bicubic %v", a, b)
+	}
+	if _, err := m.tanhSmile(2, smileGrid...); err == nil || !strings.Contains(err.Error(), "unknown interpolation") {
+		t.Fatalf("unknown interpolation: %v", err)
+	}
+	if _, err := m.tanhSmile(Bicubic, 0); err == nil || !strings.Contains(err.Error(), "bilinear interpolation needs at least 2") {
+		t.Fatalf("one strike: %v", err)
 	}
 }

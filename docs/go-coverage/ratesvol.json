@@ -30,14 +30,16 @@
       ]
     },
     {
-      "c": "itofin_black_variance_surface_new",
+      "c": "itofin_black_variance_surface_new_with_interpolation",
       "go": "Session.BlackVarianceSurface",
       "go_file": "sdk/go/vol.go",
       "python": "itofin.termstructures.BlackVarianceSurface.__init__",
       "rust_file": "crates/libitofin-ffi/src/vol_api.rs",
       "status": "implemented",
       "tests": [
-        "sdk/go/vol_test.go::TestBlackVarianceGridAndExtrapolation"
+        "sdk/go/vol_test.go::TestBlackVarianceGridAndExtrapolation",
+        "sdk/go/local_vol_test.go::TestBlackVarianceSurfaceInterpolationChoice",
+        "sdk/go/local_vol_test.go::TestLocalVolTanhSmileBicubicMatchesCoreOracle"
       ]
     },
     {
