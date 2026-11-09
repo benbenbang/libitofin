@@ -13,6 +13,7 @@ use std::rc::Weak;
 use crate::cashflow::CashFlow;
 use crate::cashflows::IborLeg;
 use crate::errors::{QlError, QlResult};
+use crate::event::Event;
 use crate::handle::{Handle, RelinkableHandle};
 use crate::indexes::iborindex::IborIndex;
 use crate::indexes::index::Index;
@@ -238,36 +239,53 @@ impl IborIborBasisSwapRateHelper {
         Ok(helper)
     }
 
-    /// One leg of the helper's swap on `index`, notional 100 (`.cpp:68-83`),
-    /// with its last coupon's fixing end date.
+    /// One leg of the helper's swap on `index`, notional 100, on a backward
+    /// schedule from `earliest` to the unadjusted `termination`
+    /// (`basisswapratehelpers.cpp:90-115`), with its schedule end date, last
+    /// payment date and last coupon's fixing end date.
     fn leg(
         &self,
         index: &Shared<IborIndex>,
         earliest: Date,
-        maturity: Date,
-    ) -> QlResult<(Vec<Shared<dyn CashFlow>>, Date)> {
+        termination: Date,
+    ) -> QlResult<BasisLeg> {
         let schedule = MakeSchedule::new()
             .from(earliest)
-            .to(maturity)
+            .to(termination)
             .with_tenor(index.tenor())
             .with_calendar(self.calendar.clone())
             .with_convention(self.convention)
             .end_of_month(self.end_of_month)
-            .forwards()
+            .backwards()
             .build();
+        let end = schedule.end_date();
         let coupons = IborLeg::new(schedule, Shared::clone(index))
             .with_notional(100.0)
             .coupons()?;
-        let last_fixing_end = coupons
+        let last = coupons
             .last()
-            .ok_or_else(|| QlError::new("basis swap leg is empty", file!(), line!()))?
-            .fixing_end_date()?;
+            .ok_or_else(|| QlError::new("basis swap leg is empty", file!(), line!()))?;
+        let last_payment = last.date();
+        let last_fixing_end = last.fixing_end_date()?;
         let leg = coupons
             .into_iter()
             .map(|coupon| coupon as Shared<dyn CashFlow>)
             .collect();
-        Ok((leg, last_fixing_end))
+        Ok(BasisLeg {
+            cashflows: leg,
+            end,
+            last_payment,
+            last_fixing_end,
+        })
     }
+}
+
+/// One built leg with the dates its helper's maturity and pillar read.
+struct BasisLeg {
+    cashflows: Vec<Shared<dyn CashFlow>>,
+    end: Date,
+    last_payment: Date,
+    last_fixing_end: Date,
 }
 
 impl AsObservable for IborIborBasisSwapRateHelper {
@@ -348,11 +366,15 @@ impl IborIborBasisSwapRateHelper {
     }
 
     /// Rebuilds the swap off the current evaluation date (`initializeDates`,
-    /// `.cpp:63-94`): spot is `settlement_days` business days after today
-    /// (`Following`), maturity is `tenor` past spot on the helper's convention,
-    /// and each leg runs spot to maturity on its index's tenor. The latest
-    /// relevant date, which is also the pillar, is the latest of the maturity
-    /// and both legs' last fixing end dates (`.cpp:87-90`).
+    /// `.cpp:85-127`): spot is `settlement_days` business days after today
+    /// (`Following`), the termination is the unadjusted `spot + tenor`, and
+    /// each leg runs backward from it on its index's tenor. The maturity is the
+    /// later schedule end; the latest relevant date, which is also the pillar,
+    /// is the latest of the maturity, both legs' last payment dates and both
+    /// legs' last fixing end dates (`.cpp:117-122`).
+    ///
+    /// Deferred (#1423): the v1.44 `rule`, `paymentLag`, `useIndexedCoupons`
+    /// and stub-index arguments; the helper always uses their defaults.
     fn rebuild_dates(&self) -> QlResult<(Swap, Date, Date, Date)> {
         let today = self
             .base
@@ -369,18 +391,23 @@ impl IborIborBasisSwapRateHelper {
             BusinessDayConvention::Following,
             false,
         );
-        let maturity =
-            self.calendar
-                .advance_by_period(earliest, self.tenor, self.convention, false);
+        let termination = earliest + self.tenor;
         crate::require!(
-            maturity > earliest,
+            termination > earliest,
             "basis swap maturity must follow its spot date"
         );
-        let (base_leg, base_fixing_end) = self.leg(&self.base_index, earliest, maturity)?;
-        let (other_leg, other_fixing_end) = self.leg(&self.other_index, earliest, maturity)?;
-        let latest_relevant = maturity.max(base_fixing_end.max(other_fixing_end));
+        let base = self.leg(&self.base_index, earliest, termination)?;
+        let other = self.leg(&self.other_index, earliest, termination)?;
+        let maturity = base.end.max(other.end);
+        let latest_relevant = maturity
+            .max(base.last_payment.max(other.last_payment))
+            .max(base.last_fixing_end.max(other.last_fixing_end));
 
-        let mut swap = Swap::two_leg(base_leg, other_leg, Shared::clone(&self.settings));
+        let mut swap = Swap::two_leg(
+            base.cashflows,
+            other.cashflows,
+            Shared::clone(&self.settings),
+        );
         let engine = shared_mut(DiscountingSwapEngine::new(
             self.discount_handle.clone(),
             None,
@@ -412,6 +439,7 @@ mod tests {
     use crate::test_support::{Flag, as_observer, implied_quote_on_dirty_curve};
     use crate::time::calendars::target::Target;
     use crate::time::date::Month;
+    use crate::time::dategenerationrule::DateGeneration;
     use crate::time::daycounters::actual360::Actual360;
     use crate::time::frequency::Frequency;
 
@@ -578,15 +606,26 @@ mod tests {
     /// An independent copy of the helper's swap on the original indices, with
     /// `basis` on the base leg and notional 1, priced off the discount curve.
     fn independent_swap_npv(m: &Market, h: &IborIborBasisSwapRateHelper, basis: Real) -> Real {
+        let tenor = Period::new(5, TimeUnit::Years);
+        independent_swap_npv_on(m, h, basis, tenor, DateGeneration::Backward)
+    }
+
+    fn independent_swap_npv_on(
+        m: &Market,
+        h: &IborIborBasisSwapRateHelper,
+        basis: Real,
+        tenor: Period,
+        rule: DateGeneration,
+    ) -> Real {
         let leg = |index: &Shared<IborIndex>, spread: Real| {
             let schedule = MakeSchedule::new()
                 .from(h.earliest_date())
-                .to(h.maturity_date())
+                .to(h.earliest_date() + tenor)
                 .with_tenor(index.tenor())
                 .with_calendar(m.euribor3m.fixing_calendar())
                 .with_convention(m.euribor3m.business_day_convention())
                 .end_of_month(m.euribor3m.end_of_month())
-                .forwards()
+                .with_rule(rule)
                 .build();
             IborLeg::new(schedule, Shared::clone(index))
                 .with_spread(spread)
@@ -633,6 +672,34 @@ mod tests {
     /// Spot is two TARGET days after today, maturity is the tenor past spot,
     /// and the pillar sits at the latest relevant date, past the maturity by
     /// the last coupon's estimation tail (`.cpp:64-66`, `:87-91`).
+    /// The default rule is `Backward` (v1.44 `basisswapratehelpers.hpp:65`):
+    /// on a 15M tenor the 6M leg carries a short front stub, so the implied
+    /// basis zeroes the backward swap but not the forward one (the v1.44
+    /// `:531-557` stub-placement check, on the default rule).
+    #[test]
+    fn default_rule_places_the_stub_at_the_front() {
+        let m = market();
+        let tenor = Period::new(15, TimeUnit::Months);
+        let h = IborIborBasisSwapRateHelper::new(
+            Handle::new(shared(SimpleQuote::new(0.002)) as Shared<dyn Quote>),
+            tenor,
+            m.euribor3m.fixing_days(),
+            m.euribor3m.fixing_calendar(),
+            m.euribor3m.business_day_convention(),
+            m.euribor3m.end_of_month(),
+            &m.euribor3m,
+            &m.euribor6m,
+            m.discount.clone(),
+            true,
+        );
+        h.set_term_structure(&m.curve3m);
+        let basis = h.implied_quote().unwrap();
+        let backward = independent_swap_npv_on(&m, &h, basis, tenor, DateGeneration::Backward);
+        let forward = independent_swap_npv_on(&m, &h, basis, tenor, DateGeneration::Forward);
+        assert!(backward.abs() < 1e-12, "backward NPV {backward}");
+        assert!(forward.abs() > 1e-7, "forward NPV {forward}");
+    }
+
     #[test]
     fn initialize_dates_places_the_pillar_at_the_latest_relevant_date() {
         let m = market();
@@ -648,11 +715,9 @@ mod tests {
         assert_eq!(h.earliest_date(), spot);
         assert_eq!(
             h.maturity_date(),
-            calendar.advance_by_period(
-                spot,
-                Period::new(5, TimeUnit::Years),
-                BusinessDayConvention::ModifiedFollowing,
-                false
+            calendar.adjust(
+                spot + Period::new(5, TimeUnit::Years),
+                BusinessDayConvention::ModifiedFollowing
             )
         );
         assert!(h.latest_relevant_date() >= h.maturity_date());
@@ -751,6 +816,133 @@ mod tests {
             });
             assert!((dirty - fresh).abs() < 1e-12, "{dirty} vs {fresh}");
             assert!((dirty - 0.003).abs() < 1e-10, "{dirty}");
+        }
+    }
+
+    /// `testIborIborBootstrap` (v1.44 `basisswapratehelpers.cpp:50-145`) on
+    /// the default schedule rule, either curve bootstrapped
+    /// (`testIborIborBaseCurveBootstrap` `:362`, `testIborIborOtherCurveBootstrap`
+    /// `:368`): every quoted swap rebuilt on the fitted curve, backward from the
+    /// unadjusted `spot + tenor`, is fair within `1e-8` on notional 100. The
+    /// C++ fixture takes today from the clock; this pins 23 October 2025, where
+    /// the 5Y termination falls on a Sunday.
+    #[test]
+    fn iboribor_bootstrap_reprices_fair_swaps_on_backward_schedules() {
+        use crate::indexes::ibor::usdlibor::UsdLibor;
+        use crate::math::interpolations::linear::Linear;
+        use crate::termstructures::bootstraptraits::ZeroYield;
+        use crate::time::calendars::unitedstates::{Market as UsMarket, UnitedStates};
+        use crate::time::daycounters::actual365fixed::Actual365Fixed;
+
+        let quotes = [
+            (1, 0.0010),
+            (2, 0.0012),
+            (3, 0.0015),
+            (5, 0.0015),
+            (8, 0.0018),
+            (10, 0.0020),
+            (15, 0.0021),
+            (20, 0.0021),
+        ];
+        let calendar = UnitedStates::new(UsMarket::GovernmentBond);
+        let convention = BusinessDayConvention::Following;
+        for bootstrap_base_curve in [true, false] {
+            let settings = shared(Settings::<Date>::new());
+            let today = Date::new(23, Month::October, 2025);
+            settings.set_evaluation_date(today);
+            let flat365 = |rate: Real| {
+                Handle::new(shared(FlatForward::with_rate(
+                    today,
+                    rate,
+                    Actual365Fixed::new(),
+                    Compounding::Continuous,
+                    Frequency::Annual,
+                )) as Shared<dyn YieldTermStructure>)
+            };
+            let known = flat365(0.01);
+            let discount = flat365(0.005);
+            let libor = |months: Integer, curve: Handle<dyn YieldTermStructure>| {
+                shared(
+                    UsdLibor::new(
+                        Period::new(months, TimeUnit::Months),
+                        curve,
+                        Shared::clone(&settings),
+                    )
+                    .unwrap(),
+                )
+            };
+            let (base, other) = if bootstrap_base_curve {
+                (libor(3, Handle::empty()), libor(6, known.clone()))
+            } else {
+                (libor(3, known.clone()), libor(6, Handle::empty()))
+            };
+            let helpers = quotes
+                .iter()
+                .map(|&(years, basis)| {
+                    IborIborBasisSwapRateHelper::new(
+                        Handle::new(shared(SimpleQuote::new(basis)) as Shared<dyn Quote>),
+                        Period::new(years, TimeUnit::Years),
+                        2,
+                        calendar.clone(),
+                        convention,
+                        false,
+                        &base,
+                        &other,
+                        discount.clone(),
+                        bootstrap_base_curve,
+                    ) as Shared<dyn RateHelper>
+                })
+                .collect();
+            let fitted = Handle::new(
+                PiecewiseYieldCurve::<ZeroYield, Linear>::new(
+                    today,
+                    helpers,
+                    Actual365Fixed::new(),
+                    Linear,
+                )
+                .unwrap() as Shared<dyn YieldTermStructure>,
+            );
+            let (base, other) = if bootstrap_base_curve {
+                (libor(3, fitted), libor(6, known.clone()))
+            } else {
+                (libor(3, known.clone()), libor(6, fitted))
+            };
+            let spot = calendar.advance(today, 2, TimeUnit::Days, convention, false);
+            for &(years, basis) in &quotes {
+                let leg = |index: &Shared<IborIndex>, spread: Real| {
+                    let schedule = MakeSchedule::new()
+                        .from(spot)
+                        .to(spot + Period::new(years, TimeUnit::Years))
+                        .with_tenor(index.tenor())
+                        .with_calendar(calendar.clone())
+                        .with_convention(convention)
+                        .backwards()
+                        .build();
+                    IborLeg::new(schedule, Shared::clone(index))
+                        .with_spread(spread)
+                        .with_notional(100.0)
+                        .build()
+                        .unwrap()
+                };
+                let mut swap = Swap::two_leg(
+                    leg(&base, basis),
+                    leg(&other, 0.0),
+                    Shared::clone(&settings),
+                );
+                swap.base_mut()
+                    .set_pricing_engine(shared_mut(DiscountingSwapEngine::new(
+                        discount.clone(),
+                        None,
+                        None,
+                        None,
+                        Shared::clone(&settings),
+                    )) as SharedMut<dyn PricingEngine>);
+                let npv = swap.npv().unwrap();
+                assert!(
+                    npv.abs() < 1e-8,
+                    "base={bootstrap_base_curve}, {years}Y fair swap NPV {npv}"
+                );
+            }
         }
     }
 }
