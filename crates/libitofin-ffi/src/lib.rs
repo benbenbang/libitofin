@@ -106,6 +106,9 @@ pub mod payment_inspection_api;
 pub mod performance_ratios_api;
 pub mod poisson_rng_api;
 pub mod prices_api;
+pub mod quotes_api;
+#[cfg(test)]
+mod quotes_api_tests;
 pub mod rates_api;
 pub mod rates_engines;
 pub mod rates_fra;
