@@ -66,6 +66,8 @@ impl CalendarImpl for SettlementImpl {
             || (d == 2 && m == Month::June && y >= 2000)
             // Assumption
             || (d == 15 && m == Month::August)
+            // Saint Francis of Assisi
+            || (d == 4 && m == Month::October && y >= 2026)
             // All Saints' Day
             || (d == 1 && m == Month::November)
             // Immaculate Conception
@@ -120,8 +122,98 @@ impl CalendarImpl for ExchangeImpl {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::time::date::{Day, Year};
 
-    // Spot-checks, not a full transcription of test-suite/calendars.cpp.
+    fn dates(list: &[(Day, Month, Year)]) -> Vec<Date> {
+        list.iter().map(|&(d, m, y)| Date::new(d, m, y)).collect()
+    }
+
+    /// `testItaly`, `test-suite/calendars.cpp:745` (v1.44).
+    #[test]
+    fn quantlib_test_italy() {
+        use Month::*;
+        let c = Italy::new(Market::Settlement);
+        assert_eq!(
+            c.holiday_list(
+                Date::new(1, January, 2002),
+                Date::new(31, December, 2004),
+                false
+            ),
+            dates(&[
+                (1, January, 2002),
+                (1, April, 2002),
+                (25, April, 2002),
+                (1, May, 2002),
+                (15, August, 2002),
+                (1, November, 2002),
+                (25, December, 2002),
+                (26, December, 2002),
+                (1, January, 2003),
+                (6, January, 2003),
+                (21, April, 2003),
+                (25, April, 2003),
+                (1, May, 2003),
+                (2, June, 2003),
+                (15, August, 2003),
+                (8, December, 2003),
+                (25, December, 2003),
+                (26, December, 2003),
+                (1, January, 2004),
+                (6, January, 2004),
+                (12, April, 2004),
+                (2, June, 2004),
+                (1, November, 2004),
+                (8, December, 2004),
+            ])
+        );
+        assert_eq!(
+            c.holiday_list(
+                Date::new(1, January, 1999),
+                Date::new(31, December, 1999),
+                false
+            ),
+            dates(&[
+                (1, January, 1999),
+                (6, January, 1999),
+                (5, April, 1999),
+                (1, November, 1999),
+                (8, December, 1999),
+                (31, December, 1999),
+            ])
+        );
+        assert_eq!(
+            c.holiday_list(
+                Date::new(1, January, 2028),
+                Date::new(31, December, 2028),
+                false
+            ),
+            dates(&[
+                (6, January, 2028),
+                (17, April, 2028),
+                (25, April, 2028),
+                (1, May, 2028),
+                (2, June, 2028),
+                (15, August, 2028),
+                (4, October, 2028),
+                (1, November, 2028),
+                (8, December, 2028),
+                (25, December, 2028),
+                (26, December, 2028),
+            ])
+        );
+        let exchange = Italy::new(Market::Exchange);
+        let republic_day = Date::new(2, June, 2025);
+        assert!(c.is_holiday(republic_day));
+        assert!(exchange.is_business_day(republic_day));
+    }
+
+    #[test]
+    fn saint_francis_is_a_holiday_only_from_2026() {
+        let c = Italy::new(Market::Settlement);
+        assert!(c.is_business_day(Date::new(4, Month::October, 2023)));
+        assert!(c.is_holiday(Date::new(4, Month::October, 2027)));
+    }
+
     #[test]
     fn names_match_quantlib() {
         assert_eq!(Italy::new(Market::Settlement).name(), "Italian settlement");

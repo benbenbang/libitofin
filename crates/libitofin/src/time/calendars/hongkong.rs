@@ -19,7 +19,7 @@ use crate::time::weekday::Weekday;
 /// (matching QuantLib's data). Past this year the calendar falls through to its
 /// weekend and recurring rules, exactly like QuantLib (which never checks the
 /// year).
-pub const HOLIDAY_HORIZON: Year = 2025;
+pub const HOLIDAY_HORIZON: Year = 2026;
 
 /// Hong Kong markets.
 ///
@@ -35,7 +35,7 @@ pub enum Market {
 /// # Accuracy
 ///
 /// Hong Kong's public/lunar holidays are tabulated (from QuantLib) only through
-/// 2025. After 2025 the tabulated holidays are not observed and the calendar
+/// 2026. After 2026 the tabulated holidays are not observed and the calendar
 /// falls through to its weekend and recurring rules, exactly like QuantLib
 /// (which never checks the year).
 pub struct HongKong;
@@ -509,6 +509,24 @@ impl CalendarImpl for HkexImpl {
             }
         }
 
+        // data from https://www.gov.hk/en/about/abouthk/holiday/2026.htm
+        if y == 2026 {
+            if
+            // Lunar New Year
+            ((d >= 17 && d <= 19) && m == Month::February)
+                // The day following Easter Monday
+                || (d == 7 && m == Month::April)
+                // Buddha's birthday
+                || (d == 25 && m == Month::May)
+                // Tuen Ng festival
+                || (d == 19 && m == Month::June)
+                // Chung Yeung festival
+                || (d == 19 && m == Month::October)
+            {
+                return false;
+            }
+        }
+
         true
     }
 }
@@ -517,7 +535,85 @@ impl CalendarImpl for HkexImpl {
 mod tests {
     use super::*;
 
-    // Spot-checks, not a full transcription of test-suite/calendars.cpp.
+    /// `testHongKong`, `test-suite/calendars.cpp:2846` (v1.44).
+    #[test]
+    fn quantlib_test_hong_kong() {
+        use Month::*;
+        let c = HongKong::new(Market::HKEx);
+        assert_eq!(c.name(), "Hong Kong stock exchange");
+        for date in [
+            Date::new(6, January, 2024),
+            Date::new(7, January, 2024),
+            Date::new(1, January, 2024),
+            Date::new(29, March, 2024),
+            Date::new(1, April, 2024),
+            Date::new(1, May, 2024),
+            Date::new(1, July, 2024),
+            Date::new(1, October, 2024),
+            Date::new(25, December, 2024),
+            Date::new(26, December, 2024),
+            Date::new(22, January, 2004),
+            Date::new(5, April, 2004),
+            Date::new(2, January, 2006),
+        ] {
+            assert!(c.is_holiday(date), "{date:?}");
+        }
+        assert!(c.is_business_day(Date::new(2, January, 2024)));
+
+        let expected = vec![
+            Date::new(1, January, 2026),
+            Date::new(17, February, 2026),
+            Date::new(18, February, 2026),
+            Date::new(19, February, 2026),
+            Date::new(3, April, 2026),
+            Date::new(6, April, 2026),
+            Date::new(7, April, 2026),
+            Date::new(1, May, 2026),
+            Date::new(25, May, 2026),
+            Date::new(19, June, 2026),
+            Date::new(1, July, 2026),
+            Date::new(1, October, 2026),
+            Date::new(19, October, 2026),
+            Date::new(25, December, 2026),
+        ];
+        assert_eq!(
+            c.holiday_list(
+                Date::new(1, January, 2026),
+                Date::new(31, December, 2026),
+                false
+            ),
+            expected
+        );
+
+        for date in [
+            Date::new(23, January, 2004),
+            Date::new(26, May, 2004),
+            Date::new(9, February, 2005),
+            Date::new(5, May, 2006),
+            Date::new(17, February, 2007),
+            Date::new(12, May, 2008),
+            Date::new(4, April, 2009),
+            Date::new(21, May, 2010),
+            Date::new(3, February, 2011),
+            Date::new(10, May, 2012),
+            Date::new(17, May, 2013),
+            Date::new(31, January, 2014),
+            Date::new(19, February, 2015),
+            Date::new(8, February, 2016),
+            Date::new(3, May, 2017),
+            Date::new(16, February, 2018),
+            Date::new(5, February, 2019),
+            Date::new(30, April, 2020),
+            Date::new(12, February, 2021),
+            Date::new(1, February, 2022),
+            Date::new(5, April, 2023),
+            Date::new(15, May, 2024),
+            Date::new(5, May, 2025),
+        ] {
+            assert!(c.is_holiday(date), "{date:?}");
+        }
+    }
+
     #[test]
     fn name_matches_quantlib() {
         assert_eq!(
@@ -556,10 +652,10 @@ mod tests {
         // QuantLib never checks the year: past the tables only weekends and
         // recurring rules apply, and tabulated dates do not recur.
         let c = HongKong::new(Market::HKEx);
-        assert!(c.is_holiday(Date::new(1, Month::July, 2026)));
-        assert!(c.is_holiday(Date::new(3, Month::April, 2026)));
+        assert!(c.is_holiday(Date::new(1, Month::July, 2027)));
+        assert!(c.is_holiday(Date::new(26, Month::March, 2027)));
         assert!(c.is_holiday(Date::new(2, Month::October, 2028)));
-        assert!(c.is_business_day(Date::new(17, Month::February, 2026)));
-        assert!(c.is_business_day(Date::new(2, Month::July, 2026)));
+        assert!(c.is_business_day(Date::new(8, Month::February, 2027)));
+        assert!(c.is_business_day(Date::new(2, Month::July, 2027)));
     }
 }
