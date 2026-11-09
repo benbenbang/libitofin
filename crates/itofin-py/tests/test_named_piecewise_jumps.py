@@ -5,10 +5,11 @@ QuantLib takes jumps on every PiecewiseYieldCurve constructor
 strictly after its date (yieldtermstructure.cpp:85). A bootstrapped curve moves
 its nodes to absorb the jumps, so the oracle is interpolation-agnostic: across
 the jump time the discount drops by exactly the jump factor, while the plain
-curve is continuous there, and a reference-date jump never applies. Jump sizes
-stay at turn-of-year magnitudes: on this short deposit strip a 0.995 jump within
-the first pillar gap drives the convex-monotone forward towards zero, where its
-forced-positive iterative bootstrap no longer converges.
+curve is continuous there, and a reference-date jump never applies. The jumps
+are 0.998 and 0.995 rather than the 0.995 and 0.99 of the node-curve oracles
+because of a known core divergence tracked in #1427: with 0.995 and 0.99 the
+convex-monotone iterative bootstrap fails to converge here, while QuantLib
+converges. #1427 restores 0.995 and 0.99.
 """
 
 # pypi/conda library
