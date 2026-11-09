@@ -3,8 +3,12 @@
 Mirrors the core #1365 MC European local-vol oracle on the same market, grid
 and seed. The smile case uses a convex skew: the binding surface defaults to
 bilinear, under which #1365's bicubic tanh grid has a negative local vol^2.
-#1399 adds interpolation="bicubic", under which the tanh grid matches the core
-oracle bit for bit.
+#1399 adds interpolation="bicubic", under which the tanh grid reproduces the
+core oracle. CORE_TANH_VOLS pins the core fixture vols 0.20 - 0.1 tanh(2m) at
+m = 0.2k as Apple libm computes them: glibc tanh is one ulp away at k = -1 and
+k = 3, so the inputs are fed as literals. The MC path itself calls the platform
+exp and log, so the pinned macOS NPVs hold to 1e-8, not bit for bit; the C ABI
+test checks bit equality against the core built in-process.
 """
 
 import math
@@ -26,6 +30,23 @@ from itofin.termstructures import (
 from itofin.time import Date, DayCounter
 
 TODAY = Date(15, 6, 2026)
+CORE_TANH_VOLS = [
+    0.29926315202011283,
+    0.29836748576936806,
+    0.2964027580075817,
+    0.29216685544064713,
+    0.28336546070121554,
+    0.2664036770267849,
+    0.2379948962255225,
+    0.2,
+    0.16200510377447752,
+    0.1335963229732151,
+    0.11663453929878446,
+    0.10783314455935288,
+    0.10359724199241832,
+    0.10163251423063198,
+    0.1007368479798872,
+]
 DC = DayCounter.actual360()
 
 
@@ -54,7 +75,7 @@ class Market:
 
     def tanh_smile(self, interpolation, ks=range(-7, 8)):
         strikes = [100.0 * math.exp(0.2 * k) for k in ks]
-        vols = [[0.2 - 0.1 * math.tanh(2 * math.log(k / 100))] * 3 for k in strikes]
+        vols = [[CORE_TANH_VOLS[k + 7]] * 3 for k in ks]
         dates = [TODAY + 60, TODAY + 120, TODAY + 240]
         return BlackVarianceSurface(TODAY, dates, strikes, vols, DC, interpolation=interpolation)
 
@@ -156,7 +177,7 @@ def test_tanh_smile_under_bicubic_matches_the_core_oracle():
     ):
         base = m.analytic(flat, option_type, strike, 180)
         _, mc, se = m.mc(process, option_type, strike, 180, samples=4000)
-        assert (mc, se) == (npv, error), (strike, mc, se)
+        assert abs(mc - npv) < 1e-8 and abs(se - error) < 1e-8, (strike, mc, se)
         assert sign * (mc - base) > 5 * se, (strike, mc, base, se)
 
 
