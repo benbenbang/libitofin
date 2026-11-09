@@ -669,13 +669,7 @@ mod tests {
         }
     }
 
-    /// Spot is two TARGET days after today, maturity is the tenor past spot,
-    /// and the pillar sits at the latest relevant date, past the maturity by
-    /// the last coupon's estimation tail (`.cpp:64-66`, `:87-91`).
-    /// The default rule is `Backward` (v1.44 `basisswapratehelpers.hpp:65`):
-    /// on a 15M tenor the 6M leg carries a short front stub, so the implied
-    /// basis zeroes the backward swap but not the forward one (the v1.44
-    /// `:531-557` stub-placement check, on the default rule).
+    /// Default-rule adaptation of v1.44 test-suite `:531-557`: the 15M stub sits at the front.
     #[test]
     fn default_rule_places_the_stub_at_the_front() {
         let m = market();
@@ -700,6 +694,9 @@ mod tests {
         assert!(forward.abs() > 1e-7, "forward NPV {forward}");
     }
 
+    /// Spot is two TARGET days after today, maturity is the tenor past spot,
+    /// and the pillar sits at the latest relevant date, past the maturity by
+    /// the last coupon's estimation tail (`.cpp:64-66`, `:87-91`).
     #[test]
     fn initialize_dates_places_the_pillar_at_the_latest_relevant_date() {
         let m = market();
