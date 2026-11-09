@@ -195,10 +195,15 @@ func (m *localVolMarket) tanhSmile(interpolation SurfaceInterpolation, ks ...int
 	var vols [][]float64
 	for _, k := range ks {
 		v := coreTanhVols[k+7]
-		strikes, vols = append(strikes, 100*math.Exp(0.2*float64(k))), append(vols, []float64{v, v, v})
+		strikes, vols = append(strikes, coreStrikes[k+7]), append(vols, []float64{v, v, v})
 	}
 	return m.s.BlackVarianceSurface(BlackVarianceSurfaceConfig{ReferenceDate: m.today, Dates: m.dates(60, 120, 240), Strikes: strikes, Volatilities: vols, DayCounter: m.dc, Interpolation: interpolation})
 }
+
+// coreStrikes is the core oracle's 100*exp(0.2k), k = -7..7, as Rust computes
+// it on macOS arm64: Go's amd64 math.Exp is not libm, so the strikes are fed
+// as these bits too.
+var coreStrikes = []float64{24.659696394160644, 30.1194211912202, 36.787944117144235, 44.932896411722155, 54.88116360940264, 67.03200460356393, 81.87307530779819, 100.0, 122.14027581601698, 149.18246976412703, 182.21188003905093, 222.55409284924679, 271.8281828459045, 332.01169227365483, 405.5199966844675}
 
 // coreTanhVols is the core oracle's 0.20 - 0.1*tanh(2m) at m = 0.2k as Apple
 // libm computes it. tanh is not correctly rounded: glibc, and Go's math.Tanh,

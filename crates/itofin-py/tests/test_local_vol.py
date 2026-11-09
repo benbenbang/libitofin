@@ -6,7 +6,8 @@ bilinear, under which #1365's bicubic tanh grid has a negative local vol^2.
 #1399 adds interpolation="bicubic", under which the tanh grid reproduces the
 core oracle. CORE_TANH_VOLS pins the core fixture vols 0.20 - 0.1 tanh(2m) at
 m = 0.2k as Apple libm computes them: glibc tanh is one ulp away at k = -1 and
-k = 3, so the inputs are fed as literals. The NPV/se literals were captured on
+k = 3, so the inputs are fed as literals, and CORE_STRIKES pins 100 exp(0.2k)
+the same way. The NPV/se literals were captured on
 macOS arm64 and are checked to abs 1e-8: Linux glibc differs by about 1e-9
 through libm exp/log in the MC path (Call K115 1.0751944774791173 vs
 1.0751944785024798). Bit equality with the core is asserted in-process by the
@@ -32,6 +33,23 @@ from itofin.termstructures import (
 from itofin.time import Date, DayCounter
 
 TODAY = Date(15, 6, 2026)
+CORE_STRIKES = [
+    24.659696394160644,
+    30.1194211912202,
+    36.787944117144235,
+    44.932896411722155,
+    54.88116360940264,
+    67.03200460356393,
+    81.87307530779819,
+    100.0,
+    122.14027581601698,
+    149.18246976412703,
+    182.21188003905093,
+    222.55409284924679,
+    271.8281828459045,
+    332.01169227365483,
+    405.5199966844675,
+]
 CORE_TANH_VOLS = [
     0.29926315202011283,
     0.29836748576936806,
@@ -76,7 +94,7 @@ class Market:
         return local, process
 
     def tanh_smile(self, interpolation, ks=range(-7, 8)):
-        strikes = [100.0 * math.exp(0.2 * k) for k in ks]
+        strikes = [CORE_STRIKES[k + 7] for k in ks]
         vols = [[CORE_TANH_VOLS[k + 7]] * 3 for k in ks]
         dates = [TODAY + 60, TODAY + 120, TODAY + 240]
         return BlackVarianceSurface(TODAY, dates, strikes, vols, DC, interpolation=interpolation)
