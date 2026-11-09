@@ -1,4 +1,4 @@
-//! Overnight-Ibor basis helper from `basisswapratehelpers.cpp:121-198`.
+//! Overnight-Ibor basis helper from v1.44 `basisswapratehelpers.cpp:156-302`.
 
 use std::cell::RefCell;
 use std::panic::{AssertUnwindSafe, catch_unwind};
@@ -7,6 +7,7 @@ use std::rc::Weak;
 use crate::cashflow::CashFlow;
 use crate::cashflows::{IborLeg, OvernightLeg};
 use crate::errors::{QlError, QlResult};
+use crate::event::Event;
 use crate::handle::{Handle, RelinkableHandle};
 use crate::indexes::iborindex::{IborIndex, OvernightIndex};
 use crate::indexes::index::Index;
@@ -36,6 +37,13 @@ use crate::types::{Integer, Natural, Real};
 /// The overnight index keeps its supplied forecast curve. An empty discount
 /// handle uses the fitted Ibor curve, matching the upstream implementation
 /// (the upstream header describes a different fallback).
+///
+/// Both legs run backward from the unadjusted `spot + tenor` (v1.44 default
+/// `DateGeneration::Backward`, `basisswapratehelpers.hpp:147`). Deferred
+/// (#1423): the v1.44 `bootstrapBaseCurve`, `paymentLag`, overnight payment
+/// frequency, `useIndexedCoupons`, `rule`, averaging, `telescopicValueDates`,
+/// `basisOnIborLeg` and stub-index arguments; the helper always uses their
+/// defaults.
 pub struct OvernightIborBasisSwapRateHelper {
     base: BootstrapHelperBase,
     swap: RefCell<Option<Swap>>,
@@ -203,6 +211,11 @@ impl OvernightIborBasisSwapRateHelper {
         }
     }
 
+    /// Rebuilds the swap off the current evaluation date (`initializeDates`,
+    /// `.cpp:214-268`). The maturity is the schedule end; the latest relevant
+    /// date, which is also the pillar, is the latest of the maturity, both
+    /// legs' last payment dates, the overnight index's maturity off its last
+    /// fixing and the last Ibor fixing end date (`.cpp:258-267`).
     fn rebuild_dates(&self) -> QlResult<(Swap, Date, Date, Date)> {
         let today = self
             .base
@@ -219,29 +232,40 @@ impl OvernightIborBasisSwapRateHelper {
             BusinessDayConvention::Following,
             false,
         );
-        let maturity =
-            self.calendar
-                .advance_by_period(earliest, self.tenor, self.convention, false);
+        let termination = earliest + self.tenor;
         let schedule = MakeSchedule::new()
             .from(earliest)
-            .to(maturity)
+            .to(termination)
             .with_tenor(self.other_index.tenor())
             .with_calendar(self.calendar.clone())
             .with_convention(self.convention)
             .end_of_month(self.end_of_month)
-            .forwards()
+            .backwards()
             .build();
-        let base_leg = OvernightLeg::new(schedule.clone(), Shared::clone(&self.base_index))
+        let maturity = schedule.end_date();
+        let base_coupons = OvernightLeg::new(schedule.clone(), Shared::clone(&self.base_index))
             .with_notional(100.0)
-            .build()?;
+            .coupons()?;
+        let last_base = base_coupons
+            .last()
+            .ok_or_else(|| QlError::new("overnight leg is empty", file!(), line!()))?;
+        let last_base_fixing_end = self
+            .base_index
+            .maturity_date(self.base_index.value_date(last_base.fixing_date())?)?;
+        let last_base_payment = last_base.date();
         let coupons = IborLeg::new(schedule, Shared::clone(&self.other_index))
             .with_notional(100.0)
             .coupons()?;
-        let last_fixing_end = coupons
+        let last_other = coupons
             .last()
-            .ok_or_else(|| QlError::new("Ibor leg is empty", file!(), line!()))?
-            .fixing_end_date()?;
-        let latest_relevant = maturity.max(last_fixing_end);
+            .ok_or_else(|| QlError::new("Ibor leg is empty", file!(), line!()))?;
+        let latest_relevant = maturity
+            .max(last_base_payment.max(last_other.date()))
+            .max(last_base_fixing_end.max(last_other.fixing_end_date()?));
+        let base_leg = base_coupons
+            .into_iter()
+            .map(|coupon| coupon as Shared<dyn CashFlow>)
+            .collect();
         let other_leg = coupons
             .into_iter()
             .map(|coupon| coupon as Shared<dyn CashFlow>)
