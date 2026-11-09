@@ -2077,6 +2077,23 @@ class VanillaOption:
         r"""
         Attach an FD engine and return the option value.
         """
+    def set_analytic_dividend_engine(self, engine: pricingengines.AnalyticDividendEuropeanEngine) -> None:
+        r"""
+        Attach the analytic dividend European engine, retaining its process.
+
+        Args:
+            engine (AnalyticDividendEuropeanEngine): The engine to attach.
+        """
+    def price_analytic_dividend(self, engine: pricingengines.AnalyticDividendEuropeanEngine) -> builtins.float:
+        r"""
+        Attach the analytic dividend European engine and return the NPV.
+
+        Args:
+            engine (AnalyticDividendEuropeanEngine): The engine to attach.
+
+        Raises:
+            ItofinError: If the exercise is not European.
+        """
     def set_qmc_engine(self, engine: pricingengines.QMCEuropeanEngine) -> None:
         r"""
         Attach the fixed-sample Sobol European engine.
