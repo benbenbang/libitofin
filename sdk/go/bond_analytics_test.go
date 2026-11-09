@@ -5,6 +5,7 @@ import (
 	"errors"
 	"math"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 )
@@ -28,25 +29,12 @@ func (a analyticsCase) want(t *testing.T, key string) float64 {
 	return *a.Expected[key]
 }
 
-var analyticsSpreadKeys = []string{"clean_spread", "dirty_spread", "leg_npv", "spread_clean", "spread_dirty", "leg_spread"}
-
-// analyticsCompositeSpreadRows is the number of composite-compounding cases whose curve-spread
-// columns QuantLib 1.44 no longer computes (null in the fixture); #1406 turns them into errors.
-const analyticsCompositeSpreadRows = 34
-
-func (a analyticsCase) unsupportedSpreads(t *testing.T) bool {
+func requireCompositeUnsupported(t *testing.T, err error) {
 	t.Helper()
-	missing := 0
-	for _, key := range analyticsSpreadKeys {
-		if a.Expected[key] == nil {
-			missing++
-		}
+	var native *Error
+	if !errors.As(err, &native) || native.Code != 3 || !strings.Contains(native.Message, "is not supported for direct calculations: use the CashFlow methods") {
+		t.Fatalf("composite compounding error required: %v", err)
 	}
-	composite := a.Compounding == SimpleThenCompounded || a.Compounding == CompoundedThenSimple
-	if missing != 0 && (missing != len(analyticsSpreadKeys) || !composite) {
-		t.Fatalf("%s: unexpected null spread columns", a.Name)
-	}
-	return missing != 0
 }
 
 func analyticsOracles(t *testing.T) []analyticsCase {
@@ -121,12 +109,8 @@ func analyticsFixture(t *testing.T, s *Session, a analyticsCase) (*Bond, *Settin
 	return b, settings, dc, curve
 }
 func TestBondAnalyticsQuantLibOracles(t *testing.T) {
-	skipped := 0
 	for _, a := range analyticsOracles(t) {
-		unsupported := a.unsupportedSpreads(t)
-		if unsupported {
-			skipped++
-		}
+		unsupported := a.Compounding == SimpleThenCompounded || a.Compounding == CompoundedThenSimple
 		t.Run(a.Name, func(t *testing.T) {
 			s, e := NewSession()
 			bondCheck(t, e)
@@ -155,7 +139,9 @@ func TestBondAnalyticsQuantLibOracles(t *testing.T) {
 				{"leg_npv", func() (float64, error) { return leg.NPVAtZSpread(a.Spread, lc) }},
 			}
 			for _, check := range checks {
-				if unsupported && a.Expected[check.name] == nil {
+				if unsupported && (check.name == "clean_spread" || check.name == "dirty_spread" || check.name == "leg_npv") {
+					_, e := check.call()
+					requireCompositeUnsupported(t, e)
 					continue
 				}
 				v, e := check.call()
@@ -174,13 +160,18 @@ func TestBondAnalyticsQuantLibOracles(t *testing.T) {
 				bondCheck(t, e)
 				analyticsSolveNear(t, v, a.want(t, "yield_"+kind))
 				if unsupported {
+					_, e = b.ZSpread(a.want(t, kind+"_curve"), BondZSpreadSolveConfig{BondZSpreadConfig: z, PriceType: priceType, AnalyticsSolverConfig: solver})
+					requireCompositeUnsupported(t, e)
 					continue
 				}
 				v, e = b.ZSpread(a.want(t, kind+"_spread"), BondZSpreadSolveConfig{BondZSpreadConfig: z, PriceType: priceType, AnalyticsSolverConfig: solver})
 				bondCheck(t, e)
 				analyticsSolveNear(t, v, a.want(t, "spread_"+kind))
 			}
-			if !unsupported {
+			if unsupported {
+				_, e := leg.ZSpread(a.want(t, "clean_curve"), CashFlowsZSpreadSolveConfig{CashFlowsZSpreadConfig: lc, AnalyticsSolverConfig: solver})
+				requireCompositeUnsupported(t, e)
+			} else {
 				v, e := leg.ZSpread(a.want(t, "leg_npv"), CashFlowsZSpreadSolveConfig{CashFlowsZSpreadConfig: lc, AnalyticsSolverConfig: solver})
 				bondCheck(t, e)
 				analyticsSolveNear(t, v, a.want(t, "leg_spread"))
@@ -197,9 +188,6 @@ func TestBondAnalyticsQuantLibOracles(t *testing.T) {
 				t.Fatal("default settlement succeeded without evaluation date")
 			}
 		})
-	}
-	if skipped != analyticsCompositeSpreadRows {
-		t.Fatalf("null composite spread rows: got %d want %d", skipped, analyticsCompositeSpreadRows)
 	}
 }
 

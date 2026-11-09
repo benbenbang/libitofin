@@ -48,7 +48,7 @@ fn leg() -> Leg {
 
 #[test]
 fn all_spread_conventions_match_compiled_quantlib_and_invert() {
-    use Compounding::{Compounded, CompoundedThenSimple, Continuous, Simple, SimpleThenCompounded};
+    use Compounding::{Compounded, Continuous, Simple};
     let cases = [
         (Simple, -0.015, false, 118.33698251346071),
         (Simple, -0.015, true, 125.33756638150949),
@@ -62,14 +62,6 @@ fn all_spread_conventions_match_compiled_quantlib_and_invert() {
         (Continuous, -0.015, true, 125.37402587676586),
         (Continuous, 0.025, false, 114.14903657951699),
         (Continuous, 0.025, true, 121.15117579521386),
-        (SimpleThenCompounded, -0.015, false, 118.3550568365311),
-        (SimpleThenCompounded, -0.015, true, 125.35564070457987),
-        (SimpleThenCompounded, 0.025, false, 114.20393450465758),
-        (SimpleThenCompounded, 0.025, true, 121.20607211455892),
-        (CompoundedThenSimple, -0.015, false, 118.33723355582764),
-        (CompoundedThenSimple, -0.015, true, 125.33782346535402),
-        (CompoundedThenSimple, 0.025, false, 114.25551402700196),
-        (CompoundedThenSimple, 0.025, true, 121.25763291317557),
     ];
     let leg = leg();
     let settings = settings();
@@ -109,6 +101,51 @@ fn all_spread_conventions_match_compiled_quantlib_and_invert() {
         )
         .unwrap();
         assert!((recovered - spread).abs() < 1e-10);
+    }
+}
+
+/// `interestrate.cpp:57` (QuantLib 1.44): a composite convention has no
+/// direct spread conversion, so both spread overloads fail.
+#[test]
+fn composite_spread_conventions_are_not_supported() {
+    let leg = leg();
+    let settings = settings();
+    let handle = Handle::new(curve(0.03));
+    let settlement = Some(date(7, Month::July, 2026));
+    for compounding in [
+        Compounding::SimpleThenCompounded,
+        Compounding::CompoundedThenSimple,
+    ] {
+        let message = format!(
+            "{compounding} is not supported for direct calculations: use the CashFlow methods"
+        );
+        let npv = CashFlows::npv_at_z_spread(
+            &leg,
+            handle.clone(),
+            0.025,
+            compounding,
+            Frequency::Semiannual,
+            &settings,
+            Some(false),
+            settlement,
+            None,
+        );
+        assert_eq!(npv.unwrap_err().message(), message);
+        let spread = CashFlows::z_spread(
+            &leg,
+            114.0,
+            handle.clone(),
+            compounding,
+            Frequency::Semiannual,
+            &settings,
+            Some(false),
+            settlement,
+            None,
+            Some(1e-12),
+            Some(100),
+            None,
+        );
+        assert_eq!(spread.unwrap_err().message(), message);
     }
 }
 

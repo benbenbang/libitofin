@@ -2,8 +2,10 @@ package itofin
 
 import (
 	"encoding/json"
+	"errors"
 	"math"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 )
@@ -55,7 +57,7 @@ func TestCallableOASQuantLibOracles(t *testing.T) {
 		Cases   []callableOASRow `json:"cases"`
 	}
 	bondCheck(t, json.Unmarshal(pricingMust(os.ReadFile("testdata/callable_oas_oracle.json")), &data))
-	if data.Version != "1.43" || len(data.Cases) != 30 {
+	if data.Version != "1.44" || len(data.Cases) != 30 {
 		t.Fatal("independent native coverage")
 	}
 	conventions := map[string]Compounding{"Continuous": Continuous, "Compounded": Compounded, "Simple": Simple, "SimpleThenCompounded": SimpleThenCompounded, "CompoundedThenSimple": CompoundedThenSimple}
@@ -66,6 +68,26 @@ func TestCallableOASQuantLibOracles(t *testing.T) {
 			dc = pricingMust(s.Actual360())
 		}
 		config := CallableOASConfig{DayCounter: dc, Compounding: conventions[row.Compounding], Frequency: Semiannual}
+		if config.Compounding == SimpleThenCompounded || config.Compounding == CompoundedThenSimple {
+			_, e := callableOAS(b, row.Spread, tree, config, nil)
+			requireCompositeUnsupported(t, e)
+			_, e = callableOAS(b, 100, tree, config, &AnalyticsSolverConfig{})
+			requireCompositeUnsupported(t, e)
+			if row.Kind == "fixed" {
+				_, e = (&CallableFixedRateBond{*b}).EffectiveDuration(row.Spread, tree, dc, config.Compounding, Semiannual, nil)
+			} else {
+				_, e = (&CallableZeroCouponBond{*b}).EffectiveDuration(row.Spread, tree, dc, config.Compounding, Semiannual, nil)
+			}
+			var native *Error
+			if !errors.As(e, &native) {
+				t.Fatalf("native composite effective duration error required: %v", e)
+			}
+			if _, message, _ := strings.Cut(native.Message, ": "); message != row.Compounding+" is not supported for direct calculations: use the CashFlow methods" {
+				t.Fatalf("exact composite effective duration error required: %v", e)
+			}
+			bondCheck(t, s.Close())
+			continue
+		}
 		price := pricingMust(callableOAS(b, row.Spread, tree, config, nil))
 		callableTreeNear(t, price, row.Price, 2e-10)
 		root := pricingMust(callableOAS(b, row.Price, tree, config, &AnalyticsSolverConfig{}))
