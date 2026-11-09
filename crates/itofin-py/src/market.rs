@@ -1,4 +1,4 @@
-//! Facades for the market inputs: SimpleQuote and BlackScholesProcess.
+//! Facades for the market inputs: quotes and BlackScholesProcess.
 
 use crate::PyQlError;
 use crate::curve::PyYieldTermStructure;
@@ -8,24 +8,148 @@ use crate::vol::PyBlackVolTermStructure;
 use libitofin::handle::Handle;
 use libitofin::interestrate::Compounding;
 use libitofin::processes::GeneralizedBlackScholesProcess;
-use libitofin::quotes::{Quote, SimpleQuote};
+use libitofin::quotes::{CompositeQuote, DerivedQuote, Quote, SimpleQuote};
 use libitofin::shared::{Shared, shared};
 use libitofin::termstructures::volatility::{BlackConstantVol, BlackVolTermStructure};
 use libitofin::termstructures::yields::FlatForward;
 use libitofin::termstructures::yieldtermstructure::YieldTermStructure;
 use libitofin::time::frequency::Frequency;
 use pyo3::prelude::*;
+use pyo3::pyclass_init::PyClassInitializer;
 #[allow(unused_imports)]
 use pyo3_stub_gen::derive::{
     gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pyfunction, gen_stub_pymethods,
 };
+
+/// A read-only market quote: the base of SimpleQuote, DerivedQuote and
+/// CompositeQuote.
+///
+/// Inputs that only read a quote, such as FlatForward.from_quote, accept any
+/// subclass and observe it, so changing a source SimpleQuote reprices them.
+/// Not constructible directly.
+#[gen_stub_pyclass]
+#[pyclass(name = "Quote", subclass, unsendable, module = "itofin.quotes")]
+pub struct PyQuote {
+    inner: Shared<dyn Quote>,
+}
+
+#[gen_stub_pymethods]
+#[pymethods]
+impl PyQuote {
+    /// Return the current value.
+    ///
+    /// Returns:
+    ///     float: The quote's current market value.
+    fn value(&self) -> PyResult<f64> {
+        Ok(self.inner.value().map_err(PyQlError::from)?)
+    }
+}
+
+impl PyQuote {
+    fn init(inner: Shared<dyn Quote>) -> PyClassInitializer<Self> {
+        PyClassInitializer::from(PyQuote { inner })
+    }
+
+    /// A handle sharing this quote, for inputs that observe it.
+    pub(crate) fn handle(&self) -> Handle<dyn Quote> {
+        Handle::new(Shared::clone(&self.inner))
+    }
+}
+
+/// A read-only quote worth `a * source + b` that follows its source.
+///
+/// Covers QuantLib DerivedQuote for affine functions; other functions are not
+/// bound because a Python callable cannot cross into the core.
+#[gen_stub_pyclass]
+#[pyclass(name = "DerivedQuote", extends = PyQuote, unsendable, module = "itofin.quotes")]
+pub struct PyDerivedQuote;
+
+#[gen_stub_pymethods]
+#[pymethods]
+impl PyDerivedQuote {
+    /// Build the derived quote.
+    ///
+    /// Args:
+    ///     source (Quote): The quote followed; may itself be dependent.
+    ///     a (float): The slope applied to the source value.
+    ///     b (float): The offset added after scaling.
+    #[gen_stub(override_return_type(type_repr = "DerivedQuote"))]
+    #[new]
+    #[pyo3(signature = (source, a = 1.0, b = 0.0))]
+    fn new(source: &PyQuote, a: f64, b: f64) -> PyClassInitializer<Self> {
+        let derived = DerivedQuote::new(source.handle(), move |x: f64| a * x + b);
+        PyQuote::init(shared(derived) as Shared<dyn Quote>).add_subclass(PyDerivedQuote)
+    }
+
+    /// Return `a * source + b` for the source's current value.
+    ///
+    /// Returns:
+    ///     float: The derived value.
+    fn value(slf: PyRef<'_, Self>) -> PyResult<f64> {
+        slf.as_super().value()
+    }
+}
+
+/// The function a CompositeQuote applies to its two sources.
+///
+/// Divide and power are not bound; a square is Multiply with the same quote
+/// twice.
+#[gen_stub_pyclass_enum]
+#[pyclass(
+    name = "CompositeOp",
+    eq,
+    eq_int,
+    from_py_object,
+    module = "itofin.quotes"
+)]
+#[derive(Clone, Copy, PartialEq)]
+pub enum PyCompositeOp {
+    Add = 0,
+    Subtract = 1,
+    Multiply = 2,
+}
+
+/// A read-only quote combining two quotes that follows both.
+#[gen_stub_pyclass]
+#[pyclass(name = "CompositeQuote", extends = PyQuote, unsendable, module = "itofin.quotes")]
+pub struct PyCompositeQuote;
+
+#[gen_stub_pymethods]
+#[pymethods]
+impl PyCompositeQuote {
+    /// Build the composite quote.
+    ///
+    /// Args:
+    ///     q1 (Quote): The first source; may itself be dependent.
+    ///     q2 (Quote): The second source; may be q1 itself.
+    ///     op (CompositeOp): The function applied; Subtract is q1 - q2.
+    #[gen_stub(override_return_type(type_repr = "CompositeQuote"))]
+    #[new]
+    fn new(q1: &PyQuote, q2: &PyQuote, op: PyCompositeOp) -> PyClassInitializer<Self> {
+        let f: fn(f64, f64) -> f64 = match op {
+            PyCompositeOp::Add => |x, y| x + y,
+            PyCompositeOp::Subtract => |x, y| x - y,
+            PyCompositeOp::Multiply => |x, y| x * y,
+        };
+        let composite = CompositeQuote::new(q1.handle(), q2.handle(), f);
+        PyQuote::init(shared(composite) as Shared<dyn Quote>).add_subclass(PyCompositeQuote)
+    }
+
+    /// Return `op(q1, q2)` for the sources' current values.
+    ///
+    /// Returns:
+    ///     float: The combined value.
+    fn value(slf: PyRef<'_, Self>) -> PyResult<f64> {
+        slf.as_super().value()
+    }
+}
 
 /// A mutable, observable market element (D1).
 ///
 /// Wraps a single value that pricing inputs observe; setting a new value
 /// notifies dependents so any cached valuation recomputes lazily.
 #[gen_stub_pyclass]
-#[pyclass(name = "SimpleQuote", unsendable, module = "itofin.quotes")]
+#[pyclass(name = "SimpleQuote", extends = PyQuote, unsendable, module = "itofin.quotes")]
 pub struct PySimpleQuote {
     inner: Shared<SimpleQuote>,
 }
@@ -37,11 +161,12 @@ impl PySimpleQuote {
     ///
     /// Args:
     ///     value (float): The initial market value.
+    #[gen_stub(override_return_type(type_repr = "SimpleQuote"))]
     #[new]
-    fn new(value: f64) -> Self {
-        PySimpleQuote {
-            inner: shared(SimpleQuote::new(value)),
-        }
+    fn new(value: f64) -> PyClassInitializer<Self> {
+        let inner = shared(SimpleQuote::new(value));
+        PyQuote::init(Shared::clone(&inner) as Shared<dyn Quote>)
+            .add_subclass(PySimpleQuote { inner })
     }
 
     /// Return the current value.
