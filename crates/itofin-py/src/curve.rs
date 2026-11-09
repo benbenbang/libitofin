@@ -2,8 +2,9 @@
 //! and the concrete FlatForward curve.
 //!
 //! Discount jumps are taken by PiecewiseYieldCurve.with_jumps and
-//! moving_with_jumps; jumps on the node curves (ZeroCurve, DiscountCurve,
-//! ForwardCurve) and the named Piecewise* classes are a tracked follow-up (#1388).
+//! moving_with_jumps, and by the jumps and jump_dates arguments of the node
+//! curves (ZeroCurve, DiscountCurve, ForwardCurve) and the named Piecewise*
+//! classes.
 
 use crate::bootstrap::{BootstrapCallbacks, PySimpleQuoteVariables, global_bootstrap};
 use crate::helpers::PyRateHelper;
@@ -1207,26 +1208,41 @@ impl PyPiecewiseLogLinearDiscount {
     ///     helpers (list[RateHelper]): The bootstrap instruments; any
     ///         RateHelper subclass is accepted.
     ///     day_counter (DayCounter): The day count turning dates into times.
+    ///     iterative_options (IterativeBootstrapOptions | None): Controls for
+    ///         the iterative bootstrap.
+    ///     jumps (list[SimpleQuote] | None): Multiplicative discount jumps;
+    ///         the curve retains them, the helpers price off the
+    ///         jump-adjusted discount, and a jump quote moving re-bootstraps
+    ///         the curve. Each applies strictly after its date. None builds
+    ///         the jump-free curve.
+    ///     jump_dates (list[Date] | None): One date per jump. None or empty
+    ///         selects consecutive December 31 dates from the reference year.
     ///
     /// Raises:
-    ///     ItofinError: On an empty helper list.
+    ///     ItofinError: On an empty helper list, and on a jumps and
+    ///         jump_dates mismatch.
     #[gen_stub(override_return_type(type_repr = "PiecewiseLogLinearDiscount"))]
     #[new]
-    #[pyo3(signature = (reference_date, helpers, day_counter, iterative_options=None))]
+    #[pyo3(signature = (reference_date, helpers, day_counter, iterative_options=None, jumps=None, jump_dates=None))]
     fn new(
         reference_date: &PyDate,
         helpers: Vec<PyRef<PyRateHelper>>,
         day_counter: &PyDayCounter,
         iterative_options: Option<&PyIterativeBootstrapOptions>,
+        jumps: Option<Vec<PyRef<PySimpleQuote>>>,
+        jump_dates: Option<Vec<PyRef<PyDate>>>,
     ) -> PyResult<PyClassInitializer<Self>> {
+        let (jump_quotes, jump_dates) = jumps_of(jumps.unwrap_or_default(), jump_dates);
         let instruments: Vec<Shared<dyn RateHelper>> =
             helpers.iter().map(|helper| helper.inner()).collect();
-        let concrete = PiecewiseYieldCurve::<Discount, LogLinear>::with_bootstrap(
+        let concrete = PiecewiseYieldCurve::<Discount, LogLinear>::with_bootstrap_and_jumps(
             reference_date.inner(),
             instruments,
             day_counter.inner(),
             LogLinear,
             strategy(iterative_options)?,
+            jump_quotes,
+            jump_dates,
         )
         .map_err(PyQlError::from)?;
         let erased = Shared::clone(&concrete) as Shared<dyn YieldTermStructure>;
@@ -1285,26 +1301,41 @@ impl PyPiecewiseLinearZero {
     ///     reference_date (Date): The curve's reference date.
     ///     helpers (list[RateHelper]): The bootstrap instruments.
     ///     day_counter (DayCounter): The day count turning dates into times.
+    ///     iterative_options (IterativeBootstrapOptions | None): Controls for
+    ///         the iterative bootstrap.
+    ///     jumps (list[SimpleQuote] | None): Multiplicative discount jumps;
+    ///         the curve retains them, the helpers price off the
+    ///         jump-adjusted discount, and a jump quote moving re-bootstraps
+    ///         the curve. Each applies strictly after its date. None builds
+    ///         the jump-free curve.
+    ///     jump_dates (list[Date] | None): One date per jump. None or empty
+    ///         selects consecutive December 31 dates from the reference year.
     ///
     /// Raises:
-    ///     ItofinError: On an empty helper list.
+    ///     ItofinError: On an empty helper list, and on a jumps and
+    ///         jump_dates mismatch.
     #[gen_stub(override_return_type(type_repr = "PiecewiseLinearZero"))]
     #[new]
-    #[pyo3(signature = (reference_date, helpers, day_counter, iterative_options=None))]
+    #[pyo3(signature = (reference_date, helpers, day_counter, iterative_options=None, jumps=None, jump_dates=None))]
     fn new(
         reference_date: &PyDate,
         helpers: Vec<PyRef<PyRateHelper>>,
         day_counter: &PyDayCounter,
         iterative_options: Option<&PyIterativeBootstrapOptions>,
+        jumps: Option<Vec<PyRef<PySimpleQuote>>>,
+        jump_dates: Option<Vec<PyRef<PyDate>>>,
     ) -> PyResult<PyClassInitializer<Self>> {
+        let (jump_quotes, jump_dates) = jumps_of(jumps.unwrap_or_default(), jump_dates);
         let instruments: Vec<Shared<dyn RateHelper>> =
             helpers.iter().map(|helper| helper.inner()).collect();
-        let concrete = PiecewiseYieldCurve::<ZeroYield, Linear>::with_bootstrap(
+        let concrete = PiecewiseYieldCurve::<ZeroYield, Linear>::with_bootstrap_and_jumps(
             reference_date.inner(),
             instruments,
             day_counter.inner(),
             Linear,
             strategy(iterative_options)?,
+            jump_quotes,
+            jump_dates,
         )
         .map_err(PyQlError::from)?;
         let erased = Shared::clone(&concrete) as Shared<dyn YieldTermStructure>;
@@ -1364,26 +1395,41 @@ impl PyPiecewiseCubicZero {
     ///     reference_date (Date): The curve's reference date.
     ///     helpers (list[RateHelper]): The bootstrap instruments.
     ///     day_counter (DayCounter): The day count turning dates into times.
+    ///     iterative_options (IterativeBootstrapOptions | None): Controls for
+    ///         the iterative bootstrap.
+    ///     jumps (list[SimpleQuote] | None): Multiplicative discount jumps;
+    ///         the curve retains them, the helpers price off the
+    ///         jump-adjusted discount, and a jump quote moving re-bootstraps
+    ///         the curve. Each applies strictly after its date. None builds
+    ///         the jump-free curve.
+    ///     jump_dates (list[Date] | None): One date per jump. None or empty
+    ///         selects consecutive December 31 dates from the reference year.
     ///
     /// Raises:
-    ///     ItofinError: On an empty helper list.
+    ///     ItofinError: On an empty helper list, and on a jumps and
+    ///         jump_dates mismatch.
     #[gen_stub(override_return_type(type_repr = "PiecewiseCubicZero"))]
     #[new]
-    #[pyo3(signature = (reference_date, helpers, day_counter, iterative_options=None))]
+    #[pyo3(signature = (reference_date, helpers, day_counter, iterative_options=None, jumps=None, jump_dates=None))]
     fn new(
         reference_date: &PyDate,
         helpers: Vec<PyRef<PyRateHelper>>,
         day_counter: &PyDayCounter,
         iterative_options: Option<&PyIterativeBootstrapOptions>,
+        jumps: Option<Vec<PyRef<PySimpleQuote>>>,
+        jump_dates: Option<Vec<PyRef<PyDate>>>,
     ) -> PyResult<PyClassInitializer<Self>> {
+        let (jump_quotes, jump_dates) = jumps_of(jumps.unwrap_or_default(), jump_dates);
         let instruments: Vec<Shared<dyn RateHelper>> =
             helpers.iter().map(|helper| helper.inner()).collect();
-        let concrete = PiecewiseYieldCurve::<ZeroYield, Cubic>::with_bootstrap(
+        let concrete = PiecewiseYieldCurve::<ZeroYield, Cubic>::with_bootstrap_and_jumps(
             reference_date.inner(),
             instruments,
             day_counter.inner(),
             Cubic,
             strategy(iterative_options)?,
+            jump_quotes,
+            jump_dates,
         )
         .map_err(PyQlError::from)?;
         let erased = Shared::clone(&concrete) as Shared<dyn YieldTermStructure>;
@@ -1441,26 +1487,41 @@ impl PyPiecewiseLinearForward {
     ///     reference_date (Date): The curve's reference date.
     ///     helpers (list[RateHelper]): The bootstrap instruments.
     ///     day_counter (DayCounter): The day count turning dates into times.
+    ///     iterative_options (IterativeBootstrapOptions | None): Controls for
+    ///         the iterative bootstrap.
+    ///     jumps (list[SimpleQuote] | None): Multiplicative discount jumps;
+    ///         the curve retains them, the helpers price off the
+    ///         jump-adjusted discount, and a jump quote moving re-bootstraps
+    ///         the curve. Each applies strictly after its date. None builds
+    ///         the jump-free curve.
+    ///     jump_dates (list[Date] | None): One date per jump. None or empty
+    ///         selects consecutive December 31 dates from the reference year.
     ///
     /// Raises:
-    ///     ItofinError: On an empty helper list.
+    ///     ItofinError: On an empty helper list, and on a jumps and
+    ///         jump_dates mismatch.
     #[gen_stub(override_return_type(type_repr = "PiecewiseLinearForward"))]
     #[new]
-    #[pyo3(signature = (reference_date, helpers, day_counter, iterative_options=None))]
+    #[pyo3(signature = (reference_date, helpers, day_counter, iterative_options=None, jumps=None, jump_dates=None))]
     fn new(
         reference_date: &PyDate,
         helpers: Vec<PyRef<PyRateHelper>>,
         day_counter: &PyDayCounter,
         iterative_options: Option<&PyIterativeBootstrapOptions>,
+        jumps: Option<Vec<PyRef<PySimpleQuote>>>,
+        jump_dates: Option<Vec<PyRef<PyDate>>>,
     ) -> PyResult<PyClassInitializer<Self>> {
+        let (jump_quotes, jump_dates) = jumps_of(jumps.unwrap_or_default(), jump_dates);
         let instruments: Vec<Shared<dyn RateHelper>> =
             helpers.iter().map(|helper| helper.inner()).collect();
-        let concrete = PiecewiseYieldCurve::<ForwardRate, Linear>::with_bootstrap(
+        let concrete = PiecewiseYieldCurve::<ForwardRate, Linear>::with_bootstrap_and_jumps(
             reference_date.inner(),
             instruments,
             day_counter.inner(),
             Linear,
             strategy(iterative_options)?,
+            jump_quotes,
+            jump_dates,
         )
         .map_err(PyQlError::from)?;
         let erased = Shared::clone(&concrete) as Shared<dyn YieldTermStructure>;
@@ -1533,20 +1594,32 @@ impl PyPiecewiseConvexMonotoneForward {
     ///         keeps a localised risk profile. The two reprice every pillar
     ///         (the local solve to its own tolerance, about 1e-7 on the
     ///         oracle strip) and diverge between them.
+    ///     iterative_options (IterativeBootstrapOptions | None): Controls for
+    ///         the iterative bootstrap.
+    ///     jumps (list[SimpleQuote] | None): Multiplicative discount jumps;
+    ///         the curve retains them, the helpers price off the
+    ///         jump-adjusted discount, and a jump quote moving re-bootstraps
+    ///         the curve. Each applies strictly after its date. None builds
+    ///         the jump-free curve.
+    ///     jump_dates (list[Date] | None): One date per jump. None or empty
+    ///         selects consecutive December 31 dates from the reference year.
     ///
     /// Raises:
-    ///     ItofinError: On an empty helper list, and on an unknown bootstrap
-    ///         name.
+    ///     ItofinError: On an empty helper list, on an unknown bootstrap
+    ///         name, and on a jumps and jump_dates mismatch.
     #[gen_stub(override_return_type(type_repr = "PiecewiseConvexMonotoneForward"))]
     #[new]
-    #[pyo3(signature = (reference_date, helpers, day_counter, bootstrap = "iterative", iterative_options=None))]
+    #[pyo3(signature = (reference_date, helpers, day_counter, bootstrap = "iterative", iterative_options=None, jumps=None, jump_dates=None))]
     fn new(
         reference_date: &PyDate,
         helpers: Vec<PyRef<PyRateHelper>>,
         day_counter: &PyDayCounter,
         bootstrap: &str,
         iterative_options: Option<&PyIterativeBootstrapOptions>,
+        jumps: Option<Vec<PyRef<PySimpleQuote>>>,
+        jump_dates: Option<Vec<PyRef<PyDate>>>,
     ) -> PyResult<PyClassInitializer<Self>> {
+        let (jump_quotes, jump_dates) = jumps_of(jumps.unwrap_or_default(), jump_dates);
         if bootstrap != "iterative" && iterative_options.is_some() {
             return Err(ItofinError::new_err(
                 "iterative_options require bootstrap=\"iterative\"",
@@ -1556,21 +1629,25 @@ impl PyPiecewiseConvexMonotoneForward {
             helpers.iter().map(|helper| helper.inner()).collect();
         let concrete = match bootstrap {
             "iterative" => ConvexMonotoneCurve::Iterative(
-                PiecewiseYieldCurve::<ForwardRate, ConvexMonotone>::with_bootstrap(
+                PiecewiseYieldCurve::<ForwardRate, ConvexMonotone>::with_bootstrap_and_jumps(
                     reference_date.inner(),
                     instruments,
                     day_counter.inner(),
                     ConvexMonotone::default(),
                     strategy(iterative_options)?,
+                    jump_quotes,
+                    jump_dates,
                 )
                 .map_err(PyQlError::from)?,
             ),
             "local" => ConvexMonotoneCurve::Local(
-                PiecewiseYieldCurve::<ForwardRate, ConvexMonotone, LocalBootstrap>::new(
+                PiecewiseYieldCurve::<ForwardRate, ConvexMonotone, LocalBootstrap>::with_jumps(
                     reference_date.inner(),
                     instruments,
                     day_counter.inner(),
                     ConvexMonotone::default(),
+                    jump_quotes,
+                    jump_dates,
                 )
                 .map_err(PyQlError::from)?,
             ),
@@ -1650,26 +1727,41 @@ impl PyPiecewiseFlatForward {
     ///     reference_date (Date): The curve's reference date.
     ///     helpers (list[RateHelper]): The bootstrap instruments.
     ///     day_counter (DayCounter): The day count turning dates into times.
+    ///     iterative_options (IterativeBootstrapOptions | None): Controls for
+    ///         the iterative bootstrap.
+    ///     jumps (list[SimpleQuote] | None): Multiplicative discount jumps;
+    ///         the curve retains them, the helpers price off the
+    ///         jump-adjusted discount, and a jump quote moving re-bootstraps
+    ///         the curve. Each applies strictly after its date. None builds
+    ///         the jump-free curve.
+    ///     jump_dates (list[Date] | None): One date per jump. None or empty
+    ///         selects consecutive December 31 dates from the reference year.
     ///
     /// Raises:
-    ///     ItofinError: On an empty helper list.
+    ///     ItofinError: On an empty helper list, and on a jumps and
+    ///         jump_dates mismatch.
     #[gen_stub(override_return_type(type_repr = "PiecewiseFlatForward"))]
     #[new]
-    #[pyo3(signature = (reference_date, helpers, day_counter, iterative_options=None))]
+    #[pyo3(signature = (reference_date, helpers, day_counter, iterative_options=None, jumps=None, jump_dates=None))]
     fn new(
         reference_date: &PyDate,
         helpers: Vec<PyRef<PyRateHelper>>,
         day_counter: &PyDayCounter,
         iterative_options: Option<&PyIterativeBootstrapOptions>,
+        jumps: Option<Vec<PyRef<PySimpleQuote>>>,
+        jump_dates: Option<Vec<PyRef<PyDate>>>,
     ) -> PyResult<PyClassInitializer<Self>> {
+        let (jump_quotes, jump_dates) = jumps_of(jumps.unwrap_or_default(), jump_dates);
         let instruments: Vec<Shared<dyn RateHelper>> =
             helpers.iter().map(|helper| helper.inner()).collect();
-        let concrete = PiecewiseYieldCurve::<ForwardRate, BackwardFlat>::with_bootstrap(
+        let concrete = PiecewiseYieldCurve::<ForwardRate, BackwardFlat>::with_bootstrap_and_jumps(
             reference_date.inner(),
             instruments,
             day_counter.inner(),
             BackwardFlat,
             strategy(iterative_options)?,
+            jump_quotes,
+            jump_dates,
         )
         .map_err(PyQlError::from)?;
         let erased = Shared::clone(&concrete) as Shared<dyn YieldTermStructure>;
