@@ -1,10 +1,8 @@
-//! Yield-curve discount jumps on the piecewise and global bootstrap constructors.
-//!
-//! Jumps on the node curves of `itofin_node_curve_new` are a tracked follow-up (#1388).
+//! Yield-curve discount jumps on the node, piecewise and global bootstrap constructors.
 use crate::bootstrap_api::global_curve;
 use crate::bootstrap_callbacks::ItofinBootstrapCallbacks;
 use crate::boundary::*;
-use crate::curves_api::{curve, piecewise_curve};
+use crate::curves_api::{curve, node_curve, piecewise_curve};
 use crate::iterative_bootstrap_api::{
     CurveAnchor, ItofinIterativeBootstrapOptions, curve_jumps, moving_anchor,
 };
@@ -93,6 +91,41 @@ pub unsafe extern "C" fn itofin_piecewise_curve_with_jumps_new(
                 jumps,
                 out,
             )
+        })
+    }
+}
+
+/// The itofin_node_curve_new twin taking multiplicative discount jumps on
+/// SimpleQuote handles, kinds as there. A jump applies strictly after its
+/// date, so one on the reference date never applies. Empty jump_dates
+/// generate December 31 jump dates from the year of dates[0]. As in
+/// itofin_node_curve_new, cal reaches the discount kinds (2, 3) only; the
+/// zero and forward kinds ignore it.
+#[unsafe(no_mangle)]
+/// # Safety
+/// Pointers must be aligned, live and valid for their stated lengths. Outputs
+/// must not overlap inputs or other outputs. Any context and its handles must
+/// belong to the calling thread; serialize calls including destruction.
+/// See the crate-level C caller contract for lifetime requirements.
+pub unsafe extern "C" fn itofin_node_curve_with_jumps_new(
+    ctx: *mut Context,
+    kind: i32,
+    dates: *const i32,
+    values: *const f64,
+    len: usize,
+    dc: u64,
+    cal: u64,
+    jumps: *const u64,
+    jump_count: usize,
+    jump_dates: *const i32,
+    jump_date_count: usize,
+    out: *mut u64,
+    error: *mut ItofinError,
+) -> i32 {
+    unsafe {
+        with_context(ctx, error, |c| {
+            let jumps = curve_jumps(c, jumps, jump_count, jump_dates, jump_date_count)?;
+            node_curve(c, kind, dates, values, len, dc, cal, Some(jumps), out)
         })
     }
 }
@@ -203,7 +236,9 @@ pub unsafe extern "C" fn itofin_curve_jumps(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::curves_api::{itofin_curve_nodes, itofin_piecewise_curve_new};
+    use crate::curves_api::{
+        itofin_curve_nodes, itofin_curve_value, itofin_node_curve_new, itofin_piecewise_curve_new,
+    };
     use crate::iterative_bootstrap_api::itofin_iterative_bootstrap_options_default;
     use libitofin::handle::Handle;
     use libitofin::indexes::Euribor;
@@ -326,6 +361,190 @@ mod tests {
                     null_mut(),
                 );
                 assert_eq!(rc, INVALID_ARGUMENT);
+            }
+        }
+    }
+
+    unsafe fn discount(c: &mut Context, id: u64, query: i32, t: f64, serial: i32) -> f64 {
+        let mut v = 0.0;
+        let rc =
+            unsafe { itofin_curve_value(c, id, query, t, 0.0, serial, true, &mut v, null_mut()) };
+        assert_eq!(rc, 0);
+        v
+    }
+
+    unsafe fn jump_serials(c: &mut Context, id: u64) -> Vec<i32> {
+        let (mut ds, mut n) = ([0; 4], 0);
+        unsafe {
+            let rc = itofin_curve_jumps(c, id, null_mut(), null_mut(), 0, &mut n, null_mut());
+            assert_eq!(rc, 0);
+            let rc = itofin_curve_jumps(c, id, ds.as_mut_ptr(), null_mut(), 4, &mut n, null_mut());
+            assert_eq!(rc, 0);
+        }
+        ds[..n].to_vec()
+    }
+
+    /// Node curves keep their nodes under jumps, so on every kind the jumped
+    /// discount is the plain discount times the jumps strictly before t: a
+    /// reference-date jump never applies, nor does a jump at the query date.
+    #[test]
+    fn jumped_node_curves_scale_the_plain_discount_on_every_kind() {
+        let mut c = Context::new();
+        let dc = c.insert(Actual365Fixed::new()).unwrap();
+        let serial = |d, m, y| Date::new(d, m, y).serial_number();
+        let nodes = [
+            serial(17, Month::June, 2026),
+            serial(17, Month::September, 2026),
+            serial(17, Month::December, 2026),
+            serial(17, Month::June, 2027),
+            serial(17, Month::June, 2028),
+        ];
+        let jump_dates = [
+            nodes[0],
+            serial(1, Month::August, 2026),
+            serial(1, Month::March, 2027),
+        ];
+        let values = [0.9, 0.995, 0.99];
+        let rates = [0.03, 0.031, 0.032, 0.033, 0.034];
+        let discounts = [1.0, 0.992, 0.984, 0.967, 0.935];
+        let queries = [
+            nodes[0],
+            serial(20, Month::July, 2026),
+            jump_dates[1],
+            serial(2, Month::August, 2026),
+            jump_dates[2],
+            serial(1, Month::June, 2027),
+            serial(1, Month::January, 2029),
+        ];
+        for kind in 0..5 {
+            let data = if matches!(kind, 2 | 3) {
+                &discounts
+            } else {
+                &rates
+            };
+            let quotes: Vec<u64> = values
+                .iter()
+                .map(|v| c.insert(shared(SimpleQuote::new(*v))).unwrap())
+                .collect();
+            let (mut plain, mut jumped, mut generated) = (0, 0, 0);
+            unsafe {
+                let rc = itofin_node_curve_new(
+                    &mut c,
+                    kind,
+                    nodes.as_ptr(),
+                    data.as_ptr(),
+                    5,
+                    dc,
+                    0,
+                    &mut plain,
+                    null_mut(),
+                );
+                assert_eq!(rc, 0);
+                let rc = itofin_node_curve_with_jumps_new(
+                    &mut c,
+                    kind,
+                    nodes.as_ptr(),
+                    data.as_ptr(),
+                    5,
+                    dc,
+                    0,
+                    quotes.as_ptr(),
+                    3,
+                    jump_dates.as_ptr(),
+                    3,
+                    &mut jumped,
+                    null_mut(),
+                );
+                assert_eq!(rc, 0);
+                assert_eq!(jump_serials(&mut c, jumped), jump_dates);
+                for q in queries {
+                    let product: f64 = jump_dates
+                        .iter()
+                        .zip(values)
+                        .filter(|(d, _)| nodes[0] < **d && **d < q)
+                        .map(|(_, v)| v)
+                        .product();
+                    let (p, j) = (
+                        discount(&mut c, plain, 1, 0.0, q),
+                        discount(&mut c, jumped, 1, 0.0, q),
+                    );
+                    assert!(
+                        (j - p * product).abs() <= 1e-15,
+                        "kind {kind} at {q}: {j} vs {p} * {product}"
+                    );
+                    if q == jump_dates[1] {
+                        assert_eq!(j, p);
+                    }
+                }
+                let t = 1.5;
+                let before = discount(&mut c, jumped, 0, t, 0);
+                assert!((before - discount(&mut c, plain, 0, t, 0) * 0.995 * 0.99).abs() <= 1e-15);
+                c.get::<Shared<SimpleQuote>>(quotes[2])
+                    .unwrap()
+                    .set_value(0.98);
+                let after = discount(&mut c, jumped, 0, t, 0);
+                assert!(
+                    (after - before * 0.98 / 0.99).abs() <= 1e-15,
+                    "kind {kind}: {after} vs {before}"
+                );
+
+                let rc = itofin_node_curve_with_jumps_new(
+                    &mut c,
+                    kind,
+                    nodes.as_ptr(),
+                    data.as_ptr(),
+                    5,
+                    dc,
+                    0,
+                    quotes.as_ptr(),
+                    2,
+                    null(),
+                    0,
+                    &mut generated,
+                    null_mut(),
+                );
+                assert_eq!(rc, 0);
+                assert_eq!(
+                    jump_serials(&mut c, generated),
+                    [
+                        serial(31, Month::December, 2026),
+                        serial(31, Month::December, 2027)
+                    ]
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn jumped_node_curve_rejects_bad_jump_arguments() {
+        let mut c = Context::new();
+        let dc = c.insert(Actual365Fixed::new()).unwrap();
+        let nodes = [
+            Date::new(17, Month::June, 2026).serial_number(),
+            Date::new(17, Month::June, 2027).serial_number(),
+        ];
+        let rates = [0.03, 0.031];
+        let quote = c.insert(shared(SimpleQuote::new(0.99))).unwrap();
+        let dates = [nodes[1], nodes[1]];
+        let mut out = 0;
+        unsafe {
+            for (jump, n, kind) in [(quote, 2, 0), (dc, 1, 0), (quote, 1, 5)] {
+                let rc = itofin_node_curve_with_jumps_new(
+                    &mut c,
+                    kind,
+                    nodes.as_ptr(),
+                    rates.as_ptr(),
+                    2,
+                    dc,
+                    0,
+                    &jump,
+                    1,
+                    dates.as_ptr(),
+                    n,
+                    &mut out,
+                    null_mut(),
+                );
+                assert_ne!(rc, 0, "{jump} {n} {kind}");
             }
         }
     }

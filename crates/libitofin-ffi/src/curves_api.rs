@@ -85,32 +85,70 @@ pub unsafe extern "C" fn itofin_node_curve_new(
 ) -> i32 {
     unsafe {
         with_context(ctx, error, |c| {
-            check_ptr(out)?;
-            let dates = input_slice(dates, len)?
-                .iter()
-                .map(|v| date(*v))
-                .collect::<BindingResult<Vec<_>>>()?;
-            let values = input_slice(values, len)?.to_vec();
-            let dc = day_counter(c, dc)?;
-            let cal = if cal == 0 {
-                None
-            } else {
-                Some(calendar(c, cal)?)
-            };
-            let v: Shared<dyn YieldTermStructure> = match kind {
-                0 => shared(ZeroCurve::new(dates, values, dc, Linear)?),
-                1 => shared(InterpolatedZeroCurve::<Cubic>::new(
-                    dates, values, dc, Cubic,
-                )?),
-                2 => shared(DiscountCurve::new(dates, values, dc, cal)?),
-                3 => shared(InterpolatedDiscountCurve::<Cubic>::new(
-                    dates, values, dc, cal,
-                )?),
-                4 => shared(ForwardCurve::new(dates, values, dc, BackwardFlat)?),
-                _ => return Err(BindingError::invalid("unknown node curve kind")),
-            };
-            output(out, c.insert(Handle::new(v))?)
+            node_curve(c, kind, dates, values, len, dc, cal, None, out)
         })
+    }
+}
+/// Builds a node curve, with jumps when given; cal reaches the discount kinds only.
+#[allow(clippy::too_many_arguments)]
+pub(crate) unsafe fn node_curve(
+    c: &mut Context,
+    kind: i32,
+    dates: *const i32,
+    values: *const f64,
+    len: usize,
+    dc: u64,
+    cal: u64,
+    jumps: Option<CurveJumps>,
+    out: *mut u64,
+) -> BindingResult<()> {
+    unsafe {
+        check_ptr(out)?;
+        let dates = input_slice(dates, len)?
+            .iter()
+            .map(|v| date(*v))
+            .collect::<BindingResult<Vec<_>>>()?;
+        let values = input_slice(values, len)?.to_vec();
+        let dc = day_counter(c, dc)?;
+        let cal = if cal == 0 {
+            None
+        } else {
+            Some(calendar(c, cal)?)
+        };
+        let v: Shared<dyn YieldTermStructure> = match (kind, jumps) {
+            (0, None) => shared(ZeroCurve::new(dates, values, dc, Linear)?),
+            (0, Some(CurveJumps(q, d))) => shared(ZeroCurve::with_jumps(
+                dates, values, dc, None, Linear, q, d,
+            )?),
+            (1, None) => shared(InterpolatedZeroCurve::<Cubic>::new(
+                dates, values, dc, Cubic,
+            )?),
+            (1, Some(CurveJumps(q, d))) => shared(InterpolatedZeroCurve::<Cubic>::with_jumps(
+                dates, values, dc, None, Cubic, q, d,
+            )?),
+            (2, None) => shared(DiscountCurve::new(dates, values, dc, cal)?),
+            (2, Some(CurveJumps(q, d))) => {
+                shared(DiscountCurve::with_jumps(dates, values, dc, cal, q, d)?)
+            }
+            (3, None) => shared(InterpolatedDiscountCurve::<Cubic>::new(
+                dates, values, dc, cal,
+            )?),
+            (3, Some(CurveJumps(q, d))) => shared(InterpolatedDiscountCurve::<Cubic>::with_jumps(
+                dates, values, dc, cal, q, d,
+            )?),
+            (4, None) => shared(ForwardCurve::new(dates, values, dc, BackwardFlat)?),
+            (4, Some(CurveJumps(q, d))) => shared(ForwardCurve::with_jumps(
+                dates,
+                values,
+                dc,
+                None,
+                BackwardFlat,
+                q,
+                d,
+            )?),
+            _ => return Err(BindingError::invalid("unknown node curve kind")),
+        };
+        output(out, c.insert(Handle::new(v))?)
     }
 }
 /// Query: 0 discount(time), 1 discount(date), 2 zero rate, 3 forward rate.

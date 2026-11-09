@@ -10202,6 +10202,33 @@ int32_t itofin_piecewise_curve_with_jumps_new(struct ItofinContext *ctx,
                                               struct ItofinError *error);
 
 /**
+ * The itofin_node_curve_new twin taking multiplicative discount jumps on
+ * SimpleQuote handles, kinds as there. A jump applies strictly after its
+ * date, so one on the reference date never applies. Empty jump_dates
+ * generate December 31 jump dates from the year of dates[0]. As in
+ * itofin_node_curve_new, cal reaches the discount kinds (2, 3) only; the
+ * zero and forward kinds ignore it.
+ * # Safety
+ * Pointers must be aligned, live and valid for their stated lengths. Outputs
+ * must not overlap inputs or other outputs. Any context and its handles must
+ * belong to the calling thread; serialize calls including destruction.
+ * See the crate-level C caller contract for lifetime requirements.
+ */
+int32_t itofin_node_curve_with_jumps_new(struct ItofinContext *ctx,
+                                         int32_t kind,
+                                         const int32_t *dates,
+                                         const double *values,
+                                         size_t len,
+                                         uint64_t dc,
+                                         uint64_t cal,
+                                         const uint64_t *jumps,
+                                         size_t jump_count,
+                                         const int32_t *jump_dates,
+                                         size_t jump_date_count,
+                                         uint64_t *out,
+                                         struct ItofinError *error);
+
+/**
  * The itofin_global_curve_new twin taking a fixed or moving reference date
  * and multiplicative discount jumps, dated as in
  * itofin_piecewise_curve_with_jumps_new. Callback ownership follows

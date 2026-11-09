@@ -103,7 +103,7 @@ pub(crate) enum CurveAnchor {
 
 /// Multiplicative discount jump quotes and their dates; both empty is no jumps.
 #[derive(Default)]
-pub(crate) struct CurveJumps(Vec<Handle<dyn Quote>>, Vec<Date>);
+pub(crate) struct CurveJumps(pub(crate) Vec<Handle<dyn Quote>>, pub(crate) Vec<Date>);
 
 /// Reads jump SimpleQuote handles and date serials from C arrays.
 pub(crate) unsafe fn curve_jumps(
