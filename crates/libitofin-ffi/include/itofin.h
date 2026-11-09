@@ -5049,6 +5049,42 @@ int32_t itofin_fd_black_scholes_engine_new(struct ItofinContext *ctx,
                                            struct ItofinError *error);
 
 /**
+ * Construct an FD engine paying `n` cash dividends, one fixed `amounts[i]` on
+ * the serial date `dates[i]`, under the Spot model. Dividends outside the
+ * option life are dropped. Both arrays share the single length `n`; with
+ * `n` zero they may be null and the engine equals the plain constructor.
+ * The Escrowed cash-dividend model is not offered (deferred to #828).
+ * Attach with `itofin_option_set_engine` kind 2. A dividend dated on the
+ * evaluation date leaves theta unavailable: querying it is a core error.
+ * # Safety
+ * Follow the crate C caller contract; arrays must have length `n`.
+ */
+int32_t itofin_fd_black_scholes_engine_with_cash_dividends(struct ItofinContext *ctx,
+                                                           uint64_t process,
+                                                           struct ItofinFdConfig cfg,
+                                                           const int32_t *dates,
+                                                           const double *amounts,
+                                                           size_t n,
+                                                           uint64_t *out,
+                                                           struct ItofinError *error);
+
+/**
+ * Construct the analytic European engine paying `n` fixed cash dividends,
+ * `amounts[i]` on the serial date `dates[i]`, retaining the process. Arrays
+ * may be null when `n` is zero. Attach with `itofin_option_set_engine` kind
+ * 2; pricing a non-European exercise is a core error.
+ * # Safety
+ * Follow the crate C caller contract; arrays must have length `n`.
+ */
+int32_t itofin_analytic_dividend_european_engine_new(struct ItofinContext *ctx,
+                                                     uint64_t process,
+                                                     const int32_t *dates,
+                                                     const double *amounts,
+                                                     size_t n,
+                                                     uint64_t *out,
+                                                     struct ItofinError *error);
+
+/**
  * Retain both live curves and copy both currencies and the spot snapshot.
  * # Safety
  * Follow the crate-level pointer and owning-thread contract. Output on success only.
