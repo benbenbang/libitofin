@@ -1,4 +1,4 @@
-"""Independent QuantLib 1.43 OAS with explicit settlement normalization."""
+"""Independent QuantLib 1.44 OAS with explicit settlement normalization."""
 
 import argparse
 import json
@@ -7,10 +7,20 @@ from pathlib import Path
 import QuantLib as q
 
 
+def unsupported(call):
+    """From QuantLib 1.44 a composite compounding has no OAS conversion: record null."""
+    try:
+        return call()
+    except RuntimeError as error:
+        if "not supported for direct calculations" not in str(error):
+            raise
+        return None
+
+
 def generate():
     """Name conventions explicitly, never reinterpret native enum ordinals."""
-    if q.__version__ != "1.43":
-        raise RuntimeError("QuantLib 1.43 required")
+    if q.__version__ != "1.44":
+        raise RuntimeError("QuantLib 1.44 required")
     reference = q.Date(7, 7, 2026)
     maturity = q.Date(7, 7, 2031)
     q.Settings.instance().evaluationDate = reference
@@ -39,9 +49,9 @@ def generate():
             for index, (name, compounding) in enumerate(conventions):
                 spread = [-0.004, 0.0, 0.015][len(rows) % 3]
                 day_counter = q.Actual365Fixed() if index % 2 == 0 else q.Actual360()
-                raw = bond.cleanPriceOAS(spread, handle, day_counter, compounding, q.Semiannual, settlement)
-                normalized = (raw + accrued) / discount - accrued
-                recovered = bond.OAS(raw, handle, day_counter, compounding, q.Semiannual, settlement, 1e-10, 100, 0.0)
+                raw = unsupported(lambda: bond.cleanPriceOAS(spread, handle, day_counter, compounding, q.Semiannual, settlement))
+                normalized = None if raw is None else (raw + accrued) / discount - accrued
+                recovered = None if raw is None else bond.OAS(raw, handle, day_counter, compounding, q.Semiannual, settlement, 1e-10, 100, 0.0)
                 rows.append(dict(kind=kind, lag=lag, compounding=name, day_counter=365 if index % 2 == 0 else 360, spread=spread, native_clean=raw, normalized_clean=normalized, native_oas=recovered, settlement=settlement.serialNumber(), settlement_date=settlement.ISO(), discount=discount))
     return dict(quantlib_version=q.__version__, normalization="(native clean + market accrued) / unspread settlement discount - market accrued", cases=rows)
 
