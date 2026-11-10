@@ -154,6 +154,15 @@ pub type FallibleAdditionalPenalties = dyn Fn(&[Time], &[Real]) -> QlResult<Vec<
 /// Additional node dates whose failures propagate out of the bootstrap.
 pub type FallibleAdditionalDates = dyn Fn() -> QlResult<Vec<Date>>;
 
+/// The initial-guess override (`InitialGuessFn`, `globalbootstrap.hpp:111-112`).
+///
+/// Replaces the traits' `global_guess` when set. It is handed the FULL node
+/// times and, on a warm restart, the full node values; on a cold start the
+/// values slice is empty (upstream `noData`, `:408-409`). It returns one value
+/// per interior node in NODE space (discount factors for `Discount`), which the
+/// driver then maps through `transform_inverse` (`:428-434`).
+pub type InitialGuessFn = dyn Fn(&[Time], &[Real]) -> Vec<Real>;
+
 /// The additional optimizer variables (`AdditionalBootstrapVariables`,
 /// `globalbootstrap.hpp:69-76`).
 ///
@@ -217,6 +226,7 @@ pub struct GlobalBootstrap {
     instrument_weights: Vec<Real>,
     penalties: Option<Box<FallibleAdditionalPenalties>>,
     additional_variables: Option<Box<dyn AdditionalBootstrapVariables>>,
+    initial_guess_fn: Option<Box<InitialGuessFn>>,
     /// The parent of a contributing curve (`mutable parentBootstrapper_`,
     /// `globalbootstrap.hpp:156`), set by
     /// [`MultiCurveBootstrapContributor::set_parent_bootstrapper`] and read at
@@ -272,6 +282,7 @@ impl GlobalBootstrap {
             instrument_weights,
             penalties: None,
             additional_variables: None,
+            initial_guess_fn: None,
             parent: RefCell::new(None),
             state: RefCell::new(None),
             penalty_len: Cell::new(0),
@@ -334,6 +345,7 @@ impl GlobalBootstrap {
             instrument_weights,
             penalties: Some(Box::new(penalties)),
             additional_variables: None,
+            initial_guess_fn: None,
             parent: RefCell::new(None),
             state: RefCell::new(None),
             penalty_len: Cell::new(0),
@@ -379,6 +391,19 @@ impl GlobalBootstrap {
         variables: Box<dyn AdditionalBootstrapVariables>,
     ) -> GlobalBootstrap {
         self.additional_variables = Some(variables);
+        self
+    }
+
+    /// Attaches an [`InitialGuessFn`] that replaces the traits' whole-curve
+    /// guess (the trailing `initialGuessFn` argument of every C++ constructor,
+    /// `globalbootstrap.hpp:115-137`). A builder step for the same reason as
+    /// [`with_additional_variables`](Self::with_additional_variables).
+    #[must_use]
+    pub fn with_initial_guess_fn<F>(mut self, initial_guess_fn: F) -> GlobalBootstrap
+    where
+        F: Fn(&[Time], &[Real]) -> Vec<Real> + 'static,
+    {
+        self.initial_guess_fn = Some(Box::new(initial_guess_fn));
         self
     }
 }
@@ -919,19 +944,47 @@ impl GlobalBootstrap {
         ))
     }
 
-    /// `makeInitialGuess` (`globalbootstrap.hpp:404-438`): the traits'
-    /// whole-curve [`global_guess`](YieldBootstrapTraits::global_guess), mapped
-    /// into the optimizer space through `transform_inverse` only when the
-    /// traits ask for it. The curve's nodes are left as `setup` installed them;
-    /// the first trial point writes them.
+    /// `makeInitialGuess` (`globalbootstrap.hpp:404-438`): the
+    /// [`InitialGuessFn`] if one is set, otherwise the traits' whole-curve
+    /// [`global_guess`](YieldBootstrapTraits::global_guess), mapped into the
+    /// optimizer space through `transform_inverse` unless the traits say the
+    /// guess is already there. The curve's nodes are left as `setup` installed
+    /// them; the first trial point writes them.
+    ///
+    /// The override runs with no borrow of the node storage alive, so it may
+    /// read the curve back, and a guess of the wrong length is an error rather
+    /// than an out-of-bounds write.
     fn initial_guess<C>(&self, curve: &C, valid_data: bool) -> QlResult<Array>
     where
         C: PiecewiseCurve<Helper = dyn RateHelper, TS = dyn YieldTermStructure>,
         C::Traits: YieldBootstrapTraits,
     {
+        let (mut guess, needs_transform) = match &self.initial_guess_fn {
+            Some(initial_guess_fn) => {
+                let (times, data) = {
+                    let cd = curve.curve_data().borrow();
+                    let data = if valid_data {
+                        cd.data().to_vec()
+                    } else {
+                        Vec::new()
+                    };
+                    (cd.times().to_vec(), data)
+                };
+                let guess = initial_guess_fn(&times, &data);
+                require!(
+                    guess.len() + 1 == times.len(),
+                    "GlobalBootstrap: the initial guess function returned {} values for {} interior nodes",
+                    guess.len(),
+                    times.len() - 1
+                );
+                (Array::from(guess), true)
+            }
+            None => {
+                let cd = curve.curve_data().borrow();
+                C::Traits::global_guess(cd.times(), cd.data(), valid_data)
+            }
+        };
         let cd = curve.curve_data().borrow();
-        let (mut guess, needs_transform) =
-            C::Traits::global_guess(cd.times(), cd.data(), valid_data);
         if needs_transform {
             for (i, value) in guess.iter_mut().enumerate() {
                 *value = C::Traits::transform_inverse(*value, cd.times()[i + 1]);
@@ -1116,6 +1169,13 @@ where
             .iter()
             .map(|helper| helper.base().observable_shared())
             .collect()
+    }
+
+    /// `false`: upstream the global solve can take its whole grid from the
+    /// additional dates and its residuals from the penalties, with no
+    /// instrument at all (`piecewiseyieldcurve.cpp:1590-1594`).
+    fn requires_instruments(&self) -> bool {
+        false
     }
 
     fn calculate(&self, curve: &C) -> QlResult<()> {
@@ -2743,6 +2803,77 @@ mod tests {
         assert!(
             (first_trial - Real::ln(2.0)).abs() < 1.0e-15,
             "the solver's first trial point is {first_trial}, not the appended guess"
+        );
+    }
+
+    /// The [`InitialGuessFn`] contract around the C++ oracle
+    /// (`globalbootstrap.hpp:407-409`): it sees the full node times with an
+    /// EMPTY value slice on a cold start and the previous solution's full node
+    /// values on a warm restart. That its node-space answer goes through
+    /// `transform_inverse` is pinned by the start-sensitive C++ oracle
+    /// (`piecewiseyieldcurve.rs`'s `global_bootstrap_initial_guess_fn`, which
+    /// misses node 17 by 2.3e-10 when the transform is skipped), not here: a
+    /// one-deposit solve converges from any start. A guess of the wrong length is an error on the curve query, not an
+    /// out-of-bounds write.
+    #[test]
+    fn the_initial_guess_fn_sees_warm_nodes_and_must_fit_the_grid() {
+        use crate::math::interpolations::loglinear::LogLinear;
+        use crate::termstructures::bootstraptraits::Discount;
+
+        let calendar = Target::new();
+        let today = calendar.adjust(
+            Date::new(15, Month::June, 2026),
+            BusinessDayConvention::Following,
+        );
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(today);
+        let index = Euribor::new(Period::new(3, TimeUnit::Months), Handle::empty(), settings)
+            .expect("a 3M tenor is valid");
+        let deposit_quote = shared(SimpleQuote::new(0.04557));
+        let deposit = DepositRateHelper::new(
+            Handle::new(Shared::clone(&deposit_quote) as Shared<dyn Quote>),
+            &index,
+        ) as Shared<dyn RateHelper>;
+
+        let seen = shared(RefCell::new(Vec::<(usize, Vec<Real>)>::new()));
+        let record = Shared::clone(&seen);
+        let curve = PiecewiseYieldCurve::<Discount, LogLinear, _>::with_bootstrap(
+            today,
+            vec![Shared::clone(&deposit)],
+            Actual365Fixed::new(),
+            LogLinear,
+            GlobalBootstrap::new(Some(1.0e-12), None, Vec::new()).with_initial_guess_fn(
+                move |times, data| {
+                    record.borrow_mut().push((times.len(), data.to_vec()));
+                    vec![1.0; times.len() - 1]
+                },
+            ),
+        )
+        .expect("a one-deposit strip builds a curve");
+
+        let solved = curve.data().expect("the cold solve converges")[1];
+        assert!(deposit.quote_error().unwrap().abs() < 1.0e-12);
+        deposit_quote.set_value(0.05);
+        curve.data().expect("the warm solve converges");
+        assert_eq!(
+            *seen.borrow(),
+            vec![(2, Vec::new()), (2, vec![1.0, solved])],
+            "cold start sees no values, the warm restart the previous nodes"
+        );
+
+        let wrong = PiecewiseYieldCurve::<Discount, LogLinear, _>::with_bootstrap(
+            today,
+            vec![deposit],
+            Actual365Fixed::new(),
+            LogLinear,
+            GlobalBootstrap::new(Some(1.0e-12), None, Vec::new())
+                .with_initial_guess_fn(|times, _| vec![1.0; times.len()]),
+        )
+        .expect("the guess length is only checked at calculation");
+        let error = wrong.data().expect_err("a guess per node plus one");
+        assert!(
+            error.to_string().contains("2 values for 1 interior nodes"),
+            "{error}"
         );
     }
 }
