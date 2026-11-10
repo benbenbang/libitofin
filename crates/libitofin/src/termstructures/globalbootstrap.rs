@@ -3,8 +3,9 @@
 //! Port of the single-curve core of `ql/termstructures/globalbootstrap.hpp`.
 //! Where [`IterativeBootstrap`] solves one node at a time against the curve
 //! built so far, `GlobalBootstrap` solves ALL interior node values
-//! SIMULTANEOUSLY: it maps every node into an unconstrained optimizer space
-//! through the traits' `transform_inverse`, hands the whole vector to a
+//! SIMULTANEOUSLY: it seeds every node in an unconstrained optimizer space
+//! from the traits' whole-curve `global_guess` (mapped through
+//! `transform_inverse` when the guess asks for it), hands the whole vector to a
 //! Levenberg-Marquardt least-squares solve whose residuals are the alive
 //! helpers' quote errors, and maps the solution back through
 //! `transform_direct`.
@@ -894,29 +895,19 @@ impl GlobalBootstrap {
             helper.set_term_structure(&term_structure);
         }
 
-        // The initial guess (`:360-374`): the additional variables initialize
-        // FIRST, then each interior node is updated through Traits::guess -
-        // which depends on the previously updated nodes, so the writes are
-        // sequential - and mapped into the optimizer space. The additional
-        // guesses are APPENDED after the node guesses, which is the layout the
-        // cost function's `x[interior..]` split relies on.
-        let additional_guesses = match &self.additional_variables {
-            Some(variables) => variables.initialize(valid_data)?,
-            None => Vec::new(),
-        };
-        let mut guess = Array::with_size(interior + additional_guesses.len());
-        {
-            let mut cd = curve.curve_data().borrow_mut();
-            for i in 0..interior {
-                let g = C::Traits::guess(i + 1, cd.times(), cd.data(), valid_data);
-                C::Traits::update_guess(cd.data_mut(), g, i + 1);
-                guess[i] = C::Traits::transform_inverse(cd.data()[i + 1], cd.times()[i + 1]);
-            }
-            cd.rebuild(curve.interpolator(), interior)?;
+        // The initial guess (`globalbootstrap.hpp:392-401`): the node guesses
+        // FIRST, then the additional variables initialize and their guesses are
+        // APPENDED, which is the layout the cost function's `x[interior..]`
+        // split relies on.
+        let mut guess: Vec<Real> = self.initial_guess(curve, valid_data)?.to_vec();
+        curve
+            .curve_data()
+            .borrow_mut()
+            .rebuild(curve.interpolator(), interior)?;
+        if let Some(variables) = &self.additional_variables {
+            guess.extend(variables.initialize(valid_data)?);
         }
-        for (i, additional_guess) in additional_guesses.into_iter().enumerate() {
-            guess[interior + i] = additional_guess;
-        }
+        let guess = Array::from(guess);
 
         Ok((
             GlobalBootstrapState {
@@ -926,6 +917,27 @@ impl GlobalBootstrap {
             },
             guess,
         ))
+    }
+
+    /// `makeInitialGuess` (`globalbootstrap.hpp:404-438`): the traits'
+    /// whole-curve [`global_guess`](YieldBootstrapTraits::global_guess), mapped
+    /// into the optimizer space through `transform_inverse` only when the
+    /// traits ask for it. The curve's nodes are left as `setup` installed them;
+    /// the first trial point writes them.
+    fn initial_guess<C>(&self, curve: &C, valid_data: bool) -> QlResult<Array>
+    where
+        C: PiecewiseCurve<Helper = dyn RateHelper, TS = dyn YieldTermStructure>,
+        C::Traits: YieldBootstrapTraits,
+    {
+        let cd = curve.curve_data().borrow();
+        let (mut guess, needs_transform) =
+            C::Traits::global_guess(cd.times(), cd.data(), valid_data);
+        if needs_transform {
+            for (i, value) in guess.iter_mut().enumerate() {
+                *value = C::Traits::transform_inverse(*value, cd.times()[i + 1]);
+            }
+        }
+        Ok(guess)
     }
 
     /// `setCostFunctionArgument` (`globalbootstrap.hpp:376-387`): the interior
