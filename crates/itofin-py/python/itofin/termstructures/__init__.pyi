@@ -2256,7 +2256,7 @@ class OptionletStripper1:
 @typing.final
 class OptionletStripper2:
     r"""
-    Correct a stripped lognormal grid to ATM cap term volatilities.
+    Correct a stripped grid to ATM cap term volatilities, priced with its volatility type.
     """
     def __init__(self, stripper: OptionletStripper1, atm_curve: CapFloorTermVolCurve) -> None:
         r"""

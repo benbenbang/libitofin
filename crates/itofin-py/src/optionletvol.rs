@@ -774,7 +774,7 @@ impl PyOptionletSmileSection {
     }
 }
 
-/// Correct a stripped lognormal grid to ATM cap term volatilities.
+/// Correct a stripped grid to ATM cap term volatilities, priced with its volatility type.
 #[gen_stub_pyclass]
 #[pyclass(
     name = "OptionletStripper2",
