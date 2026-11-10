@@ -20,15 +20,12 @@ const (
 
 func sequenceStatisticsEvaluate(samples [][]float64, weights []float64, measure int) ([]float64, error) {
 	rows := len(samples)
-	if rows < 1 || rows > 100000 {
-		return nil, fmt.Errorf("itofin: sequence statistics requires 1-100000 rows")
+	if rows < 1 {
+		return nil, fmt.Errorf("itofin: sequence statistics requires at least 1 row")
 	}
 	dimension := len(samples[0])
 	if dimension < 1 || dimension > 256 {
 		return nil, fmt.Errorf("itofin: sequence statistics requires 1-256 coordinates")
-	}
-	if rows > 1000000/dimension {
-		return nil, fmt.Errorf("itofin: sequence statistics input exceeds size limit")
 	}
 	outputLen := dimension
 	if measure == sequenceCovariance || measure == sequenceCorrelation {

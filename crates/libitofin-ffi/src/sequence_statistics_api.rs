@@ -15,8 +15,8 @@ use libitofin::types::Real;
 /// The exact output length is `dimension` for 0-5 and `dimension * dimension`
 /// for 6-7. Variance/covariance use the observation-count N/(N-1) correction,
 /// counting zero-weight rows. On every error, the entire output is unchanged.
-/// Dimensions are limited to 1-256, rows to 1-100,000, inputs to 1,000,000
-/// values and covariance/correlation work to 100,000,000 row-coordinate pairs.
+/// Dimensions are limited to 1-256, rows must be positive and
+/// covariance/correlation work is limited to 100,000,000 row-coordinate pairs.
 ///
 /// # Safety
 ///

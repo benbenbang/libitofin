@@ -15,7 +15,7 @@ pub const MAX_DISCREPANCY_WORK: usize = 100_000_000;
 ///
 /// # Errors
 /// Rejects dimensions outside `2..=256`, empty or oversized point sets,
-/// shared sequence component limits, and overflowing or excessive pair work.
+/// shared sequence dimension limits, and overflowing or excessive pair work.
 pub fn validate_discrepancy_shape(rows: usize, dimension: usize) -> QlResult<usize> {
     require!(dimension >= 2, "discrepancy dimension must be at least two");
     validate_sequence_shape(rows, dimension, SequenceStatistic::Mean)?;

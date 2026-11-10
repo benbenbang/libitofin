@@ -237,7 +237,8 @@ Every new sequence query, including min/max, requires a positive total weight. M
 estimate and matrices need at least two. This stricter sequence-batch rule does
 not change scalar `GeneralStatistics` min/max behavior.
 
-Limits are 256 columns, 100,000 rows and 1,000,000 input values. Matrix requests
+Inputs need 1-256 columns and at least one row; like QuantLib, the row count is
+otherwise unbounded, apart from rejecting a `rows × columns` overflow. Matrix requests
 also require `rows × columns² ≤ 100,000,000`; output matrices have at most 65,536
 entries. Invalid shapes, mismatched weight counts, negative/nonfinite weights,
 zero total weight, exceeded limits and nonfinite arithmetic/results
@@ -274,7 +275,8 @@ A zero-weight row still requires finite asset and benchmark observations.
 Omitted weights mean unit weights; supplied weights must be finite,
 nonnegative, equal-length and have a finite positive sum.
 
-- Accepts 2-100,000 equal-length observation pairs, all finite.
+- Accepts at least 2 equal-length observation pairs, all finite; the covariance
+  work limit bounds them at 25,000,000.
 - Constant benchmark returns, including constant positive-weight support, fail.
 - Nonfinite moments/results and variance underflow to zero fail rather than
   returning NaN, infinity or inventing a denominator floor.

@@ -235,7 +235,7 @@ def average_shortfall(observations: typing.Sequence[builtins.float], target: bui
 
 def benchmark_beta(asset_returns: typing.Sequence[builtins.float], benchmark_returns: typing.Sequence[builtins.float], *, weights: typing.Optional[typing.Sequence[builtins.float]] = None) -> builtins.float:
     r"""
-    Weighted covariance / benchmark variance for 2-100000 aligned return pairs.
+    Weighted covariance / benchmark variance for at least 2 aligned return pairs.
 
     No annualization, data feed or risk-free adjustment. Weights are optional,
     finite and nonnegative with finite positive total. Both moments apply the

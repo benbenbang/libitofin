@@ -1,12 +1,13 @@
 //! Stateless benchmark beta with atomic caller-owned output.
 
 use crate::boundary::{BindingError, ItofinError, check_ptr, input_slice, without_context};
-use libitofin::math::statistics::{MAX_SEQUENCE_ROWS, benchmark_beta};
+use libitofin::math::statistics::benchmark_beta;
 use libitofin::types::Real;
 
 /// Compute asset/benchmark beta from already aligned return samples.
 ///
-/// Requires 2-100,000 observations and equal asset/benchmark lengths. Null
+/// Requires at least two observations, equal asset/benchmark lengths and at
+/// most 25,000,000 rows (the covariance work bound). Null
 /// weights with zero length selects unit weights; otherwise weights must have
 /// one finite nonnegative entry per observation and a finite positive total.
 /// Count-corrected covariance/benchmark variance uses all rows, including
@@ -35,9 +36,9 @@ pub unsafe extern "C" fn itofin_benchmark_beta(
                 check_ptr(error)?;
             }
             check_ptr(out)?;
-            if !(2..=MAX_SEQUENCE_ROWS).contains(&asset_len) || asset_len != benchmark_len {
+            if asset_len < 2 || asset_len != benchmark_len {
                 return Err(BindingError::invalid(
-                    "benchmark beta requires 2-100000 aligned rows",
+                    "benchmark beta requires at least 2 aligned rows",
                 ));
             }
             let weights = if weights.is_null() && weights_len == 0 {

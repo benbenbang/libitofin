@@ -199,11 +199,12 @@ impl BrownianBridge {
 }
 
 #[cfg(test)]
-pub(crate) mod tests {
+mod tests {
     use super::*;
     use crate::math::distributions::normal::InverseCumulativeNormal;
     use crate::math::randomnumbers::sobol::{DirectionIntegers, SobolRsg};
     use crate::math::randomnumbers::{InverseCumulativeRsg, SequenceGenerator, SobolSequence};
+    use crate::math::statistics::SequenceStatistics;
 
     fn max_diff(a: &[Real], b: &[Real]) -> Real {
         a.iter()
@@ -212,59 +213,9 @@ pub(crate) mod tests {
             .fold(0.0, Real::max)
     }
 
-    pub(crate) struct Moments {
-        n: usize,
-        samples: usize,
-        sum: Vec<Real>,
-        quadratic_sum: Vec<Real>,
-    }
-
-    impl Moments {
-        pub(crate) fn new(n: usize) -> Self {
-            Moments {
-                n,
-                samples: 0,
-                sum: vec![0.0; n],
-                quadratic_sum: vec![0.0; n * n],
-            }
-        }
-
-        pub(crate) fn add(&mut self, x: &[Real]) {
-            for i in 0..self.n {
-                for j in 0..self.n {
-                    self.quadratic_sum[i * self.n + j] += x[i] * x[j];
-                }
-                self.sum[i] += x[i];
-            }
-            self.samples += 1;
-        }
-
-        pub(crate) fn mean(&self) -> Vec<Real> {
-            let count = self.samples as Real;
-            self.sum.iter().map(|s| s / count).collect()
-        }
-
-        pub(crate) fn covariance(&self) -> Vec<Real> {
-            let count = self.samples as Real;
-            let mean = self.mean();
-            let mut result = vec![0.0; self.n * self.n];
-            for i in 0..self.n {
-                for j in 0..self.n {
-                    result[i * self.n + j] = (self.quadratic_sum[i * self.n + j] / count
-                        - mean[i] * mean[j])
-                        * (count / (count - 1.0));
-                }
-            }
-            result
-        }
-    }
-
     #[test]
     fn variates_match_brownian_moments() {
-        // test-suite/brownianbridge.cpp:62 testVariates. The crate's
-        // SequenceStatistics caps rows at 100_000 (sequence_shape.rs:7), so the
-        // QL GenericSequenceStatistics sums (sequencestatistics.hpp:135-139) are
-        // accumulated locally instead.
+        // test-suite/brownianbridge.cpp:62 testVariates.
         let times = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 2.0, 5.0];
         let n = times.len();
         let samples = 262143;
@@ -273,18 +224,18 @@ pub(crate) mod tests {
             InverseCumulativeNormal::standard(),
         );
         let bridge = BrownianBridge::from_times(&times).unwrap();
-        let mut stats1 = Moments::new(n);
-        let mut stats2 = Moments::new(n);
+        let mut stats1 = SequenceStatistics::new(n).unwrap();
+        let mut stats2 = SequenceStatistics::new(n).unwrap();
         let mut temp = vec![0.0; n];
         for _ in 0..samples {
             let sample = &generator.next_sequence().value;
             bridge.transform(sample, &mut temp).unwrap();
-            stats1.add(&temp);
+            stats1.add(&temp).unwrap();
             temp[0] *= times[0].sqrt();
             for j in 1..n {
                 temp[j] = temp[j - 1] + temp[j] * (times[j] - times[j - 1]).sqrt();
             }
-            stats2.add(&temp);
+            stats2.add(&temp).unwrap();
         }
 
         let mean_tolerance = 1.0e-16;
@@ -293,8 +244,8 @@ pub(crate) mod tests {
         for i in 0..n {
             expected_cov[i * n + i] = 1.0;
         }
-        let mean_error = max_diff(&stats1.mean(), &expected_mean);
-        let cov_error = max_diff(&stats1.covariance(), &expected_cov);
+        let mean_error = max_diff(&stats1.mean().unwrap(), &expected_mean);
+        let cov_error = max_diff(&stats1.covariance().unwrap(), &expected_cov);
         assert!(mean_error <= mean_tolerance, "mean error {mean_error}");
         assert!(cov_error <= 2.5e-4, "covariance error {cov_error}");
 
@@ -304,8 +255,8 @@ pub(crate) mod tests {
                 expected_cov[j * n + i] = times[i];
             }
         }
-        let mean_error = max_diff(&stats2.mean(), &expected_mean);
-        let cov_error = max_diff(&stats2.covariance(), &expected_cov);
+        let mean_error = max_diff(&stats2.mean().unwrap(), &expected_mean);
+        let cov_error = max_diff(&stats2.covariance().unwrap(), &expected_cov);
         assert!(mean_error <= mean_tolerance, "mean error {mean_error}");
         assert!(cov_error <= 6.0e-4, "covariance error {cov_error}");
     }

@@ -4,7 +4,7 @@ use crate::PyQlError;
 use pyo3::prelude::*;
 use pyo3_stub_gen::derive::gen_stub_pyfunction;
 
-/// Weighted covariance / benchmark variance for 2-100000 aligned return pairs.
+/// Weighted covariance / benchmark variance for at least 2 aligned return pairs.
 ///
 /// No annualization, data feed or risk-free adjustment. Weights are optional,
 /// finite and nonnegative with finite positive total. Both moments apply the
