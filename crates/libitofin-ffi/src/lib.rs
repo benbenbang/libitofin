@@ -102,6 +102,9 @@ pub mod models_api;
 pub mod optimize_api;
 pub mod options_api;
 pub mod overnight_futures_api;
+pub mod parameter_sensitivity_api;
+#[cfg(test)]
+mod parameter_sensitivity_api_tests;
 pub mod payment_inspection_api;
 pub mod performance_ratios_api;
 pub mod poisson_rng_api;
