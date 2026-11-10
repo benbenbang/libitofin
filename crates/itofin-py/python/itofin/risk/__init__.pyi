@@ -73,7 +73,8 @@ def parameter_sensitivity(quote: quotes.SimpleQuote, parameters: typing.Sequence
     DerivedQuote or CompositeQuote built on `quote`. A None `reference_values`
     reads them from the parameters before the bump; otherwise it needs one
     entry per parameter, and a None entry skips its parameter, giving
-    `(None, None)`. A zero shift is an error. The quote is restored on return.
+    `(None, None)`. A zero or non-finite shift, or a non-finite reference value,
+    is an error. The quote is restored on return.
 
     There is no QuantLib test-suite oracle: the parameter forms were removed
     upstream. An invalid parameter would also be skipped, but no binding can

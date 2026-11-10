@@ -224,6 +224,18 @@ fn handles(parameters: &[PyRef<'_, PyQuote>]) -> Vec<Handle<dyn Quote>> {
         .collect()
 }
 
+fn finite_inputs(
+    reference_values: Option<&[Option<f64>]>,
+    shift: f64,
+) -> libitofin::errors::QlResult<()> {
+    let references = reference_values.into_iter().flatten().flatten();
+    libitofin::require!(
+        shift.is_finite() && references.copied().all(f64::is_finite),
+        "non-finite rate or amount"
+    );
+    Ok(())
+}
+
 /// Sensitivities of `parameters` to a bump of `quote` by `shift`.
 ///
 /// Returns one `(first, second)` per parameter, in parameter order; `second`
@@ -231,7 +243,8 @@ fn handles(parameters: &[PyRef<'_, PyQuote>]) -> Vec<Handle<dyn Quote>> {
 /// DerivedQuote or CompositeQuote built on `quote`. A None `reference_values`
 /// reads them from the parameters before the bump; otherwise it needs one
 /// entry per parameter, and a None entry skips its parameter, giving
-/// `(None, None)`. A zero shift is an error. The quote is restored on return.
+/// `(None, None)`. A zero or non-finite shift, or a non-finite reference value,
+/// is an error. The quote is restored on return.
 ///
 /// There is no QuantLib test-suite oracle: the parameter forms were removed
 /// upstream. An invalid parameter would also be skipped, but no binding can
@@ -247,6 +260,7 @@ pub(crate) fn parameter_sensitivity(
     kind: PySensitivityAnalysis,
 ) -> PyResult<Vec<ParameterSlot>> {
     crate::bootstrap::ensure_quote_mutation_allowed()?;
+    finite_inputs(reference_values.as_deref(), shift).map_err(PyQlError::from)?;
     let (first, second) = risk::parameter_sensitivity(
         &quote.shared(),
         &handles(&parameters),
@@ -273,6 +287,7 @@ pub(crate) fn parameter_sensitivity_vector(
     kind: PySensitivityAnalysis,
 ) -> PyResult<Rows<ParameterSlot>> {
     crate::bootstrap::ensure_quote_mutation_allowed()?;
+    finite_inputs(None, shift).map_err(PyQlError::from)?;
     let (first, second) = risk::parameter_sensitivity_vector(
         &shared(&quotes),
         &handles(&parameters),

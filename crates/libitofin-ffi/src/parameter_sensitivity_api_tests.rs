@@ -44,17 +44,32 @@ fn fixture(c: &mut Context) -> (u64, [u64; 2]) {
     (q, [dependent(c, q, None), dependent(c, q, Some(3.0))])
 }
 
-fn vector(c: &mut Context, quotes: &[u64], parameters: &[u64]) -> Result<Vec<Slot>, String> {
+fn vector(
+    c: &mut Context,
+    quotes: &[u64],
+    parameters: &[u64],
+    shift: f64,
+) -> Result<Vec<Slot>, (i32, String)> {
     let mut out =
         vec![ItofinParameterSensitivity::default(); (quotes.len() * parameters.len()).max(1)];
     let mut e = error();
     let (q, p) = (quotes.as_ptr(), parameters.as_ptr());
     let (nq, np) = (quotes.len(), parameters.len());
     let code = unsafe {
-        itofin_parameter_sensitivity_vector(c, q, nq, p, np, H, CENTERED, out.as_mut_ptr(), &mut e)
+        itofin_parameter_sensitivity_vector(
+            c,
+            q,
+            nq,
+            p,
+            np,
+            shift,
+            CENTERED,
+            out.as_mut_ptr(),
+            &mut e,
+        )
     };
     if code != 0 {
-        return Err(message(&e));
+        return Err((code, message(&e)));
     }
     Ok(out[..nq * np].iter().map(slot).collect())
 }
@@ -132,26 +147,77 @@ fn the_single_form_matches_the_core_and_skips_a_missing_reference() {
     assert_eq!(value(&mut c, q), X);
 }
 
+fn composite(c: &mut Context, q1: u64, q2: u64, op: i32) -> u64 {
+    let mut out = 0;
+    assert_eq!(
+        unsafe { itofin_composite_quote_new(c, q1, q2, op, &mut out, null_mut()) },
+        0
+    );
+    out
+}
+
+/// Two quotes x = 0.75, y = 0.5 against three parameters x * x, x - y and
+/// x * y, centered with h = 0.0625. The differences are exact: d/dx gives
+/// (2x, 2), (1, 0), (y, 0) and d/dy gives (0, 0), (-1, 0), (x, 0). The 2 x 3
+/// buffer is asymmetric, so a column-major write or swapped counts fail.
 #[test]
 fn the_vector_form_is_row_major_and_matches_the_core() {
     let mut c = Context::new();
     let (q1, q2) = (simple(&mut c, X), simple(&mut c, 0.5));
-    let (quotes, parameters) = (
-        [q1, q2],
-        [
-            dependent(&mut c, q1, None),
-            dependent(&mut c, q2, Some(5.0)),
-        ],
-    );
-    let out = vector(&mut c, &quotes, &parameters).unwrap();
-    let first: Vec<_> = out.iter().map(|s| s.0.unwrap()).collect();
-    assert_eq!(first, [1.5, 0.0, 0.0, 5.0]);
+    let quotes = [q1, q2];
+    let parameters = [
+        composite(&mut c, q1, q1, ITOFIN_COMPOSITE_MULTIPLY),
+        composite(&mut c, q1, q2, ITOFIN_COMPOSITE_SUBTRACT),
+        composite(&mut c, q1, q2, ITOFIN_COMPOSITE_MULTIPLY),
+    ];
+    let out = vector(&mut c, &quotes, &parameters, H).unwrap();
+    let cells = [
+        (1.5, 2.0),
+        (1.0, 0.0),
+        (0.5, 0.0),
+        (0.0, 0.0),
+        (-1.0, 0.0),
+        (X, 0.0),
+    ];
+    let want: Vec<Slot> = cells.iter().map(|&(f, s)| (Some(f), Some(s))).collect();
+    assert_eq!(out, want);
     let rows: Vec<Slot> = quotes
         .iter()
         .flat_map(|&q| core(&c, q, &parameters, SensitivityAnalysis::Centered))
         .collect();
     assert_eq!(out, rows);
     assert_eq!((value(&mut c, q1), value(&mut c, q2)), (X, 0.5));
+}
+
+#[test]
+fn non_finite_shifts_and_reference_values_are_invalid_arguments() {
+    let mut c = Context::new();
+    let (q, parameters) = fixture(&mut c);
+    let invalid = (INVALID_ARGUMENT, "non-finite rate or amount".to_owned());
+    for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        let references = [Some(bad), None];
+        for (references, shift) in [(None, bad), (Some(&references[..]), H)] {
+            let got = single(&mut c, q, &parameters, references, shift, CENTERED);
+            assert_eq!(got.unwrap_err(), invalid);
+        }
+        assert_eq!(vector(&mut c, &[q], &parameters, bad).unwrap_err(), invalid);
+    }
+    assert_eq!(value(&mut c, q), X);
+}
+
+/// A supplied reference of 0.0 enters the formulas: for x * x at x = 0.75,
+/// h = 0.0625, the centered second is ((x + h)^2 + (x - h)^2) / h^2 = 290 and
+/// the one-sided first is (x + h)^2 / h = 10.5625.
+#[test]
+fn a_zero_reference_value_is_a_value() {
+    let mut c = Context::new();
+    let (q, parameters) = fixture(&mut c);
+    let references = [Some(0.0), None];
+    let centered = single(&mut c, q, &parameters, Some(&references), H, CENTERED).unwrap();
+    assert_eq!(centered, [(Some(1.5), Some(290.0)), (None, None)]);
+    let one_side = single(&mut c, q, &parameters, Some(&references), H, ONE_SIDE).unwrap();
+    assert_eq!(one_side, [(Some(10.5625), None), (None, None)]);
+    assert_eq!(value(&mut c, q), X);
 }
 
 #[test]
@@ -181,7 +247,7 @@ fn invalid_inputs_are_errors_that_leave_the_quote() {
         INVALID_HANDLE
     );
     assert_eq!(
-        vector(&mut c, &[], &parameters).unwrap_err(),
+        vector(&mut c, &[], &parameters, H).unwrap_err().1,
         "empty SimpleQuote vector"
     );
     assert_eq!(value(&mut c, q), X);
