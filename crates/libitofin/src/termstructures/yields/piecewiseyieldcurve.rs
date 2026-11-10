@@ -1147,9 +1147,9 @@ mod tests {
     /// - `transform_inverse` is not reached at all: since QuantLib v1.44 a
     ///   cold `Discount` solve starts from `Discount::global_guess`, which is
     ///   already in log space (`-AVG_RATE * t`, `bootstraptraits.hpp:84-95`)
-    ///   and skips the transform; the inverse only maps a warm restart.
-    ///   `transform_inverse` is therefore transcription-verified only, like
-    ///   the space choice.
+    ///   and skips the transform; here the inverse only maps a warm restart.
+    ///   On the `InitialGuessFn` path it is pinned by
+    ///   `global_bootstrap_initial_guess_fn`.
     #[test]
     fn global_bootstrap_discount_consistency() {
         use crate::termstructures::globalbootstrap::GlobalBootstrap;

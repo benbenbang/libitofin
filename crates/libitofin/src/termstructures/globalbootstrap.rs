@@ -951,9 +951,9 @@ impl GlobalBootstrap {
     /// guess is already there. The curve's nodes are left as `setup` installed
     /// them; the first trial point writes them.
     ///
-    /// The override runs with no borrow of the node storage alive, so it may
-    /// read the curve back, and a guess of the wrong length is an error rather
-    /// than an out-of-bounds write.
+    /// The override runs with no borrow of the node storage alive, and a
+    /// guess of the wrong length is an error rather than an out-of-bounds
+    /// write.
     fn initial_guess<C>(&self, curve: &C, valid_data: bool) -> QlResult<Array>
     where
         C: PiecewiseCurve<Helper = dyn RateHelper, TS = dyn YieldTermStructure>,
