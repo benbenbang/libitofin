@@ -60,6 +60,7 @@
       "status": "implemented",
       "tests": [
         "TestParameterSensitivityAnalyticOracle",
+        "TestParameterSensitivityZeroReferenceIsAValue",
         "TestParameterSensitivityErrorsLeaveTheQuote"
       ]
     },

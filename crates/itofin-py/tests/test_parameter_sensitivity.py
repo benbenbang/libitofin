@@ -6,6 +6,7 @@ The values are exact binary fractions, so the asserts are exact.
 """
 
 # standard library
+import math
 from typing import Any, cast
 
 # third party
@@ -45,12 +46,43 @@ def test_a_simple_quote_is_a_parameter():
 
 
 def test_vector_form_is_one_single_form_row_per_quote():
+    """Quotes x = 0.75, y = 0.5 against x * x, x - y and x * y, centered.
+
+    d/dx gives (2x, 2), (1, 0), (y, 0) and d/dy gives (0, 0), (-1, 0), (x, 0),
+    so the 2 x 3 rows are asymmetric and a transposed layout fails.
+    """
     q1, q2 = SimpleQuote(X), SimpleQuote(0.5)
-    parameters = [CompositeQuote(q1, q1, CompositeOp.Multiply), DerivedQuote(q2, 5.0)]
+    parameters = [
+        CompositeQuote(q1, q1, CompositeOp.Multiply),
+        CompositeQuote(q1, q2, CompositeOp.Subtract),
+        CompositeQuote(q1, q2, CompositeOp.Multiply),
+    ]
     rows = parameter_sensitivity_vector([q1, q2], parameters, H)
-    assert [[first for first, _ in row] for row in rows] == [[1.5, 0.0], [0.0, 5.0]]
+    assert rows == [[(1.5, 2.0), (1.0, 0.0), (0.5, 0.0)], [(0.0, 0.0), (-1.0, 0.0), (X, 0.0)]]
     assert rows == [parameter_sensitivity(q, parameters, shift=H) for q in (q1, q2)]
     assert (q1.value(), q2.value()) == (X, 0.5)
+
+
+def test_a_zero_reference_value_is_a_value():
+    """For x * x at x = 0.75, h = 0.0625, a 0.0 reference gives centered second
+    ((x + h)^2 + (x - h)^2) / h^2 = 290 and one-sided first (x + h)^2 / h = 10.5625."""
+    quote, parameters = _fixture()
+    assert parameter_sensitivity(quote, parameters, [0.0, None], H) == [(1.5, 290.0), (None, None)]
+    one_side = parameter_sensitivity(quote, parameters, [0.0, None], H, SensitivityAnalysis.OneSide)
+    assert one_side == [(10.5625, None), (None, None)]
+    assert quote.value() == X
+
+
+@pytest.mark.parametrize("bad", [math.nan, math.inf, -math.inf])
+def test_non_finite_shifts_and_reference_values_are_errors(bad):
+    quote, parameters = _fixture()
+    with pytest.raises(ItofinError, match="non-finite rate or amount"):
+        parameter_sensitivity(quote, parameters, shift=bad)
+    with pytest.raises(ItofinError, match="non-finite rate or amount"):
+        parameter_sensitivity(quote, parameters, [bad, None], H)
+    with pytest.raises(ItofinError, match="non-finite rate or amount"):
+        parameter_sensitivity_vector([quote], parameters, bad)
+    assert quote.value() == X
 
 
 def test_invalid_inputs_are_errors_that_leave_the_quote():
