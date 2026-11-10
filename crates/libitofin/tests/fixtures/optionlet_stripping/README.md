@@ -14,6 +14,8 @@
   off-node cubic normal smile. Compile as a macOS bundle using `clang++ -std=c++17
   -bundle -undefined dynamic_lookup`, QuantLib and Boost include paths; load the
   wheel extension with `ctypes.RTLD_GLOBAL`, then call `optionlet_oracle()`.
+  Its `atm` spreads are QuantLib 1.43 values; the v1.44 bracketed solve supersedes
+  them (see `../optionlet_stripper2_v144/`). Its strikes and prices are unchanged.
 - `overnight_oracle.py PATH/TO/QuantLib` generates the actual overnight-leg cap
   price and three surface values. It uses the original source market data and
   explicitly sets a quarterly coupon schedule. The upstream test leaves its
