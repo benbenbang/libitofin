@@ -384,7 +384,10 @@ where
         jumps: Vec<Handle<dyn Quote>>,
         jump_dates: Vec<Date>,
     ) -> QlResult<Shared<PiecewiseYieldCurve<T, I, B>>> {
-        require!(!instruments.is_empty(), "no bootstrap helpers given");
+        require!(
+            !instruments.is_empty() || !bootstrap.requires_instruments(),
+            "no bootstrap helpers given"
+        );
 
         let lazy = shared_mut(LazyObject::new(true));
         let observable = lazy.borrow().observable_handle();
@@ -1995,6 +1998,168 @@ mod tests {
             );
         }
         assert!(worst < 1.0e-9, "worst relative discount gap is {worst}");
+    }
+
+    /// `testGlobalBootstrapInitialGuessFn` (`piecewiseyieldcurve.cpp:1552`,
+    /// par coupons): a `<Discount, LogLinear>` global curve over NO
+    /// instruments. The strip goes in as additional helpers, the grid comes
+    /// from additional dates (eight 45-day steps from 1 Oct 2019 on the TARGET
+    /// calendar, then every later helper pillar), and every residual comes from
+    /// the penalty: the helpers' quote errors plus a `1e-2` weighted
+    /// forward-gradient smoothness term. The [`InitialGuessFn`] seeds every
+    /// node at a discount factor of 1.0 and must run exactly once; the 24
+    /// nodes match the C++ to 1e-10 (`:1618`).
+    ///
+    /// The setup is the upstream one because it is sensitive to the start
+    /// point: from the traits' own guess the same system lands about 1.3e-9
+    /// away from the C++ nodes, outside the 1e-10 tolerance, which the second
+    /// run pins so the oracle stays able to see the override.
+    ///
+    /// [`InitialGuessFn`]: crate::termstructures::globalbootstrap::InitialGuessFn
+    #[test]
+    #[allow(
+        clippy::excessive_precision,
+        reason = "Preserve exact upstream decimal tokens"
+    )]
+    fn global_bootstrap_initial_guess_fn() {
+        use std::cell::Cell;
+        use std::rc::Rc;
+
+        use crate::termstructures::globalbootstrap::GlobalBootstrap;
+
+        const EXPECTED_DATES: [(Day, Month, Year); 24] = [
+            (27, Month::September, 2019),
+            (1, Month::October, 2019),
+            (15, Month::November, 2019),
+            (30, Month::December, 2019),
+            (13, Month::February, 2020),
+            (30, Month::March, 2020),
+            (14, Month::May, 2020),
+            (29, Month::June, 2020),
+            (13, Month::August, 2020),
+            (28, Month::September, 2020),
+            (27, Month::September, 2021),
+            (27, Month::September, 2022),
+            (27, Month::September, 2023),
+            (27, Month::September, 2024),
+            (29, Month::September, 2025),
+            (28, Month::September, 2026),
+            (27, Month::September, 2027),
+            (27, Month::September, 2028),
+            (27, Month::September, 2029),
+            (29, Month::September, 2031),
+            (27, Month::September, 2034),
+            (27, Month::September, 2039),
+            (27, Month::September, 2044),
+            (27, Month::September, 2049),
+        ];
+        const EXPECTED_DFS: [Real; 24] = [
+            1.0,
+            0.9994923431162580,
+            0.9938069118457880,
+            0.9882401711181712,
+            0.9828381250775845,
+            0.9774079566030049,
+            0.9721182498392723,
+            0.9667951580943512,
+            0.9617336341824015,
+            0.9564548068987965,
+            0.9135007024272714,
+            0.8698607442445871,
+            0.8266650007699866,
+            0.7829682196126155,
+            0.7399209887960153,
+            0.6973589159124343,
+            0.6565792747227167,
+            0.6180250998622848,
+            0.5818438569698231,
+            0.5127051907762759,
+            0.4218543471337612,
+            0.3050840671400172,
+            0.2225943633033588,
+            0.165544906093695,
+        ];
+
+        let vars = common_vars_on(Date::new(25, Month::September, 2019));
+        assert!(vars.settings.using_at_par_coupons());
+
+        let calendar = Target::new();
+        let mut pillar_dates = vec![Date::new(1, Month::October, 2019)];
+        for _ in 0..8 {
+            let last = *pillar_dates.last().unwrap();
+            pillar_dates.push(calendar.adjust(last + 45, BusinessDayConvention::Following));
+        }
+        for helper in &vars.instruments {
+            if helper.pillar_date() > *pillar_dates.last().unwrap() {
+                pillar_dates.push(helper.pillar_date());
+            }
+        }
+
+        let build = |initial_guess_calls: Option<Rc<Cell<usize>>>| {
+            let helpers = vars.instruments.clone();
+            let dates = pillar_dates.clone();
+            let mut bootstrap = GlobalBootstrap::with_fallible_penalties(
+                vars.instruments.clone(),
+                Some(Box::new(move || Ok(dates.clone()))),
+                Some(1.0e-12),
+                None,
+                Vec::new(),
+                move |times, data| {
+                    let mut errors = Vec::with_capacity(helpers.len() + times.len() - 2);
+                    for helper in &helpers {
+                        errors.push(helper.quote_error()?);
+                    }
+                    let rates: Vec<Real> = (0..times.len() - 1)
+                        .map(|i| (data[i] / data[i + 1] - 1.0) / (times[i + 1] - times[i]))
+                        .collect();
+                    for i in 0..times.len() - 2 {
+                        errors.push(1.0e-2 * (rates[i + 1] - rates[i]) / (times[i + 1] - times[i]));
+                    }
+                    Ok(errors)
+                },
+            );
+            if let Some(calls) = initial_guess_calls {
+                bootstrap = bootstrap.with_initial_guess_fn(move |times, _| {
+                    calls.set(calls.get() + 1);
+                    vec![1.0; times.len() - 1]
+                });
+            }
+            PiecewiseYieldCurve::<Discount, LogLinear, _>::with_bootstrap(
+                vars.settlement,
+                Vec::new(),
+                Actual365Fixed::new(),
+                LogLinear,
+                bootstrap,
+            )
+            .expect("a global curve takes its grid from the additional dates")
+        };
+
+        let calls = Rc::new(Cell::new(0));
+        let curve = build(Some(Rc::clone(&calls)));
+        let nodes = curve.nodes().expect("the penalised system solves");
+        assert_eq!(nodes.len(), EXPECTED_DATES.len());
+        for (i, ((date, df), (day, month, year))) in nodes.iter().zip(EXPECTED_DATES).enumerate() {
+            assert_eq!(*date, Date::new(day, month, year), "node {i} date");
+            assert!(
+                (df - EXPECTED_DFS[i]).abs() < 1.0e-10,
+                "node {i}: {df} vs {}",
+                EXPECTED_DFS[i]
+            );
+        }
+        assert_eq!(calls.get(), 1, "the initial guess function runs once");
+
+        let default_nodes = build(None)
+            .nodes()
+            .expect("the same system solves from the traits' guess");
+        let miss = default_nodes
+            .iter()
+            .zip(EXPECTED_DFS)
+            .map(|((_, df), expected)| (df - expected).abs())
+            .fold(0.0, Real::max);
+        assert!(
+            miss > 1.0e-10,
+            "the traits' start also lands on the C++ nodes (miss {miss}), so the oracle cannot see the override"
+        );
     }
 
     fn rolled(today: Date) -> Date {
