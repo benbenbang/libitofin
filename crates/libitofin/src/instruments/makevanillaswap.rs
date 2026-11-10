@@ -979,6 +979,52 @@ mod tests {
         );
     }
 
+    /// Without a settlement calendar the settlement days count on the floating
+    /// leg calendar, not the index fixing calendar (v1.44
+    /// `makevanillaswap.cpp:86-87`; a source pin, not a ported test case): on
+    /// Thursday 2 July 2026 a TARGET + US floating calendar skips Friday 3 July,
+    /// giving Tuesday 7 July where the TARGET fixing calendar gives Monday 6 July.
+    #[test]
+    fn settlement_days_fall_back_to_the_floating_leg_calendar() {
+        use crate::time::calendars::unitedstates::Market;
+        use crate::time::calendars::{JointCalendar, JointCalendarRule, Target, UnitedStates};
+
+        let today = Date::new(2, Month::July, 2026);
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(today);
+        let index = euribor6m(&settings);
+        let swap = MakeVanillaSwap::new(
+            Period::new(5, TimeUnit::Years),
+            Shared::clone(&index),
+            Some(0.03),
+            Period::new(0, TimeUnit::Days),
+            settings,
+        )
+        .with_settlement_days(2)
+        .with_floating_leg_calendar(JointCalendar::of_two(
+            Target::new(),
+            UnitedStates::new(Market::Settlement),
+            JointCalendarRule::JoinHolidays,
+        ))
+        .build()
+        .unwrap();
+        let start = swap.fixed_vs_floating().fixed_leg()[0]
+            .as_coupon()
+            .unwrap()
+            .accrual_start_date();
+        assert_eq!(start, Date::new(7, Month::July, 2026));
+        assert_eq!(
+            index.fixing_calendar().advance(
+                today,
+                2,
+                TimeUnit::Days,
+                BusinessDayConvention::Following,
+                false
+            ),
+            Date::new(6, Month::July, 2026)
+        );
+    }
+
     /// The index-default spot still adjusts a Saturday evaluation date on the
     /// fixing calendar before the value-date roll (v1.44
     /// `makevanillaswap.cpp:82`): 20 June 2026 gives Wednesday 24 June.
