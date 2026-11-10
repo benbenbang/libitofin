@@ -1748,6 +1748,22 @@ typedef struct ItofinSofrFutureHelperConfig {
 } ItofinSofrFutureHelperConfig;
 
 /**
+ * One parameter's first and, for a centered scheme, second derivative.
+ */
+typedef struct ItofinParameterSensitivity {
+  double first;
+  double second;
+  /**
+   * Zero for a skipped parameter, whose `first` is zero.
+   */
+  uint8_t has_first;
+  /**
+   * Zero for a skipped parameter or a one-sided scheme, whose `second` is zero.
+   */
+  uint8_t has_second;
+} ItofinParameterSensitivity;
+
+/**
  * Navigation policy for an erased leg. Date zero uses the evaluation date.
  */
 typedef struct ItofinPaymentQuery {
@@ -8364,6 +8380,49 @@ int32_t itofin_overnight_add_fixing(struct ItofinContext *ctx,
                                     int32_t fixing_date,
                                     double value,
                                     struct ItofinError *error);
+
+/**
+ * Sensitivities of `parameters` to a bump of the SimpleQuote `quote`.
+ * `kind`: 0 one-sided, 1 centered. A null `reference_values` reads the
+ * reference values from the parameters before the bump; otherwise
+ * `reference_values` and `reference_has_value` each hold `reference_count`
+ * entries, which must equal `parameter_count`, and a zero `has_value` entry
+ * skips its parameter. Writes `parameter_count` results to `out`,
+ * index-aligned with `parameters`. A zero shift is an error. The quote is
+ * restored on success and error.
+ * # Safety
+ * Pointers and thread ownership must satisfy the crate-level C caller contract.
+ */
+int32_t itofin_parameter_sensitivity(struct ItofinContext *ctx,
+                                     uint64_t quote,
+                                     const uint64_t *parameters,
+                                     size_t parameter_count,
+                                     const double *reference_values,
+                                     const uint8_t *reference_has_value,
+                                     size_t reference_count,
+                                     double shift,
+                                     int32_t kind,
+                                     struct ItofinParameterSensitivity *out,
+                                     struct ItofinError *error);
+
+/**
+ * `itofin_parameter_sensitivity` for each SimpleQuote of `quotes`, bumped one
+ * at a time, with the reference values read once from the parameters. Writes
+ * `quote_count * parameter_count` results to `out`, row-major: one row of
+ * `parameter_count` results per quote. Same `kind`, shift and restore
+ * conventions as `itofin_parameter_sensitivity`.
+ * # Safety
+ * Pointers and thread ownership must satisfy the crate-level C caller contract.
+ */
+int32_t itofin_parameter_sensitivity_vector(struct ItofinContext *ctx,
+                                            const uint64_t *quotes,
+                                            size_t quote_count,
+                                            const uint64_t *parameters,
+                                            size_t parameter_count,
+                                            double shift,
+                                            int32_t kind,
+                                            struct ItofinParameterSensitivity *out,
+                                            struct ItofinError *error);
 
 /**
  * Read the leg's accrual span: field 0 start, 1 maturity. Empty legs fail.

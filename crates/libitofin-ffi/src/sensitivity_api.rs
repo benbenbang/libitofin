@@ -78,7 +78,7 @@ pub(crate) fn instrument(c: &Context, id: u64) -> BindingResult<SharedMut<dyn In
          vanilla options, swaptions, cap/floors and credit default swaps",
     ))
 }
-fn kind(value: i32) -> BindingResult<SensitivityAnalysis> {
+pub(crate) fn kind(value: i32) -> BindingResult<SensitivityAnalysis> {
     match value {
         0 => Ok(SensitivityAnalysis::OneSide),
         1 => Ok(SensitivityAnalysis::Centered),

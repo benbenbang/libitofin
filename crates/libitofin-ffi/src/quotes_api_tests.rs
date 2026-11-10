@@ -9,7 +9,7 @@ use std::ptr::null_mut;
 type Affine = (f64, f64, fn(f64) -> f64);
 type Op = (i32, fn(f64, f64) -> f64);
 
-fn error() -> ItofinError {
+pub(crate) fn error() -> ItofinError {
     ItofinError {
         code: 0,
         message: [0; 1024],
@@ -22,7 +22,7 @@ fn message(e: &ItofinError) -> String {
         .into_owned()
 }
 
-fn simple(c: &mut Context, value: f64) -> u64 {
+pub(crate) fn simple(c: &mut Context, value: f64) -> u64 {
     let mut out = 0;
     assert_eq!(
         unsafe { itofin_quote_new(c, value, &mut out, null_mut()) },
@@ -35,7 +35,7 @@ fn set(c: &mut Context, id: u64, value: f64) {
     assert_eq!(unsafe { itofin_quote_set(c, id, value, null_mut()) }, 0);
 }
 
-fn value(c: &mut Context, id: u64) -> f64 {
+pub(crate) fn value(c: &mut Context, id: u64) -> f64 {
     let mut out = 0.0;
     assert_eq!(
         unsafe { itofin_quote_value(c, id, &mut out, null_mut()) },
