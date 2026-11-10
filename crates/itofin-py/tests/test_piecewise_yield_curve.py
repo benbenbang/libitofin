@@ -206,6 +206,19 @@ def test_empty_helper_list_raises_at_construction():
         PiecewiseYieldCurve(settlement, [], DayCounter.actual360(), "LogLinear")
 
 
+def test_global_empty_helper_list_raises_at_first_query():
+    """Only the iterative bootstrap rejects an empty helper list at
+    construction (iterativebootstrap.hpp:147). A "global" curve without helpers
+    builds and raises an ItofinError, not a panic, at its first query: its
+    one-node grid fails the globalbootstrap.hpp:323 grid-size check."""
+    _, _, _, settlement, _, _ = _fixture()
+    curve = PiecewiseYieldCurve(
+        settlement, [], DayCounter.actual360(), "LogLinear", "global"
+    )
+    with pytest.raises(ItofinError, match="not enough curve points"):
+        curve.discount(1.0)
+
+
 def test_unknown_interpolation_raises():
     """An interpolation name outside {LogLinear, Linear, Cubic} is rejected at
     construction (the facade's string dispatch)."""

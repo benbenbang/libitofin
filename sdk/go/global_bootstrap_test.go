@@ -124,6 +124,22 @@ func TestGlobalBootstrapIndependentOracleAndRetainedGraph(t *testing.T) {
 
 func isFiniteGlobal(v float64) bool { return !math.IsNaN(v) && !math.IsInf(v, 0) }
 
+func TestGlobalBootstrapEmptyHelpersFailAtFirstQuery(t *testing.T) {
+	s, _, _, cfg := globalStrip(t)
+	cfg.Helpers = nil
+	curve, err := s.NewPiecewiseYieldCurve(cfg)
+	if err != nil {
+		t.Fatalf("a global curve without helpers must build: %v", err)
+	}
+	if _, err = curve.Discount(1, false); err == nil || !strings.Contains(err.Error(), "not enough curve points") {
+		t.Fatalf("first query error = %v", err)
+	}
+	cfg.Bootstrap = ""
+	if _, err = s.NewPiecewiseYieldCurve(cfg); err == nil || !strings.Contains(err.Error(), "no bootstrap helpers given") {
+		t.Fatalf("iterative construction error = %v", err)
+	}
+}
+
 func TestGlobalBootstrapCallbackErrorsAndReentry(t *testing.T) {
 	for _, phase := range []string{"dates", "penalties"} {
 		for _, failure := range []string{"error", "panic", "query", "close"} {

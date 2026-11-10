@@ -2953,10 +2953,11 @@ class PiecewiseYieldCurve(YieldTermStructure):
     Quote mutation from a callback is rejected; read helpers and trial nodes instead.
     The supplied time and data lists include the reference node and are copies.
 
-    The bootstrap is lazy: construction only rejects an empty helper list, and
-    the solver runs on the first query, re-running after a helper-quote or
-    evaluation-date change. A bootstrap failure therefore surfaces from the
-    query methods, not from the constructor.
+    The bootstrap is lazy: construction only rejects an empty helper list (under
+    "iterative"; "global" accepts one and fails at the first query when its grid
+    is too short), and the solver runs on the first query, re-running after a
+    helper-quote or evaluation-date change. A bootstrap failure therefore
+    surfaces from the query methods, not from the constructor.
 
     max_date is the exception: it swallows a bootstrap failure and reports the
     current grid bound, or the reference date before a grid has been installed.
@@ -2987,9 +2988,10 @@ class PiecewiseYieldCurve(YieldTermStructure):
                 solved jointly with nodes. All additional options require global.
 
         Raises:
-            ItofinError: On an empty helper list, on an unknown interpolation
-                or bootstrap name, on additional helpers under "iterative",
-                and on "Cubic" under "global".
+            ItofinError: On an empty helper list under "iterative" (a "global"
+                curve without helpers raises at its first query instead), on an
+                unknown interpolation or bootstrap name, on additional helpers
+                under "iterative", and on "Cubic" under "global".
         """
     @staticmethod
     def moving(settlement_days: builtins.int, calendar: time.Calendar, helpers: typing.Sequence[RateHelper], day_counter: time.DayCounter, settings: itofin.Settings, interpolation: builtins.str = 'LogLinear', bootstrap: builtins.str = 'iterative', additional_helpers: typing.Optional[typing.Sequence[RateHelper]] = None, *, additional_penalties: typing.Optional[typing.Callable[[list[float], list[float]], list[float]]] = None, additional_dates: typing.Optional[typing.Callable[[], list[time.Date]]] = None, additional_variables: typing.Optional[SimpleQuoteVariables] = None, iterative_options: typing.Optional[IterativeBootstrapOptions] = None) -> PiecewiseYieldCurve:

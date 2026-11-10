@@ -170,8 +170,9 @@ where
     /// reference year.
     ///
     /// # Errors
-    /// Rejects an empty helper set, or returns a [`YieldJumps`] construction
-    /// error.
+    /// Rejects an empty helper set unless the bootstrap takes none (a global
+    /// bootstrap, whose first query then fails if its grid is too short), or
+    /// returns a [`YieldJumps`] construction error.
     pub fn with_jumps(
         reference_date: Date,
         instruments: Vec<Shared<dyn RateHelper>>,
@@ -286,8 +287,9 @@ where
     /// construction, so the evaluation date must already be set.
     ///
     /// # Errors
-    /// Rejects an empty helper set, or returns a [`YieldJumps`] construction
-    /// error.
+    /// Rejects an empty helper set unless the bootstrap takes none (a global
+    /// bootstrap, whose first query then fails if its grid is too short), or
+    /// returns a [`YieldJumps`] construction error.
     #[allow(clippy::too_many_arguments)]
     pub fn moving_with_jumps(
         settlement_days: Natural,
@@ -1998,6 +2000,59 @@ mod tests {
             );
         }
         assert!(worst < 1.0e-9, "worst relative discount gap is {worst}");
+    }
+
+    /// The empty-helper guard is the iterative bootstrap's
+    /// (`iterativebootstrap.hpp:147`): iterative and local curves still reject
+    /// an empty helper list at construction, while a global curve, which
+    /// upstream has no such guard, builds and fails at its first query through
+    /// the grid-size check (`globalbootstrap.hpp:323`) rather than panicking.
+    #[test]
+    fn only_the_global_bootstrap_accepts_an_empty_helper_list() {
+        use crate::math::interpolations::convexmonotone::ConvexMonotone;
+        use crate::termstructures::globalbootstrap::GlobalBootstrap;
+        use crate::termstructures::localbootstrap::LocalBootstrap;
+
+        let vars = common_vars();
+        let iterative = PiecewiseYieldCurve::<Discount, LogLinear>::new(
+            vars.settlement,
+            Vec::new(),
+            Actual360::new(),
+            LogLinear,
+        )
+        .err()
+        .expect("an iterative curve needs helpers");
+        assert!(
+            iterative.to_string().contains("no bootstrap helpers given"),
+            "{iterative}"
+        );
+        let local = PiecewiseYieldCurve::<ForwardRate, ConvexMonotone, LocalBootstrap>::new(
+            vars.settlement,
+            Vec::new(),
+            Actual360::new(),
+            ConvexMonotone::default(),
+        )
+        .err()
+        .expect("a local curve needs helpers");
+        assert!(
+            local.to_string().contains("no bootstrap helpers given"),
+            "{local}"
+        );
+
+        let global = PiecewiseYieldCurve::<Discount, LogLinear, GlobalBootstrap>::new(
+            vars.settlement,
+            Vec::new(),
+            Actual360::new(),
+            LogLinear,
+        )
+        .expect("a global curve builds without helpers");
+        let error = global
+            .discount(1.0, true)
+            .expect_err("a one-node grid cannot be interpolated");
+        assert!(
+            error.to_string().contains("not enough curve points (1)"),
+            "{error}"
+        );
     }
 
     /// `testGlobalBootstrapInitialGuessFn` (`piecewiseyieldcurve.cpp:1552`,
