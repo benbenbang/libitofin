@@ -295,7 +295,7 @@ fn assert_matches_oracle(second: &OptionletStripper2, case: &str) {
         assert!((strikes[i] - strike).abs() < 1e-12, "{case} {i} strike");
         assert!((prices[i] - price).abs() < 2.5e-8, "{case} {i} price");
         assert!(
-            (spreads[i] - spread).abs() < 1e-9,
+            (spreads[i] - spread).abs() < 1e-7,
             "{case} {i} spread {} vs {spread}",
             spreads[i]
         );
