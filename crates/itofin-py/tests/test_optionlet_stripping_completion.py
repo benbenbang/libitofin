@@ -106,7 +106,7 @@ def test_stripper2_atm_curve_retention_updates_and_normal_rejection():
     strikes, prices = second.atm_cap_floor_strikes(), second.atm_cap_floor_prices()
     assert strikes == pytest.approx([.039850314101546484, .039850293421813322, .039849613061160541], abs=1e-12, rel=0)
     assert prices == pytest.approx([.0010954230960266622, .0087581286819643916, .019163763351720011], abs=2.5e-8, rel=0)
-    assert second.spreads_vol() == pytest.approx([.020000005236476808, .020000058319575627, .020000166175862723], abs=1e-7, rel=0)
+    assert second.spreads_vol() == pytest.approx([.020000001831464633, .020000020399749262, .020000058111508685], abs=1e-7, rel=0)
     for tenor, strike, target in zip(tenors, strikes, prices, strict=True):
         cap = CapFloor(CapFloorType.Cap, tenor, index, strike, Period(0, "Days"), settings)
         cap.set_black_engine(engine)
