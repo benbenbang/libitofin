@@ -340,3 +340,22 @@ fn atm_price_below_the_attainable_minimum_is_rejected() {
     let error = second.spreads_vol().unwrap_err().to_string();
     assert!(error.contains(expected), "{error}");
 }
+
+/// ATM and spread pricing follow the source vol type and displacement (`optionletstripper.cpp:253-283`).
+#[test]
+fn vol_type_and_displacement_route_the_atm_pricing() {
+    let displaced = oracle_stripper(
+        VolatilityType::ShiftedLognormal,
+        0.01,
+        |_, _| 0.18,
+        [0.20; 3],
+    );
+    assert_matches_oracle(&displaced, "displaced");
+    let normal = oracle_stripper(
+        VolatilityType::Normal,
+        0.0,
+        |i, strike| 0.008 + 0.0002 * i as f64 + 0.002 * strike,
+        [0.0085, 0.0095, 0.0100],
+    );
+    assert_matches_oracle(&normal, "normal");
+}

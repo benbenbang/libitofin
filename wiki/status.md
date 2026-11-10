@@ -109,8 +109,9 @@ ATM curves retain live quotes with fixed or moving reference dates. Surface
 volatility interpolation remains linear; adapter smiles use cubic interpolation.
 
 `dontThrow` substitutes zero only for failed implied-volatility inversions;
-invalid market data and pricing errors still propagate. Stripper2 uses Black
-pricing and rejects normal inputs. The typed overnight constructor requires an
+invalid market data and pricing errors still propagate. Stripper2 prices with
+the source volatility type (Black with displacement, or Bachelier) and solves
+spreads on the QuantLib v1.44 brackets. The typed overnight constructor requires an
 optionlet frequency and follows QuantLib's daily Ibor cap construction. Separate
 `CapFloor.overnight` constructors price actual compounded overnight legs; flat
 and stripped normal-volatility prices have independent QuantLib checks at `2.5e-8`.

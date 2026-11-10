@@ -16,7 +16,8 @@ use crate::option::OptionType;
 use crate::patterns::lazyobject::LazyObject;
 use crate::patterns::observable::{AsObservable, Observable, Observer};
 use crate::pricingengine::PricingEngine;
-use crate::pricingengines::{BlackCapFloorEngine, black_formula};
+use crate::pricingengines::blackformula::bachelier_black_formula;
+use crate::pricingengines::{BachelierCapFloorEngine, BlackCapFloorEngine, black_formula};
 use crate::quotes::make_quote_handle;
 use crate::shared::{Shared, SharedMut, shared, shared_mut};
 use crate::termstructures::TermStructure;
@@ -54,8 +55,8 @@ impl Observer for Updater {
 
 /// Inserts ATM cap strikes with implied additive volatility corrections.
 ///
-/// Like the reference implementation, this layer prices ATM caps with the Black
-/// model. Normal inputs are rejected explicitly; Stripper1 supports both models.
+/// ATM caps are priced, and the spreads solved, with the source's volatility type:
+/// shifted-lognormal Black with the source displacement, or normal Bachelier.
 pub struct OptionletStripper2 {
     source: Shared<OptionletStripper1>,
     atm_curve: Shared<CapFloorTermVolCurve>,
@@ -71,10 +72,6 @@ impl OptionletStripper2 {
         source: Shared<OptionletStripper1>,
         atm_curve: Shared<CapFloorTermVolCurve>,
     ) -> QlResult<Self> {
-        crate::require!(
-            source.volatility_type() == VolatilityType::ShiftedLognormal,
-            "OptionletStripper2 requires shifted-lognormal volatility"
-        );
         crate::require!(
             source.day_counter() == atm_curve.day_counter(),
             "different day counters provided"
@@ -143,13 +140,23 @@ impl OptionletStripper2 {
                 "cap/floor length {tenor} does not contain any optionlets"
             );
             let strike = cap.atm_rate(curve.as_ref())?;
-            let engine = shared_mut(BlackCapFloorEngine::with_flat_vol(
-                curve_handle.clone(),
-                make_quote_handle(atm_vol).handle(),
-                day_counter.clone(),
-                0.0,
-                settings.clone(),
-            )?) as SharedMut<dyn PricingEngine>;
+            let normal = self.volatility_type() == VolatilityType::Normal;
+            let engine: SharedMut<dyn PricingEngine> = if normal {
+                shared_mut(BachelierCapFloorEngine::with_flat_vol(
+                    curve_handle.clone(),
+                    make_quote_handle(atm_vol).handle(),
+                    day_counter.clone(),
+                    settings.clone(),
+                )?)
+            } else {
+                shared_mut(BlackCapFloorEngine::with_flat_vol(
+                    curve_handle.clone(),
+                    make_quote_handle(atm_vol).handle(),
+                    day_counter.clone(),
+                    self.displacement(),
+                    settings.clone(),
+                )?)
+            };
             let mut cap = MakeCapFloor::new(
                 CapFloorType::Cap,
                 tenor,
@@ -185,14 +192,25 @@ impl OptionletStripper2 {
                 inputs
                     .iter()
                     .map(|&(forward, root_time, vol, annuity)| {
-                        black_formula(
-                            OptionType::Call,
-                            strike,
-                            forward,
-                            (vol + spread) * root_time,
-                            annuity,
-                            self.displacement(),
-                        )
+                        let std_dev = (vol + spread) * root_time;
+                        if normal {
+                            bachelier_black_formula(
+                                OptionType::Call,
+                                strike,
+                                forward,
+                                std_dev,
+                                annuity,
+                            )
+                        } else {
+                            black_formula(
+                                OptionType::Call,
+                                strike,
+                                forward,
+                                std_dev,
+                                annuity,
+                                self.displacement(),
+                            )
+                        }
                         .unwrap_or(Real::NAN)
                     })
                     .sum::<Real>()
