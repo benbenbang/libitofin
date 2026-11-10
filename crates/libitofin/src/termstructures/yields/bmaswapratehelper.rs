@@ -19,7 +19,7 @@ use crate::time::{
     daycounter::DayCounter, period::Period, schedule::MakeSchedule, timeunit::TimeUnit,
 };
 use std::{
-    cell::{Ref, RefCell},
+    cell::RefCell,
     panic::{AssertUnwindSafe, catch_unwind},
     rc::Weak,
 };
@@ -27,7 +27,7 @@ use std::{
 /// Fits the BMA forecast curve from fractions of a supplied Ibor forecast curve.
 pub struct BMASwapRateHelper {
     base: BootstrapHelperBase,
-    swap: RefCell<Option<BMASwap>>,
+    swap: RefCell<Option<SharedMut<BMASwap>>>,
     date_error: RefCell<Option<QlError>>,
     tenor: Period,
     settlement_days: u32,
@@ -111,11 +111,13 @@ impl BMASwapRateHelper {
         helper.try_initialize_dates()?;
         Ok(helper)
     }
-    /// The BMA swap underlying the helper (v1.44 `ratehelpers.hpp:315`), rebuilt
-    /// whenever the evaluation date moves. The borrow must be released before
-    /// the evaluation date changes, since the rebuild replaces the swap.
-    pub fn swap(&self) -> Option<Ref<'_, BMASwap>> {
-        Ref::filter_map(self.swap.borrow(), Option::as_ref).ok()
+    /// A shared handle to the BMA swap underlying the helper (v1.44
+    /// `ratehelpers.hpp:315`, a `shared_ptr` there). Moving the evaluation date
+    /// rebuilds a new swap and leaves a held handle on the old one, so holding
+    /// it never blocks the rebuild. A borrow held on it while the helper prices
+    /// makes `implied_quote` return an error rather than panic.
+    pub fn swap(&self) -> Option<SharedMut<BMASwap>> {
+        self.swap.borrow().clone()
     }
     /// Atomically rebuilds dates and stores errors until a subsequent successful update.
     pub fn try_initialize_dates(&self) -> QlResult<()> {
@@ -128,7 +130,7 @@ impl BMASwapRateHelper {
         });
         match result {
             Ok((swap, earliest, maturity, latest)) => {
-                *self.swap.borrow_mut() = Some(swap);
+                *self.swap.borrow_mut() = Some(shared_mut(swap));
                 self.base.set_earliest_date(earliest);
                 self.base.set_maturity_date(maturity);
                 self.base.set_latest_relevant_date(latest);
@@ -229,8 +231,12 @@ impl RateHelper for BMASwapRateHelper {
         }
         let curve = self.base.term_structure()?;
         curve.discount(0.0, true)?;
-        let mut slot = self.swap.borrow_mut();
-        let swap = slot.as_mut().expect("validated BMA helper has a swap");
+        let slot = self.swap.borrow();
+        let mut swap = slot
+            .as_ref()
+            .expect("validated BMA helper has a swap")
+            .try_borrow_mut()
+            .map_err(|_| QlError::new("BMA helper swap is borrowed", file!(), line!()))?;
         swap.swap_mut().deep_update();
         swap.fair_libor_fraction()
     }

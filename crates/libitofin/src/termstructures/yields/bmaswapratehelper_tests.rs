@@ -14,6 +14,7 @@ use crate::time::daycounters::{
     actualactual::{ActualActual, Convention},
 };
 use crate::time::frequency::Frequency;
+use std::rc::Rc;
 
 const YEARS: [i32; 10] = [1, 2, 3, 4, 5, 7, 10, 15, 20, 30];
 const FRACTIONS: [f64; 10] = [
@@ -373,9 +374,9 @@ fn implied_quote_on_a_dirty_curve_reprices_the_new_quote() {
 /// swap starts on its earliest date (Wednesday 17 January 2024, two joint
 /// business days from Martin Luther King Day) with 20 quarterly BMA coupons,
 /// and moving the evaluation date one month rebuilds it (start Tuesday
-/// 20 February 2024, past Presidents' Day). C++ also checks the rebuilt
-/// `shared_ptr` differs; the swap lives in the helper's `RefCell`, so the port
-/// checks the rebuilt start date instead.
+/// 20 February 2024, past Presidents' Day). The first handle is held across
+/// the move, and the rebuilt swap is a different allocation, as C++ checks on
+/// the `shared_ptr` (:2488).
 #[test]
 fn bma_helper_swap_follows_the_evaluation_date() {
     let today = Date::new(15, Month::January, 2024);
@@ -408,11 +409,9 @@ fn bma_helper_swap_follows_the_evaluation_date() {
     )
     .unwrap();
 
-    let first_start = {
-        let swap = helper.swap().unwrap();
-        assert_eq!(swap.swap().leg(1).unwrap().len(), 20);
-        swap.swap().start_date().unwrap()
-    };
+    let first = helper.swap().unwrap();
+    assert_eq!(first.borrow().swap().leg(1).unwrap().len(), 20);
+    let first_start = first.borrow().swap().start_date().unwrap();
     assert_eq!(first_start, helper.base().earliest_date());
     assert_eq!(first_start, Date::new(17, Month::January, 2024));
 
@@ -423,8 +422,32 @@ fn bma_helper_swap_follows_the_evaluation_date() {
         Bdc::Following,
         false,
     ));
-    let second_start = helper.swap().unwrap().swap().start_date().unwrap();
+    let second = helper.swap().unwrap();
+    assert!(!Rc::ptr_eq(&first, &second));
+    assert_eq!(first.borrow().swap().start_date().unwrap(), first_start);
+    let second_start = second.borrow().swap().start_date().unwrap();
     assert_ne!(second_start, first_start);
     assert_eq!(second_start, helper.base().earliest_date());
     assert_eq!(second_start, Date::new(20, Month::February, 2024));
+}
+
+/// A borrow held on the shared swap while the helper prices is reported as an
+/// error by `implied_quote`, and pricing recovers once it is released.
+#[test]
+fn a_borrowed_swap_makes_implied_quote_fail_without_panicking() {
+    let m = Market::new();
+    let h = m.helper(1, &shared(SimpleQuote::new(0.6756)));
+    let curve = PiecewiseYieldCurve::<Discount, LogLinear>::new(
+        m.today,
+        vec![h.clone() as Shared<dyn RateHelper>],
+        Actual360::new(),
+        LogLinear,
+    )
+    .unwrap();
+    curve.discount_date(h.pillar_date(), false).unwrap();
+    let swap = h.swap().unwrap();
+    let held = swap.borrow();
+    assert!(h.implied_quote().is_err());
+    drop(held);
+    assert!((h.implied_quote().unwrap() - 0.6756).abs() < 1e-10);
 }
