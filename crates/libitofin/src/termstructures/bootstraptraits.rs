@@ -33,6 +33,7 @@
 //! term-structure family whose nodes are not discount factors.
 
 use crate::errors::QlResult;
+use crate::math::array::Array;
 use crate::math::interpolations::{Interpolation, Interpolator};
 use crate::time::date::Date;
 use crate::types::{DiscountFactor, Real, Size, Time};
@@ -136,6 +137,31 @@ pub trait YieldBootstrapTraits: BootstrapTraits {
     fn transform_inverse(x: Real, _t: Time) -> Real {
         x
     }
+
+    /// The global bootstrap's whole-curve initial guess over the interior
+    /// nodes, and whether it still has to be mapped through
+    /// [`transform_inverse`](Self::transform_inverse) (`Traits::globalGuess`,
+    /// `bootstraptraits.hpp:84,184,275,365`).
+    ///
+    /// The default is the per-node path `makeInitialGuess` falls back to for a
+    /// convention without a `globalGuess` (`globalbootstrap.hpp:412-427`):
+    /// every node is seeded through [`guess`](BootstrapTraits::guess) and
+    /// [`update_guess`](BootstrapTraits::update_guess) in order, because each
+    /// guess may read the nodes before it, and the result needs the transform.
+    /// It runs on a copy of `data`: the curve's own nodes are not written until
+    /// the first trial point, exactly as on the upstream `globalGuess` path.
+    /// All four yield conventions override it.
+    fn global_guess(times: &[Time], data: &[Real], valid_data: bool) -> (Array, bool) {
+        let mut nodes = data.to_vec();
+        let guess = (1..times.len())
+            .map(|i| {
+                let value = Self::guess(i, times, &nodes, valid_data);
+                Self::update_guess(&mut nodes, value, i);
+                nodes[i]
+            })
+            .collect();
+        (guess, true)
+    }
 }
 
 /// Discount-factor bootstrap traits (`struct Discount`,
@@ -213,6 +239,17 @@ impl YieldBootstrapTraits for Discount {
     fn transform_inverse(x: Real, _t: Time) -> Real {
         x.ln()
     }
+
+    /// `Discount::globalGuess` (`bootstraptraits.hpp:84-95`): a reused
+    /// solution is handed back for the transform, while a fresh curve starts
+    /// from a flat `AVG_RATE` already in the log-discount optimizer space,
+    /// `-AVG_RATE * t`, so no `exp`/`log` round trip is needed.
+    fn global_guess(times: &[Time], data: &[Real], valid_data: bool) -> (Array, bool) {
+        if valid_data {
+            return (Array::from(data[1..].to_vec()), true);
+        }
+        (times[1..].iter().map(|t| t * -AVG_RATE).collect(), false)
+    }
 }
 
 /// The per-node guess the rate-storing conventions share (`ZeroYield`/
@@ -233,6 +270,17 @@ fn rate_guess(i: Size, data: &[Real], valid_data: bool) -> Real {
         return AVG_RATE;
     }
     data[i - 1]
+}
+
+/// The whole-curve guess the rate-storing conventions share
+/// (`ZeroYield`/`ForwardRate`/`SimpleZeroYield` `globalGuess`,
+/// `bootstraptraits.hpp:184-190`/`:275-281`/`:365-371`): the reused solution,
+/// or a flat `AVG_RATE` on a fresh curve, both to be transformed.
+fn rate_global_guess(times: &[Time], data: &[Real], valid_data: bool) -> (Array, bool) {
+    if valid_data {
+        return (Array::from(data[1..].to_vec()), true);
+    }
+    (Array::filled(times.len() - 1, AVG_RATE), true)
 }
 
 /// The lower bracket the rate-storing conventions share (`minValueAfter`,
@@ -319,6 +367,10 @@ impl YieldBootstrapTraits for ZeroYield {
         };
         Ok((-z * t).exp())
     }
+
+    fn global_guess(times: &[Time], data: &[Real], valid_data: bool) -> (Array, bool) {
+        rate_global_guess(times, data, valid_data)
+    }
 }
 
 /// Forward-rate bootstrap traits (`struct ForwardRate`,
@@ -374,6 +426,10 @@ impl YieldBootstrapTraits for ForwardRate {
             interpolation.primitive(t_max)? + last_forward * (t - t_max)
         };
         Ok((-integral).exp())
+    }
+
+    fn global_guess(times: &[Time], data: &[Real], valid_data: bool) -> (Array, bool) {
+        rate_global_guess(times, data, valid_data)
     }
 }
 
@@ -460,6 +516,10 @@ impl YieldBootstrapTraits for SimpleZeroYield {
     /// `log(x - (-1/t + 1e-8))` (`bootstraptraits.hpp:389-393`).
     fn transform_inverse(x: Real, t: Time) -> Real {
         (x - simple_zero_floor(t)).ln()
+    }
+
+    fn global_guess(times: &[Time], data: &[Real], valid_data: bool) -> (Array, bool) {
+        rate_global_guess(times, data, valid_data)
     }
 }
 
@@ -673,6 +733,95 @@ mod tests {
         let mut data = [1.0, 0.98, 1.0];
         Discount::update_guess(&mut data, 0.95, 2);
         assert_eq!(data[2], 0.95);
+    }
+
+    /// `Discount::globalGuess` (`bootstraptraits.hpp:84-95`): a fresh curve
+    /// starts at `-AVG_RATE * t` already in log space and skips the transform;
+    /// a reused solution is the stored interior nodes, to be transformed.
+    #[test]
+    fn discount_global_guess_is_log_space_flat_average_rate() {
+        let times = [0.0, 0.5, 2.0];
+        let data = [1.0, 0.98, 0.90];
+        let (guess, needs_transform) = Discount::global_guess(&times, &data, false);
+        assert_eq!(guess, Array::from(vec![-0.025, -0.1]));
+        assert!(!needs_transform);
+        let (guess, needs_transform) = Discount::global_guess(&times, &data, true);
+        assert_eq!(guess, Array::from(vec![0.98, 0.90]));
+        assert!(needs_transform);
+    }
+
+    /// The rate conventions' `globalGuess` (`bootstraptraits.hpp:184-190`,
+    /// `:275-281`, `:365-371`): flat `AVG_RATE` on a fresh curve, the stored
+    /// interior nodes on a reused one, both to be transformed.
+    #[test]
+    fn rate_convention_global_guess_is_flat_average_rate() {
+        let times = [0.0, 0.5, 2.0];
+        let data = [0.02, 0.02, 0.03];
+        for (fresh, reused) in [
+            (
+                ZeroYield::global_guess(&times, &data, false),
+                ZeroYield::global_guess(&times, &data, true),
+            ),
+            (
+                ForwardRate::global_guess(&times, &data, false),
+                ForwardRate::global_guess(&times, &data, true),
+            ),
+            (
+                SimpleZeroYield::global_guess(&times, &data, false),
+                SimpleZeroYield::global_guess(&times, &data, true),
+            ),
+        ] {
+            assert_eq!(fresh, (Array::from(vec![AVG_RATE, AVG_RATE]), true));
+            assert_eq!(reused, (Array::from(vec![0.02, 0.03]), true));
+        }
+    }
+
+    /// A convention that delegates everything to `Discount` but keeps the
+    /// default `global_guess`, so the per-node fallback is exercised.
+    struct PerNodeDiscount;
+
+    impl BootstrapTraits for PerNodeDiscount {
+        fn initial_value() -> Real {
+            Discount::initial_value()
+        }
+        fn guess(i: Size, times: &[Time], data: &[Real], valid_data: bool) -> Real {
+            Discount::guess(i, times, data, valid_data)
+        }
+        fn min_value_after(i: Size, times: &[Time], data: &[Real], valid_data: bool) -> Real {
+            Discount::min_value_after(i, times, data, valid_data)
+        }
+        fn max_value_after(i: Size, times: &[Time], data: &[Real], valid_data: bool) -> Real {
+            Discount::max_value_after(i, times, data, valid_data)
+        }
+        fn update_guess(data: &mut [Real], value: Real, i: Size) {
+            Discount::update_guess(data, value, i);
+        }
+        fn max_iterations() -> Size {
+            Discount::max_iterations()
+        }
+    }
+
+    impl YieldBootstrapTraits for PerNodeDiscount {
+        fn discount_from_nodes<I: Interpolation>(
+            interpolation: &I,
+            t: Time,
+        ) -> QlResult<DiscountFactor> {
+            Discount::discount_from_nodes(interpolation, t)
+        }
+    }
+
+    /// The default `global_guess` is the per-node fallback of
+    /// `makeInitialGuess` (`globalbootstrap.hpp:412-427`): each node seeded by
+    /// `guess` reading the nodes updated before it, flagged for the transform.
+    #[test]
+    fn default_global_guess_seeds_node_by_node() {
+        let times = [0.0, 0.5, 2.0];
+        let data = [1.0, 1.0, 1.0];
+        let (guess, needs_transform) = PerNodeDiscount::global_guess(&times, &data, false);
+        let first = 1.0 / (1.0 + AVG_RATE * 0.5);
+        let r = -first.ln() / 0.5;
+        assert_eq!(guess, Array::from(vec![first, (-r * 2.0).exp()]));
+        assert!(needs_transform);
     }
 
     /// The `Discount` optimizer transforms are `exp`/`log`
