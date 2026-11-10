@@ -596,10 +596,11 @@ impl PyForwardCurve {
 /// Quote mutation from a callback is rejected; read helpers and trial nodes instead.
 /// The supplied time and data lists include the reference node and are copies.
 ///
-/// The bootstrap is lazy: construction only rejects an empty helper list, and
-/// the solver runs on the first query, re-running after a helper-quote or
-/// evaluation-date change. A bootstrap failure therefore surfaces from the
-/// query methods, not from the constructor.
+/// The bootstrap is lazy: construction only rejects an empty helper list (under
+/// "iterative"; "global" accepts one and fails at the first query when its grid
+/// is too short), and the solver runs on the first query, re-running after a
+/// helper-quote or evaluation-date change. A bootstrap failure therefore
+/// surfaces from the query methods, not from the constructor.
 ///
 /// max_date is the exception: it swallows a bootstrap failure and reports the
 /// current grid bound, or the reference date before a grid has been installed.
@@ -661,9 +662,10 @@ impl PyPiecewiseYieldCurve {
     ///         solved jointly with nodes. All additional options require global.
     ///
     /// Raises:
-    ///     ItofinError: On an empty helper list, on an unknown interpolation
-    ///         or bootstrap name, on additional helpers under "iterative",
-    ///         and on "Cubic" under "global".
+    ///     ItofinError: On an empty helper list under "iterative" (a "global"
+    ///         curve without helpers raises at its first query instead), on an
+    ///         unknown interpolation or bootstrap name, on additional helpers
+    ///         under "iterative", and on "Cubic" under "global".
     #[gen_stub(override_return_type(type_repr = "PiecewiseYieldCurve"))]
     #[new]
     #[allow(clippy::too_many_arguments)]
