@@ -10,6 +10,8 @@ __all__ = [
     "bucket_analysis",
     "bucket_analysis_matrix",
     "parallel_analysis",
+    "parameter_sensitivity",
+    "parameter_sensitivity_vector",
 ]
 
 @typing.final
@@ -60,4 +62,29 @@ def parallel_analysis(quotes: typing.Sequence[quotes.SimpleQuote], instruments: 
     Under a Monte Carlo engine each reprice carries sampling error that does not
     shrink with the shift, so the result is noisy; prefer an analytic, tree or
     finite-difference engine.
+    """
+
+def parameter_sensitivity(quote: quotes.SimpleQuote, parameters: typing.Sequence[quotes.Quote], reference_values: typing.Optional[typing.Sequence[typing.Optional[builtins.float]]] = None, shift: builtins.float = 0.0001, kind: SensitivityAnalysis = SensitivityAnalysis.Centered) -> builtins.list[tuple[typing.Optional[builtins.float], typing.Optional[builtins.float]]]:
+    r"""
+    Sensitivities of `parameters` to a bump of `quote` by `shift`.
+
+    Returns one `(first, second)` per parameter, in parameter order; `second`
+    is None for `OneSide`. Parameters may be any Quote, typically a
+    DerivedQuote or CompositeQuote built on `quote`. A None `reference_values`
+    reads them from the parameters before the bump; otherwise it needs one
+    entry per parameter, and a None entry skips its parameter, giving
+    `(None, None)`. A zero shift is an error. The quote is restored on return.
+
+    There is no QuantLib test-suite oracle: the parameter forms were removed
+    upstream. An invalid parameter would also be skipped, but no binding can
+    build an invalid quote.
+    """
+
+def parameter_sensitivity_vector(quotes: typing.Sequence[quotes.SimpleQuote], parameters: typing.Sequence[quotes.Quote], shift: builtins.float = 0.0001, kind: SensitivityAnalysis = SensitivityAnalysis.Centered) -> builtins.list[builtins.list[tuple[typing.Optional[builtins.float], typing.Optional[builtins.float]]]]:
+    r"""
+    `parameter_sensitivity` for each quote, bumped one at a time, with the
+    reference values read once from the parameters.
+
+    Returns one list of `(first, second)` per quote, each in parameter order.
+    An empty `quotes` is an error. Same conventions as `parameter_sensitivity`.
     """
