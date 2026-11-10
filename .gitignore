@@ -164,3 +164,5 @@ mutants*
 PORT_COVERAGE.md
 *.patch
 review*.md
+benchmarks/**/*.md
+!benchmarks/**/benchmark*.md
