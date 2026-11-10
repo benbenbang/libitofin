@@ -118,7 +118,11 @@ impl OptionletStripper2 {
         let adapter = StrippedOptionletAdapter::new(self.source.clone(), settings.clone())?;
         adapter.enable_extrapolation();
         let times = self.source.optionlet_fixing_times()?;
-        let first_optionlet_date = self.source.optionlet_fixing_dates()?[0];
+        let first_optionlet_date = *self
+            .source
+            .optionlet_fixing_dates()?
+            .first()
+            .ok_or_else(|| crate::errors::QlError::new("empty optionlet grid", file!(), line!()))?;
         let mut state = Correction::default();
         for i in 0..self.source.optionlet_maturities() {
             state.strikes.push(self.source.optionlet_strikes(i)?);
@@ -211,10 +215,9 @@ impl OptionletStripper2 {
                                 self.displacement(),
                             )
                         }
-                        .unwrap_or(Real::NAN)
                     })
-                    .sum::<Real>()
-                    - price
+                    .sum::<QlResult<Real>>()
+                    .map(|npv| npv - price)
             };
             let min_base_vol = inputs
                 .iter()
@@ -225,22 +228,38 @@ impl OptionletStripper2 {
                 "negative optionlet volatility at ATM strike {strike}"
             );
             let mut solver = Brent::new().with_max_evaluations(10000);
-            let value_at_zero = objective(0.0);
+            let value_at_zero = objective(0.0)?;
             let spread = if close(value_at_zero, 0.0) {
                 0.0
             } else if value_at_zero > 0.0 {
                 let min_spread = -min_base_vol;
                 crate::require!(
-                    min_base_vol > 0.0 && objective(min_spread) <= 0.0,
+                    min_base_vol > 0.0,
                     "ATM cap/floor price for option expiry {tenor} is below the minimum attainable price"
                 );
-                solver.solve_bracketed(&objective, 1e-6, 0.5 * min_spread, min_spread, 0.0)?
+                crate::require!(
+                    objective(min_spread)? <= 0.0,
+                    "ATM cap/floor price for option expiry {tenor} is below the minimum attainable price"
+                );
+                solver.solve_bracketed(
+                    |spread| objective(spread).unwrap_or(Real::NAN),
+                    1e-6,
+                    0.5 * min_spread,
+                    min_spread,
+                    0.0,
+                )?
             } else {
                 crate::require!(
-                    objective(MAX_SPREAD) >= 0.0,
+                    objective(MAX_SPREAD)? >= 0.0,
                     "ATM cap/floor price for option expiry {tenor} requires a volatility spread greater than {MAX_SPREAD}"
                 );
-                solver.solve_bracketed(&objective, 1e-6, 0.5 * MAX_SPREAD, 0.0, MAX_SPREAD)?
+                solver.solve_bracketed(
+                    |spread| objective(spread).unwrap_or(Real::NAN),
+                    1e-6,
+                    0.5 * MAX_SPREAD,
+                    0.0,
+                    MAX_SPREAD,
+                )?
             };
             for (i, &time) in times.iter().enumerate().take(count) {
                 let vol = adapter.volatility(time, strike, true)? + spread;
