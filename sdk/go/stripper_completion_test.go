@@ -100,7 +100,7 @@ func TestOptionletStripperCompletion(t *testing.T) {
 	}
 	wantStrikes := []float64{.039850314101546484, .039850293421813322, .039849613061160541}
 	wantPrices := []float64{.0010954230960266622, .0087581286819643916, .019163763351720011}
-	wantSpreads := []float64{.020000005236476808, .020000058319575627, .020000166175862723}
+	wantSpreads := []float64{.020000001831464633, .020000020399749262, .020000058111508685}
 	spreads := pricingMust(second.SpreadsVol())
 	for i := range prices {
 		pricingNear(t, atmStrikes[i], wantStrikes[i], 1e-12)

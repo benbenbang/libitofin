@@ -9,6 +9,7 @@ use crate::event::Event;
 use crate::indexes::interestrateindex::InterestRateIndex;
 use crate::instrument::Instrument;
 use crate::instruments::{CapFloorType, MakeCapFloor};
+use crate::math::comparison::close;
 use crate::math::solver1d::Solver1D;
 use crate::math::solvers1d::brent::Brent;
 use crate::option::OptionType;
@@ -28,6 +29,8 @@ use crate::time::{
 };
 use crate::types::{Natural, Rate, Real, Time, Volatility};
 use std::cell::RefCell;
+
+const MAX_SPREAD: Volatility = 0.1;
 
 #[derive(Default)]
 struct Correction {
@@ -105,6 +108,7 @@ impl OptionletStripper2 {
         result
     }
 
+    #[allow(clippy::neg_cmp_op_on_partial_ord)]
     fn perform_calculations(&self) -> QlResult<()> {
         let index = self.source.base().ibor_index();
         let settings = index.base().settings().clone();
@@ -185,7 +189,7 @@ impl OptionletStripper2 {
                             OptionType::Call,
                             strike,
                             forward,
-                            (vol + spread).abs() * root_time,
+                            (vol + spread) * root_time,
                             annuity,
                             self.displacement(),
                         )
@@ -194,9 +198,32 @@ impl OptionletStripper2 {
                     .sum::<Real>()
                     - price
             };
-            let spread = Brent::new()
-                .with_max_evaluations(10000)
-                .solve_bracketed(objective, 1e-6, 0.0001, -0.1, 0.1)?;
+            let min_base_vol = inputs
+                .iter()
+                .map(|&(_, _, vol, _)| vol)
+                .fold(Real::MAX, Real::min);
+            crate::require!(
+                min_base_vol >= 0.0,
+                "negative optionlet volatility at ATM strike {strike}"
+            );
+            let mut solver = Brent::new().with_max_evaluations(10000);
+            let value_at_zero = objective(0.0);
+            let spread = if close(value_at_zero, 0.0) {
+                0.0
+            } else if value_at_zero > 0.0 {
+                let min_spread = -min_base_vol;
+                crate::require!(
+                    min_base_vol > 0.0 && objective(min_spread) <= 0.0,
+                    "ATM cap/floor price for option expiry {tenor} is below the minimum attainable price"
+                );
+                solver.solve_bracketed(&objective, 1e-6, 0.5 * min_spread, min_spread, 0.0)?
+            } else {
+                crate::require!(
+                    objective(MAX_SPREAD) >= 0.0,
+                    "ATM cap/floor price for option expiry {tenor} requires a volatility spread greater than {MAX_SPREAD}"
+                );
+                solver.solve_bracketed(&objective, 1e-6, 0.5 * MAX_SPREAD, 0.0, MAX_SPREAD)?
+            };
             for (i, &time) in times.iter().enumerate().take(count) {
                 let vol = adapter.volatility(time, strike, true)? + spread;
                 let position = state.strikes[i].partition_point(|&value| value < strike);

@@ -212,3 +212,131 @@ fn atm_adjustment_stops_at_the_last_cap_optionlet() {
     assert!(!holds(1, atm[0]) && holds(1, atm[1]));
     assert!(!holds(3, atm[0]) && !holds(3, atm[1]));
 }
+
+fn oracle(case: &str) -> Vec<[f64; 3]> {
+    include_str!("fixtures/optionlet_stripper2_v144/oracle.txt")
+        .lines()
+        .filter_map(|line| {
+            let fields: Vec<&str> = line.split(' ').collect();
+            (fields[0] == case).then(|| std::array::from_fn(|k| fields[k + 2].parse().unwrap()))
+        })
+        .collect()
+}
+
+fn oracle_stripper(
+    vol_type: VolatilityType,
+    displacement: f64,
+    vol: impl Fn(usize, f64) -> f64,
+    atm_vols: [f64; 3],
+) -> OptionletStripper2 {
+    let v = vars();
+    let tenors: Vec<Period> = [1, 2, 3, 5, 7, 10]
+        .into_iter()
+        .map(|n| Period::new(n, Years))
+        .collect();
+    let strikes = vec![0.01, 0.02, 0.04, 0.06, 0.1];
+    let mut vols = Matrix::filled(tenors.len(), strikes.len(), 0.0);
+    for i in 0..tenors.len() {
+        for (j, &strike) in strikes.iter().enumerate() {
+            vols[(i, j)] = vol(i, strike);
+        }
+    }
+    let surface = shared(
+        CapFloorTermVolSurface::moving_from_matrix(
+            0,
+            Target::new(),
+            Following,
+            tenors,
+            strikes,
+            &vols,
+            Actual365Fixed::new(),
+            v.settings.clone(),
+        )
+        .unwrap(),
+    );
+    let first = shared(
+        OptionletStripper1::new(
+            surface,
+            v.index.clone(),
+            Handle::empty(),
+            1e-10,
+            100,
+            vol_type,
+            displacement,
+            None,
+        )
+        .unwrap(),
+    );
+    let atm_tenors = [1, 3, 5].map(|n| Period::new(n, Years)).to_vec();
+    let quotes = atm_vols
+        .iter()
+        .map(|&vol| make_quote_handle(vol).handle())
+        .collect();
+    let atm = CapFloorTermVolCurve::moving(
+        0,
+        Target::new(),
+        Following,
+        atm_tenors,
+        quotes,
+        Actual365Fixed::new(),
+        v.settings.clone(),
+    )
+    .unwrap();
+    OptionletStripper2::new(first, shared(atm)).unwrap()
+}
+
+fn assert_matches_oracle(second: &OptionletStripper2, case: &str) {
+    let strikes = second.atm_cap_floor_strikes().unwrap();
+    let prices = second.atm_cap_floor_prices().unwrap();
+    let spreads = second.spreads_vol().unwrap();
+    let expected = oracle(case);
+    assert_eq!(expected.len(), 3);
+    for (i, [strike, price, spread]) in expected.into_iter().enumerate() {
+        assert!((strikes[i] - strike).abs() < 1e-12, "{case} {i} strike");
+        assert!((prices[i] - price).abs() < 2.5e-8, "{case} {i} price");
+        assert!(
+            (spreads[i] - spread).abs() < 1e-9,
+            "{case} {i} spread {} vs {spread}",
+            spreads[i]
+        );
+    }
+}
+
+/// Bracketed spread solve (`optionletstripper2.cpp:176-207`): positive and negative roots.
+#[test]
+fn spread_solve_matches_v1_44_on_both_brackets() {
+    for (case, atm) in [("lognormal", 0.20), ("lognormal_below", 0.17)] {
+        let second = oracle_stripper(VolatilityType::ShiftedLognormal, 0.0, |_, _| 0.18, [atm; 3]);
+        assert_matches_oracle(&second, case);
+    }
+}
+
+/// A root beyond the 0.1 spread cap is an error (`optionletstripper2.cpp:199-204`).
+#[test]
+fn spread_beyond_the_cap_is_rejected() {
+    let second = oracle_stripper(
+        VolatilityType::ShiftedLognormal,
+        0.0,
+        |_, _| 0.18,
+        [0.40; 3],
+    );
+    let error = second.spreads_vol().unwrap_err().to_string();
+    assert!(error.contains("greater than 0.1"), "{error}");
+}
+
+/// An ATM price under the zero-optionlet-vol floor is an error (`optionletstripper2.cpp:182-195`).
+#[test]
+fn atm_price_below_the_attainable_minimum_is_rejected() {
+    let expected = include_str!("fixtures/optionlet_stripper2_v144/oracle.txt")
+        .lines()
+        .find_map(|line| line.strip_prefix("steep error "))
+        .unwrap();
+    let second = oracle_stripper(
+        VolatilityType::ShiftedLognormal,
+        0.0,
+        |i, _| 0.05 + 0.05 * i as f64,
+        [0.01; 3],
+    );
+    let error = second.spreads_vol().unwrap_err().to_string();
+    assert!(error.contains(expected), "{error}");
+}
