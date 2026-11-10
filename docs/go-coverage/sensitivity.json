@@ -51,6 +51,29 @@
       ]
     },
     {
+      "c": "itofin_parameter_sensitivity",
+      "go": [
+        "Session.ParameterSensitivity",
+        "ParameterSensitivity"
+      ],
+      "python": "itofin.risk.parameter_sensitivity",
+      "status": "implemented",
+      "tests": [
+        "TestParameterSensitivityAnalyticOracle",
+        "TestParameterSensitivityErrorsLeaveTheQuote"
+      ]
+    },
+    {
+      "c": "itofin_parameter_sensitivity_vector",
+      "go": "Session.ParameterSensitivityVector",
+      "python": "itofin.risk.parameter_sensitivity_vector",
+      "status": "implemented",
+      "tests": [
+        "TestParameterSensitivityVectorIsOneRowPerQuote",
+        "TestParameterSensitivityErrorsLeaveTheQuote"
+      ]
+    },
+    {
       "go": "SensitivityAnalysis",
       "python": "itofin.risk.SensitivityAnalysis",
       "status": "implemented",
@@ -82,5 +105,5 @@
       "status": "language-specific"
     }
   ],
-  "scope": "Parallel and bucket PV01 over SimpleQuotes for bonds, vanilla swaps, OIS, vanilla options, swaptions, cap/floors and CDS. Matrix bucket PV01 over a ragged quote matrix (C row-major buffers plus row lengths, Go [][] slices, Python list of lists). Python bucket_analysis also returns a labelled dict for a Mapping of quotes; Go KeyRateAnalysis returns the labelled report as an ordered slice and rejects duplicate labels."
+  "scope": "Parallel and bucket PV01 over SimpleQuotes for bonds, vanilla swaps, OIS, vanilla options, swaptions, cap/floors and CDS. Matrix bucket PV01 over a ragged quote matrix (C row-major buffers plus row lengths, Go [][] slices, Python list of lists). Python bucket_analysis also returns a labelled dict for a Mapping of quotes; Go KeyRateAnalysis returns the labelled report as an ordered slice and rejects duplicate labels. Parameter sensitivities of any quotes (typically DerivedQuote or CompositeQuote) to a SimpleQuote bump, single and vector forms (C ItofinParameterSensitivity with has_first/has_second, vector row-major; Go *float64; Python None)."
 }

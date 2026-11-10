@@ -1,5 +1,6 @@
 //! Bump-and-reprice sensitivities: parallel, bucket and matrix bucket PV01 over
-//! SimpleQuotes.
+//! SimpleQuotes, and parameter sensitivities of any quotes to a SimpleQuote
+//! bump.
 //!
 //! Supported instruments: every bond (each runs the same refresh and
 //! floating-coupon preflight as `Bond.npv` once, before the first reprice),
@@ -14,13 +15,14 @@ use crate::PyQlError;
 use crate::bonds::PyBond;
 use crate::capfloor::PyCapFloor;
 use crate::credit::PyCreditDefaultSwap;
-use crate::market::PySimpleQuote;
+use crate::market::{PyQuote, PySimpleQuote};
 use crate::ois::PyOvernightIndexedSwap;
 use crate::option::PyVanillaOption;
 use crate::swap::PyVanillaSwap;
 use crate::swaption::PySwaption;
+use libitofin::handle::Handle;
 use libitofin::instrument::Instrument;
-use libitofin::quotes::SimpleQuote;
+use libitofin::quotes::{Quote, SimpleQuote};
 use libitofin::risk::{self, DEFAULT_SHIFT, Rows, SensitivityAnalysis};
 use libitofin::shared::{Shared, SharedMut};
 use pyo3::exceptions::PyTypeError;
@@ -205,6 +207,79 @@ pub(crate) fn bucket_analysis_matrix(
     let (first, second) =
         risk::bucket_analysis_matrix(&rows, &instruments, &quantities, shift, kind.inner())
             .map_err(PyQlError::from)?;
+    Ok(first
+        .into_iter()
+        .zip(second)
+        .map(|(first, second)| first.into_iter().zip(second).collect())
+        .collect())
+}
+
+/// One parameter's `(first, second)` derivatives; both None for a skipped slot.
+type ParameterSlot = (Option<f64>, Option<f64>);
+
+fn handles(parameters: &[PyRef<'_, PyQuote>]) -> Vec<Handle<dyn Quote>> {
+    parameters
+        .iter()
+        .map(|parameter| parameter.handle())
+        .collect()
+}
+
+/// Sensitivities of `parameters` to a bump of `quote` by `shift`.
+///
+/// Returns one `(first, second)` per parameter, in parameter order; `second`
+/// is None for `OneSide`. Parameters may be any Quote, typically a
+/// DerivedQuote or CompositeQuote built on `quote`. A None `reference_values`
+/// reads them from the parameters before the bump; otherwise it needs one
+/// entry per parameter, and a None entry skips its parameter, giving
+/// `(None, None)`. A zero shift is an error. The quote is restored on return.
+///
+/// There is no QuantLib test-suite oracle: the parameter forms were removed
+/// upstream. An invalid parameter would also be skipped, but no binding can
+/// build an invalid quote.
+#[gen_stub_pyfunction(module = "itofin.risk")]
+#[pyfunction]
+#[pyo3(signature = (quote, parameters, reference_values = None, shift = DEFAULT_SHIFT, kind = PySensitivityAnalysis::Centered))]
+pub(crate) fn parameter_sensitivity(
+    quote: PyRef<'_, PySimpleQuote>,
+    parameters: Vec<PyRef<'_, PyQuote>>,
+    reference_values: Option<Vec<Option<f64>>>,
+    shift: f64,
+    kind: PySensitivityAnalysis,
+) -> PyResult<Vec<ParameterSlot>> {
+    crate::bootstrap::ensure_quote_mutation_allowed()?;
+    let (first, second) = risk::parameter_sensitivity(
+        &quote.shared(),
+        &handles(&parameters),
+        reference_values.as_deref(),
+        shift,
+        kind.inner(),
+    )
+    .map_err(PyQlError::from)?;
+    Ok(first.into_iter().zip(second).collect())
+}
+
+/// `parameter_sensitivity` for each quote, bumped one at a time, with the
+/// reference values read once from the parameters.
+///
+/// Returns one list of `(first, second)` per quote, each in parameter order.
+/// An empty `quotes` is an error. Same conventions as `parameter_sensitivity`.
+#[gen_stub_pyfunction(module = "itofin.risk")]
+#[pyfunction]
+#[pyo3(signature = (quotes, parameters, shift = DEFAULT_SHIFT, kind = PySensitivityAnalysis::Centered))]
+pub(crate) fn parameter_sensitivity_vector(
+    quotes: Vec<PyRef<'_, PySimpleQuote>>,
+    parameters: Vec<PyRef<'_, PyQuote>>,
+    shift: f64,
+    kind: PySensitivityAnalysis,
+) -> PyResult<Rows<ParameterSlot>> {
+    crate::bootstrap::ensure_quote_mutation_allowed()?;
+    let (first, second) = risk::parameter_sensitivity_vector(
+        &shared(&quotes),
+        &handles(&parameters),
+        shift,
+        kind.inner(),
+    )
+    .map_err(PyQlError::from)?;
     Ok(first
         .into_iter()
         .zip(second)
