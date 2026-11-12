@@ -204,6 +204,10 @@ mod tests {
 
     /// Expected dates from QuantLib-Python 1.44 `yearFractionToDate`; 1.43, with
     /// the old `100 * epsilon` shift, returns the adjacent day in every case.
+    /// Reproduce each row with
+    /// `uv run --with QuantLib==1.44 python -c 'import QuantLib as ql; print(ql.yearFractionToDate(DC, REF, T))'`
+    /// (DC the row's day counter, e.g. `ql.Actual360(True)`, REF its reference
+    /// date, T its time), and with `QuantLib==1.43` for the adjacent day.
     #[test]
     fn near_tie_times_round_like_quantlib_1_44() {
         let feb_2023 = Date::new(1, Month::February, 2023);

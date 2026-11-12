@@ -455,9 +455,10 @@ pub fn black_formula_implied_std_dev_approximation(
 /// Normal implied volatility, solved on out-of-the-money time value.
 ///
 /// A bracketed inversion avoids subtracting intrinsic value inside the solver.
-/// As in QuantLib v1.44 (`blackformula.cpp:919`), a premium `close_enough` to
-/// the intrinsic value returns zero before the negative-time-value check, so a
-/// price that rounds a few ulps below intrinsic still inverts.
+/// As in QuantLib v1.44 (`blackformula.cpp:908-926`), a strike `close_enough` to
+/// the forward takes the at-the-money closed form, and a premium `close_enough`
+/// to the intrinsic value returns zero before the negative-time-value check, so
+/// a price that rounds a few ulps below intrinsic still inverts.
 /// Invalid prices and nonpositive expiry/discount return an error.
 pub fn bachelier_black_formula_implied_vol(
     option_type: OptionType,
@@ -482,7 +483,7 @@ pub fn bachelier_black_formula_implied_vol(
     let intrinsic = (sign_of(option_type) * (forward - strike)).max(0.0);
     let distance = (forward - strike).abs();
     let scale = (2.0 * std::f64::consts::PI).sqrt();
-    if distance == 0.0 {
+    if close_enough(strike, forward) {
         return Ok(premium * scale / expiry.sqrt());
     }
     if close_enough(premium, intrinsic) {
@@ -1334,6 +1335,49 @@ mod tests {
                 bachelier_black_formula_implied_vol(option_type, strike, forward, 0.5, price, 1.0)
                     .expect("a price within close_enough of intrinsic must invert");
             assert_eq!(implied, 0.0);
+        }
+    }
+
+    #[test]
+    fn bachelier_implied_vol_one_ulp_above_intrinsic_is_zero() {
+        for (option_type, strike, forward) in [
+            (OptionType::Call, 0.03, 0.05),
+            (OptionType::Put, 0.05, 0.03),
+        ] {
+            let intrinsic = sign_of(option_type) * (forward - strike);
+            let price = intrinsic.next_up();
+            let implied =
+                bachelier_black_formula_implied_vol(option_type, strike, forward, 0.5, price, 1.0)
+                    .expect("a price within close_enough of intrinsic must invert");
+            assert_eq!(implied, 0.0);
+        }
+    }
+
+    #[test]
+    fn bachelier_implied_vol_of_a_negligible_out_of_the_money_premium_is_zero() {
+        let price = 1e-30;
+        for (option_type, strike, forward) in [
+            (OptionType::Call, 0.05, 0.03),
+            (OptionType::Put, 0.03, 0.05),
+        ] {
+            let implied =
+                bachelier_black_formula_implied_vol(option_type, strike, forward, 0.5, price, 1.0)
+                    .expect("a premium within close_enough of zero intrinsic must invert");
+            assert_eq!(implied, 0.0);
+        }
+    }
+
+    #[test]
+    fn bachelier_implied_vol_near_the_money_takes_the_atm_closed_form() {
+        let forward: Real = 0.05;
+        let strike = forward.next_up();
+        let (tte, price): (Real, Real) = (0.5, 0.004);
+        let expected = price * (2.0 * std::f64::consts::PI).sqrt() / tte.sqrt();
+        for option_type in [OptionType::Call, OptionType::Put] {
+            let implied =
+                bachelier_black_formula_implied_vol(option_type, strike, forward, tte, price, 1.0)
+                    .expect("valid inputs");
+            assert_eq!(implied.to_bits(), expected.to_bits());
         }
     }
 
