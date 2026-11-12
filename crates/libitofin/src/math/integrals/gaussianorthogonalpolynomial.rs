@@ -38,6 +38,13 @@ pub trait GaussianOrthogonalPolynomial {
     /// The weight function `w(x)`.
     fn w(&self, x: Real) -> Real;
 
+    /// `ln(w(x))` (QuantLib's `logW`), used by the quadrature weights when
+    /// `w(x)` under- or overflows; families override it with a form that
+    /// stays finite in the tails.
+    fn log_w(&self, x: Real) -> Real {
+        self.w(x).ln()
+    }
+
     /// The value of the monic polynomial `P_n(x)` via the three-term
     /// recurrence (iterative form of QuantLib's recursive `value`).
     fn value(&self, n: Size, x: Real) -> Real {
@@ -242,6 +249,10 @@ impl GaussianOrthogonalPolynomial for GaussLaguerrePolynomial {
     fn w(&self, x: Real) -> Real {
         x.powf(self.s) * (-x).exp()
     }
+
+    fn log_w(&self, x: Real) -> Real {
+        self.s * x.ln() - x
+    }
 }
 
 /// Generalized Gauss-Hermite polynomial, weight
@@ -286,6 +297,10 @@ impl GaussianOrthogonalPolynomial for GaussHermitePolynomial {
     fn w(&self, x: Real) -> Real {
         x.abs().powf(2.0 * self.mu) * (-x * x).exp()
     }
+
+    fn log_w(&self, x: Real) -> Real {
+        2.0 * self.mu * x.abs().ln() - x * x
+    }
 }
 
 /// Gauss hyperbolic polynomial, weight `w(x) = 1/cosh(x)` on the real line.
@@ -312,6 +327,13 @@ impl GaussianOrthogonalPolynomial for GaussHyperbolicPolynomial {
 
     fn w(&self, x: Real) -> Real {
         1.0 / x.cosh()
+    }
+
+    /// Uses `ln(cosh x) = |x| - ln 2 + ln_1p(exp(-2|x|))`, since `cosh`
+    /// overflows above `|x|` of about 710.
+    fn log_w(&self, x: Real) -> Real {
+        let ax = x.abs();
+        -(ax - std::f64::consts::LN_2 + (-2.0 * ax).exp().ln_1p())
     }
 }
 

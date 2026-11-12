@@ -34,6 +34,12 @@ impl GaussianQuadrature {
     /// Builds the `n`-point rule for the polynomial family `poly` by solving
     /// the eigenproblem of its Jacobi matrix.
     ///
+    /// Each weight is `mu_0 * v_i^2 / w(x_i)`; where `w(x_i)` underflows (or
+    /// the quotient is non-finite) it is formed in logarithms through
+    /// [`GaussianOrthogonalPolynomial::log_w`], and a weight that is still
+    /// non-finite (its eigenvector component underflowed) is set to zero, as
+    /// in QuantLib v1.44.
+    ///
     /// # Errors
     ///
     /// Returns an error if `n` is zero.
@@ -61,8 +67,27 @@ impl GaussianQuadrature {
         let x = tqr.eigenvalues().clone();
         let ev = tqr.eigenvectors();
         let mu_0 = poly.mu_0();
+        let log_weight =
+            |e: Real, xi: Real| (mu_0.ln() + 2.0 * e.abs().ln() - poly.log_w(xi)).exp();
         let w: Array = (0..n)
-            .map(|i| mu_0 * ev[(0, i)] * ev[(0, i)] / poly.w(x[i]))
+            .map(|i| {
+                let e = ev[(0, i)];
+                let wx = poly.w(x[i]);
+                let mut wi = if wx > 0.0 {
+                    mu_0 * e * e / wx
+                } else {
+                    log_weight(e, x[i])
+                };
+                if !wi.is_finite() {
+                    if e != 0.0 {
+                        wi = log_weight(e, x[i]);
+                    }
+                    if !wi.is_finite() {
+                        wi = 0.0;
+                    }
+                }
+                wi
+            })
             .collect();
 
         Ok(GaussianQuadrature { x, w })
@@ -488,6 +513,53 @@ mod tests {
             std::f64::consts::PI,
         );
         check_single(&quad, "f(x) = x/cosh(x)", |x| x / x.cosh(), 0.0);
+    }
+
+    // Faithful port of testLaguerreLargeOrder from
+    // test-suite/gaussianquadratures.cpp (v1.44): the finiteness check comes
+    // first because a tolerance check alone lets a NaN through.
+    #[test]
+    fn laguerre_large_order_oracle() {
+        for n in (184..=400).step_by(8) {
+            let quad = GaussianQuadrature::laguerre(n, 0.0).unwrap();
+            let calculated = quad.integrate(|x| (-x).exp());
+            assert!(
+                calculated.is_finite(),
+                "laguerre({n}) returned a non-finite result integrating exp(-x): {calculated}"
+            );
+            check_single(&quad, "f(x) = exp(-x)", |x| (-x).exp(), 1.0);
+        }
+    }
+
+    // Faithful port of testHighOrderWeightsStayFinite from
+    // test-suite/gaussianquadratures.cpp (v1.44).
+    #[test]
+    fn high_order_weights_stay_finite_oracle() {
+        use std::f64::consts::PI;
+
+        fn check(family: &str, n: Size, calculated: Real, expected: Real) {
+            assert!(
+                calculated.is_finite() && (calculated - expected).abs() <= 1e-12,
+                "{family}({n}): calculated {calculated:.16}, expected {expected:.16}"
+            );
+        }
+
+        for n in [200, 300, 400, 500] {
+            let l = GaussianQuadrature::laguerre(n, 0.0)
+                .unwrap()
+                .integrate(|x| (-x).exp());
+            check("laguerre", n, l, 1.0);
+
+            let h = GaussianQuadrature::hermite(n, 0.0)
+                .unwrap()
+                .integrate(|x| (-x * x).exp());
+            check("hermite", n, h, PI.sqrt());
+
+            let y = GaussianQuadrature::hyperbolic(n)
+                .unwrap()
+                .integrate(|x| 1.0 / x.cosh());
+            check("hyperbolic", n, y, PI);
+        }
     }
 
     // Faithful ports of testGaussLegendreIntegrator, testGaussChebyshev
