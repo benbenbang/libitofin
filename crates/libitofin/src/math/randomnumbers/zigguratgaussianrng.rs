@@ -732,6 +732,43 @@ mod tests {
     }
 
     #[test]
+    fn wedge_draw_above_the_density_is_rejected() {
+        let wedge_layer = 1;
+        let norm_x1 = 3.654152885361008796;
+        let wedge_x = 3.5;
+        let fast_path_layer = 200;
+        let fast_path_u = 0.1;
+
+        let scripted = ScriptedRng {
+            ints: vec![
+                draw_for(wedge_layer, wedge_x / norm_x1),
+                draw_for(fast_path_layer, fast_path_u),
+            ],
+            reals: vec![0.1],
+            int_pos: 0,
+            real_pos: 0,
+        };
+        let mut rng = ZigguratGaussianRng::new(scripted);
+        let reference = ScriptedRng {
+            ints: vec![draw_for(fast_path_layer, fast_path_u)],
+            reals: vec![],
+            int_pos: 0,
+            real_pos: 0,
+        };
+        let mut fast_path_only = ZigguratGaussianRng::new(reference);
+
+        let sample = rng.next_gaussian();
+        let expected = fast_path_only.next_gaussian();
+
+        assert_eq!(
+            sample.to_bits(),
+            expected.to_bits(),
+            "a wedge draw above the density must be rejected with exactly one uniform \
+             consumed: expected the following fast-path draw {expected}, returned {sample}"
+        );
+    }
+
+    #[test]
     fn statistics_of_next_gaussian_are_standard_normal() {
         let seed = 42;
         let mut rng = ZigguratGaussianRng::new(Xoshiro256StarStarUniformRng::new(seed));
