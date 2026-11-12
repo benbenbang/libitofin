@@ -633,4 +633,45 @@ mod tests {
         assert!(c.is_business_day(Date::new(4, Month::January, 2027)));
         assert!(c.is_business_day(Date::new(8, Month::February, 2027)));
     }
+
+    /// Port of `testTaiwanCalendar` (`test-suite/calendars.cpp:2928`, QuantLib v1.44).
+    #[test]
+    fn taiwan_calendar() {
+        let calendar = Taiwan::new(Market::Tsec);
+        assert!(calendar.is_holiday(Date::new(1, Month::January, 2024)));
+        assert!(calendar.is_holiday(Date::new(28, Month::February, 2024)));
+        assert!(calendar.is_holiday(Date::new(1, Month::May, 2024)));
+        assert!(calendar.is_holiday(Date::new(10, Month::October, 2024)));
+        assert!(calendar.is_holiday(Date::new(9, Month::February, 2024)));
+        assert!(calendar.is_holiday(Date::new(9, Month::February, 2002)));
+        assert!(calendar.is_business_day(Date::new(2, Month::January, 2024)));
+        let historical = [
+            (4, Month::June, 2003),
+            (21, Month::January, 2004),
+            (9, Month::February, 2005),
+            (5, Month::April, 2006),
+            (19, Month::February, 2007),
+            (7, Month::February, 2008),
+            (26, Month::January, 2009),
+            (13, Month::January, 2010),
+            (2, Month::February, 2011),
+            (23, Month::January, 2012),
+            (11, Month::February, 2013),
+            (31, Month::January, 2014),
+            (18, Month::February, 2015),
+            (8, Month::February, 2016),
+            (27, Month::January, 2017),
+            (16, Month::February, 2018),
+            (5, Month::February, 2019),
+            (27, Month::January, 2020),
+            (12, Month::February, 2021),
+            (1, Month::February, 2022),
+            (23, Month::January, 2023),
+            (27, Month::January, 2025),
+            (16, Month::February, 2026),
+        ];
+        for (d, m, y) in historical {
+            assert!(calendar.is_holiday(Date::new(d, m, y)), "{d} {m:?} {y}");
+        }
+    }
 }

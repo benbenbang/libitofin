@@ -269,4 +269,26 @@ mod tests {
         assert!(c.is_weekend(Weekday::Saturday));
         assert!(c.is_weekend(Weekday::Sunday));
     }
+
+    /// Port of `testGermanySettlementCalendar` (`test-suite/calendars.cpp:592`, QuantLib v1.44).
+    /// The `name()` check is covered by `names_match_quantlib`.
+    #[test]
+    fn settlement_calendar() {
+        let settlement = Germany::new(Market::Settlement);
+        let frankfurt = Germany::new(Market::FrankfurtStockExchange);
+        let corpus_christi = Date::new(30, Month::May, 2024);
+        assert!(settlement.is_holiday(corpus_christi));
+        assert!(frankfurt.is_business_day(corpus_christi));
+    }
+
+    /// Port of `testGermanyEuwaxCalendar` (`test-suite/calendars.cpp:601`, QuantLib v1.44).
+    /// The `name()` check is covered by `names_match_quantlib`.
+    #[test]
+    fn euwax_calendar() {
+        let euwax = Germany::new(Market::Euwax);
+        let xetra = Germany::new(Market::Xetra);
+        let whit_monday = Date::new(20, Month::May, 2024);
+        assert!(euwax.is_holiday(whit_monday));
+        assert!(xetra.is_business_day(whit_monday));
+    }
 }

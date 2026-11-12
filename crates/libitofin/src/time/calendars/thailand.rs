@@ -439,4 +439,54 @@ mod tests {
         assert!(c.is_business_day(Date::new(7, Month::April, 2026)));
         assert!(c.is_business_day(Date::new(12, Month::May, 2026)));
     }
+
+    /// Port of `testThailandCalendar` (`test-suite/calendars.cpp:2953`, QuantLib v1.44).
+    #[test]
+    fn thailand_calendar() {
+        let calendar = Thailand::new();
+        assert!(calendar.is_holiday(Date::new(1, Month::January, 2024)));
+        assert!(calendar.is_holiday(Date::new(15, Month::April, 2019)));
+        assert!(calendar.is_business_day(Date::new(15, Month::April, 2020)));
+        assert!(calendar.is_holiday(Date::new(4, Month::May, 2020)));
+        assert!(calendar.is_holiday(Date::new(3, Month::June, 2024)));
+        assert!(calendar.is_holiday(Date::new(29, Month::July, 2024)));
+        assert!(calendar.is_holiday(Date::new(14, Month::October, 2024)));
+        assert!(calendar.is_business_day(Date::new(2, Month::January, 2024)));
+        let historical = [
+            (5, Month::May, 2001),
+            (23, Month::February, 2005),
+            (23, Month::May, 2005),
+            (22, Month::July, 2005),
+            (13, Month::February, 2006),
+            (12, Month::June, 2006),
+            (11, Month::July, 2006),
+            (5, Month::March, 2007),
+            (31, Month::May, 2007),
+            (24, Month::December, 2007),
+            (21, Month::February, 2008),
+            (19, Month::May, 2008),
+            (17, Month::July, 2008),
+            (9, Month::February, 2009),
+            (1, Month::March, 2010),
+            (18, Month::February, 2011),
+            (2, Month::January, 2012),
+            (7, Month::May, 2012),
+            (4, Month::June, 2012),
+            (6, Month::May, 2013),
+            (23, Month::October, 2013),
+            (14, Month::February, 2014),
+            (4, Month::March, 2015),
+            (22, Month::February, 2016),
+            (13, Month::February, 2017),
+            (1, Month::March, 2018),
+            (4, Month::May, 2019),
+            (3, Month::June, 2019),
+            (12, Month::February, 2021),
+            (16, Month::February, 2022),
+            (6, Month::March, 2023),
+        ];
+        for (d, m, y) in historical {
+            assert!(calendar.is_holiday(Date::new(d, m, y)), "{d} {m:?} {y}");
+        }
+    }
 }

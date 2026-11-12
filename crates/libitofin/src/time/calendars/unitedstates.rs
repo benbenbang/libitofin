@@ -523,4 +523,26 @@ mod tests {
         assert!(c.is_weekend(Weekday::Saturday));
         assert!(c.is_weekend(Weekday::Sunday));
     }
+
+    /// Port of `testUSLiborImpactCalendar` (`test-suite/calendars.cpp:449`, QuantLib v1.44).
+    /// The `name()` check is covered by `names_match_quantlib`.
+    #[test]
+    fn libor_impact_calendar() {
+        let settlement = UnitedStates::new(Market::Settlement);
+        let libor_impact = UnitedStates::new(Market::LiborImpact);
+        let observed_independence_day = Date::new(3, Month::July, 2020);
+        assert!(settlement.is_holiday(observed_independence_day));
+        assert!(libor_impact.is_business_day(observed_independence_day));
+    }
+
+    /// Port of `testUSNercCalendar` (`test-suite/calendars.cpp:458`, QuantLib v1.44).
+    /// The `name()` check is covered by `names_match_quantlib`.
+    #[test]
+    fn nerc_calendar() {
+        let settlement = UnitedStates::new(Market::Settlement);
+        let nerc = UnitedStates::new(Market::Nerc);
+        let juneteenth = Date::new(19, Month::June, 2024);
+        assert!(settlement.is_holiday(juneteenth));
+        assert!(nerc.is_business_day(juneteenth));
+    }
 }
