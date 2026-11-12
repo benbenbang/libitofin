@@ -387,4 +387,47 @@ mod tests {
         assert!(c.is_business_day(Date::new(24, Month::April, 2035)));
         assert!(c.is_business_day(Date::new(12, Month::December, 2035)));
     }
+
+    /// Port of `testTurkeyCalendar` (`test-suite/calendars.cpp:2981`, QuantLib v1.44).
+    #[test]
+    fn turkey_calendar() {
+        let calendar = Turkey::new();
+        assert_eq!(calendar.name(), "Turkey");
+        assert!(calendar.is_holiday(Date::new(1, Month::January, 2024)));
+        assert!(calendar.is_holiday(Date::new(23, Month::April, 2024)));
+        assert!(calendar.is_holiday(Date::new(1, Month::May, 2024)));
+        assert!(calendar.is_holiday(Date::new(19, Month::May, 2024)));
+        assert!(calendar.is_holiday(Date::new(15, Month::July, 2024)));
+        assert!(calendar.is_holiday(Date::new(30, Month::August, 2024)));
+        assert!(calendar.is_holiday(Date::new(29, Month::October, 2024)));
+        assert!(calendar.is_business_day(Date::new(2, Month::January, 2024)));
+        let historical = [
+            (1, Month::February, 2004),
+            (19, Month::January, 2005),
+            (10, Month::January, 2006),
+            (2, Month::January, 2007),
+            (30, Month::September, 2008),
+            (20, Month::September, 2009),
+            (9, Month::September, 2010),
+            (9, Month::November, 2011),
+            (18, Month::August, 2012),
+            (7, Month::August, 2013),
+            (27, Month::July, 2014),
+            (17, Month::July, 2015),
+            (5, Month::July, 2016),
+            (25, Month::June, 2017),
+            (15, Month::June, 2018),
+            (4, Month::June, 2019),
+            (24, Month::May, 2020),
+            (13, Month::May, 2021),
+            (2, Month::May, 2022),
+            (21, Month::April, 2023),
+            (10, Month::April, 2024),
+            (31, Month::March, 2025),
+            (20, Month::March, 2026),
+        ];
+        for (d, m, y) in historical {
+            assert!(calendar.is_holiday(Date::new(d, m, y)), "{d} {m:?} {y}");
+        }
+    }
 }
