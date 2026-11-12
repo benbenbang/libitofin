@@ -4,9 +4,10 @@
 //! Ziggurat method of Doornik ("An Improved Ziggurat Method to Generate
 //! Normal Random Samples"), which QuantLib in turn adapted from the
 //! `rand_distr` Rust crate. The `normX`/`normF` tables are transcribed
-//! from the QuantLib header by script. The acceptance test in the wedge
-//! branch reproduces QuantLib's expression verbatim, including its
-//! parenthesization.
+//! from the QuantLib header by script. The wedge branch is the
+//! Marsaglia-Tsang acceptance test of QuantLib v1.44, which draws uniformly
+//! between `normF(i + 1)` and `normF(i)`:
+//! `normF(i + 1) + (normF(i) - normF(i + 1)) * w < pdf(x)`.
 
 #![allow(clippy::excessive_precision)]
 
@@ -71,9 +72,10 @@ impl<R: Uint64Rng> GaussianRng for ZigguratGaussianRng<R> {
             if i == 0 {
                 return self.zero_case(u);
             }
-            if NORM_F[i + 1] + (NORM_F[i] - NORM_F[i + 1] * self.uint64_generator.next_real())
-                < pdf(x)
-            {
+            let fi = NORM_F[i];
+            let fi_plus1 = NORM_F[i + 1];
+            let w = self.uint64_generator.next_real();
+            if fi_plus1 + (fi - fi_plus1) * w < pdf(x) {
                 return x;
             }
         }
@@ -603,7 +605,7 @@ const NORM_F: [Real; 257] = [
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::math::randomnumbers::Xoshiro256StarStarUniformRng;
+    use crate::math::randomnumbers::{UniformRng, Xoshiro256StarStarUniformRng};
     use crate::math::statistics::{IncrementalStatistics, MeanStdDev, Statistics};
 
     #[test]
@@ -622,6 +624,111 @@ mod tests {
         for (i, &e) in expected.iter().enumerate() {
             assert_eq!(rng.next_gaussian(), e, "mismatch at index {i}");
         }
+    }
+
+    #[test]
+    fn seed42_draws_93_to_96_match_quantlib_v144() {
+        let mut rng = ZigguratGaussianRng::new(Xoshiro256StarStarUniformRng::new(42));
+        for _ in 0..93 {
+            rng.next_gaussian();
+        }
+        let expected = [
+            -1.2978059822930959,
+            2.7314735398612013,
+            0.12800214452341643,
+            -0.58477565777661056,
+        ];
+        for (k, &e) in expected.iter().enumerate() {
+            assert_eq!(rng.next_gaussian(), e, "mismatch at index {}", 93 + k);
+        }
+    }
+
+    #[test]
+    fn seed42_stream_matches_quantlib_v144_fixture() {
+        let fixture =
+            include_str!("../../../tests/fixtures/ziggurat_gaussian_v144/seed42_draws.tsv");
+        let mut rng = ZigguratGaussianRng::new(Xoshiro256StarStarUniformRng::new(42));
+        let mut rows = 0;
+        for line in fixture.lines().skip(1) {
+            let fields: Vec<&str> = line.split('\t').collect();
+            let index: usize = fields[0].parse().expect("index column");
+            let bits = u64::from_str_radix(fields[2].trim_start_matches("0x"), 16)
+                .expect("bit-pattern column");
+            assert_eq!(index, rows, "fixture rows are consecutive");
+            assert_eq!(
+                rng.next_gaussian().to_bits(),
+                bits,
+                "mismatch at index {index}"
+            );
+            rows += 1;
+        }
+        assert_eq!(rows, 101);
+    }
+
+    struct ScriptedRng {
+        ints: Vec<u64>,
+        reals: Vec<Real>,
+        int_pos: usize,
+        real_pos: usize,
+    }
+
+    impl UniformRng for ScriptedRng {
+        fn next_real(&mut self) -> Real {
+            let r = *self
+                .reals
+                .get(self.real_pos)
+                .expect("scripted next_real() exhausted");
+            self.real_pos += 1;
+            r
+        }
+    }
+
+    impl Uint64Rng for ScriptedRng {
+        fn next_u64(&mut self) -> u64 {
+            let r = *self
+                .ints
+                .get(self.int_pos)
+                .expect("scripted next_u64() exhausted");
+            self.int_pos += 1;
+            r
+        }
+    }
+
+    fn draw_for(layer: u64, u: Real) -> u64 {
+        assert!(layer <= 0xff, "layer {layer} outside [0, 255]");
+        assert!((-1.0..1.0).contains(&u), "u {u} outside [-1, 1)");
+        let two_pow53 = (1u64 << 53) as Real;
+        let bucket = ((u + 1.0) / 2.0 * two_pow53 - 0.5).round() as u64;
+        assert!(bucket < 1u64 << 53, "bucket {bucket} overflows for u = {u}");
+        (bucket << 11) | layer
+    }
+
+    #[test]
+    fn wedge_draw_is_accepted() {
+        let wedge_layer = 1;
+        let norm_x1 = 3.654152885361008796;
+        let wedge_x = 3.5;
+        let fast_path_layer = 200;
+        let fast_path_u = 0.1;
+
+        let scripted = ScriptedRng {
+            ints: vec![
+                draw_for(wedge_layer, wedge_x / norm_x1),
+                draw_for(fast_path_layer, fast_path_u),
+            ],
+            reals: vec![0.5],
+            int_pos: 0,
+            real_pos: 0,
+        };
+        let mut rng = ZigguratGaussianRng::new(scripted);
+
+        let sample = rng.next_gaussian();
+
+        assert!(
+            (sample - wedge_x).abs() <= 1.0e-12,
+            "rejected a wedge draw that the Marsaglia-Tsang acceptance test accepts: \
+             expected {wedge_x} (the wedge draw), returned {sample} (the following fast-path draw)"
+        );
     }
 
     #[test]
