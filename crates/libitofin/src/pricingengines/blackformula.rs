@@ -1336,4 +1336,39 @@ mod tests {
             assert_eq!(implied, 0.0);
         }
     }
+
+    #[test]
+    fn deep_in_the_money_prices_are_not_below_intrinsic() {
+        for (option_type, strike, forward) in [
+            (OptionType::Call, 50.0, 100.0),
+            (OptionType::Put, 100.0, 50.0),
+            (OptionType::Call, 0.03, 0.05),
+            (OptionType::Put, 0.05, 0.03),
+            (OptionType::Call, 1000.0, 1234.5),
+            (OptionType::Put, 1234.5, 1000.0),
+        ] {
+            let moneyness = sign_of(option_type) * (forward - strike);
+            for discount in [1.0, 0.97] {
+                let intrinsic = discount * moneyness.max(0.0);
+                let black = black_formula(option_type, strike, forward, 0.01, discount, 0.0)
+                    .expect("valid inputs");
+                assert!(
+                    black >= intrinsic,
+                    "Black {black} below intrinsic {intrinsic}"
+                );
+                let bachelier = bachelier_black_formula(
+                    option_type,
+                    strike,
+                    forward,
+                    moneyness / 20.0,
+                    discount,
+                )
+                .expect("valid inputs");
+                assert!(
+                    bachelier >= intrinsic,
+                    "Bachelier {bachelier} below intrinsic {intrinsic}"
+                );
+            }
+        }
+    }
 }

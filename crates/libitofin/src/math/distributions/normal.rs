@@ -78,9 +78,16 @@ impl NormalDistribution {
         }
     }
 
-    /// The derivative of the density at `x`.
+    /// The derivative of the density at `x`; zero wherever the density
+    /// underflows to zero, including `x = +-inf` (QuantLib v1.44,
+    /// `normaldistribution.hpp:309-313`).
     pub fn derivative(&self, x: Real) -> Real {
-        (self.value(x) * (self.average - x)) / self.der_normalization_factor
+        let density = self.value(x);
+        if density == 0.0 {
+            0.0
+        } else {
+            (density * (self.average - x)) / self.der_normalization_factor
+        }
     }
 }
 
@@ -364,5 +371,39 @@ mod tests {
         // NaN and infinities must error, not fall through to Ok(NaN).
         assert!(InverseCumulativeNormal::standard_value(Real::NAN).is_err());
         assert!(InverseCumulativeNormal::standard_value(Real::INFINITY).is_err());
+    }
+
+    #[test]
+    fn density_derivative_vanishes_at_the_extremes() {
+        let normal = NormalDistribution::standard();
+        for x in [Real::MAX, -Real::MAX, Real::INFINITY, Real::NEG_INFINITY] {
+            assert_eq!(normal.derivative(x), 0.0, "x = {x}");
+        }
+    }
+
+    #[test]
+    fn erf_and_cumulative_normal_saturate_in_the_upper_tail() {
+        for x in [6.0, 6.5, 7.0, 10.0, 28.0, 100.0] {
+            assert_eq!(erf(x), 1.0, "erf({x})");
+            assert_eq!(erf(-x), -1.0, "erf(-{x})");
+        }
+        let mut previous = erf(5.5);
+        for i in 1..=1000 {
+            let x = 5.5 + Real::from(i) * 0.001;
+            let y = erf(x);
+            assert!(y >= previous && y <= 1.0, "erf not monotonic at {x}");
+            previous = y;
+        }
+        let cumulative = CumulativeNormalDistribution::standard();
+        for z in [8.5, 9.0, 10.0, 20.0, 40.0] {
+            assert_eq!(cumulative.value(z), 1.0, "N({z})");
+        }
+        let mut previous = cumulative.value(7.0);
+        for i in 1..=3000 {
+            let z = 7.0 + Real::from(i) * 0.001;
+            let p = cumulative.value(z);
+            assert!(p >= previous && p <= 1.0, "N not monotonic at {z}");
+            previous = p;
+        }
     }
 }

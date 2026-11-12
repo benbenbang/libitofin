@@ -13,7 +13,9 @@
 
 use crate::types::Real;
 
-const TINY: Real = Real::EPSILON;
+/// fdlibm's `tiny`, as in QuantLib v1.44 (`errorfunction.cpp:126`): below half
+/// an ulp of one, so `ONE - TINY` for `|x| >= 6` rounds to exactly one.
+const TINY: Real = 1e-300;
 const ONE: Real = 1.0;
 // c = (float)0.84506291151
 const ERX: Real = 8.45062911510467529297e-01;
