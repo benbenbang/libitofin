@@ -4,6 +4,14 @@
 //! calendar-time guess, the search refines by whole years, then months, then
 //! days, and finally rounds to whichever neighbouring date reproduces the
 //! target fraction more closely.
+//!
+//! As in QuantLib v1.44 (`yearfractiontodate.cpp:54`), the walk and the final
+//! distances compare against `t` nudged by `500 * epsilon` in the search
+//! direction, while the `close_enough` checks keep the unshifted `t`.
+//!
+//! Omitted: the `QL_HIGH_RESOLUTION_DATE` intraday branch
+//! (`yearfractiontodate.cpp:67-92`) and `roundToDayStart` (`.hpp:34`, the identity
+//! without it); dates here have whole-day resolution only.
 
 use crate::errors::QlResult;
 use crate::math::comparison::close_enough;
@@ -68,12 +76,12 @@ pub fn year_fraction_to_date(
 
     let search_direction = 1.0f64.copysign(t - guess_time) as Integer;
 
-    let t = t + Time::from(search_direction) * 100.0 * f64::EPSILON;
+    let comp_t = t + Time::from(search_direction) * 500.0 * f64::EPSILON;
 
     for u in [TimeUnit::Years, TimeUnit::Months, TimeUnit::Days] {
         while let Some(next_date) = step_within_bounds(guess_date, search_direction, u) {
             if Time::from(search_direction)
-                * (day_counter.year_fraction(reference_date, next_date) - t)
+                * (day_counter.year_fraction(reference_date, next_date) - comp_t)
                 < 0.0
             {
                 guess_date = next_date;
@@ -86,13 +94,15 @@ pub fn year_fraction_to_date(
     let guess_time = day_counter.year_fraction(reference_date, guess_date);
     let Some(next_date) = step_within_bounds(guess_date, search_direction, TimeUnit::Days) else {
         require!(
-            close_enough(guess_time, t) || Time::from(search_direction) * (guess_time - t) >= 0.0,
+            close_enough(guess_time, t)
+                || Time::from(search_direction) * (guess_time - comp_t) >= 0.0,
             "time {t} maps to a date outside the supported date range from {reference_date}"
         );
         return Ok(guess_date);
     };
     if close_enough(guess_time, t)
-        || (day_counter.year_fraction(reference_date, next_date) - t).abs() > (guess_time - t).abs()
+        || (day_counter.year_fraction(reference_date, next_date) - comp_t).abs()
+            > (guess_time - comp_t).abs()
     {
         Ok(guess_date)
     } else {
@@ -174,6 +184,7 @@ mod tests {
     fn rounds_to_the_closer_date() {
         let day_counters = [
             Thirty360::with_convention(Thirty360Convention::USA),
+            Actual360::with_last_day(true),
             Actual360::new(),
         ];
         let d1 = Date::new(1, Month::February, 2023);
@@ -188,6 +199,72 @@ mod tests {
                 assert_eq!(inv, expected, "offset {offset}, day counter {}", dc.name());
                 offset += 0.05;
             }
+        }
+    }
+
+    /// Expected dates from QuantLib-Python 1.44 `yearFractionToDate`; 1.43, with
+    /// the old `100 * epsilon` shift, returns the adjacent day in every case.
+    #[test]
+    fn near_tie_times_round_like_quantlib_1_44() {
+        let feb_2023 = Date::new(1, Month::February, 2023);
+        let jan_2020 = Date::new(31, Month::January, 2020);
+        let cases = [
+            (
+                Thirty360::with_convention(Thirty360Convention::USA),
+                feb_2023,
+                0.15416666666664272,
+                Date::new(27, Month::March, 2023),
+            ),
+            (
+                Actual360::new(),
+                feb_2023,
+                0.14861111111108802,
+                Date::new(27, Month::March, 2023),
+            ),
+            (
+                Actual360::with_last_day(true),
+                feb_2023,
+                0.15138888888886537,
+                Date::new(27, Month::March, 2023),
+            ),
+            (
+                Actual366::with_last_day(true),
+                feb_2023,
+                0.14890710382515893,
+                Date::new(26, Month::March, 2023),
+            ),
+            (
+                Actual365Fixed::new(),
+                jan_2020,
+                20.127397260273863,
+                Date::new(13, Month::March, 2040),
+            ),
+            (
+                ActualActual::with_convention(ActActConvention::ISDA),
+                jan_2020,
+                20.148907103825028,
+                Date::new(26, Month::March, 2040),
+            ),
+            (
+                Actual36525::new(),
+                jan_2020,
+                20.149212867898807,
+                Date::new(25, Month::March, 2040),
+            ),
+            (
+                Thirty360::with_convention(Thirty360Convention::European),
+                jan_2020,
+                20.15416666666656,
+                Date::new(26, Month::March, 2040),
+            ),
+        ];
+        for (dc, reference, t, expected) in &cases {
+            assert_eq!(
+                year_fraction_to_date(dc, *reference, *t).unwrap(),
+                *expected,
+                "t {t}, day counter {}",
+                dc.name()
+            );
         }
     }
 
