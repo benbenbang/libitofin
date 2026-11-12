@@ -15,12 +15,13 @@ unchanged. Negative forwards and strikes are valid.
 | Standard deviation | Return value |
 | --- | --- |
 | Positive | `Phi(sign * (forward - strike) / std_dev)` |
-| Exactly zero, including negative zero | `max(sign * (forward - strike), 0)` |
+| Exactly zero, including negative zero | `1` if `sign * (forward - strike) > 0`, else `0` |
 
-**The zero-volatility branch is intrinsic value, not a probability.** It may
-exceed one. Exactly at the money it returns zero, whereas any positive standard
-deviation gives one half. This deliberately preserves the QuantLib helper's
-unusual discontinuity, rather than substituting an indicator or clamping it.
+**The zero-volatility branch is the in-the-money indicator** of QuantLib v1.44
+(`blackformula.cpp:970`), the `std_dev -> 0` limit off the money. Exactly at the
+money it returns zero, whereas any positive standard deviation gives one half.
+QuantLib 1.43 and earlier returned the intrinsic value `max(sign * (forward -
+strike), 0)` here, which is not a probability.
 
 ```rust
 use libitofin::option::OptionType;
@@ -30,17 +31,16 @@ let atm = bachelier_black_formula_asset_itm_probability(
     OptionType::Call, -0.01, -0.01, 0.005,
 )?;
 assert_eq!(atm, 0.5);
-let intrinsic = bachelier_black_formula_asset_itm_probability(
+let in_the_money = bachelier_black_formula_asset_itm_probability(
     OptionType::Call, -2.0, 3.0, 0.0,
 )?;
-assert_eq!(intrinsic, 5.0);
+assert_eq!(in_the_money, 1.0);
 # Ok::<(), libitofin::errors::QlError>(())
 ```
 
 ## Validation and numerical boundaries
 
 - Unlike native QuantLib, this new fallible API rejects non-finite inputs.
-- An unrepresentable zero-volatility intrinsic value returns an error.
 - Ordinary positive-volatility calculations retain subtraction before division,
   avoiding cancellation from independently dividing close levels.
 - Only when that difference overflows, division precedes subtraction. With
@@ -53,8 +53,9 @@ assert_eq!(intrinsic, 5.0);
 ## Reference coverage
 
 The fixture generator calls native **QuantLib 1.43** for 30 ordinary-domain
-cases. Two overflow-range cases use a separate 90-digit Decimal normal-density
+cases; the two in-the-money zero-volatility rows are pinned to the v1.44 rule
+instead. Two overflow-range cases use a separate 90-digit Decimal normal-density
 integral. The local C++ source oracle is `blackformula.cpp:950` at commit
 `9863b578af0caa4cecabf697196533e84a8308b6`; it is distinct from the native wheel.
 Tests cover parity, ATM, negative rates, tails, signed zero, adjacent values,
-finite-domain errors, zero-volatility discontinuity and overflow boundaries.
+finite-domain errors, the zero-volatility indicator and overflow boundaries.

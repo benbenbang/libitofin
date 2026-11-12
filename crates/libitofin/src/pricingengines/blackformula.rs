@@ -19,16 +19,15 @@
 //! Black approximation-seeded and normal implied-volatility inversions support
 //! caplet stripping; other specialized approximation families remain separate.
 //!
-//! One deviation from the C++ reference: at `std_dev == 0` the reference's
-//! `blackFormulaAssetItmProbability` tests `forward * sign < strike * sign`,
-//! which inverts its own `std_dev -> 0` limit (`N(sign * d1) -> 1` exactly
-//! when `sign * (forward - strike) > 0`) and the cash probability next to it.
-//! The port uses the limit off the money; exactly at the money it returns
-//! 0.0 like both C++ probability branches, where the limit would be 0.5.
-//! Tests lock the off-the-money continuity and the at-the-money convention.
+//! At `std_dev == 0` the Black cash and asset and the Bachelier asset
+//! in-the-money probabilities all return QuantLib v1.44's indicator
+//! (`blackformula.cpp:580,611,970`): one when `sign * (forward - strike) > 0`,
+//! zero otherwise. That is the `std_dev -> 0` limit off the money; exactly at
+//! the money it is zero, where the limit would be one half.
 
 use crate::errors::QlResult;
 use crate::fail;
+use crate::math::comparison::close_enough;
 use crate::math::distributions::normal::{CumulativeNormalDistribution, NormalDistribution};
 use crate::math::solver1d::{DerivativeSolver, func1d};
 use crate::math::solvers1d::newtonsafe::NewtonSafe;
@@ -456,6 +455,9 @@ pub fn black_formula_implied_std_dev_approximation(
 /// Normal implied volatility, solved on out-of-the-money time value.
 ///
 /// A bracketed inversion avoids subtracting intrinsic value inside the solver.
+/// As in QuantLib v1.44 (`blackformula.cpp:919`), a premium `close_enough` to
+/// the intrinsic value returns zero before the negative-time-value check, so a
+/// price that rounds a few ulps below intrinsic still inverts.
 /// Invalid prices and nonpositive expiry/discount return an error.
 pub fn bachelier_black_formula_implied_vol(
     option_type: OptionType,
@@ -478,17 +480,17 @@ pub fn bachelier_black_formula_implied_vol(
     }
     let premium = price / discount;
     let intrinsic = (sign_of(option_type) * (forward - strike)).max(0.0);
-    let time_value = premium - intrinsic;
-    if time_value < 0.0 {
-        fail!("option price implies negative time value ({time_value})");
-    }
-    if time_value == 0.0 {
-        return Ok(0.0);
-    }
     let distance = (forward - strike).abs();
     let scale = (2.0 * std::f64::consts::PI).sqrt();
     if distance == 0.0 {
         return Ok(premium * scale / expiry.sqrt());
+    }
+    if close_enough(premium, intrinsic) {
+        return Ok(0.0);
+    }
+    let time_value = premium - intrinsic;
+    if time_value < 0.0 {
+        fail!("option price implies negative time value ({time_value})");
     }
     let upper = (time_value * scale + distance) * 2.0;
     let objective = |std_dev| {
@@ -602,23 +604,22 @@ pub fn bachelier_black_formula_std_dev_derivative(
     Ok(discount * phi.derivative(d1))
 }
 
-/// QuantLib's Bachelier asset ITM helper (`blackformula.cpp:950`).
+/// QuantLib's Bachelier asset ITM helper (`blackformula.cpp:962`).
 ///
 /// For positive `std_dev`, returns `Phi(sign * (forward - strike) / std_dev)`.
-/// At exactly zero, preserves QuantLib's intrinsic-value convention instead:
-/// `max(sign * (forward - strike), 0)`. That branch is not a probability and
-/// can exceed one; its at-the-money value is zero, not the positive-volatility
-/// limit of one half. Negative forwards and strikes are supported.
+/// At exactly zero, returns QuantLib v1.44's indicator (`blackformula.cpp:970`):
+/// one when `sign * (forward - strike) > 0`, zero otherwise. Its at-the-money
+/// value is zero, not the positive-volatility limit of one half. Negative
+/// forwards and strikes are supported.
 ///
-/// Divergence: rejects non-finite inputs and an unrepresentable intrinsic value.
-/// For positive volatility, an overflowing difference is divided before
-/// subtraction, retaining a representable standardized distance. An infinite
-/// standardized distance legitimately yields a normal-CDF endpoint.
+/// Divergence: rejects non-finite inputs. For positive volatility, an
+/// overflowing difference is divided before subtraction, retaining a
+/// representable standardized distance. An infinite standardized distance
+/// legitimately yields a normal-CDF endpoint.
 ///
 /// # Errors
 ///
-/// Returns an error for non-finite inputs, negative `std_dev`, or a zero-volatility
-/// intrinsic value larger than the representable finite range.
+/// Returns an error for non-finite inputs or negative `std_dev`.
 ///
 /// # Examples
 ///
@@ -645,11 +646,7 @@ pub fn bachelier_black_formula_asset_itm_probability(
     let sign = sign_of(option_type);
     let difference = forward - strike;
     if std_dev == 0.0 {
-        let intrinsic = (difference * sign).max(0.0);
-        if !intrinsic.is_finite() {
-            fail!("zero-volatility intrinsic value must be finite");
-        }
-        return Ok(intrinsic);
+        return Ok(if difference * sign > 0.0 { 1.0 } else { 0.0 });
     }
 
     let h = if difference.is_finite() {
@@ -1250,5 +1247,93 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn itm_probabilities_with_zero_volatility_are_the_limit() {
+        let cases = [
+            (OptionType::Call, 0.03, 0.05),
+            (OptionType::Call, 0.05, 0.03),
+            (OptionType::Put, 0.03, 0.05),
+            (OptionType::Put, 0.05, 0.03),
+            (OptionType::Call, 90.0, 100.0),
+            (OptionType::Put, 90.0, 100.0),
+        ];
+        let tiny_std_dev = 1.0e-8;
+        for (option_type, strike, forward) in cases {
+            let expected = if sign_of(option_type) * (forward - strike) > 0.0 {
+                1.0
+            } else {
+                0.0
+            };
+            let probabilities = |std_dev| {
+                [
+                    black_formula_cash_itm_probability(option_type, strike, forward, std_dev, 0.0),
+                    black_formula_asset_itm_probability(option_type, strike, forward, std_dev, 0.0),
+                    bachelier_black_formula_asset_itm_probability(
+                        option_type,
+                        strike,
+                        forward,
+                        std_dev,
+                    ),
+                ]
+            };
+            for value in probabilities(tiny_std_dev)
+                .into_iter()
+                .chain(probabilities(0.0))
+            {
+                assert_close(value.expect("valid inputs"), expected, 1.0e-12);
+            }
+        }
+    }
+
+    #[test]
+    fn bachelier_implied_vol_at_intrinsic_inverts() {
+        let tte: Real = 0.01;
+        let vol = 1e-5;
+        for forward in [-0.01, 0.005, 0.05, 1.0] {
+            for offset in [0.01, 0.03, 0.07] {
+                for option_type in [OptionType::Call, OptionType::Put] {
+                    let strike = match option_type {
+                        OptionType::Call => forward - offset,
+                        OptionType::Put => forward + offset,
+                    };
+                    let price = bachelier_black_formula(
+                        option_type,
+                        strike,
+                        forward,
+                        vol * tte.sqrt(),
+                        1.0,
+                    )
+                    .expect("valid inputs");
+                    let implied = bachelier_black_formula_implied_vol(
+                        option_type,
+                        strike,
+                        forward,
+                        tte,
+                        price,
+                        1.0,
+                    )
+                    .expect("a price at intrinsic must invert");
+                    assert!(implied >= 0.0, "implied vol {implied}");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn bachelier_implied_vol_one_ulp_below_intrinsic_is_zero() {
+        for (option_type, strike, forward) in [
+            (OptionType::Call, 0.03, 0.05),
+            (OptionType::Put, 0.05, 0.03),
+            (OptionType::Call, -0.02, 0.01),
+        ] {
+            let intrinsic = sign_of(option_type) * (forward - strike);
+            let price = intrinsic.next_down();
+            let implied =
+                bachelier_black_formula_implied_vol(option_type, strike, forward, 0.5, price, 1.0)
+                    .expect("a price within close_enough of intrinsic must invert");
+            assert_eq!(implied, 0.0);
+        }
     }
 }
