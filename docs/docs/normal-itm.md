@@ -53,9 +53,10 @@ assert_eq!(in_the_money, 1.0);
 ## Reference coverage
 
 The fixture generator calls native **QuantLib 1.43** for 30 ordinary-domain
-cases; the two in-the-money zero-volatility rows are pinned to the v1.44 rule
-instead. Two overflow-range cases use a separate 90-digit Decimal normal-density
-integral. The local C++ source oracle is `blackformula.cpp:950` at commit
-`9863b578af0caa4cecabf697196533e84a8308b6`; it is distinct from the native wheel.
+cases. Three of them are re-pinned to v1.44: the two in-the-money
+zero-volatility rows follow the v1.44 indicator rule, and the `far_tail` put is
+native QuantLib 1.44's exactly-one value. Two overflow-range cases use a
+separate 90-digit Decimal normal-density integral. The C++ source oracle is
+`blackformula.cpp:962` at QuantLib v1.44; it is distinct from the native wheel.
 Tests cover parity, ATM, negative rates, tails, signed zero, adjacent values,
 finite-domain errors, the zero-volatility indicator and overflow boundaries.
