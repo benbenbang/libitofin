@@ -52,10 +52,10 @@ fn positive_volatility_call_put_parity_and_atm() {
 }
 
 #[test]
-fn zero_volatility_is_intrinsic_not_probability_or_continuous_limit() {
-    assert_eq!(itm(OptionType::Call, -2.0, 3.0, 0.0).unwrap(), 5.0);
+fn zero_volatility_is_the_v1_44_indicator_not_the_continuous_limit() {
+    assert_eq!(itm(OptionType::Call, -2.0, 3.0, 0.0).unwrap(), 1.0);
     assert_eq!(itm(OptionType::Put, -2.0, 3.0, 0.0).unwrap(), 0.0);
-    assert_eq!(itm(OptionType::Put, 3.0, -2.0, -0.0).unwrap(), 5.0);
+    assert_eq!(itm(OptionType::Put, 3.0, -2.0, -0.0).unwrap(), 1.0);
     assert_eq!(itm(OptionType::Call, 3.0, -2.0, -0.0).unwrap(), 0.0);
     for option in [OptionType::Call, OptionType::Put] {
         assert_eq!(itm(option, -0.01, -0.01, 0.0).unwrap(), 0.0);
@@ -82,10 +82,10 @@ fn non_finite_inputs_and_negative_standard_deviation_fail() {
 }
 
 #[test]
-fn extreme_finite_distances_have_cdf_endpoints_but_intrinsic_overflow_fails() {
+fn extreme_finite_distances_have_cdf_and_indicator_endpoints() {
     let maximum = f64::MAX;
-    assert!(itm(OptionType::Call, -maximum, maximum, 0.0).is_err());
-    assert!(itm(OptionType::Put, maximum, -maximum, 0.0).is_err());
+    assert_eq!(itm(OptionType::Call, -maximum, maximum, 0.0).unwrap(), 1.0);
+    assert_eq!(itm(OptionType::Put, maximum, -maximum, 0.0).unwrap(), 1.0);
     assert_eq!(itm(OptionType::Put, -maximum, maximum, 0.0).unwrap(), 0.0);
     assert_eq!(itm(OptionType::Call, maximum, -maximum, 0.0).unwrap(), 0.0);
     for std_dev in [1.0, f64::from_bits(1)] {
@@ -106,7 +106,7 @@ fn extreme_finite_distances_have_cdf_endpoints_but_intrinsic_overflow_fails() {
             1.0
         );
     }
-    assert_eq!(itm(OptionType::Call, 0.0, maximum, 0.0).unwrap(), maximum);
+    assert_eq!(itm(OptionType::Call, 0.0, maximum, 0.0).unwrap(), 1.0);
 }
 
 #[test]

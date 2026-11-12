@@ -10,6 +10,10 @@
 - Native QuantLib overflows the unscaled difference in those two cases and
   instead returns one/zero. The Rust function deliberately retains the finite
   mathematical ratio. This is not a claim of native bitwise parity there.
+- Rows sourced `v1.44 rule` (`zero_itm` Call, `zero_otm` Put) are hand-pinned
+  to QuantLib v1.44's zero-volatility indicator (`blackformula.cpp:970`); the
+  1.43 generator emits the old intrinsic value `5.0` there. Native QuantLib 1.44
+  returns `1.0` for both.
 - Inputs are emitted using round-trippable Python float representations.
 - TSV is UTF-8 with LF endings and regenerated deterministically.
 
