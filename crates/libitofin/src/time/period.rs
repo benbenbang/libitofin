@@ -685,4 +685,37 @@ mod tests {
         assert!(weeks(&Period::new(1, Months)).is_err());
         assert!(days(&Period::new(1, Years)).is_err());
     }
+
+    /// QuantLib v1.44 `testNegativePeriodComparison` (`period.cpp:246`):
+    /// negating both periods reverses their ordering and keeps an undecidable
+    /// comparison undecidable.
+    #[test]
+    fn v144_negative_period_comparison() {
+        let values = [
+            Period::new(1, Days),
+            Period::new(27, Days),
+            Period::new(28, Days),
+            Period::new(30, Days),
+            Period::new(31, Days),
+            Period::new(32, Days),
+            Period::new(365, Days),
+            Period::new(366, Days),
+            Period::new(367, Days),
+            Period::new(1, Weeks),
+            Period::new(4, Weeks),
+            Period::new(5, Weeks),
+            Period::new(52, Weeks),
+            Period::new(53, Weeks),
+            Period::new(1, Months),
+            Period::new(2, Months),
+            Period::new(12, Months),
+            Period::new(1, Years),
+            Period::new(2, Years),
+        ];
+        for p1 in values {
+            for p2 in values {
+                assert_eq!(less(&p1, &p2), less(&-p2, &-p1), "{p1} < {p2}");
+            }
+        }
+    }
 }

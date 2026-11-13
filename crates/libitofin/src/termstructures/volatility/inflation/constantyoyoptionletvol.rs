@@ -276,7 +276,8 @@ mod tests {
     use super::*;
     use crate::quotes::SimpleQuote;
     use crate::shared::shared;
-    use crate::test_support::{Flag, as_observer};
+    use crate::test_support::{Flag, as_observer, check_close};
+    use crate::time::calendars::target::Target;
     use crate::time::calendars::unitedkingdom::{self, UnitedKingdom};
     use crate::time::date::Month::{April, July, June, March, May};
     use crate::time::daycounters::actual365fixed::Actual365Fixed;
@@ -420,5 +421,41 @@ mod tests {
                 .unwrap(),
             VOL
         );
+    }
+
+    /// QuantLib v1.44 `testConstantVolatilityQuoteIsObserved`
+    /// (`inflationvolatility.cpp:396`), the YoY half: moving the quote itself
+    /// (not relinking the handle) notifies the surface's observers.
+    /// `ConstantCPIVolatility` is not ported, so the CPI half is skipped:
+    /// tracked as #1458.
+    #[test]
+    fn v144_constant_volatility_quote_is_observed() {
+        let settings = shared(Settings::<Date>::new());
+        settings.set_evaluation_date(Date::new(15, June, 2026));
+        let quote = shared(SimpleQuote::new(0.01));
+        let yoy = ConstantYoYOptionletVolatility::with_quote(
+            Handle::new(quote.clone() as Shared<dyn Quote>),
+            0,
+            Target::new(),
+            BusinessDayConvention::Following,
+            Actual365Fixed::new(),
+            Period::new(3, TimeUnit::Months),
+            Frequency::Monthly,
+            false,
+            -1.0,
+            100.0,
+            settings,
+        );
+        let flag = Flag::new();
+        yoy.observable().register_observer(&as_observer(&flag));
+        Flag::lower(&flag);
+
+        quote.set_value(0.02);
+
+        assert!(Flag::is_up(&flag), "the YoY surface did not notify");
+        let vol = yoy
+            .volatility(Date::new(15, June, 2027), 0.02, zero_lag())
+            .unwrap();
+        check_close(vol, 0.02, 1.0e-10);
     }
 }

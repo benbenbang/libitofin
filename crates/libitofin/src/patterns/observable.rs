@@ -613,4 +613,30 @@ mod tests {
         // exact counts of the C++ recursion
         assert_eq!(plain.borrow().counter, 2);
     }
+
+    /// QuantLib v1.44 `testDuplicateRegistration` (`observable.cpp:190`).
+    #[test]
+    fn v144_duplicate_registration() {
+        let observable = Observable::new();
+        let first = UpdateCounter::new();
+        let second = UpdateCounter::new();
+
+        assert!(observable.register_observer(&as_observer(&first)));
+        assert!(!observable.register_observer(&as_observer(&first)));
+        observable.register_observer(&as_observer(&second));
+
+        observable.notify_observers();
+        assert_eq!(first.borrow().counter, 1);
+        assert_eq!(second.borrow().counter, 1);
+
+        assert!(observable.unregister_observer(&as_observer(&first)));
+        observable.notify_observers();
+        assert_eq!(first.borrow().counter, 1);
+        assert_eq!(second.borrow().counter, 2);
+
+        assert!(observable.register_observer(&as_observer(&first)));
+        observable.notify_observers();
+        assert_eq!(first.borrow().counter, 2);
+        assert_eq!(second.borrow().counter, 3);
+    }
 }
