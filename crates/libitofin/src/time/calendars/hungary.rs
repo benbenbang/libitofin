@@ -91,4 +91,12 @@ mod tests {
         assert!(c.is_weekend(Weekday::Saturday));
         assert!(c.is_weekend(Weekday::Sunday));
     }
+
+    /// Port of `testHungaryCalendar` (`test-suite/calendars.cpp:3025`, QuantLib v1.44).
+    #[test]
+    fn hungary_calendar() {
+        let calendar = Hungary::new();
+        assert!(calendar.is_holiday(Date::new(15, Month::March, 2024)));
+        assert!(calendar.is_business_day(Date::new(14, Month::March, 2024)));
+    }
 }
