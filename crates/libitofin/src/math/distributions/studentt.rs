@@ -16,6 +16,9 @@ use crate::math::gammafunction::log_gamma;
 use crate::require;
 use crate::types::Real;
 
+#[cfg_attr(not(test), expect(dead_code))]
+mod inverse;
+
 // Defaults transcribed from QuantLib's InverseCumulativeStudent (accuracy 1e-6,
 // 50 iterations). Kept private until a consumer needs them configurable, rather
 // than introducing a generic solver-options type speculatively.
