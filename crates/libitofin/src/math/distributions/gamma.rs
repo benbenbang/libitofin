@@ -60,7 +60,9 @@ impl Cdf for CumulativeGammaDistribution {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::math::gammafunction::log_gamma;
     use crate::math::incompletegamma::incomplete_gamma;
+    use crate::test_support::check_close;
 
     fn assert_close(got: Real, expected: Real, tol: Real) {
         assert!(
@@ -129,5 +131,24 @@ mod tests {
         assert!(CumulativeGammaDistribution::new(-1.0).is_err());
         assert!(CumulativeGammaDistribution::new(Real::NAN).is_err());
         assert!(CumulativeGammaDistribution::new(Real::INFINITY).is_err());
+    }
+
+    /// QuantLib v1.44 `testCumulativeGammaDistribution` (`functions.cpp:121`);
+    /// `GammaFunction().logValue` is [`log_gamma`].
+    #[test]
+    fn v144_cumulative_gamma_distribution() {
+        let exponential = CumulativeGammaDistribution::new(1.0).unwrap();
+        assert_eq!(exponential.cdf(-1.0), 0.0);
+        assert_eq!(exponential.cdf(0.0), 0.0);
+        check_close(exponential.cdf(0.5), 1.0 - (-0.5_f64).exp(), 1.0e-5);
+        check_close(exponential.cdf(2.0), 1.0 - (-2.0_f64).exp(), 1.0e-5);
+
+        let shape_two = CumulativeGammaDistribution::new(2.0).unwrap();
+        check_close(shape_two.cdf(1.0), 1.0 - 2.0 * (-1.0_f64).exp(), 1.0e-5);
+        check_close(shape_two.cdf(4.0), 1.0 - 5.0 * (-4.0_f64).exp(), 1.0e-5);
+
+        assert!(CumulativeGammaDistribution::new(0.0).is_err());
+        assert!(CumulativeGammaDistribution::new(-1.0).is_err());
+        assert!(log_gamma(0.0).is_err());
     }
 }

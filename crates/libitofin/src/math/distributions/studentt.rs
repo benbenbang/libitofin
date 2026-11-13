@@ -141,6 +141,7 @@ impl Quantile for StudentT {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_support::check_close;
 
     const TOL: Real = 1e-12;
 
@@ -339,5 +340,22 @@ mod tests {
         // Non-finite dof would make ln_normalization NaN and panic cdf's expect.
         assert!(StudentT::new(Real::INFINITY).is_err());
         assert!(StudentT::new(Real::NEG_INFINITY).is_err());
+    }
+
+    /// QuantLib v1.44 `testStudentDistribution` (`distributions.cpp:839`):
+    /// `StudentDistribution` and `CumulativeStudentDistribution` are both
+    /// [`StudentT`].
+    #[test]
+    fn v144_student_distribution() {
+        let cauchy = StudentT::new(1.0).unwrap();
+        check_close(cauchy.pdf(0.0), 1.0 / PI, 1.0e-10);
+        check_close(cauchy.pdf(1.0), 0.5 / PI, 1.0e-10);
+
+        let student = StudentT::new(5.0).unwrap();
+        check_close(student.pdf(-1.0), student.pdf(1.0), 1.0e-12);
+        check_close(student.cdf(0.0), 0.5, 1.0e-12);
+        check_close(student.cdf(-1.0), 1.0 - student.cdf(1.0), 1.0e-12);
+
+        assert!(StudentT::new(0.0).is_err());
     }
 }

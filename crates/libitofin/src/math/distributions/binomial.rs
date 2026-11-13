@@ -9,6 +9,11 @@
 //! QuantLib's `BigNatural`). The mass forms `ln C(n, k)` from exact factorial
 //! log-sums rather than the Lanczos `log_gamma`, whose error would dominate
 //! these factorial-sensitive values (the same reasoning as the Poisson mass).
+//!
+//! QuantLib's public `binomialCoefficient`/`binomialCoefficientLn` (private
+//! here) and `PeizerPrattMethod2Inversion` are not ported, so the QuantLib v1.44
+//! `testBinomialDistribution` (`distributions.cpp:535`) assertions on them are
+//! skipped: tracked as #1453.
 
 use crate::errors::QlResult;
 use crate::math::beta::incomplete_beta;
@@ -112,6 +117,7 @@ impl CumulativeBinomialDistribution {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_support::check_close;
 
     fn assert_close(got: Real, expected: Real, tol: Real) {
         assert!(
@@ -210,5 +216,43 @@ mod tests {
         assert!(BinomialDistribution::new(Real::NAN, 5).is_err());
         assert!(CumulativeBinomialDistribution::new(-0.1, 5).is_err());
         assert!(CumulativeBinomialDistribution::new(Real::NAN, 5).is_err());
+    }
+
+    /// QuantLib v1.44 `testBinomialDistribution` (`distributions.cpp:535`), the
+    /// mass and CDF assertions; the coefficient and Peizer-Pratt ones are
+    /// skipped (see the module docs).
+    #[test]
+    fn v144_binomial_distribution() {
+        let pmf = BinomialDistribution::new(0.25, 4).unwrap();
+        check_close(pmf.pmf(0), 0.75_f64.powi(4), 1.0e-12);
+        check_close(
+            pmf.pmf(2),
+            6.0 * 0.25_f64.powi(2) * 0.75_f64.powi(2),
+            1.0e-12,
+        );
+        assert_eq!(pmf.pmf(5), 0.0);
+
+        let zero_p = BinomialDistribution::new(0.0, 4).unwrap();
+        assert_eq!(zero_p.pmf(0), 1.0);
+        assert_eq!(zero_p.pmf(1), 0.0);
+        let one_p = BinomialDistribution::new(1.0, 4).unwrap();
+        assert_eq!(one_p.pmf(3), 0.0);
+        assert_eq!(one_p.pmf(4), 1.0);
+        assert!(BinomialDistribution::new(-0.1, 4).is_err());
+        assert!(BinomialDistribution::new(1.1, 4).is_err());
+
+        let cdf = CumulativeBinomialDistribution::new(0.25, 4).unwrap();
+        check_close(cdf.cdf(2), pmf.pmf(0) + pmf.pmf(1) + pmf.pmf(2), 1.0e-12);
+        assert_eq!(cdf.cdf(4), 1.0);
+        assert_eq!(
+            CumulativeBinomialDistribution::new(0.0, 4).unwrap().cdf(0),
+            1.0
+        );
+        assert_eq!(
+            CumulativeBinomialDistribution::new(1.0, 4).unwrap().cdf(3),
+            0.0
+        );
+        assert!(CumulativeBinomialDistribution::new(-0.1, 4).is_err());
+        assert!(CumulativeBinomialDistribution::new(1.1, 4).is_err());
     }
 }
