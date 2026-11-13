@@ -341,6 +341,40 @@ impl GaussianOrthogonalPolynomial for GaussHyperbolicPolynomial {
 mod tests {
     use super::*;
 
+    /// The log-space weights (QuantLib v1.44 `logWeight` overrides,
+    /// gaussianorthogonalpolynomial.cpp:74,100,194) must equal `ln(w(x))`
+    /// wherever `w` does not underflow. The v1.44 quadrature oracles only use
+    /// `s = 0` and `mu = 0`, and the far-tail nodes that take the log-space
+    /// path contribute below 1e-15 to any integral, so a `log_w` that dropped
+    /// its `s` or `mu` term would pass them; this pins the terms directly.
+    #[test]
+    fn log_weights_equal_the_log_of_the_weights() {
+        fn check(family: &str, log_w: Real, w: Real, x: Real) {
+            let expected = w.ln();
+            assert!(
+                (log_w - expected).abs() <= 1e-12 * expected.abs().max(1.0),
+                "{family}: log_w({x}) = {log_w}, ln(w({x})) = {expected}"
+            );
+        }
+        let xs = [0.3, 1.0, 2.0, 5.0, 10.0];
+        for s in [0.5, 1.5] {
+            let p = GaussLaguerrePolynomial::new(s).unwrap();
+            for x in xs {
+                check("laguerre", p.log_w(x), p.w(x), x);
+            }
+        }
+        for mu in [0.5, 1.0] {
+            let p = GaussHermitePolynomial::new(mu).unwrap();
+            for x in xs.iter().flat_map(|&x| [x, -x]) {
+                check("hermite", p.log_w(x), p.w(x), x);
+            }
+        }
+        let p = GaussHyperbolicPolynomial;
+        for x in xs.iter().flat_map(|&x| [x, -x]) {
+            check("hyperbolic", p.log_w(x), p.w(x), x);
+        }
+    }
+
     // Monic Legendre recurrence: alpha_k = 0, beta_k = k^2 / (4k^2 - 1),
     // weight w(x) = 1 on [-1, 1], mu_0 = 2.
     struct MonicLegendre;
