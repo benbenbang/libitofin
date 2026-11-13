@@ -325,4 +325,27 @@ mod tests {
             );
         }
     }
+
+    /// QuantLib v1.44 `testInverseCumulativePoisson` (`distributions.cpp:659`),
+    /// the endpoint and monotonicity assertions added at `:689-699`. v1.44
+    /// returns `QL_MAX_REAL` at `p = 1`; we return `+inf`, the support bound, as
+    /// documented on [`InverseCumulativePoisson::quantile`] (the same endpoint
+    /// rule as the Student-t quantile).
+    #[test]
+    fn v144_inverse_cumulative_poisson_endpoints() {
+        let at = |icp: &InverseCumulativePoisson, p: Real| {
+            icp.quantile(Probability::try_from(p).unwrap()).unwrap()
+        };
+        let icp = InverseCumulativePoisson::new(1.0).unwrap();
+        assert_eq!(at(&icp, 0.0), 0.0);
+        assert_eq!(at(&icp, 1.0), Real::INFINITY);
+
+        let icp4 = InverseCumulativePoisson::new(4.0).unwrap();
+        let mut previous = -1.0;
+        for p in [0.1, 0.5, 0.9, 0.99] {
+            let calculated = at(&icp4, p);
+            assert!(calculated > previous, "icp4({p}) = {calculated}");
+            previous = calculated;
+        }
+    }
 }
