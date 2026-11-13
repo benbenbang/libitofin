@@ -51,6 +51,8 @@ impl Cdf for CumulativeChiSquareDistribution {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::math::distributions::noncentralchisquare::NonCentralCumulativeChiSquareDistribution;
+    use crate::test_support::check_close;
 
     fn assert_close(got: Real, expected: Real, tol: Real) {
         assert!(
@@ -145,5 +147,19 @@ mod tests {
         assert!(CumulativeChiSquareDistribution::new(-1.0).is_err());
         assert!(CumulativeChiSquareDistribution::new(Real::NAN).is_err());
         assert!(CumulativeChiSquareDistribution::new(Real::INFINITY).is_err());
+    }
+
+    /// QuantLib v1.44 `testCumulativeChiSquareDistribution`
+    /// (`distributions.cpp:1253`).
+    #[test]
+    fn v144_cumulative_chi_square_distribution() {
+        let chi_square = CumulativeChiSquareDistribution::new(2.0).unwrap();
+        assert_eq!(chi_square.cdf(-1.0), 0.0);
+        assert_eq!(chi_square.cdf(0.0), 0.0);
+        check_close(chi_square.cdf(2.0), 1.0 - (-1.0_f64).exp(), 1.0e-5);
+
+        let non_central = NonCentralCumulativeChiSquareDistribution::new(4.0, 1.0).unwrap();
+        assert_eq!(non_central.value(0.0), 0.0);
+        assert_eq!(non_central.value(-1.0), 0.0);
     }
 }

@@ -4,7 +4,9 @@
 //! [`NormalDistribution`] (density), [`CumulativeNormalDistribution`] (the CDF
 //! via [`erf`], with an asymptotic tail for very negative arguments), and
 //! [`InverseCumulativeNormal`] (Peter Acklam's rational approximation). The
-//! Moro and Maddock variants are deferred.
+//! Moro and Maddock variants are deferred, so their QuantLib v1.44 oracles
+//! (`testMoroInverseCumulativeNormal`, `distributions.cpp:365`, and
+//! `testMaddockNormalDistributions`, `:407`) are not ported: tracked as #1453.
 
 // Math constants are transcribed verbatim from QuantLib's mathconstants.hpp;
 // their precision exceeds f64 but rounds to the intended bit pattern.
@@ -263,6 +265,7 @@ impl InverseCumulativeNormal {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_support::check_close;
 
     const TOL: Real = 1e-15;
 
@@ -404,6 +407,101 @@ mod tests {
             let p = cumulative.value(z);
             assert!(p >= previous && p <= 1.0, "N not monotonic at {z}");
             previous = p;
+        }
+    }
+
+    /// QuantLib v1.44 `testInverseCumulativeNormal` (`distributions.cpp:318`).
+    #[test]
+    fn v144_inverse_cumulative_normal() {
+        let inv = InverseCumulativeNormal::standard();
+        let at = |p: Real| inv.value(p).unwrap();
+        for p in [0.0, 1.0, Real::EPSILON, 1.0 - Real::EPSILON] {
+            assert!(at(p).is_finite(), "p = {p}");
+        }
+        assert!(at(0.0) < 0.0);
+        assert!(at(1.0) > 0.0);
+        check_close(at(0.02425), -1.972961049, 1.0e-6);
+        check_close(at(0.97575), 1.972961049, 1.0e-6);
+        check_close(at(0.1), -at(0.9), 1.0e-12);
+
+        assert_eq!(at(-0.5 * Real::EPSILON), Real::MIN);
+        assert!(inv.value(-2.0 * Real::EPSILON).is_err());
+        assert!(inv.value(1.0 + 100.0 * Real::EPSILON).is_err());
+
+        let probabilities = [1.0e-6, 0.01, 0.1, 0.5, 0.9, 0.99, 1.0 - 1.0e-6];
+        let mut previous = -Real::MAX;
+        for p in probabilities {
+            let value = at(p);
+            assert!(value > previous, "p = {p}");
+            previous = value;
+        }
+        let shifted = InverseCumulativeNormal::new(3.0, 2.0).unwrap();
+        for p in probabilities {
+            check_close(shifted.value(p).unwrap(), 3.0 + 2.0 * at(p), 1.0e-12);
+        }
+
+        assert!(inv.value(-1.0e-8).is_err());
+        assert!(inv.value(1.0 + 1.0e-4).is_err());
+        assert!(InverseCumulativeNormal::new(0.0, -1.0).is_err());
+        assert!(InverseCumulativeNormal::new(0.0, Real::NAN).is_err());
+    }
+
+    /// QuantLib v1.44 `testCumulativeNormal` (`distributions.cpp:454`).
+    ///
+    /// The C++ references are Boost.Math's normal quantile and cdf
+    /// (`:466-486`); the literals here are the same quantities from mpmath at
+    /// 50 digits, rounded once to a double (`tests/fixtures/normal_cdf_v144.py`,
+    /// run with `uv run --with mpmath==1.3.0`). The `derivative` assertions
+    /// (`:506-509`) are `density_derivative_vanishes_at_the_extremes`.
+    #[test]
+    fn v144_cumulative_normal() {
+        let cumulative = CumulativeNormalDistribution::standard();
+        assert_eq!(cumulative.value(Real::NEG_INFINITY), 0.0);
+        assert_eq!(cumulative.value(Real::INFINITY), 1.0);
+
+        let switch = -5.612001244174789;
+        for (x, expected) in [
+            (switch - 1.0e-6, 9.999942196720321e-09),
+            (switch, 9.99999999999998e-09),
+            (switch + 1.0e-6, 1.0000057803604033e-08),
+        ] {
+            let error = (cumulative.value(x) - expected).abs();
+            assert!(error <= 1.0e-14, "N({x}) off by {error}");
+        }
+        for (x, expected) in [
+            (-6.0, 9.86587645037698e-10),
+            (-10.0, 7.619853024160525e-24),
+            (-20.0, 2.7536241186062337e-89),
+        ] {
+            check_close(cumulative.value(x), expected, 1.0e-5);
+        }
+        let mut previous = 0.0;
+        for x in [-20.0, -10.0, -6.0, -1.0, 0.0, 1.0, 6.0, 10.0, 20.0] {
+            let value = cumulative.value(x);
+            assert!(value >= previous && (0.0..=1.0).contains(&value), "N({x})");
+            previous = value;
+        }
+        for (x, expected) in [(6.0, 0.9999999990134123), (10.0, 1.0), (20.0, 1.0)] {
+            let error = (cumulative.value(x) - expected).abs();
+            assert!(error <= 1.0e-14, "N({x}) off by {error}");
+        }
+
+        let shifted_normal = NormalDistribution::new(3.0, 2.0).unwrap();
+        let shifted_cumulative = CumulativeNormalDistribution::new(3.0, 2.0).unwrap();
+        let standard_density = NormalDistribution::standard();
+        for x in [1.0, 3.0, 5.0] {
+            let z = (x - 3.0) / 2.0;
+            check_close(
+                shifted_normal.value(x),
+                standard_density.value(z) / 2.0,
+                1.0e-12,
+            );
+            check_close(shifted_cumulative.value(x), cumulative.value(z), 1.0e-12);
+        }
+
+        for sigma in [0.0, -1.0] {
+            assert!(NormalDistribution::new(0.0, sigma).is_err());
+            assert!(CumulativeNormalDistribution::new(0.0, sigma).is_err());
         }
     }
 }

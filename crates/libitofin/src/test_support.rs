@@ -81,3 +81,16 @@ pub(crate) fn implied_quote_on_dirty_curve(
     let (fresh_helper, _fresh_curve) = bootstrap(&shared(SimpleQuote::new(quote_after)));
     (dirty, fresh_helper.implied_quote().unwrap())
 }
+
+/// Boost's `BOOST_CHECK_CLOSE(got, expected, percent)`: the strong relative
+/// check, `|got - expected|` within `percent / 100` of both magnitudes.
+#[track_caller]
+pub(crate) fn check_close(got: Real, expected: Real, percent: Real) {
+    let diff = (got - expected).abs();
+    let fraction = percent / 100.0;
+    assert!(
+        diff == 0.0 || (diff <= fraction * got.abs() && diff <= fraction * expected.abs()),
+        "got {got}, expected {expected}, relative diff {} exceeds {percent}%",
+        diff / expected.abs()
+    );
+}

@@ -348,4 +348,59 @@ mod tests {
         assert!(Biv::new(5, 1.5).is_err());
         assert!(Biv::new(5, Real::NAN).is_err());
     }
+
+    /// QuantLib v1.44 `testBivariateCumulativeStudentInvalidParameters`
+    /// (`distributions.cpp:1013`).
+    #[test]
+    fn v144_invalid_parameters() {
+        assert!(Biv::new(0, 0.0).is_err());
+        for rho in [-1.1, 1.1, Real::NAN, Real::INFINITY, Real::NEG_INFINITY] {
+            assert!(Biv::new(1, rho).is_err(), "rho = {rho}");
+        }
+    }
+
+    /// QuantLib v1.44 `testBivariateCumulativeStudentBoundaryContinuity`
+    /// (`distributions.cpp:1034`).
+    #[test]
+    fn v144_boundary_continuity() {
+        let univariate = StudentT::new(5.0).unwrap();
+        let positive = Biv::new(5, 1.0).unwrap();
+        let negative = Biv::new(5, -1.0).unwrap();
+        let symmetric = Biv::new(5, 0.5).unwrap();
+        let points = [-2.0, -0.25, 0.0, 1.5];
+        let tolerance = 1.0e-10;
+        let small = |value: Real, tolerance: Real| {
+            assert!(value.abs() <= tolerance, "{value} exceeds {tolerance}");
+        };
+
+        for x in points {
+            for y in points {
+                small(positive.value(x, y) - univariate.cdf(x.min(y)), tolerance);
+                let negative_expected = if x < -y {
+                    0.0
+                } else {
+                    univariate.cdf(x) - univariate.cdf(-y)
+                };
+                small(negative.value(x, y) - negative_expected, tolerance);
+            }
+        }
+        small(
+            symmetric.value(0.75, -1.25) - symmetric.value(-1.25, 0.75),
+            tolerance,
+        );
+
+        let epsilon = 1.0e-7;
+        small(
+            positive.value(1.0, 1.0 + epsilon) - positive.value(1.0, 1.0 - epsilon),
+            1.0e-6,
+        );
+        small(
+            negative.value(1.0, -1.0 + epsilon) - negative.value(1.0, -1.0 + 2.0 * epsilon),
+            1.0e-6,
+        );
+        small(
+            negative.value(1.0, -1.0 - epsilon) - negative.value(1.0, -1.0 - 2.0 * epsilon),
+            1.0e-6,
+        );
+    }
 }
