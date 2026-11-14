@@ -160,4 +160,12 @@ mod tests {
         assert!(c.is_weekend(Weekday::Saturday));
         assert!(c.is_weekend(Weekday::Sunday));
     }
+
+    /// Port of the `testBrazil` delta (`test-suite/calendars.cpp:1441-1447`, QuantLib v1.44).
+    #[test]
+    fn christmas_eve_is_exchange_only_holiday() {
+        let christmas_eve = Date::new(24, Month::December, 2024);
+        assert!(Brazil::new(Market::Settlement).is_business_day(christmas_eve));
+        assert!(Brazil::new(Market::Exchange).is_holiday(christmas_eve));
+    }
 }

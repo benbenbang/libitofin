@@ -655,4 +655,39 @@ mod tests {
         assert!(c.is_business_day(Date::new(3, Month::March, 2027)));
         assert!(c.is_business_day(Date::new(27, Month::January, 2027)));
     }
+
+    /// Port of the `testIndia` historical list (`test-suite/calendars.cpp:4773-4782`, QuantLib v1.44).
+    #[test]
+    fn historical_holidays() {
+        let c = India::new(Market::Nse);
+        let historical = [
+            (21, Month::January, 2005),
+            (11, Month::January, 2006),
+            (1, Month::January, 2007),
+            (6, Month::March, 2008),
+            (8, Month::January, 2009),
+            (1, Month::January, 2010),
+            (2, Month::March, 2011),
+            (20, Month::February, 2012),
+            (27, Month::March, 2013),
+            (27, Month::February, 2014),
+            (19, Month::February, 2019),
+            (19, Month::February, 2020),
+            (19, Month::February, 2021),
+            (1, Month::March, 2022),
+            (7, Month::March, 2023),
+            (22, Month::January, 2024),
+            (19, Month::February, 2025),
+        ];
+        for (d, m, y) in historical {
+            assert!(c.is_holiday(Date::new(d, m, y)), "{d} {m:?} {y}");
+        }
+    }
+
+    /// Newest-year pin: Chatrapati Shivaji Jayanti 2026 (`ql/time/calendars/india.cpp:476-480`, QuantLib v1.44).
+    #[test]
+    fn newest_year_pin() {
+        let date = Date::new(19, Month::February, 2026);
+        assert!(India::new(Market::Nse).is_holiday(date), "{date:?}");
+    }
 }

@@ -489,4 +489,14 @@ mod tests {
             assert!(calendar.is_holiday(Date::new(d, m, y)), "{d} {m:?} {y}");
         }
     }
+
+    /// Newest-year pins: the first 2024 and 2025 table rows (`ql/time/calendars/thailand.cpp:289,299`, QuantLib v1.44).
+    #[test]
+    fn newest_year_pins() {
+        let c = Thailand::new();
+        let pin_2024 = Date::new(26, Month::February, 2024);
+        let pin_2025 = Date::new(12, Month::February, 2025);
+        assert!(c.is_holiday(pin_2024), "{pin_2024:?}");
+        assert!(c.is_holiday(pin_2025), "{pin_2025:?}");
+    }
 }

@@ -174,4 +174,17 @@ mod tests {
         assert!(c.is_weekend(Weekday::Sunday));
         assert!(!c.is_weekend(Weekday::Monday));
     }
+
+    /// Port of `testAustriaCalendars` (`test-suite/calendars.cpp:3087`, QuantLib v1.44).
+    #[test]
+    fn austria_calendars() {
+        let settlement = Austria::new(Market::Settlement);
+        let exchange = Austria::new(Market::Exchange);
+        assert!(settlement.is_holiday(Date::new(1, Month::January, 2024)));
+        assert!(settlement.is_holiday(Date::new(1, Month::May, 2024)));
+        assert!(settlement.is_holiday(Date::new(26, Month::October, 2024)));
+        assert!(exchange.is_holiday(Date::new(29, Month::March, 2024)));
+        assert!(exchange.is_holiday(Date::new(24, Month::December, 2024)));
+        assert!(exchange.is_business_day(Date::new(2, Month::January, 2024)));
+    }
 }

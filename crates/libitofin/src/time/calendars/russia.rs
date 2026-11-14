@@ -292,4 +292,12 @@ mod tests {
         assert!(c.is_weekend(Weekday::Sunday));
         assert!(!c.is_weekend(Weekday::Friday));
     }
+
+    /// Port of the `testRussia` delta (`test-suite/calendars.cpp:1403-1406`, QuantLib v1.44).
+    #[test]
+    fn settlement_holiday_is_moex_business_day() {
+        let holiday = Date::new(6, Month::January, 2012);
+        assert!(Russia::new(Market::Settlement).is_holiday(holiday));
+        assert!(Russia::new(Market::Moex).is_business_day(holiday));
+    }
 }
