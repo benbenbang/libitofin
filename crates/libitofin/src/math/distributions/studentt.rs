@@ -114,6 +114,11 @@ impl StudentT {
     /// `x >= y`; this always uses the forward [`incomplete_beta`] in `x`, the
     /// same evaluation as [`Cdf::cdf`], and the pdf in place of Boost's ibeta
     /// derivative.
+    ///
+    /// Like Boost's `x == 0` bail-out, the estimate is returned unrefined once
+    /// the density is subnormal (the deep tail, `|t|` past about `1e80` at
+    /// `ν = 3`), where the step would divide by zero; Hill's estimate there
+    /// already holds the cdf to about `1e-8` relative.
     fn halley_step(&self, t: Real, u: Real) -> QlResult<Real> {
         let nu = self.degrees_of_freedom;
         let t2 = t * t;
@@ -123,6 +128,9 @@ impl StudentT {
         }
         let p0 = 0.5 * incomplete_beta(0.5 * nu, 0.5, xb)? - u;
         let p1 = self.pdf(t);
+        if !p1.is_normal() {
+            return Ok(t);
+        }
         let p2 = t * (nu + 1.0) / (t2 + nu);
         Ok(-(t.abs() + p0 / (p1 + p0 * p2 / 2.0)))
     }
@@ -484,6 +492,28 @@ mod tests {
                     "n={n}, p={p}: {lower} vs {upper}"
                 );
             }
+        }
+    }
+
+    #[test]
+    fn deep_tail_quantiles_stay_finite_when_the_density_underflows() {
+        for nu in [2.5, 3.0, 5.0, 10.0, 30.0] {
+            let dist = StudentT::new(nu).unwrap();
+            for p in [1.0e-250, 1.0e-300, 5.0e-324] {
+                let x = q(&dist, p);
+                assert!(x.is_finite() && x < 0.0, "nu={nu}, p={p}: {x}");
+                if p >= 1.0e-300 {
+                    assert_close(dist.cdf(x) / p, 1.0, 1.0e-6);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn non_integer_dof_below_two_keeps_newton() {
+        let dist = StudentT::new(1.5).unwrap();
+        for p in [0.05, 0.25, 0.75, 0.95] {
+            assert_close(dist.cdf(q(&dist, p)), p, 1.0e-6);
         }
     }
 
