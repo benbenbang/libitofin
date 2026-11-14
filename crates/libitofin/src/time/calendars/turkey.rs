@@ -430,4 +430,11 @@ mod tests {
             assert!(calendar.is_holiday(Date::new(d, m, y)), "{d} {m:?} {y}");
         }
     }
+
+    /// Newest-year pin: Kurban Bayrami 2034 (`ql/time/calendars/turkey.cpp:252-256`, QuantLib v1.44).
+    #[test]
+    fn newest_year_pin() {
+        let date = Date::new(28, Month::February, 2034);
+        assert!(Turkey::new().is_holiday(date), "{date:?}");
+    }
 }

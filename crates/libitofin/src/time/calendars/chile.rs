@@ -168,4 +168,16 @@ mod tests {
         assert!(c.is_weekend(Weekday::Saturday));
         assert!(c.is_weekend(Weekday::Sunday));
     }
+
+    /// Port of `testChileCalendar` (`test-suite/calendars.cpp:3142`, QuantLib v1.44).
+    #[test]
+    fn chile_calendar() {
+        let calendar = Chile::new(Market::Sse);
+        assert!(calendar.is_holiday(Date::new(1, Month::January, 2024)));
+        assert!(calendar.is_holiday(Date::new(29, Month::March, 2024)));
+        assert!(calendar.is_holiday(Date::new(21, Month::May, 2024)));
+        assert!(calendar.is_holiday(Date::new(18, Month::September, 2024)));
+        assert!(calendar.is_holiday(Date::new(19, Month::September, 2024)));
+        assert!(calendar.is_business_day(Date::new(2, Month::January, 2024)));
+    }
 }
