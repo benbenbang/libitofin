@@ -233,6 +233,7 @@ fn body_series(df: Real, ln_normalization: Real, u: Real) -> Real {
 mod tests {
     use super::*;
     use crate::math::distributions::studentt::StudentT;
+    use crate::math::distributions::{Probability, Quantile};
 
     fn oracle() -> impl Iterator<Item = (Real, Real, Real)> {
         include_str!("../../../../tests/fixtures/studentt_quantile/quantiles.csv")
@@ -294,5 +295,17 @@ mod tests {
         let (x, exact) = estimate(1e9, 0.025);
         assert!(!exact);
         assert!((x + 1.959963984540054).abs() < 1e-8);
+    }
+
+    #[test]
+    fn quantile_matches_mpmath_table_to_1e_10_relative() {
+        for (nu, p, expected) in oracle() {
+            let dist = StudentT::new(nu).unwrap();
+            let x = dist.quantile(Probability::try_from(p).unwrap()).unwrap();
+            assert!(
+                ((x - expected) / expected).abs() <= 1e-10,
+                "nu={nu}, p={p}: {x} vs {expected}"
+            );
+        }
     }
 }

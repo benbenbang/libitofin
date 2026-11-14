@@ -3,8 +3,8 @@
 //! Port of `ql/math/distributions/studenttdistribution.{hpp,cpp}`: the standard
 //! (location 0, scale 1) Student-t [`StudentT`] with `ν` degrees of freedom,
 //! providing the density, the cumulative distribution via the regularized
-//! [`incomplete_beta`] function, and the inverse via the Newton iteration that
-//! QuantLib's `InverseCumulativeStudent` uses.
+//! [`incomplete_beta`] function, and the inverse via Boost's Student-t quantile
+//! that QuantLib v1.44's `InverseCumulativeStudent` calls.
 
 use std::f64::consts::PI;
 
@@ -16,14 +16,7 @@ use crate::math::gammafunction::log_gamma;
 use crate::require;
 use crate::types::Real;
 
-#[cfg_attr(not(test), expect(dead_code))]
 mod inverse;
-
-// Defaults transcribed from QuantLib's InverseCumulativeStudent (accuracy 1e-6,
-// 50 iterations). Kept private until a consumer needs them configurable, rather
-// than introducing a generic solver-options type speculatively.
-const QUANTILE_ACCURACY: Real = 1e-6;
-const QUANTILE_MAX_ITERATIONS: u32 = 50;
 
 /// The standard Student-t distribution with `ν` degrees of freedom.
 #[derive(Clone, Copy, Debug)]
@@ -113,24 +106,38 @@ impl Support for StudentT {
     }
 }
 
-impl Quantile for StudentT {
-    fn quantile(&self, p: Probability) -> QlResult<Real> {
-        let p = p.value();
-        // The generalized inverse maps the closed endpoints to the support.
-        if p == 0.0 {
-            return Ok(self.lower_bound());
+impl StudentT {
+    /// One Halley step on the forward cdf from a lower-tail estimate `t < 0`
+    /// at `u <= 0.5`, as Boost's `fast_students_t_quantile_imp`.
+    ///
+    /// Boost evaluates the cdf as `ibeta(1/2, ν/2, y)` complemented when
+    /// `x >= y`; this always uses the forward [`incomplete_beta`] in `x`, the
+    /// same evaluation as [`Cdf::cdf`], and the pdf in place of Boost's ibeta
+    /// derivative.
+    fn halley_step(&self, t: Real, u: Real) -> QlResult<Real> {
+        let nu = self.degrees_of_freedom;
+        let t2 = t * t;
+        let xb = nu / (nu + t2);
+        if xb == 0.0 {
+            return Ok(t);
         }
-        if p == 1.0 {
-            return Ok(self.upper_bound());
-        }
-        // Newton-Raphson from x = 0 using the density as derivative, exactly as
-        // QuantLib's InverseCumulativeStudent. Genuinely fallible: extreme-tail
-        // probabilities can exhaust the iteration budget.
+        let p0 = 0.5 * incomplete_beta(0.5 * nu, 0.5, xb)? - u;
+        let p1 = self.pdf(t);
+        let p2 = t * (nu + 1.0) / (t2 + nu);
+        Ok(-(t.abs() + p0 / (p1 + p0 * p2 / 2.0)))
+    }
+
+    /// Newton-Raphson from `x = 0` with QuantLib v1.43's defaults (accuracy
+    /// `1e-6`, 50 iterations), kept for non-integer `ν < 2` until #1452 ports
+    /// Boost's inverse incomplete beta for that domain.
+    fn newton_quantile(&self, p: Real) -> QlResult<Real> {
+        const ACCURACY: Real = 1e-6;
+        const MAX_ITERATIONS: u32 = 50;
         let mut x = 0.0;
-        for _ in 0..QUANTILE_MAX_ITERATIONS {
+        for _ in 0..MAX_ITERATIONS {
             let diff = (self.cdf(x) - p) / self.pdf(x);
             x -= diff;
-            if diff.abs() <= QUANTILE_ACCURACY {
+            if diff.abs() <= ACCURACY {
                 return Ok(x);
             }
         }
@@ -138,6 +145,49 @@ impl Quantile for StudentT {
             "Student-t quantile did not converge for p={p} (df={})",
             self.degrees_of_freedom
         );
+    }
+}
+
+impl Quantile for StudentT {
+    /// The quantile by Boost's `students_t` quantile, which QuantLib v1.44's
+    /// `InverseCumulativeStudent` calls: the `inverse_students_t` estimate for the lower
+    /// tail `u = min(p, 1 - p)`, refined by one Halley step unless the estimate
+    /// is exact, and reflected for `p > 0.5`.
+    ///
+    /// `quantile(0)` is `-∞` and `quantile(1)` is `+∞`, a deliberate divergence
+    /// from v1.44's `QL_MIN_REAL` / `QL_MAX_REAL`: the generalized inverse maps
+    /// the closed endpoints to the support. `quantile(0.5)` is `0`, as in
+    /// v1.44's `InverseCumulativeStudent`. Non-integer `ν < 2` keeps the
+    /// v1.43 Newton iteration (tracked as #1452).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the incomplete beta of the Halley step does not
+    /// converge, or if the non-integer `ν < 2` Newton iteration exhausts its
+    /// budget.
+    fn quantile(&self, p: Probability) -> QlResult<Real> {
+        let p = p.value();
+        if p == 0.0 {
+            return Ok(self.lower_bound());
+        }
+        if p == 1.0 {
+            return Ok(self.upper_bound());
+        }
+        if p == 0.5 {
+            return Ok(0.0);
+        }
+        let nu = self.degrees_of_freedom;
+        if nu < 2.0 && nu.floor() != nu {
+            return self.newton_quantile(p);
+        }
+        let (u, invert) = if p > 0.5 { (1.0 - p, true) } else { (p, false) };
+        let (estimate, exact) = inverse::inverse_students_t(nu, self.ln_normalization, u)?;
+        let t = if exact || estimate == 0.0 {
+            estimate
+        } else {
+            self.halley_step(estimate, u)?
+        };
+        Ok(if invert { -t } else { t })
     }
 }
 
@@ -295,7 +345,9 @@ mod tests {
     // VI. Inverse: endpoints, the symmetric centre, round trips, a known value.
     #[test]
     fn quantile_endpoints_are_support_bounds() {
-        let dist = StudentT::new(5.0).unwrap();
+        let dist = StudentT::new(4.0).unwrap();
+        assert!(Probability::try_from(-0.1).is_err());
+        assert!(Probability::try_from(1.1).is_err());
         assert_eq!(
             dist.quantile(Probability::try_from(0.0).unwrap()).unwrap(),
             Real::NEG_INFINITY
@@ -332,6 +384,107 @@ mod tests {
         let dist = StudentT::new(1.0).unwrap();
         let x = dist.quantile(Probability::try_from(0.75).unwrap()).unwrap();
         assert_close(x, 1.0, 1e-6);
+    }
+
+    fn q(dist: &StudentT, p: Real) -> Real {
+        dist.quantile(Probability::try_from(p).unwrap()).unwrap()
+    }
+
+    const ORACLE_PROBABILITIES: [Real; 17] = [
+        1.0e-12,
+        1.0e-9,
+        1.0e-6,
+        1.0e-4,
+        0.001,
+        0.01,
+        0.10,
+        0.25,
+        0.50,
+        0.75,
+        0.90,
+        0.99,
+        0.999,
+        1.0 - 1.0e-4,
+        1.0 - 1.0e-6,
+        1.0 - 1.0e-9,
+        1.0 - 1.0e-12,
+    ];
+
+    #[test]
+    fn inverse_cumulative_cauchy_matches_closed_form() {
+        let dist = StudentT::new(1.0).unwrap();
+        for p in ORACLE_PROBABILITIES {
+            let expected = if p < 0.5 {
+                -1.0 / (PI * p).tan()
+            } else if p > 0.5 {
+                1.0 / (PI * (1.0 - p)).tan()
+            } else {
+                0.0
+            };
+            let calculated = q(&dist, p);
+            let tolerance = 1.0e-10 * expected.abs().max(1.0);
+            assert!(
+                (calculated - expected).abs() <= tolerance,
+                "p={p}: calculated {calculated}, expected {expected}"
+            );
+        }
+    }
+
+    #[test]
+    fn inverse_cumulative_student2_matches_closed_form() {
+        let dist = StudentT::new(2.0).unwrap();
+        for p in ORACLE_PROBABILITIES {
+            let expected = (2.0 * p - 1.0) / (2.0 * p * (1.0 - p)).sqrt();
+            let calculated = q(&dist, p);
+            let tolerance = 1.0e-12 * expected.abs().max(1.0);
+            assert!(
+                (calculated - expected).abs() <= tolerance,
+                "p={p}: calculated {calculated}, expected {expected}"
+            );
+        }
+    }
+
+    #[test]
+    fn inverse_cumulative_student_round_trips_monotone_and_symmetric() {
+        let round_trip = [
+            1.0e-10,
+            1.0e-8,
+            1.0e-6,
+            1.0e-4,
+            0.001,
+            0.01,
+            0.10,
+            0.25,
+            0.50,
+            0.75,
+            0.90,
+            0.99,
+            0.999,
+            1.0 - 1.0e-4,
+            1.0 - 1.0e-6,
+            1.0 - 1.0e-8,
+            1.0 - 1.0e-10,
+        ];
+        let symmetry = [1.0e-8, 1.0e-6, 1.0e-4, 0.001, 0.01, 0.10, 0.25];
+        for n in [3.0, 4.0, 5.0, 10.0, 30.0, 100.0] {
+            let dist = StudentT::new(n).unwrap();
+            let mut previous = Real::MIN;
+            for p in round_trip {
+                let x = q(&dist, p);
+                assert!(x > previous, "n={n}, p={p}: {x} <= {previous}");
+                previous = x;
+                assert_close(dist.cdf(x), p, 1.0e-8);
+            }
+            for p in symmetry {
+                let lower = q(&dist, p);
+                let upper = q(&dist, 1.0 - p);
+                let tolerance = 1.0e-8 * lower.abs().max(upper.abs()).max(1.0);
+                assert!(
+                    (lower + upper).abs() <= tolerance,
+                    "n={n}, p={p}: {lower} vs {upper}"
+                );
+            }
+        }
     }
 
     // VII. Construction validation.
