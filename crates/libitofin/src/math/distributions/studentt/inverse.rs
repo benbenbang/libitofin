@@ -245,6 +245,13 @@ mod tests {
             })
     }
 
+    /// Rows where Boost's exact `ν = 4` closed form cancels (`r - 4` as
+    /// `p -> 0.5`, about `4e-4` relative at `p = 0.5 + 1e-7`). They are held to
+    /// Boost parity by `four_dof_matches_boost_near_the_centre` instead.
+    fn four_dof_centre(nu: Real, p: Real) -> bool {
+        nu == 4.0 && (0.499..0.6).contains(&p)
+    }
+
     fn estimate(df: Real, u: Real) -> (Real, bool) {
         let dist = StudentT::new(df).unwrap();
         inverse_students_t(df, dist.ln_normalization, u).unwrap()
@@ -263,7 +270,9 @@ mod tests {
             assert!((two - expected).abs() <= 1e-12 * expected.abs().max(1.0));
         }
         assert_eq!(estimate(1.0, 0.5), (0.0, true));
-        for (nu, p, expected) in oracle().filter(|&(nu, p, _)| nu == 4.0 && p < 0.5) {
+        for (nu, p, expected) in
+            oracle().filter(|&(nu, p, _)| nu == 4.0 && p < 0.5 && !four_dof_centre(nu, p))
+        {
             let (x, exact) = estimate(nu, p);
             assert!(exact);
             assert!(
@@ -299,12 +308,31 @@ mod tests {
 
     #[test]
     fn quantile_matches_mpmath_table_to_1e_10_relative() {
-        for (nu, p, expected) in oracle() {
+        for (nu, p, expected) in oracle().filter(|&(nu, p, _)| !four_dof_centre(nu, p)) {
             let dist = StudentT::new(nu).unwrap();
             let x = dist.quantile(Probability::try_from(p).unwrap()).unwrap();
             assert!(
                 ((x - expected) / expected).abs() <= 1e-10,
                 "nu={nu}, p={p}: {x} vs {expected}"
+            );
+        }
+    }
+
+    /// Values from compiled Boost 1.92 `quantile(students_t(4), p)`
+    /// (`tests/fixtures/studentt_quantile/boost_nu4.cpp`), which v1.44 returns.
+    #[test]
+    fn four_dof_matches_boost_near_the_centre() {
+        let dist = StudentT::new(4.0).unwrap();
+        for (p, boost) in [
+            (0.499, -0.002_666_670_617_245_677),
+            (0.4999, -0.000_266_666_671_037_377_94),
+            (0.49999, -2.666_666_776_987_159e-5),
+            (0.5 + 1.0e-7, 2.665_600_749_850_022_6e-7),
+        ] {
+            let x = dist.quantile(Probability::try_from(p).unwrap()).unwrap();
+            assert!(
+                ((x - boost) / boost).abs() <= 1e-12,
+                "p={p}: {x} vs {boost}"
             );
         }
     }

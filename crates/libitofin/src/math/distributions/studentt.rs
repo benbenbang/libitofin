@@ -107,18 +107,24 @@ impl Support for StudentT {
 }
 
 impl StudentT {
-    /// One Halley step on the forward cdf from a lower-tail estimate `t < 0`
-    /// at `u <= 0.5`, as Boost's `fast_students_t_quantile_imp`.
+    /// One Halley step on the cdf from a lower-tail estimate `t < 0` at
+    /// `u <= 0.5`, as Boost's `fast_students_t_quantile_imp`.
     ///
-    /// Boost evaluates the cdf as `ibeta(1/2, ν/2, y)` complemented when
-    /// `x >= y`; this always uses the forward [`incomplete_beta`] in `x`, the
-    /// same evaluation as [`Cdf::cdf`], and the pdf in place of Boost's ibeta
+    /// The residual `p0 = cdf(t) - u` is the forward `I_x(ν/2, 1/2) / 2 - u`
+    /// in `x = ν/(ν+t²)` when `y = t²/(ν+t²) >= 3/(ν+5)`, else, near the
+    /// centre where `I_y` is small and the forward form cancels,
+    /// `(0.5 - u) - I_y(1/2, ν/2) / 2`.
+    /// Boost switches at `x < y` and evaluates the complement
+    /// `f0 = 1 - I_y(1/2, ν/2)` to full precision inside its ibeta; this
+    /// [`incomplete_beta`] has no complemented entry point, so `p0 = f0/2 - u`
+    /// is rearranged to avoid the subtraction and used only where `I_y` is
+    /// small (Boost's switch would cancel in the large-`ν` tails, where
+    /// `t² < ν` but `I_y` is near `1`). The pdf stands in for Boost's ibeta
     /// derivative.
     ///
-    /// Like Boost's `x == 0` bail-out, the estimate is returned unrefined once
-    /// the density is subnormal (the deep tail, `|t|` past about `1e80` at
-    /// `ν = 3`), where the step would divide by zero; Hill's estimate there
-    /// already holds the cdf to about `1e-8` relative.
+    /// The step ratio `p0 / pdf(t)` is formed in log space, so it stays
+    /// defined where the density is subnormal (the deep tail); only Boost's
+    /// `x == 0` bail-out returns the estimate unrefined.
     fn halley_step(&self, t: Real, u: Real) -> QlResult<Real> {
         let nu = self.degrees_of_freedom;
         let t2 = t * t;
@@ -126,13 +132,15 @@ impl StudentT {
         if xb == 0.0 {
             return Ok(t);
         }
-        let p0 = 0.5 * incomplete_beta(0.5 * nu, 0.5, xb)? - u;
-        let p1 = self.pdf(t);
-        if !p1.is_normal() {
-            return Ok(t);
-        }
+        let y = t2 / (nu + t2);
+        let p0 = if y * (nu + 5.0) >= 3.0 {
+            0.5 * incomplete_beta(0.5 * nu, 0.5, xb)? - u
+        } else {
+            (0.5 - u) - 0.5 * incomplete_beta(0.5, 0.5 * nu, y)?
+        };
+        let r = p0.signum() * (p0.abs().ln() - self.ln_pdf(t)).exp();
         let p2 = t * (nu + 1.0) / (t2 + nu);
-        Ok(-(t.abs() + p0 / (p1 + p0 * p2 / 2.0)))
+        Ok(-(t.abs() + r / (1.0 + r * p2 / 2.0)))
     }
 
     /// Newton-Raphson from `x = 0` with QuantLib v1.43's defaults (accuracy
@@ -506,6 +514,38 @@ mod tests {
                     assert_close(dist.cdf(x) / p, 1.0, 1.0e-6);
                 }
             }
+        }
+    }
+
+    #[test]
+    fn deep_tail_quantiles_are_strictly_increasing_across_the_old_guard() {
+        let (lo, hi) = (1.0e-320_f64.ln(), 1.0e-200_f64.ln());
+        for nu in [3.0, 5.0, 10.0, 30.0, 100.0, 1000.0] {
+            let dist = StudentT::new(nu).unwrap();
+            let mut previous = Real::NEG_INFINITY;
+            for k in 0..200 {
+                let p = (lo + (hi - lo) * Real::from(k) / 199.0).exp();
+                let x = q(&dist, p);
+                assert!(x.is_finite() && x < 0.0, "nu={nu}, p={p}: {x}");
+                assert!(x > previous, "nu={nu}, p={p}: {x} <= {previous}");
+                previous = x;
+            }
+        }
+    }
+
+    #[test]
+    fn huge_dof_normal_quantile_holds_the_acklam_bound() {
+        let dist = StudentT::new(1.0e20).unwrap();
+        for (p, expected) in [
+            (1.0e-10, -6.361_340_902_404_057),
+            (0.01, -2.326_347_874_040_841),
+            (0.3, -0.524_400_512_708_040_8),
+        ] {
+            let x = q(&dist, p);
+            assert!(
+                ((x - expected) / expected).abs() <= 1.15e-9,
+                "p={p}: {x} vs {expected}"
+            );
         }
     }
 
